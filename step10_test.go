@@ -179,7 +179,7 @@ func TestChainReadsCommitted(t *testing.T) {
 	s.write(prices, clean, "restore it")
 	// import accepts prices now, so the update runs the cells past it, and
 	// their committed files are no orphans: the advice keeps them.
-	keep := "\nimport accepts the case now, so FIXTURE_UPDATE_GOLDEN=1 go test ./... reruns it and runs the cell. Delete nothing by hand."
+	keep := "\nimport accepts the case now, so FIXTURE_UPDATE_GOLDEN=1 go test ./... reruns it and runs evaluate. Delete nothing by hand."
 	for _, outcome := range []string{"rejected", "panicked"} {
 		s.edit(prices, "import's committed outcome is "+outcome, set("out/import/outcome", outcome+"\n"))
 		r := s.normal("chain")
@@ -698,6 +698,15 @@ func TestChainShared(t *testing.T) {
 	s.fails(s.normal("chain-a"), "via/import/quote/B1 differs (-golden +got):\n- =A1*3\n+ =A1*2")
 	b = s.run("b", "chain-b", false)
 	s.fails(b, "out/list/files.txt differs (-golden +got):", "- quote/B1 \"=A1*2\\n\"\n+ quote/B1 \"=A1*3\\n\"")
+	s.lacks(b, "import ran")
+	s.write(prices, clean, "restore it")
+
+	// b doesn't run import in a normal run, so it can't tell whether
+	// import accepts prices now, and its advice keeps the files of its
+	// cells that import's missing outcome blocks.
+	s.edit(prices, "import's cell has no committed outcome", drop("out/import/outcome"))
+	b = s.run("b", "chain-b", false)
+	s.fails(b, "out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.\nOnly the package that owns import runs it in a normal run, so this one can't tell whether import accepts the case now. Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which reruns it, and delete nothing by hand before it has.")
 	s.lacks(b, "import ran")
 	s.write(prices, clean, "restore it")
 
