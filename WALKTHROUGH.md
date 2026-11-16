@@ -1102,15 +1102,17 @@ check, the properties it registers, and `evaluate`: the type it consumes,
   `_test.go` counts, whatever it holds, but one whose name starts with `_`
   or `.`, which Go ignores. The check counts none of the registry's
   columns, lifts or transforms (steps 6 and 7) as owned, its lifts as
-  used, or the transforms its corpus types list as needing an owner,
-  though their sections stay claimed. A lift needs an owner when a package
-  with tests uses it, and a transform when a package with tests lists it
-  in a corpus type. One that needs an owner, and that only such packages
-  own, fails as owned by no package, and the failure names them. The
-  registry's root-package check, corpus types and properties still count
-  where the check compares registries, which is the stricter choice: a
-  second root-package check, or a corpus type or property that another
-  package declares differently, still fails.
+  used, or the transforms its corpus types list as needing an owner. The
+  sections of its suites, its owned lifts and its listed transforms stay
+  claimed, so the registry's own failure is the one that reports them. A
+  lift needs an owner when a package with tests uses it, and a transform
+  when a package with tests lists it in a corpus type. One that needs an
+  owner, and that only such packages own, fails as owned by no package,
+  and the failure names them. The registry's root-package check, corpus
+  types and properties still count where the check compares registries,
+  which is the stricter choice: a second root-package check, or a corpus
+  type or property that another package declares differently, still
+  fails.
 - In a normal run, every package's run over a corpus root fails when no
   registry records a root-package check for that root.
 
