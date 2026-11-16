@@ -1,0 +1,57 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # variants
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/echo
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/echo
+            --- PASS: TestCorpus/script/twice/variant/more
+                --- PASS: TestCorpus/script/twice/variant/more/echo
+PASS
+$ edit testdata/script/twice.txtar  # mark more's cell, and change what it prints
+$ go test  # variants
+    script/twice/variant/more: The do/ tree gains a second output.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, variant/more/gaps line 1: "echo b1 is three, in digits. Waits on sheets#3."
+        Its committed files record today's behavior, and the run now produces different ones:
+        variant/more/out/echo/b.txt differs (-committed +got):
+        - b1 three
+        + b1 3
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/echo
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/echo
+            --- FAIL: TestCorpus/script/twice/variant/more
+                --- FAIL: TestCorpus/script/twice/variant/more/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # variants
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/twice/variant/more: The do/ tree gains a second output.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, variant/more/gaps line 1: "echo b1 is three, in digits. Waits on sheets#3."
+        Its committed files record today's behavior, and the run now produces different ones:
+        variant/more/out/echo/b.txt differs (-committed +got):
+        - b1 three
+        + b1 3
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/echo
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/echo
+            --- FAIL: TestCorpus/script/twice/variant/more
+                --- FAIL: TestCorpus/script/twice/variant/more/echo
+FAIL
+[exit 1]

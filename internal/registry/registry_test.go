@@ -23,7 +23,10 @@ func TestParse(t *testing.T) {
 	now := Registry{
 		UpdateVar: "X", CorpusRoot: ".",
 		IssueLinks: []IssueLink{{Pattern: `sheets#(\d+)`, URL: "https://example.com/$1"}},
-		Types:      []Type{{Dir: "sheet", Description: "A sheet.", GoType: "example.com/m.Sheet"}},
+		Types: []Type{{Dir: "sheet", Description: "A sheet.", GoType: "example.com/m.Sheet", Transforms: []Transform{
+			{Name: "renamed", Description: "Moves.", Gives: []string{}, Keeps: []string{"dangling", "circular"}, Probe: true},
+			{Name: "looped", Description: "Loops.", Gives: []string{"circular"}, Owned: true},
+		}}},
 		Suites: []Suite{{
 			Name: "calc", Description: "Runs calc.", Consumes: RawInput, Corpora: []string{"sheet"},
 			Outputs: []Output{{Pattern: "stdout.txt", Description: "What it prints."}}, Rejects: []string{"circular"},
@@ -35,6 +38,10 @@ func TestParse(t *testing.T) {
 	}
 	if !bytes.Equal(got.Marshal(), now.Marshal()) {
 		t.Errorf("format %d read back as\n%s\nwant\n%s", Format, got.Marshal(), now.Marshal())
+	}
+	// Marshal sorts the transforms by name, and their properties.
+	if trs := got.Types[0].Transforms; trs[0].Name != "looped" || !slices.Equal(trs[1].Keeps, []string{"circular", "dangling"}) || trs[0].Keeps == nil {
+		t.Errorf("the transforms are written as %+v", trs)
 	}
 
 	for _, data := range []string{olderData, fmt.Sprintf(`{"format": %d}`, Format+1)} {
@@ -116,5 +123,27 @@ func TestFindFS(t *testing.T) {
 	}
 	if want := []string{".", "a", "a/b"}; !slices.Equal(got, want) {
 		t.Errorf("FindFS = %q, want %q", got, want)
+	}
+}
+
+// TestVariantProperties: a transform's variant states what the transform
+// gives, then what it keeps that the base states, in the base's order; a
+// base that states a property the transform neither gives nor keeps is
+// declined, and its variant states nothing.
+func TestVariantProperties(t *testing.T) {
+	for _, c := range []struct {
+		name                   string
+		gives, keeps, base     []string
+		wantProps, wantNeither []string
+	}{
+		{name: "gives", gives: []string{"circular"}, wantProps: []string{"circular"}},
+		{name: "keeps in the base's order", gives: []string{"x"}, keeps: []string{"b", "a", "c"}, base: []string{"a", "b"}, wantProps: []string{"x", "a", "b"}},
+		{name: "a given property the base states", gives: []string{"a"}, keeps: []string{"b"}, base: []string{"b", "a"}, wantProps: []string{"a", "b"}},
+		{name: "declines", gives: []string{"circular"}, keeps: []string{"a"}, base: []string{"a", "dangling", "z"}, wantNeither: []string{"dangling", "z"}},
+	} {
+		props, neither := VariantProperties(c.gives, c.keeps, c.base)
+		if !slices.Equal(props, c.wantProps) || !slices.Equal(neither, c.wantNeither) {
+			t.Errorf("%s: VariantProperties = %q, %q, want %q, %q", c.name, props, neither, c.wantProps, c.wantNeither)
+		}
 	}
 }

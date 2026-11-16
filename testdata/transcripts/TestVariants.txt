@@ -1,0 +1,83 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # variants
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/echo
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/echo
+            --- PASS: TestCorpus/script/twice/variant/more
+                --- PASS: TestCorpus/script/twice/variant/more/echo
+PASS
+$ cat testdata/script/twice.txtar
+A1 is twice B1, which echo prints in words.
+-- in/do/out/values.txt --
+a1 six
+-- out/echo/values.txt --
+a1 six
+-- variant/cycle/about --
+The do/ tree errs, as on a cycle.
+-- variant/cycle/properties --
+circular
+-- variant/cycle/in/do/error --
+A1 -> B1 -> A1: cycle
+-- variant/cycle/out/echo/error.txt --
+A1 -> B1 -> A1: cycle
+-- variant/cycle/out/echo/values.txt --
+a1 six
+-- variant/blank/about --
+The do/ tree's output is gone, so echo prints nothing.
+-- variant/blank/delete --
+do/out/values.txt
+-- variant/more/about --
+The do/ tree gains a second output.
+-- variant/more/in/do/out/b.txt --
+b1 three
+-- variant/more/out/echo/b.txt --
+b1 three
+-- variant/more/out/echo/values.txt --
+a1 six
+$ go test  # variants
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/echo
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/echo
+            --- PASS: TestCorpus/script/twice/variant/more
+                --- PASS: TestCorpus/script/twice/variant/more/echo
+PASS
+$ go test -run=TestCorpus/script/twice/variant/cycle/echo  # variants
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/echo
+PASS
+$ edit testdata/script/twice.txtar  # move cycle's properties to the base
+$ go test  # variants
+    script/twice: A1 is twice B1, which echo prints in words.
+        echo: Does what the case's do/ tree says.
+        echo returned no error, but the case states circular, which echo rejects.
+        Fix the code, or correct the case's properties or echo's Rejects.
+    script/twice/variant/cycle: The do/ tree errs, as on a cycle.
+        echo: Does what the case's do/ tree says.
+        echo returned an error, but the case states no property echo rejects:
+          A1 -> B1 -> A1: cycle
+        Fix the code, or state the property on the case and in echo's Rejects.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- FAIL: TestCorpus/script/twice/echo
+            --- FAIL: TestCorpus/script/twice/variant/cycle
+                --- FAIL: TestCorpus/script/twice/variant/cycle/echo
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/echo
+            --- PASS: TestCorpus/script/twice/variant/more
+                --- PASS: TestCorpus/script/twice/variant/more/echo
+FAIL
+[exit 1]

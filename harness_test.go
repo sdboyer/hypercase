@@ -50,6 +50,9 @@ func init() {
 		register, ok = rawRegistrations[name]
 	}
 	if !ok {
+		register, ok = transformRegistrations[name]
+	}
+	if !ok {
 		panic("selftest: no registration named " + name)
 	}
 	register()

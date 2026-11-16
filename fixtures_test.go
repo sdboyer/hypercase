@@ -323,6 +323,7 @@ var registrations = map[string]func(){
 	"pkg-a-circular": func() { hypercase.Register(project, rootPkg, circular, scriptType, own(echo)) },
 	"pkg-b":          func() { hypercase.Register(project, scriptType, own(shout)) },
 	"pkg-b-gone":     func() { hypercase.Register(project) },
+	"root-only":      func() { hypercase.Register(project, rootPkg) },
 	"pkg-b-echo":     func() { hypercase.Register(project, scriptType, own(withName(shout, "echo"))) },
 	"pkg-b-circular": func() { hypercase.Register(project, circular, scriptType, own(withRejects(shout, circular))) },
 	"pkg-b-loop":     func() { hypercase.Register(project, loop, scriptType, own(withRejects(shout, loop))) },
@@ -411,6 +412,10 @@ var fixturePackages = map[string][]fixturePkg{
 	"shared-ladder": {{".", "ladder-a"}, {"b", "ladder-b"}},
 	"no-archive":    {{".", "lift-only"}},
 	"no-product":    {{".", "picked"}},
+
+	"variants":           {{".", "variants"}},
+	"transforms":         {{".", "transforms"}},
+	"transform-failures": {{".", "poke"}},
 }
 
 type fixturePkg struct{ dir, registration string }

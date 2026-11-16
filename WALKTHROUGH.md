@@ -949,7 +949,7 @@ check, the properties it registers, and `evaluate`: the type it consumes,
 <!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 3,
+  "format": 4,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
@@ -1097,6 +1097,25 @@ check, the properties it registers, and `evaluate`: the type it consumes,
   - a directory under `testdata/` that holds archives and that no registry
     declares.
 - A declared directory that doesn't exist yet is fine.
+- A package whose directory holds no `_test.go` file owns and uses
+  nothing, whatever its registry records. Any file whose name ends in
+  `_test.go` counts, whatever it holds, but one whose name starts with `_`
+  or `.`, which Go ignores. The check reads names, not build constraints,
+  so a package whose only test file a constraint excludes counts as
+  tested, and the result doesn't depend on the environment the check
+  runs in. The check counts none of the registry's columns, lifts or
+  transforms (steps 6 and 7) as owned, its lifts as used, or the
+  transforms its corpus types list as needing an owner. The sections of
+  its suites, its owned lifts and its listed transforms stay claimed, so
+  the registry's own failure is the one that reports them. A lift needs
+  an owner when a package with tests uses it, and a transform when a
+  package with tests lists it in a corpus type. One that needs an owner,
+  and that only such packages own, fails as owned by no package, and the
+  failure names them. The registry's root-package check, corpus
+  types and properties still count where the check compares registries,
+  which is the stricter choice: a second root-package check, or a corpus
+  type or property that another package declares differently, still
+  fails.
 - In a normal run, every package's run over a corpus root fails when no
   registry records a root-package check for that root.
 
@@ -1429,8 +1448,10 @@ package owns every column it registers.
   in process. A package that uses a lift neither writes nor judges the
   lift's sections.
 - The root-package check fails on a column two packages own, in place of
-  step 5's column two packages register, and on a lift that packages use
-  and none owns.
+  step 5's column two packages register, and on a lift that a package
+  with tests uses and none owns (step 5's rule for packages with no
+  tests). A suite named like the lift owns no lift, and the check fails on
+  the two as a collision, since lifts share the suites' column names.
 
 **Blocked cells.**
 
@@ -1642,18 +1663,46 @@ whether each has a probe, and whether the package owns it.
   and keeps `circular` and `dangling`, so it runs over bases that state
   either; a base that states `malformed` is declined.
 - It is materialized. An update writes `transform/<name>/in/…` and
-  `transform/<name>/delete`, and a normal run checks them like goldens. In a
-  normal run the variant's cells read the committed sections.
+  `transform/<name>/delete`, and the owner's normal run checks them like
+  goldens.
+- Every package's update runs the variant's cells on what the transform
+  makes, and every normal run on the committed sections. What an update
+  writes depends only on the inputs and the code, so one pass of the
+  module's update settles, whichever package runs first. A frozen cell is
+  the exception: no update writes it. When a transform's change moves its
+  output, every update of the package that owns its column fails on it,
+  and so does each of that package's normal runs once the transform's
+  owner has rewritten the inputs. Before then, the cell reads the old
+  inputs, and that package's run of the frozen cell passes, while the
+  transform owner's normal run fails on the inputs, which differ from
+  what the transform makes. It fails until a person deletes its files or
+  removes its `gaps` line, and then the package that owns its column runs
+  its update, which writes the cell. Until then, that package's normal
+  run still fails on it, since no other package's update writes it.
+- The update of a package that doesn't own the transform, alone, after the
+  transform changed, writes the variant's cells on what the transform
+  makes, while its normal run reads the sections the owner has yet to
+  rewrite. A cell whose output on those sections differs from what the
+  update wrote fails, and the failure shows how the sections differ from
+  what the transform makes, and names the module's update.
 - An update replaces a transform's `in/…` and `delete` whole: a file the
   transform no longer produces is removed, and the removal shows in the diff.
-- When a transform no longer applies to a base, its owner's update removes
-  its `in/…` and `delete`, and what remains under `transform/<name>/out/` is
+- When a transform no longer applies to a base, no cell runs on its
+  variant. Its owner's normal run fails on any `in/…` and `delete` the
+  archive still holds for it, whether or not they make an input view, and
+  its update removes them. What remains under `transform/<name>/out/` is
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
   root-package check reports them and names the strip command.
-- The package that owns a transform writes and judges its `in/…` and
-  `delete`. Each column's owner writes and judges that column's cells on the
-  variant.
+- The root-package check fails on a transform that a package with tests
+  lists in a corpus type and no package owns (step 5's rule for packages
+  with no tests), and on one that two own.
+- The package that owns a transform writes its `in/…` and `delete`, and
+  judges them against what the transform makes. When the transform makes
+  the variant, every package's normal run fails it if its committed `in/…`
+  and `delete` make no input view, such as an empty `delete` or one that
+  lists a path twice, and runs none of its cells. Each column's owner
+  writes and judges that column's cells on the variant.
 
 **Known gaps in a transform's variant.** A known gap in a cell of a
 transform's variant is a line in the base's `gaps` section that names the

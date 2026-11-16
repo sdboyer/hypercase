@@ -96,15 +96,19 @@ var topLevel = map[string]bool{
 	Via:        false,
 	Properties: true,
 	Gaps:       true,
-	Variant:    false,
-	Transform:  false,
+	Variant:    true,
+	Transform:  true,
 }
 
 // HandWritten reports whether a section of the given name is written by a
 // person and never touched by an update. The answer depends on the name
 // alone.
 func HandWritten(name string) bool {
-	top, _, _ := strings.Cut(name, "/")
+	kind, _, rest := SplitCase(name)
+	if kind == Transform {
+		return false
+	}
+	top, _, _ := strings.Cut(rest, "/")
 	switch top {
 	case Out, Via:
 		return false
@@ -158,34 +162,55 @@ func (a *Archive) Check() []Problem {
 		}
 		switch top {
 		case In:
-			tree, file, _ := strings.Cut(rest, "/")
-			switch {
-			case file == "":
-				ps = append(ps, Problem{Section: s.Name, Msg: "an input belongs in a tree, as in/<tree>/<file>"})
-			case tree == ParamsTree:
-				ps = append(ps, Problem{Section: s.Name, Msg: "the tree name params is reserved: a column's parameters are fixed in Go, or derived from the archive's name, and an archive carries none"})
-			}
+			ps = append(ps, checkIn(s.Name, rest)...)
 		case Out:
-			col, file, _ := strings.Cut(rest, "/")
-			if col == "" || file == "" {
-				ps = append(ps, Problem{Section: s.Name, Msg: "an output belongs under its column, as out/<column>/<file>"})
-			}
+			ps = append(ps, checkOut(s.Name, rest)...)
 		case Properties, Gaps:
 			if rest != "" {
 				ps = append(ps, Problem{Section: s.Name, Msg: fmt.Sprintf("%s is one section, with nothing below it", top)})
 				continue
 			}
 			if top == Properties {
-				_, lps := ParseProperties(s.Data)
+				_, lps := ParsePropertiesIn(s.Name, s.Data)
 				ps = append(ps, lps...)
 			} else {
-				_, lps := ParseGaps(s.Data)
+				_, lps := ParseGapsIn(s.Name, s.Data)
 				ps = append(ps, lps...)
 			}
+		case Variant, Transform:
+			kind, name, vrest := SplitCase(s.Name)
+			ps = append(ps, checkVariant(s, kind, name, vrest)...)
 		}
 	}
 	ps = append(ps, Conflicts(names)...)
+	if len(ps) == 0 {
+		ps = a.checkVariants()
+	}
 	return ps
+}
+
+// checkIn reports the problems of an input's name: section is the whole
+// name, and rest its part below in/.
+func checkIn(section, rest string) []Problem {
+	tree, file, _ := strings.Cut(rest, "/")
+	prefix := strings.TrimSuffix(section, rest)
+	switch {
+	case file == "":
+		return []Problem{{Section: section, Msg: fmt.Sprintf("an input belongs in a tree, as %s<tree>/<file>", prefix)}}
+	case tree == ParamsTree:
+		return []Problem{{Section: section, Msg: "the tree name params is reserved: a column's parameters are fixed in Go, or derived from the archive's name, and an archive carries none"}}
+	}
+	return nil
+}
+
+// checkOut reports the problems of an output's name: section is the whole
+// name, and rest its part below out/.
+func checkOut(section, rest string) []Problem {
+	col, file, _ := strings.Cut(rest, "/")
+	if col == "" || file == "" {
+		return []Problem{{Section: section, Msg: fmt.Sprintf("an output belongs under its column, as %s<column>/<file>", strings.TrimSuffix(section, rest))}}
+	}
+	return nil
 }
 
 func topLevelList() string {
@@ -258,17 +283,10 @@ func keyValue(line string) bool {
 	return true
 }
 
-// View returns the case's input view: every section under in/, with the
-// prefix removed.
-func (a *Archive) View() fs.FS {
-	files := map[string][]byte{}
-	for _, s := range a.Sections {
-		if rest, ok := strings.CutPrefix(s.Name, In+"/"); ok {
-			files[rest] = s.Data
-		}
-	}
-	return NewFS(files)
-}
+// View returns the base's input view: every section under in/, with the
+// prefix removed. It reads the base, as [Archive.Base] does; read the Base
+// once to make the views of the base and its variants.
+func (a *Archive) View() fs.FS { return a.Base().View() }
 
 // HandWrittenSections returns the archive's hand-written sections, in the
 // order the file holds them.
@@ -282,28 +300,67 @@ func (a *Archive) HandWrittenSections() []Section {
 	return hs
 }
 
-// Place returns the archive with every update-written section in its place:
-// the hand-written sections in the order written, then via/ and out/, each
-// sorted by name. Where a section goes depends only on names and on the
-// hand-written sections, never on where it sat.
+// Place returns the archive with every update-written section in its place.
+// The base comes first: its hand-written sections in the order written,
+// then via/ and out/, each sorted by name. Each hand-written variant
+// follows, in the order written, laid out the same way. Each transform's
+// variant comes last, by the transform's name: in/ sorted by name, then
+// delete, then via/ and out/, each sorted by name. Where a section goes
+// depends only on names and on the hand-written sections, never on where it
+// sat.
 func (a *Archive) Place() *Archive {
-	p := &Archive{Comment: a.Comment}
-	var via, out []Section
+	type group struct{ hand, in, del, via, out []Section }
+	groups := map[string]*group{}
+	var transforms []string
 	for _, s := range a.Sections {
-		switch top, _, _ := strings.Cut(s.Name, "/"); {
+		kind, name, rest := SplitCase(s.Name)
+		c := ""
+		if kind != "" {
+			c = kind + "/" + name
+		}
+		g := groups[c]
+		if g == nil {
+			g = &group{}
+			groups[c] = g
+			if kind == Transform {
+				transforms = append(transforms, c)
+			}
+		}
+		top, _, _ := strings.Cut(rest, "/")
+		switch {
+		case HandWritten(s.Name):
+			g.hand = append(g.hand, s)
+		case top == In:
+			g.in = append(g.in, s)
+		case rest == Delete:
+			g.del = append(g.del, s)
 		case top == Via:
-			via = append(via, s)
-		case top == Out:
-			out = append(out, s)
+			g.via = append(g.via, s)
 		default:
-			p.Sections = append(p.Sections, s)
+			g.out = append(g.out, s)
 		}
 	}
+	order := []string{""}
+	for _, n := range a.variantOrder() {
+		order = append(order, Variant+"/"+n)
+	}
+	slices.Sort(transforms)
+	order = append(order, transforms...)
+
+	p := &Archive{Comment: a.Comment}
 	byName := func(a, b Section) int { return strings.Compare(a.Name, b.Name) }
-	slices.SortStableFunc(via, byName)
-	slices.SortStableFunc(out, byName)
-	p.Sections = append(p.Sections, via...)
-	p.Sections = append(p.Sections, out...)
+	for _, c := range order {
+		g := groups[c]
+		if g == nil {
+			continue
+		}
+		for _, ss := range [][]Section{g.in, g.via, g.out} {
+			slices.SortStableFunc(ss, byName)
+		}
+		for _, ss := range [][]Section{g.hand, g.in, g.del, g.via, g.out} {
+			p.Sections = append(p.Sections, ss...)
+		}
+	}
 	return p
 }
 

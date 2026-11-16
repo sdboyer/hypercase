@@ -23,7 +23,7 @@ import (
 
 // Format is the version of what a registry holds. It changes on any change
 // to that.
-const Format = 3
+const Format = 4
 
 // Name is a registry's file name, in its package's testdata/ directory.
 const Name = "hypercase.json"
@@ -69,7 +69,46 @@ type Type struct {
 	Dir         string `json:"dir"`
 	Description string `json:"description"`
 	// GoType is the Go type, by its package's import path and its name.
-	GoType string `json:"goType"`
+	GoType     string      `json:"goType"`
+	Transforms []Transform `json:"transforms"`
+}
+
+// A Transform is one of a corpus type's transforms.
+type Transform struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// Gives and Keeps name the properties the transform gives and keeps, so
+	// a tool computes its variants' properties without running anything.
+	Gives []string `json:"gives"`
+	Keeps []string `json:"keeps"`
+	// Probe records that the transform has a probe.
+	Probe bool `json:"probe"`
+	// Owned records that the package owns the transform, and writes and
+	// judges its variants' inputs.
+	Owned bool `json:"owned"`
+}
+
+// VariantProperties returns what a transform's variant of a base that
+// states base states: what the transform gives, then each property it
+// keeps that the base states, in the base's order. A transform declines a
+// base that states a property it neither gives nor keeps: neither lists
+// those, and the variant, which isn't made, states nothing.
+func VariantProperties(gives, keeps, base []string) (props, neither []string) {
+	props = slices.Clone(gives)
+	for _, p := range base {
+		switch {
+		case slices.Contains(keeps, p):
+			if !slices.Contains(props, p) {
+				props = append(props, p)
+			}
+		case !slices.Contains(gives, p):
+			neither = append(neither, p)
+		}
+	}
+	if len(neither) > 0 {
+		return nil, neither
+	}
+	return props, nil
 }
 
 // A Lift is a registered lift, which the package owns or only uses.
@@ -117,7 +156,18 @@ func (r Registry) Marshal() []byte {
 	r.Format = Format
 	r.IssueLinks = sorted(r.IssueLinks, func(l IssueLink) string { return l.Pattern + "\x00" + l.URL })
 	r.Properties = sorted(r.Properties, func(p Property) string { return p.Name })
-	r.Types = sorted(r.Types, func(t Type) string { return t.Dir })
+	types := sorted(r.Types, func(t Type) string { return t.Dir })
+	for i, t := range types {
+		trs := sorted(t.Transforms, func(tr Transform) string { return tr.Name })
+		for j, tr := range trs {
+			tr.Gives = sorted(tr.Gives, func(n string) string { return n })
+			tr.Keeps = sorted(tr.Keeps, func(n string) string { return n })
+			trs[j] = tr
+		}
+		t.Transforms = trs
+		types[i] = t
+	}
+	r.Types = types
 	lifts := sorted(r.Lifts, func(l Lift) string { return l.Name })
 	for i, l := range lifts {
 		l.Corpora = sorted(l.Corpora, func(n string) string { return n })

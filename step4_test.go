@@ -122,7 +122,8 @@ func TestGapsForm(t *testing.T) {
 		"gaps, line 2: the column's name is followed by more than one space",
 		"gaps, line 3: the line is blank",
 		"gaps, line 5: lines 4 and 5 both mark the cell of echo",
-		`gaps, line 6: the line starts with "transform/looped", which is not a column's name`,
+		`gaps, line 6: the line starts with "transform/Looped", which is not transform/<name> for a transform's name`,
+		"gaps, line 7: the line names transform/looped echo and has no text",
 		"testdata/script/empty.txtar has problems of form",
 		"gaps: the section is empty",
 	}
@@ -245,7 +246,7 @@ func TestRejectsRelations(t *testing.T) {
 	r := s.normal("rejects-unregistered")
 	s.fails(r, "the suite echo rejects circular, and the package registers no property of that name.\nRegister the property, or remove it from echo's Rejects.", "No case runs until the registrations agree.")
 	s.lacks(r, "TestCorpus/script/loop")
-	s.fails(s.normal("rejects-other-description"), "the suite echo rejects a property named circular, which the package registers with another description.")
+	s.fails(s.normal("rejects-other-description"), "the suite echo rejects a property named circular, which the package registers with another description.\n    Keep one declaration of circular, with one description: register it, and list it in echo's Rejects.")
 	// A property registered in a later Register call, as from a file
 	// initialized after the suite's, is accepted.
 	s.contains(s.normal("rejects-registered-later"), "--- PASS: TestCorpus/script/loop/echo")

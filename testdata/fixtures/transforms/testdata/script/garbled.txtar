@@ -1,0 +1,5 @@
+A case that states malformed, which no transform gives or keeps.
+-- in/do/out/values.txt --
+x
+-- properties --
+malformed

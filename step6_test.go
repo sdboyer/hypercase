@@ -277,7 +277,7 @@ func TestLiftRefusals(t *testing.T) {
 		{"own-and-use-calls", "panic: hypercase: the lift parse is given to both hypercase.Own and hypercase.Use."},
 		{"bare-lift", "panic: hypercase: Register was given the lift parse. Pass it to hypercase.Own, in the package that owns its column, or to hypercase.Use, in a package that only reads its product."},
 		{"use-suite", "panic: hypercase: hypercase.Use was given the suite calc. It takes lifts only: a package runs only its own suites. Register the suite, or give it to hypercase.Own, in the package that runs it."},
-		{"own-other", "panic: hypercase: hypercase.Own was given a decl.Property. It takes the columns the package owns: hypercase.Suite and decl.Lift values."},
+		{"own-other", "panic: hypercase: hypercase.Own was given a decl.Property. It takes the columns the package owns, hypercase.Suite and decl.Lift values, and the transforms it owns, decl.Transform values."},
 	} {
 		r := s.normal(tt.reg)
 		s.fails(r, tt.want)

@@ -1,0 +1,183 @@
+$ edit b/corpus_test.go  # a package b over the corpus
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # poke
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/error/transform/poke: Adds do/out/p.txt.
+        poke failed on the base: poke: the base is too big
+        Fix its jenny, or make its probe decline such a base.
+    script/flat/transform/poke: Adds do/out/p.txt.
+        poke made a variant an archive can't hold:
+          transform/poke/in/flat: an input belongs in a tree, as transform/poke/in/<tree>/<file>
+        Fix its jenny: what it makes is the variant's whole input view, with the trees as its top-level directories.
+    script/marker/transform/poke: Adds do/out/p.txt.
+        poke made files an archive can't hold:
+          do/out/m.txt: its line 2 is shaped like a section marker, which starts another section when the archive is read
+        Fix its jenny.
+    script/nest/transform/poke: Adds do/out/p.txt.
+        poke made an input view no file tree holds: it holds tr/nest, and tr/nest/x below it.
+        Fix its jenny.
+    script/panic/transform/poke: Adds do/out/p.txt.
+        poke panicked on the base: boom
+        Fix its jenny.
+    script/probe-no/transform/poke: poke declines the base: the base is too small
+    script/probe-none/transform/poke: Adds do/out/p.txt.
+        poke's probe said the base isn't for it, and gave no reason.
+        Fix the probe: when it says no, it says why.
+    script/probe-panic/transform/poke: Adds do/out/p.txt.
+        poke's probe panicked on the base: probe boom
+        Fix the probe.
+    script/same/transform/poke: Adds do/out/p.txt.
+        poke made an input view equal to the base's. A variant changes the base.
+        Make its probe decline such a base.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/error
+            --- PASS: TestCorpus/script/error/echo
+            --- FAIL: TestCorpus/script/error/transform/poke
+        --- FAIL: TestCorpus/script/flat
+            --- PASS: TestCorpus/script/flat/echo
+            --- FAIL: TestCorpus/script/flat/transform/poke
+        --- FAIL: TestCorpus/script/marker
+            --- PASS: TestCorpus/script/marker/echo
+            --- FAIL: TestCorpus/script/marker/transform/poke
+        --- FAIL: TestCorpus/script/nest
+            --- PASS: TestCorpus/script/nest/echo
+            --- FAIL: TestCorpus/script/nest/transform/poke
+        --- FAIL: TestCorpus/script/panic
+            --- PASS: TestCorpus/script/panic/echo
+            --- FAIL: TestCorpus/script/panic/transform/poke
+        --- PASS: TestCorpus/script/probe-no
+            --- PASS: TestCorpus/script/probe-no/echo
+            --- SKIP: TestCorpus/script/probe-no/transform/poke
+        --- FAIL: TestCorpus/script/probe-none
+            --- PASS: TestCorpus/script/probe-none/echo
+            --- FAIL: TestCorpus/script/probe-none/transform/poke
+        --- FAIL: TestCorpus/script/probe-panic
+            --- PASS: TestCorpus/script/probe-panic/echo
+            --- FAIL: TestCorpus/script/probe-panic/transform/poke
+        --- FAIL: TestCorpus/script/same
+            --- PASS: TestCorpus/script/same/echo
+            --- FAIL: TestCorpus/script/same/transform/poke
+FAIL
+[exit 1]
+$ go test  # poke
+    script/error/transform/poke: Adds do/out/p.txt.
+        poke failed on the base: poke: the base is too big
+        Fix its jenny, or make its probe decline such a base.
+    script/flat/transform/poke: Adds do/out/p.txt.
+        poke made a variant an archive can't hold:
+          transform/poke/in/flat: an input belongs in a tree, as transform/poke/in/<tree>/<file>
+        Fix its jenny: what it makes is the variant's whole input view, with the trees as its top-level directories.
+    script/marker/transform/poke: Adds do/out/p.txt.
+        poke made files an archive can't hold:
+          do/out/m.txt: its line 2 is shaped like a section marker, which starts another section when the archive is read
+        Fix its jenny.
+    script/nest/transform/poke: Adds do/out/p.txt.
+        poke made an input view no file tree holds: it holds tr/nest, and tr/nest/x below it.
+        Fix its jenny.
+    script/panic/transform/poke: Adds do/out/p.txt.
+        poke panicked on the base: boom
+        Fix its jenny.
+    script/probe-no/transform/poke: poke declines the base: the base is too small
+    script/probe-none/transform/poke: Adds do/out/p.txt.
+        poke's probe said the base isn't for it, and gave no reason.
+        Fix the probe: when it says no, it says why.
+    script/probe-panic/transform/poke: Adds do/out/p.txt.
+        poke's probe panicked on the base: probe boom
+        Fix the probe.
+    script/same/transform/poke: Adds do/out/p.txt.
+        poke made an input view equal to the base's. A variant changes the base.
+        Make its probe decline such a base.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/error
+            --- PASS: TestCorpus/script/error/echo
+            --- FAIL: TestCorpus/script/error/transform/poke
+        --- FAIL: TestCorpus/script/flat
+            --- PASS: TestCorpus/script/flat/echo
+            --- FAIL: TestCorpus/script/flat/transform/poke
+        --- FAIL: TestCorpus/script/marker
+            --- PASS: TestCorpus/script/marker/echo
+            --- FAIL: TestCorpus/script/marker/transform/poke
+        --- FAIL: TestCorpus/script/nest
+            --- PASS: TestCorpus/script/nest/echo
+            --- FAIL: TestCorpus/script/nest/transform/poke
+        --- FAIL: TestCorpus/script/panic
+            --- PASS: TestCorpus/script/panic/echo
+            --- FAIL: TestCorpus/script/panic/transform/poke
+        --- PASS: TestCorpus/script/probe-no
+            --- PASS: TestCorpus/script/probe-no/echo
+            --- SKIP: TestCorpus/script/probe-no/transform/poke
+        --- FAIL: TestCorpus/script/probe-none
+            --- PASS: TestCorpus/script/probe-none/echo
+            --- FAIL: TestCorpus/script/probe-none/transform/poke
+        --- FAIL: TestCorpus/script/probe-panic
+            --- PASS: TestCorpus/script/probe-panic/echo
+            --- FAIL: TestCorpus/script/probe-panic/transform/poke
+        --- FAIL: TestCorpus/script/same
+            --- PASS: TestCorpus/script/same/echo
+            --- FAIL: TestCorpus/script/same/transform/poke
+FAIL
+[exit 1]
+$ cat testdata/script/error.txtar
+poke fails on the base.
+-- in/do/out/values.txt --
+x
+-- in/tr/error --
+the base is too big
+-- out/echo/values.txt --
+x
+$ cat testdata/script/same.txtar
+poke makes the base, unchanged.
+-- in/do/out/values.txt --
+x
+-- in/tr/same --
+-- out/echo/values.txt --
+x
+$ cat testdata/script/probe-no.txtar
+poke's probe says no, with a reason.
+-- in/do/out/values.txt --
+x
+-- in/tr/probe --
+the base is too small
+-- out/echo/values.txt --
+x
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # poke-b
+    script/error/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/flat/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/marker/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/nest/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/panic/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/probe-no/transform/poke: poke declines the base: the base is too small
+    script/probe-none/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/probe-panic/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/same/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/error
+            --- PASS: TestCorpus/script/error/copy
+            --- SKIP: TestCorpus/script/error/transform/poke
+        --- PASS: TestCorpus/script/flat
+            --- PASS: TestCorpus/script/flat/copy
+            --- SKIP: TestCorpus/script/flat/transform/poke
+        --- PASS: TestCorpus/script/marker
+            --- PASS: TestCorpus/script/marker/copy
+            --- SKIP: TestCorpus/script/marker/transform/poke
+        --- PASS: TestCorpus/script/nest
+            --- PASS: TestCorpus/script/nest/copy
+            --- SKIP: TestCorpus/script/nest/transform/poke
+        --- PASS: TestCorpus/script/panic
+            --- PASS: TestCorpus/script/panic/copy
+            --- SKIP: TestCorpus/script/panic/transform/poke
+        --- PASS: TestCorpus/script/probe-no
+            --- PASS: TestCorpus/script/probe-no/copy
+            --- SKIP: TestCorpus/script/probe-no/transform/poke
+        --- PASS: TestCorpus/script/probe-none
+            --- PASS: TestCorpus/script/probe-none/copy
+            --- SKIP: TestCorpus/script/probe-none/transform/poke
+        --- PASS: TestCorpus/script/probe-panic
+            --- PASS: TestCorpus/script/probe-panic/copy
+            --- SKIP: TestCorpus/script/probe-panic/transform/poke
+        --- PASS: TestCorpus/script/same
+            --- PASS: TestCorpus/script/same/copy
+            --- SKIP: TestCorpus/script/same/transform/poke
+PASS

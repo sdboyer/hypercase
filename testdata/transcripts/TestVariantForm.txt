@@ -1,0 +1,35 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # variants
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/echo
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/echo
+            --- PASS: TestCorpus/script/twice/variant/more
+                --- PASS: TestCorpus/script/twice/variant/more/echo
+PASS
+$ edit testdata/script/twice.txtar  # delete a path the base lacks, and split cycle's hand-written sections
+$ go test  # variants
+    testdata/script/twice.txtar has problems of form, so none of its cells run, and no update writes it:
+          variant/blank/delete, line 2: the base has no do/out/gone.txt to remove
+          variant/cycle/gaps: the section sits apart from variant/cycle's other hand-written sections; each case's hand-written sections sit together
+        Fix the archive by hand.
+    testdata/script/twice.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    the suite echo applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # variants
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    testdata/script/twice.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    the suite echo applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]

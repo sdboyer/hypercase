@@ -149,6 +149,7 @@ type corpusType struct {
 	description string
 	goType      reflect.Type
 	new         func(view fs.FS) any
+	transforms  []*transform
 }
 
 // A lift is a registered decl.Lift, owned or used.

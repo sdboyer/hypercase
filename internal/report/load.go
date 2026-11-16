@@ -23,10 +23,12 @@ type snapshot struct {
 	// columns holds each corpus's columns, by name.
 	columns map[string]map[string]string // corpus → column → description
 	props   map[string]string            // property → description
-	cases   map[caseKey]*caseAt
-	cells   map[cellKey]*cellAt
-	gaps    map[cellKey]string // the text of the gaps line that marks a cell
-	regs    int                // the registries over the corpus root
+	// transforms holds each corpus's transforms, by name.
+	transforms map[string]map[string]registry.Transform // corpus → transform → its declaration
+	cases      map[caseKey]*caseAt
+	cells      map[cellKey]*cellAt
+	gaps       map[cellKey]string // the text of the gaps line that marks a cell
+	regs       int                // the registries over the corpus root
 }
 
 // The kinds of case: the base, which an archive's in/ holds, and its
@@ -116,12 +118,13 @@ const outcomeFile = "outcome"
 // module there, and holds nothing.
 func load(rev Rev, tree fs.FS, mod, root string) (*snapshot, error) {
 	s := &snapshot{
-		rev:     rev,
-		columns: map[string]map[string]string{},
-		props:   map[string]string{},
-		cases:   map[caseKey]*caseAt{},
-		cells:   map[cellKey]*cellAt{},
-		gaps:    map[cellKey]string{},
+		rev:        rev,
+		columns:    map[string]map[string]string{},
+		props:      map[string]string{},
+		transforms: map[string]map[string]registry.Transform{},
+		cases:      map[caseKey]*caseAt{},
+		cells:      map[cellKey]*cellAt{},
+		gaps:       map[cellKey]string{},
 	}
 	if mod == "" {
 		return s, nil
@@ -149,6 +152,16 @@ func load(rev Rev, tree fs.FS, mod, root string) (*snapshot, error) {
 		for _, p := range g.Properties {
 			if _, ok := s.props[p.Name]; !ok {
 				s.props[p.Name] = p.Description
+			}
+		}
+		for _, ty := range g.Types {
+			if s.transforms[ty.Dir] == nil {
+				s.transforms[ty.Dir] = map[string]registry.Transform{}
+			}
+			for _, tr := range ty.Transforms {
+				if _, ok := s.transforms[ty.Dir][tr.Name]; !ok {
+					s.transforms[ty.Dir][tr.Name] = tr
+				}
 			}
 		}
 		addColumn := func(name, description string, corpora []string) {
@@ -229,130 +242,90 @@ func unreadable(p string, rev Rev, err error) error {
 }
 
 // addArchive reads one archive's cases and cells. It reads the sections
-// that say what a case is and what its cells hold, and fails on one of
-// them whose form it can't read.
+// that say what a case is and what its cells hold, with the archive
+// package's parsers, and fails on one of them whose form it can't read.
 func (s *snapshot) addArchive(corpus, name string, data []byte) error {
 	a := archive.Parse(data)
 	baseKey := caseKey{corpus: corpus, archive: name, kind: base}
 	s.cases[baseKey] = &caseAt{description: strings.TrimSpace(string(a.Comment))}
+	var transforms []caseKey // the archive's transforms' variants
 	seen := map[string]bool{}
 	for _, sec := range a.Sections {
 		if seen[sec.Name] {
 			return problem(sec.Name, 0, "the section appears twice")
 		}
 		seen[sec.Name] = true
-		top, rest, _ := strings.Cut(sec.Name, "/")
-		switch top {
-		case archive.Properties, archive.Gaps:
-			if rest != "" {
-				continue
+		kind, vname, rest := archive.SplitCase(sec.Name)
+		k := baseKey
+		if kind != "" {
+			if vname == "" || rest == "" {
+				return problem(sec.Name, 0, fmt.Sprintf("a variant's section belongs under its name, as %s/<name>/<section>", kind))
 			}
-			if err := s.addHandWritten(baseKey, sec.Name, top, sec.Data); err != nil {
-				return err
-			}
-		case archive.Out:
-			if err := s.addCellFile(baseKey, sec.Name, rest, sec.Data); err != nil {
-				return err
-			}
-		case archive.Variant, archive.Transform:
-			vname, vrest, _ := strings.Cut(rest, "/")
-			if vname == "" || vrest == "" {
-				return problem(sec.Name, 0, fmt.Sprintf("a variant's section belongs under its name, as %s/<name>/<section>", top))
-			}
-			k := caseKey{corpus: corpus, archive: name, kind: variant, name: vname}
-			if top == archive.Transform {
+			k = caseKey{corpus: corpus, archive: name, kind: variant, name: vname}
+			if kind == archive.Transform {
 				k.kind = transform
 			}
 			if s.cases[k] == nil {
 				s.cases[k] = &caseAt{}
-			}
-			vtop, vfile, _ := strings.Cut(vrest, "/")
-			switch {
-			case vtop == archive.Out:
-				if err := s.addCellFile(k, sec.Name, vfile, sec.Data); err != nil {
-					return err
-				}
-			case k.kind == variant && vrest == "about":
-				s.cases[k].description = strings.TrimSpace(string(sec.Data))
-			case k.kind == variant && (vrest == archive.Properties || vrest == archive.Gaps):
-				if err := s.addHandWritten(k, sec.Name, vrest, sec.Data); err != nil {
-					return err
+				if k.kind == transform {
+					transforms = append(transforms, k)
 				}
 			}
 		}
+		top, file, _ := strings.Cut(rest, "/")
+		switch {
+		case top == archive.Out:
+			if err := s.addCellFile(k, sec.Name, file, sec.Data); err != nil {
+				return err
+			}
+		case kind == archive.Transform:
+			// A transform's inputs; its description is in the registry.
+		case kind == archive.Variant && rest == archive.About:
+			s.cases[k].description = strings.TrimSpace(string(sec.Data))
+		case rest == archive.Properties:
+			names, ps := archive.ParsePropertiesIn(sec.Name, sec.Data)
+			if len(ps) > 0 {
+				return errors.New(ps[0].String())
+			}
+			s.cases[k].properties = names
+		case rest == archive.Gaps:
+			gaps, ps := archive.ParseGapsIn(sec.Name, sec.Data)
+			if len(ps) > 0 {
+				return errors.New(ps[0].String())
+			}
+			for _, g := range gaps {
+				ck := cellKey{c: k, column: g.Column}
+				if g.Transform != "" {
+					// The line is the base's, and marks a cell of the
+					// transform's variant, which is shown even where the
+					// variant has no sections.
+					ck.c = caseKey{corpus: corpus, archive: name, kind: transform, name: g.Transform}
+					if s.cases[ck.c] == nil {
+						s.cases[ck.c] = &caseAt{}
+						transforms = append(transforms, ck.c)
+					}
+				}
+				s.gaps[ck] = g.Text
+			}
+		}
+	}
+	for _, k := range transforms {
+		s.cases[k].properties = s.transformProperties(corpus, k.name, s.cases[baseKey].properties)
 	}
 	return nil
 }
 
-// addHandWritten reads a case's properties or gaps section.
-func (s *snapshot) addHandWritten(k caseKey, section, kind string, data []byte) error {
-	if kind == archive.Properties {
-		names, ps := archive.ParseProperties(data)
-		if len(ps) > 0 {
-			return problem(section, ps[0].Line, ps[0].Msg)
-		}
-		s.cases[k].properties = names
+// transformProperties returns what a transform's variant states, as the
+// registries declare the transform, by [registry.VariantProperties]. A
+// transform no registry declares gives its variant none, as does one that
+// declines the base.
+func (s *snapshot) transformProperties(corpus, name string, base []string) []string {
+	tr, ok := s.transforms[corpus][name]
+	if !ok {
 		return nil
 	}
-	lines, err := parseGaps(section, data, k.kind == base)
-	if err != nil {
-		return err
-	}
-	for _, g := range lines {
-		ck := cellKey{c: k, column: g.column}
-		if g.transform != "" {
-			// The line is the case's, even where the transform's variant
-			// has no sections, so the line is shown.
-			ck.c = caseKey{corpus: k.corpus, archive: k.archive, kind: transform, name: g.transform}
-			if s.cases[ck.c] == nil {
-				s.cases[ck.c] = &caseAt{}
-			}
-		}
-		s.gaps[ck] = g.text
-	}
-	return nil
-}
-
-type gapLine struct {
-	transform string // the transform whose variant's cell the line marks, or ""
-	column    string
-	text      string
-}
-
-// parseGaps parses a gaps section. Each line is read as archive.ParseGaps
-// reads it. A base's section may also hold lines that mark a cell of a
-// transform's variant: transform/<name>, one space, then such a line.
-func parseGaps(section string, data []byte, transforms bool) ([]gapLine, error) {
-	if len(data) == 0 {
-		_, ps := archive.ParseGaps(data)
-		return nil, problem(section, 0, ps[0].Msg)
-	}
-	var out []gapLine
-	seen := map[[2]string]int{}
-	for i, l := range strings.Split(strings.TrimSuffix(string(data), "\n"), "\n") {
-		n := i + 1
-		var g gapLine
-		rest := l
-		if head, r, ok := strings.Cut(l, " "); transforms && ok && strings.HasPrefix(head, archive.Transform+"/") {
-			g.transform = strings.TrimPrefix(head, archive.Transform+"/")
-			if !archive.ValidName(g.transform) {
-				return nil, problem(section, n, fmt.Sprintf("the line starts with %q, which names no transform", head))
-			}
-			rest = r
-		}
-		gs, ps := archive.ParseGaps([]byte(rest + "\n"))
-		if len(ps) > 0 {
-			return nil, problem(section, n, ps[0].Msg)
-		}
-		g.column, g.text = gs[0].Column, gs[0].Text
-		key := [2]string{g.transform, g.column}
-		if m := seen[key]; m > 0 {
-			return nil, problem(section, n, fmt.Sprintf("lines %d and %d both mark one cell", m, n))
-		}
-		seen[key] = n
-		out = append(out, g)
-	}
-	return out, nil
+	props, _ := registry.VariantProperties(tr.Gives, tr.Keeps, base)
+	return props
 }
 
 // addCellFile reads one file of a cell: rest is its path under out/, as

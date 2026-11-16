@@ -8,10 +8,31 @@ $ go test  # pkg-a
             --- PASS: TestCorpus/script/twice/echo
 FAIL
 [exit 1]
+$ edit b/_corpus_test.go  # a test file Go ignores, by its leading _
+$ edit b/.corpus_test.go  # a test file Go ignores, by its leading .
+$ go test  # pkg-a
+    b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ rm b/_corpus_test.go  # remove the file Go ignores
+$ rm b/.corpus_test.go  # remove the file Go ignores
+$ edit b/x_test.go  # a test file a build constraint excludes
+$ go test  # pkg-a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ rm b/x_test.go  # remove the excluded file
 $ edit b/corpus_test.go  # restore b's tests
 $ edit b/testdata/hypercase.json  # a registry from a later hypercase
 $ go test  # pkg-a
-    b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format 3.
+    b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format 4.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.
     testdata/script/twice.txtar: no registry claims out/shout/values.txt: no column named shout runs over the corpus script.
         If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.

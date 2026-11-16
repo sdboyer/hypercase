@@ -1,5 +1,5 @@
 {
-  "format": 3,
+  "format": 4,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,

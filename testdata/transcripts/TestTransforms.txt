@@ -1,0 +1,186 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # transforms
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+PASS
+$ cat testdata/script/twice.txtar
+echo prints a1 six.
+-- in/do/out/values.txt --
+a1 six
+-- out/echo/values.txt --
+a1 six
+-- transform/looped/in/do/error --
+A1 -> A1: cycle
+-- transform/looped/in/resolve/error --
+A1 -> A1: cycle
+-- transform/looped/out/echo/error.txt --
+A1 -> A1: cycle
+-- transform/looped/out/echo/values.txt --
+a1 six
+-- transform/upper/in/do/out/values.txt --
+A1 SIX
+-- transform/upper/out/echo/values.txt --
+A1 SIX
+$ cat testdata/script/errs.txtar
+echo errs on a cycle, and prints part of its values.
+-- in/do/error --
+A1 -> A1: cycle
+-- in/do/out/values.txt --
+partial
+-- properties --
+circular
+-- out/echo/error.txt --
+A1 -> A1: cycle
+-- out/echo/values.txt --
+partial
+-- transform/upper/in/do/out/values.txt --
+PARTIAL
+-- transform/upper/out/echo/error.txt --
+A1 -> A1: cycle
+-- transform/upper/out/echo/values.txt --
+PARTIAL
+$ cat testdata/script/garbled.txtar
+A case that states malformed, which no transform gives or keeps.
+-- in/do/out/values.txt --
+x
+-- properties --
+malformed
+-- out/echo/values.txt --
+x
+$ cat testdata/hypercase.json
+{
+  "format": 4,
+  "updateVar": "FIXTURE_UPDATE_GOLDEN",
+  "corpusRoot": ".",
+  "rootPackage": true,
+  "issueLinks": [],
+  "properties": [
+    {
+      "name": "circular",
+      "description": "Some cell's formula refers back to itself, directly or through other cells."
+    },
+    {
+      "name": "dangling",
+      "description": "Some formula refers to a cell the sheet doesn't have."
+    },
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    }
+  ],
+  "types": [
+    {
+      "dir": "script",
+      "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
+      "goType": "github.com/sdboyer/hypercase_test.Script",
+      "transforms": [
+        {
+          "name": "looped",
+          "description": "Adds do/error and resolve/error, so echo and resolve err as on a cycle.",
+          "gives": [
+            "circular"
+          ],
+          "keeps": [],
+          "probe": true,
+          "owned": true
+        },
+        {
+          "name": "upper",
+          "description": "Uppercases every file under do/out/.",
+          "gives": [],
+          "keeps": [
+            "circular",
+            "dangling"
+          ],
+          "probe": true,
+          "owned": true
+        }
+      ]
+    }
+  ],
+  "lifts": [],
+  "suites": [
+    {
+      "name": "echo",
+      "description": "Does what the case's do/ tree says.",
+      "consumes": "github.com/sdboyer/hypercase_test.Script",
+      "corpora": [
+        "script"
+      ],
+      "outputs": [
+        {
+          "pattern": "?.txt",
+          "description": "A file the case's instructions name with one letter."
+        },
+        {
+          "pattern": "archive.txt",
+          "description": "The archive's name, as the run received it."
+        },
+        {
+          "pattern": "dir.txt",
+          "description": "The path of a temp dir the run made."
+        },
+        {
+          "pattern": "error.txt",
+          "description": "The error the case's instructions give."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "What the case's instructions write to stderr."
+        },
+        {
+          "pattern": "stdout.txt",
+          "description": "What the case's instructions write to stdout."
+        },
+        {
+          "pattern": "values.txt",
+          "description": "The values the case's instructions give."
+        }
+      ],
+      "rejects": [
+        "circular",
+        "dangling"
+      ]
+    }
+  ]
+}
+$ go test  # transforms
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+PASS
