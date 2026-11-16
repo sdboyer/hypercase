@@ -238,16 +238,13 @@ func TestCreateNoPartialFile(t *testing.T) {
 }
 
 // TestCreateFailsPartWay: a Create whose write fails once the temp file is
-// written leaves neither the case nor the temp file, and removes the
-// directories it made for the case, and none it found: from an empty
-// corpus root, testdata/ and testdata/sheet/; with testdata/ there, only
-// testdata/sheet/; with both there, neither. The next Create completes.
+// written leaves neither the case nor the temp file, and keeps
+// testdata/sheet/, whether it made the directories or found them: from an
+// empty corpus root, with testdata/ there, and with both there. The next
+// Create completes.
 func TestCreateFailsPartWay(t *testing.T) {
-	for pre, want := range map[string][]string{
-		"":               nil,
-		"testdata":       {"testdata"},
-		"testdata/sheet": {"testdata", "testdata/sheet"},
-	} {
+	want := []string{"testdata", "testdata/sheet"}
+	for _, pre := range []string{"", "testdata", "testdata/sheet"} {
 		corp := newCorpus(t)
 		if pre != "" {
 			if err := os.MkdirAll(filepath.Join(corp.Dir(), pre), 0o755); err != nil {
@@ -275,17 +272,45 @@ func TestCreateFailsPartWay(t *testing.T) {
 	}
 }
 
-// TestCreateOpenFails: a Create whose temp file can't be opened, as when
-// its name is longer than the filesystem holds, leaves nothing under the
-// corpus root, the directories it made for the case included.
+// TestCreateOpenFails: a Create whose temp file can't be opened, here
+// because the temp file's name, longer than the case's, is longer than the
+// filesystem holds, writes no file, and keeps the directories it made.
 func TestCreateOpenFails(t *testing.T) {
 	corp := newCorpus(t)
 	name := strings.Repeat("a", 240)
 	_, err := Create(corp, project, sheetType, name, serialize(t, cells))
 	fails(t, err, "creating "+filepath.Join(corp.Dir(), "testdata", "sheet", name+".txtar")+": open ", "file name too long")
-	if got := dirs(t, corp.Dir()); len(got) > 0 {
-		t.Errorf("a Create that couldn't open its temp file left %q", got)
+	if got, want := dirs(t, corp.Dir()), []string{"testdata", "testdata/sheet"}; !slices.Equal(got, want) {
+		t.Errorf("a Create that couldn't open its temp file left %q, not %q", got, want)
 	}
+}
+
+// TestCreateFailsBesideAnother: a Create, A, that fails after another, B,
+// has run to the end in the directories A made leaves B's case as B
+// wrote it. A's hook runs B once A's temp file is written, then fails A.
+func TestCreateFailsBesideAnother(t *testing.T) {
+	corp := newCorpus(t)
+	ss := serialize(t, cells)
+	aTemp := ".hypercase-tmp-first.txtar-"
+	var bPath string
+	var bErr error
+	hooks.AfterTemp = func(tmp string) error {
+		if !strings.HasPrefix(filepath.Base(tmp), aTemp) {
+			return nil
+		}
+		bPath, bErr = Create(corp, project, sheetType, "second", ss)
+		return errors.New("the disk is full")
+	}
+	_, err := Create(corp, project, sheetType, "first", ss)
+	hooks.AfterTemp = nil
+	if bErr != nil || bPath == "" {
+		t.Fatalf("B, run from A's hook, failed: %v", bErr)
+	}
+	dir := filepath.Join(corp.Dir(), "testdata", "sheet")
+	fails(t, err, "creating "+filepath.Join(dir, "first.txtar")+": the disk is full.")
+	same(t, bPath, format(ss))
+	absent(t, filepath.Join(dir, "first.txtar"))
+	noTemps(t, dir)
 }
 
 // TestCreateAfterACrash: a Create cut short once its temp file is written,

@@ -1,6 +1,7 @@
 package hypercase_test
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"testing/fstest"
 
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/internal/hooks"
 	"github.com/sdboyer/hypercase/root"
 	"github.com/sdboyer/hypercase/snapshot"
 )
@@ -198,6 +200,48 @@ func TestSnapshotCorpusRoot(t *testing.T) {
 			s.done()
 		})
 	}
+}
+
+// TestSnapshotFailedCreate: a Create that fails once its temp file is
+// written keeps the directories it made, corp/testdata/ and
+// corp/testdata/script/, and a normal run reads the empty corpus
+// directory as it read the missing one: its output is the same.
+func TestSnapshotFailedCreate(t *testing.T) {
+	t.Setenv(fixtureUpdate, "")
+	s := newSandbox(t, "")
+	cmd := s.path("cmd/snapshot")
+	for _, d := range []string{cmd, s.path("corp")} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s.registers("corp-a")
+	if s.exists("corp/testdata") {
+		t.Fatal("corp/testdata/ exists before any Create")
+	}
+	s.note("a normal run, with no corp/testdata/")
+	missing := s.normal("corp-a")
+	corpus, err := root.Find(cmd, "corp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	hooks.AfterTemp = func(string) error { return errors.New("the disk is full") }
+	_, err = snapshot.Create(corpus, project, scriptType, "six", s.serialize(map[string]fs.FS{"do": fstest.MapFS{"out/values.txt": {Data: []byte("A1 6\n")}}}))
+	hooks.AfterTemp = nil
+	if err == nil {
+		t.Fatal("Create succeeded, and its write should fail")
+	}
+	s.note("snapshot.Create fails:\n%s", strings.TrimSuffix(s.normalize([]byte(err.Error())), "\n"))
+	entries, err := os.ReadDir(s.path("corp/testdata/script"))
+	if err != nil || len(entries) > 0 {
+		t.Fatalf("the failed Create left corp/testdata/script/ holding %v (%v), not empty", entries, err)
+	}
+	s.note("the failed Create keeps corp/testdata/script/, empty; a normal run")
+	empty := s.normal("corp-a")
+	if empty != missing {
+		t.Errorf("a run reads an empty corpus directory otherwise than a missing one:\n%s\nnot:\n%s", empty.out, missing.out)
+	}
+	s.done()
 }
 
 // mustRel returns target relative to base, which holds it, failing the

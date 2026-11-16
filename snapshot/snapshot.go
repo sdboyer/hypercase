@@ -138,8 +138,10 @@ func noCorpus(fn string) error {
 // process creates between a check and the write, and no reader sees part
 // of one. A write cut short leaves only a temp file, which blocks no later
 // Create, and which the root-package check reports. A write that fails
-// leaves no file, and removes the directories Create made for it, when
-// they are empty.
+// leaves no file, and keeps the directories Create made for it: a
+// concurrent Create may have found one, and removing it would fail that
+// write. A run reads an empty testdata/<typ.Dir>/ as it reads a missing
+// one.
 //
 // The comment is left empty, since the description is for a person to
 // write: until they do, the root-package check fails on the case, and an
@@ -181,17 +183,12 @@ func Create[T ~struct{ fs.FS }](c root.Corpus, project decl.Project, typ decl.Ty
 	if err != nil {
 		return "", fmt.Errorf("the sections for the case %s can't be written: %v.\nFix the section, or leave it out.", name, err)
 	}
-	made, err := mkdirs(dir, "testdata", typ.Dir)
-	if err != nil {
-		return "", err
+	corpusDir := filepath.Join(dir, "testdata", typ.Dir)
+	if err := os.MkdirAll(corpusDir, 0o755); err != nil {
+		return "", fmt.Errorf("creating %s: %v.\nFix what stopped it, and create the case again.", corpusDir, err)
 	}
-	path := filepath.Join(dir, "testdata", typ.Dir, name+".txtar")
+	path := filepath.Join(corpusDir, name+".txtar")
 	if err := archive.CreateFile(path, data); err != nil {
-		// Each directory Create made is removed only when it is empty: a
-		// concurrent Create may have written into it.
-		for _, d := range slices.Backward(made) {
-			os.Remove(d)
-		}
 		if errors.Is(err, fs.ErrExist) {
 			return "", fmt.Errorf("%s exists, and Create never replaces a case.\nName the new case otherwise, or remove the archive first.", path)
 		}
@@ -233,34 +230,6 @@ func recorded(c root.Corpus, updateVar string) error {
 		have = "its registries record " + strings.Join(quoted, ", ")
 	}
 	return fmt.Errorf("no registry under the module root %s records the corpus root %q, so no package's tests would read the case: %s.\nPass root.Find the path a package passes to hypercase.Root, or . for one that passes none. A package's first update, %s=1 go test ./..., writes its registry.", c.Module(), c.Rel(), have, updateVar)
-}
-
-// mkdirs makes each missing directory of the path that the elements name
-// under base, which exists, one at a time, and returns those it made, in
-// order. A directory that another process makes meanwhile is not one it
-// made.
-func mkdirs(base string, elems ...string) ([]string, error) {
-	var made []string
-	dir := base
-	for _, e := range elems {
-		dir = filepath.Join(dir, e)
-		err := os.Mkdir(dir, 0o755)
-		if err == nil {
-			made = append(made, dir)
-			continue
-		}
-		if errors.Is(err, fs.ErrExist) {
-			if fi, serr := os.Stat(dir); serr == nil && fi.IsDir() {
-				continue
-			}
-			err = errors.New("it exists, and isn't a directory")
-		}
-		for _, d := range slices.Backward(made) {
-			os.Remove(d)
-		}
-		return nil, fmt.Errorf("creating %s: %v.\nFix what stopped it, and create the case again.", dir, err)
-	}
-	return made, nil
 }
 
 // checkDir refuses a corpus type's directory that no corpus type can
