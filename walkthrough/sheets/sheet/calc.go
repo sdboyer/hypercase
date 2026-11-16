@@ -9,7 +9,8 @@ import (
 // Calc evaluates the sheet in fsys and writes its values to stdout as CSV, one
 // row of the sheet per line, from row 1 to the last row with a cell and from
 // column A to the last column with one. An empty cell is an empty field. For
-// each cell that divides by zero, in cell order, it writes a warning to stderr.
+// each cell whose value is a division by zero of its own, in cell order, it
+// writes a warning to stderr.
 // It returns the error that stops the sheet being evaluated, and writes nothing
 // when there is one.
 func Calc(fsys fs.FS, stdout, stderr io.Writer) error {

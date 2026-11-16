@@ -52,7 +52,7 @@ func (g *Graph) Evaluate() Values {
 }
 
 // evaluate computes the value of every cell, and returns as well the cells
-// that divide by zero themselves, in cell order.
+// whose value is a division by zero of their own, in cell order.
 func (g *Graph) evaluate() (Values, []*cell) {
 	vals := make(Values, len(g.order))
 	var divs []*cell
@@ -83,10 +83,13 @@ func (ev *evaluator) eval(e expr) float64 {
 	case ref:
 		return ev.vals[string(e)]
 	case binary:
-		l, r := ev.eval(e.l), ev.eval(e.r)
+		// A fault stops the formula: nothing to its right is evaluated, so a
+		// division past it never runs, and never warns.
+		l := ev.eval(e.l)
 		if isFault(l) {
 			return l
 		}
+		r := ev.eval(e.r)
 		if isFault(r) {
 			return r
 		}
