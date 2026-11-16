@@ -1204,13 +1204,14 @@ var Project = decl.Project{
 func renderError(in fs.FS, err error) []byte {
 	out := []byte(err.Error() + "\n")
 	for _, p := range sheet.Positions(err) {
-		switch line := lineAt(in, p.Path, p.Line); {
-		case p.Line == 0:
+		if p.Line == 0 {
 			out = fmt.Appendf(out, "  %s\n", p.Path)
-		case line == "":
-			out = fmt.Appendf(out, "  %s:%d\n", p.Path, p.Line)
-		default:
+			continue
+		}
+		if line := lineAt(in, p.Path, p.Line); line != "" {
 			out = fmt.Appendf(out, "  %s:%d: %s\n", p.Path, p.Line, line)
+		} else {
+			out = fmt.Appendf(out, "  %s:%d\n", p.Path, p.Line)
 		}
 	}
 	return out
