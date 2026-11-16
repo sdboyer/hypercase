@@ -366,7 +366,8 @@ func TestTransformExpectedErrors(t *testing.T) {
 
 // TestTransformsShared: one package owns each transform, and writes and
 // judges its variants' inputs. Every package that runs the type runs each
-// variant's cells, on the committed inputs, but in the owner's update.
+// variant's cells: an update on what the transform makes, and a normal run
+// on the inputs the archive holds.
 func TestTransformsShared(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -382,26 +383,25 @@ func TestTransformsShared(t *testing.T) {
 
 	s.edit(twice, "edit upper's input by hand", set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n"))
 	b := s.run("b", "tr-b", false)
-	s.fails(b, "transform/upper/out/copy/values.txt differs (-golden +got):")
+	s.fails(b, "transform/upper/out/copy/values.txt differs (-golden +got):",
+		"The archive's inputs for upper's variant differ from what upper makes now: a normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and this cell.")
 	s.lacks(b, "differs from its committed inputs")
-	// b's update runs the cells on the committed inputs too, and leaves
-	// them to upper's owner.
+	// b's update runs the cells on what upper makes, and leaves the inputs
+	// to upper's owner, so b's normal run fails until the owner's update
+	// rewrites them.
 	s.passes(s.run("b", "tr-b", true))
-	s.hasSections(twice, map[string]string{"transform/upper/in/do/out/values.txt": "A1 SEVEN\n", "transform/upper/out/copy/values.txt": "A1 SEVEN\n"})
-	s.passes(s.run("b", "tr-b", false))
-	// The owner's update rewrites them, and b's next update follows.
-	s.passes(s.update("transforms"))
+	s.hasSections(twice, map[string]string{"transform/upper/in/do/out/values.txt": "A1 SEVEN\n", "transform/upper/out/copy/values.txt": "A1 SIX\n"})
 	s.fails(s.run("b", "tr-b", false), "transform/upper/out/copy/values.txt differs (-golden +got):")
-	s.passes(s.run("b", "tr-b", true))
+	s.passes(s.update("transforms"))
 	s.passes(s.run("b", "tr-b", false))
 	s.done()
 }
 
-// TestTransformJennyChanges: when a transform's jenny changes, only its
-// owner's update runs the cells on the variant it now makes. Another
-// package's update runs them on the committed inputs, so its next normal
-// run passes, and a whole-module update settles over passes: the owner
-// rewrites the inputs, and on the next pass the others follow.
+// TestTransformJennyChanges: when a transform's jenny changes, every
+// package's update runs the cells on the variant it now makes, so the
+// module's update settles in one pass, in either order or at once. Another
+// package's update alone leaves its normal run failing on the inputs the
+// archive holds, and the failure names the module's update.
 func TestTransformJennyChanges(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -411,28 +411,40 @@ func TestTransformJennyChanges(t *testing.T) {
 	before := s.read(twice)
 
 	// upper's jenny now doubles what it uppercases. b's update alone
-	// writes nothing, and b's normal run passes.
+	// writes its cells on what upper makes, and b's normal run, on the
+	// inputs the archive holds, fails and names the module's update.
 	s.passes(s.run("b", "tr-b-jenny", true))
-	s.same(twice, before)
-	s.passes(s.run("b", "tr-b-jenny", false))
-
-	// The rest of a whole-module update that ran b first: the owner's
-	// update rewrites upper's inputs after b ran its cells, so b's are
-	// stale.
+	s.hasSections(twice, map[string]string{
+		"transform/upper/in/do/out/values.txt": "A1 SIX\n",
+		"transform/upper/out/copy/values.txt":  "A1 SIX\nA1 SIX\n",
+	})
+	s.fails(s.run("b", "tr-b-jenny", false), "transform/upper/out/copy/values.txt differs (-golden +got):",
+		"The archive's inputs for upper's variant differ from what upper makes now: a normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and this cell.")
+	// The rest of the module's update, the owner's, settles it.
 	s.passes(s.update("tr-jenny"))
 	s.hasSections(twice, map[string]string{
 		"transform/upper/in/do/out/values.txt": "A1 SIX\nA1 SIX\n",
 		"transform/upper/out/echo/values.txt":  "A1 SIX\nA1 SIX\n",
-		"transform/upper/out/copy/values.txt":  "A1 SIX\n",
+		"transform/upper/out/copy/values.txt":  "A1 SIX\nA1 SIX\n",
 	})
-	s.fails(s.run("b", "tr-b-jenny", false), "transform/upper/out/copy/values.txt differs (-golden +got):")
-	// The next pass settles it, and the one after changes nothing.
-	s.passes(s.run("b", "tr-b-jenny", true))
-	s.passes(s.update("tr-jenny"))
 	settled := s.read(twice)
-	s.hasSections(twice, map[string]string{"transform/upper/out/copy/values.txt": "A1 SIX\nA1 SIX\n"})
-	s.passes(s.run("b", "tr-b-jenny", true))
+	s.passes(s.normal("tr-jenny"))
+	s.passes(s.run("b", "tr-b-jenny", false))
+
+	// From before the change, one pass of the module's update settles it
+	// with the owner first too, and with both at once.
+	s.write(twice, before, "restore the archive from before the jenny changed")
 	s.passes(s.update("tr-jenny"))
+	s.passes(s.run("b", "tr-b-jenny", true))
+	s.same(twice, settled)
+	s.write(twice, before, "restore the archive from before the jenny changed")
+	for _, r := range s.parallel(childRun{".", "tr-jenny", true}, childRun{"b", "tr-b-jenny", true}) {
+		s.passes(r)
+	}
+	s.same(twice, settled)
+	// A further pass changes nothing.
+	s.passes(s.update("tr-jenny"))
+	s.passes(s.run("b", "tr-b-jenny", true))
 	s.same(twice, settled)
 	s.passes(s.normal("tr-jenny"))
 	s.passes(s.run("b", "tr-b-jenny", false))

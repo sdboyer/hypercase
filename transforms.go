@@ -336,39 +336,31 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if owner {
 			r.judgeInputs(t, c, pc, v, w)
 		}
-		// Only the owner's update runs the cells on what the transform
-		// makes, as it writes those inputs. Every other run reads the
-		// inputs the archive holds, so no package writes outputs of inputs
-		// the archive doesn't hold; after the owner's update, the others'
-		// next updates follow.
-		if owner && r.update || !v.committed.Inputs {
+		// An update runs the cells on what the transform makes, in every
+		// package: what it writes depends on the inputs and the code
+		// alone, never on sections an update wrote. A normal run reads the
+		// inputs the archive holds.
+		if r.update || !v.committed.Inputs {
 			c.setView(p, archive.NewFS(v.made))
-		} else {
-			c.setView(p, v.view)
+			break
 		}
+		if !owner && !v.inputDiffs(pc.a).empty() {
+			c.stale = fmt.Sprintf("The archive's inputs for %s's variant differ from what %s makes now: a normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and this cell.", v.name, v.name, v.name, r.updateCmd(), v.name)
+		}
+		c.setView(p, v.view)
 	}
 	r.runCells(t, c, p.cols, w)
 }
 
-// judgeInputs compares a transform's committed inputs with those it made,
-// as goldens, in the package that owns it. An update writes them whole.
-func (r *runner) judgeInputs(t *testing.T, c *aCase, pc plannedCase, v *plannedVariant, w *caseWrites) {
-	t.Helper()
-	made := v.sections
-	if r.update {
-		w.replaceInputs(v.name, made)
-		return
-	}
-	if !v.committed.Inputs {
-		t.Errorf("%s\n%s's variant of the base isn't written: the archive holds none of its inputs.\nRun %s to write them, and read them before committing.", c.header(), v.name, r.updateCmd())
-		return
-	}
+// inputDiffs says how the committed inputs of a transform's variant differ
+// from those it made.
+func (v *plannedVariant) inputDiffs(a *archive.Archive) *msg {
 	committed := map[string][]byte{}
-	for _, s := range v.inputs(pc.a) {
+	for _, s := range v.inputs(a) {
 		committed[s.Name] = s.Data
 	}
 	m := &msg{}
-	for _, s := range made {
+	for _, s := range v.sections {
 		g, ok := committed[s.Name]
 		switch {
 		case !ok:
@@ -381,7 +373,22 @@ func (r *runner) judgeInputs(t *testing.T, c *aCase, pc plannedCase, v *plannedV
 	for _, name := range slices.Sorted(maps.Keys(committed)) {
 		m.add("%s is no longer made", name)
 	}
-	if !m.empty() {
+	return m
+}
+
+// judgeInputs compares a transform's committed inputs with those it made,
+// as goldens, in the package that owns it. An update writes them whole.
+func (r *runner) judgeInputs(t *testing.T, c *aCase, pc plannedCase, v *plannedVariant, w *caseWrites) {
+	t.Helper()
+	if r.update {
+		w.replaceInputs(v.name, v.sections)
+		return
+	}
+	if !v.committed.Inputs {
+		t.Errorf("%s\n%s's variant of the base isn't written: the archive holds none of its inputs.\nRun %s to write them, and read them before committing.", c.header(), v.name, r.updateCmd())
+		return
+	}
+	if m := v.inputDiffs(pc.a); !m.empty() {
 		t.Errorf("%s\n%s's variant of the base differs from its committed inputs:\n%s\nIf the change is intended, run %s and read the diff before committing.", c.header(), v.name, m, r.updateCmd())
 	}
 }
