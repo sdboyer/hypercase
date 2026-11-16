@@ -437,6 +437,7 @@ var fixturePackages = map[string][]fixturePkg{
 	"chain":        {{".", "chain"}},
 	"chain-render": {{".", "chain-render"}},
 	"chain-past":   {{".", "chain-past"}},
+	"chain-twice":  {{".", "chain-twice"}},
 	"chain-shared": {{".", "chain-a"}, {"b", "chain-b"}},
 }
 

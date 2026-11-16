@@ -437,7 +437,7 @@ $ go test  # chain
         + blocked import
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
-        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        import accepts the case now, so FIXTURE_UPDATE_GOLDEN=1 go test ./... reruns it and runs the cell. Delete nothing by hand.
     export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
         parse: Parses the script, as its parse/ tree says.
         out/parse/outcome differs (-golden +got):

@@ -1023,17 +1023,28 @@ func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, b *
 	}
 	frozen := cf.frozen(marked)
 	r.ranNothing(m, c, col, archive.Outcome{State: archive.Blocked, Detail: b.failed}, frozen, goldens, res)
+	// A normal run reads a bytes lift's committed outcome, which may be
+	// stale, or missing. When the lift accepts the case now, the update,
+	// which reruns it, runs the cell, so its files are no orphans.
+	unblocks := b.outcome != "" && c.state.acceptsNow(b.lift)
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
-		if p == outcomeFile {
-			continue
+		switch {
+		case p == outcomeFile:
+		case unblocks:
+			m.add("%s is recorded, and the cell is blocked: %s.\n%s accepts the case now, so %s reruns it and runs the cell. Delete nothing by hand.", c.out(col.name, p), why, b.lift.name, r.updateCmd())
+		default:
+			m.add("%s is recorded, and the cell is blocked: %s.\nIf the cell should run, fix the lift or %s. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), why, c.inputsAt(), r.updateCmd())
 		}
-		m.add("%s is recorded, and the cell is blocked: %s.\nIf the cell should run, fix the lift or %s. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), why, c.inputsAt(), r.updateCmd())
 	}
 	if col.lift != nil && col.lift.bytes && !frozen {
 		res.via = true
 		if !r.update {
 			dir := col.lift.viaDir(c.prefix)
 			for _, p := range slices.Sorted(maps.Keys(cf.product)) {
+				if unblocks {
+					m.add("%s is recorded, and %s is blocked: %s.\n%s accepts the case now, so %s reruns it and runs %s. Delete nothing by hand.", dir+p, col.name, why, b.lift.name, r.updateCmd(), col.name)
+					continue
+				}
 				m.add("%s is recorded, and %s is blocked: %s, so it has no product.\nRun %s, which removes it, and read the diff before committing.", dir+p, col.name, why, r.updateCmd())
 			}
 		}

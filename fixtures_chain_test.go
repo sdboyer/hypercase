@@ -196,6 +196,19 @@ var (
 			return &Parsed{view: in.FS, trail: []string{"import-parse"}}, nil
 		},
 	}
+	// exportGrid is a bytes lift to Export, which import lifts on, so a
+	// grid reaches Script through two bytes lifts: export follows the
+	// grid's export/ tree as import does its import/.
+	exportGrid = decl.Lift[Grid, Export]{
+		Name:        "export",
+		Description: "Exports the grid, as its export/ tree says.",
+		Outputs:     []decl.Output{{Pattern: "error.txt", Description: "Why the exporter rejects the grid."}},
+		Product:     []decl.Output{{Pattern: "import/out/quote/*", Description: "What import makes as its product's quote/ tree."}},
+		Rejects:     []decl.Property{unterminated},
+		Jenny: jenny.For[Grid]().New("export", func(in Grid) (jenny.Files, error) {
+			return steerImport("export", in)
+		}),
+	}
 
 	// list lists its input view, which, past import, is import's product.
 	list = hypercase.Suite[Script]{
@@ -299,6 +312,7 @@ var chainRegistrations = map[string]func(){
 	"chain-render":    func() { chain(projectRender, plainExportType, own(importLift, parse, resolve, evaluate)) },
 	"chain-past":      func() { chain(project, plainExportType, own(unpack, repack, parse, resolve, evaluate, list)) },
 	"chain-two-paths": func() { chain(project, plainExportType, own(importLift, parse, importParsed, format)) },
+	"chain-twice":     func() { chain(project, gridType, plainExportType, own(exportGrid, importLift, list)) },
 
 	// Packages over one export corpus: . owns import, parse and resolve,
 	// and ./b uses them, and owns evaluate, list and the transform louder.

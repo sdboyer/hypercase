@@ -305,6 +305,18 @@ func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
 	return lr.value, lr.view, nil
 }
 
+// acceptsNow reports whether the bytes lift l, run on the case as its own
+// cell runs it, accepts the case, and an update writes its cell: then the
+// update runs the cells past it, whatever the archive commits for l.
+func (s *caseState) acceptsNow(l *lift) bool {
+	in, view, b := s.stage(l.in)
+	if b != nil {
+		return false
+	}
+	v := s.liftVerdict(l, s.runLift(l, in), in, view)
+	return v.writable && accepts(v.files[archive.OutcomeFile])
+}
+
 // read reads, once, what the archive commits for a bytes lift on the
 // case. Its committed outcome decides: accepted gives the committed
 // product, an empty one included; blocked by another lift blocks the cells
