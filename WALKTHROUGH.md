@@ -1543,8 +1543,8 @@ package owns every column it registers.
 **Parameters.**
 
 - Parameters are fixed in Go, or derived from the archive's name by a fixed
-  convention. No lift of this step uses the archive's name; `import`
-  (step 10) does, and reads `csv/<archive>.csv`.
+  convention. No lift of this step uses the archive's name, and a bytes
+  lift (step 10) can't: its jenny receives its input alone.
 - The archive's name is the one thing a column gets from an archive besides
   its input. It is the same for the base and every variant, so no variant
   varies a parameter.
@@ -2284,15 +2284,20 @@ product is the files it makes, which are that type's input, and they are
 committed as such.
 
 Proposed names: `decl.Lift`'s `Product` field, which declares the product's
-files.
+files, and its `Jenny` field, which a bytes lift gives in place of `Run`. The
+`Jenny` is a [jenny](https://pkg.go.dev/github.com/sdboyer/jenny), a named
+generator function, which here generates the product's files from the lift's
+input. It receives the input alone, so `import` finds its CSV by its tree,
+not by the archive's name. `view` gives each file of the sheet that
+`sheet.ImportCSV` returns as one of the jenny's files.
 
 ```go
 // walkthrough/sheets/step10/sheetcorpus/types.go gains
-type CSV struct{ fs.FS } // in/csv/<archive>.csv
+type CSV struct{ fs.FS } // in/csv/<name>.csv
 
 var CSVType = decl.Type[CSV]{
 	Dir:         "csv",
-	Description: "A CSV export: in/csv/<archive>.csv, one row of the sheet per line.",
+	Description: "A CSV export: one file under in/csv/, one row of the sheet per line.",
 }
 
 var Unterminated = decl.Property{
@@ -2310,10 +2315,13 @@ var Import = decl.Lift[CSV, Sheet]{
 		{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them."},
 	},
 	Rejects: []decl.Property{Unterminated},
-	Run: func(archive string, in CSV, stderr io.Writer) (Sheet, error) {
-		cells, err := sheet.ImportCSV(in, "csv/"+archive+".csv")
-		return Sheet{cells}, err
-	},
+	Jenny: jenny.For[CSV]().New("import", func(in CSV) (jenny.Files, error) {
+		paths, _ := fs.Glob(in, "csv/*.csv")
+		if len(paths) != 1 {
+			return nil, fmt.Errorf("%d files under csv/, not one", len(paths))
+		}
+		return view(sheet.ImportCSV(in, paths[0]))
+	}),
 }
 ```
 
@@ -2376,7 +2384,7 @@ blocked import
 -- out/format/outcome --
 blocked import
 -- out/import/error.txt --
-line 1: quote never closes
+import: line 1: quote never closes
   csv/open-quote.csv:1: 4,"six,=A1+B1
 -- out/import/outcome --
 rejected C101
@@ -2386,7 +2394,12 @@ blocked import
 blocked import
 ```
 
-`hypercase.json` marks each bytes lift, and lists its product declarations.
+A jenny's error starts with the jenny's name, so `import`'s `error.txt` starts
+`import: `.
+
+`hypercase.json` gives every lift `"bytes"`, true for a bytes lift, and
+`"productFiles"`, its product declarations, which are empty for every other
+lift.
 
 ### Rules
 
@@ -2395,20 +2408,47 @@ blocked import
   under `via/<lift>/`, which holds the product only, under whatever file
   names the product has: `via/import/sheet/A1` is the downstream case's
   `sheet/A1`.
+- A lift whose product type is a corpus type gives `Jenny`, not `Run`, and
+  declares its product's files in `Product`, each with a pattern and a
+  description, as a suite declares its outputs. A lift whose product is a
+  stage gives no `Product`. The jenny receives the input alone, with no
+  archive name and no stderr, so the lift's cell writes `outcome` and
+  `error.txt` only, and `error.txt` is the one output it may declare.
+- Each product file sits in a tree, a top-level directory of the product's
+  input view, as `sheet/A1` does; `params/` is reserved there as in every
+  input view. A pattern of `Product` that can match no such file fails the
+  run.
+- A product file outside a tree or under `params/`, one that no declaration
+  or two declarations match, and one an archive can't hold, such as a file
+  with no final newline, fails the lift's cell. An update writes nothing for
+  that cell, and every cell past the lift fails, runs nothing, and is not
+  written either.
 - The lift's own cell files sit in `out/<lift>/`, like any column's. A
   lift's name covers both directories.
 - A variant's product goes under `variant/<name>/via/<lift>/` or
   `transform/<name>/via/<lift>/`, and holds the variant's whole product, not
   an overlay on the base's.
 - `out/` holds only terminal outputs: nothing downstream reads from it.
-- An update replaces `via/<lift>/…` whole, at every level: a file the lift
-  no longer produces is removed, and the removal shows in the diff. An
-  update writes `via/` first, then runs whatever reads it.
-- In a normal run, downstream columns read the committed `via/` bytes, so
-  churn upstream fails only the upstream column. A downstream column takes
-  `blocked` from the lift's committed `outcome`. A lift that is `accepted`
-  with no product files gives its readers an empty view.
-- A bytes lift's frozen cell includes its `via/` product.
+- The update of the package that owns the lift replaces `via/<lift>/…`
+  whole, at every level: a file the lift no longer produces is removed, and
+  the removal shows in the diff. A lift that fails on the case or is
+  blocked, or whose variant's transform declines the base, has no product,
+  and the update removes its `via/<lift>/`. That package's normal run fails
+  on what remains there, and says to run the update.
+- In an update, the cells past the lift read the product it makes in that
+  run, in every package. In a normal run, every package's cells past it
+  read the committed `via/` bytes, so churn upstream fails only the
+  upstream column, and only the package that owns the lift runs it, in the
+  lift's own cell. A downstream column takes `blocked` from the lift's
+  committed `outcome`: any outcome but `accepted`, or none, blocks it. A
+  lift that is `accepted` with no product files gives its readers an empty
+  view.
+- A bytes lift's frozen cell includes its `via/` product: no update writes
+  it, and a product that differs from what the lift makes fails the cell,
+  in every run. The cells past it are written by an update from what the
+  lift makes, so they fail normal runs, which read the committed product,
+  until a person resolves the frozen cell. Deleting the cell's files
+  includes deleting its product.
 - The properties a case states hold for every column the case reaches,
   through the lift too. A CSV with a quote that never closes states
   `unterminated`, which `import` rejects, and a CSV whose imported sheet has
@@ -2420,6 +2460,10 @@ blocked import
   consumes `Sheet`, runs on every CSV that `import` accepts.
 - Past a bytes lift, a cell's input view, which `RenderError` receives, is
   that lift's product.
+- The root-package check claims `via/<lift>/…` in a corpus for each bytes
+  lift a package owns over it; any other `via/` section is unclaimed.
+- A corpus check (step 8) receives a bytes lift's committed product as its
+  cell's `Product`, by each file's path under `via/<lift>/`.
 - `testdata/sheet/prices.txtar` and `testdata/csv/prices.txtar` both reach
   `evaluate`, the second through `import`. Their cases are `sheet/prices` and
   `csv/prices` (step 3), and their cells' subtests
