@@ -1,19 +1,25 @@
 {
-  "format": 1,
+  "format": 3,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step04",
   "rootPackage": true,
+  "issueLinks": [],
   "properties": [
     {
       "name": "circular",
       "description": "Some cell's formula refers back to itself, directly or through other cells."
     }
   ],
+  "types": [],
+  "lifts": [],
   "suites": [
     {
       "name": "evaluate",
       "description": "Evaluates every cell of the sheet.",
-      "corpus": "sheet",
+      "consumes": "io/fs.FS",
+      "corpora": [
+        "sheet"
+      ],
       "outputs": [
         {
           "pattern": "error.txt",

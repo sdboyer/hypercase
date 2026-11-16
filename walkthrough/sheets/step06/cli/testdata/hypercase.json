@@ -1,8 +1,9 @@
 {
-  "format": 2,
+  "format": 3,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step06",
   "rootPackage": false,
+  "issueLinks": [],
   "properties": [
     {
       "name": "circular",

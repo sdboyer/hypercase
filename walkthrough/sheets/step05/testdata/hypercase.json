@@ -1,8 +1,9 @@
 {
-  "format": 1,
+  "format": 3,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
+  "issueLinks": [],
   "properties": [
     {
       "name": "circular",
@@ -17,11 +18,16 @@
       "description": "Some cell holds neither a number nor a formula."
     }
   ],
+  "types": [],
+  "lifts": [],
   "suites": [
     {
       "name": "evaluate",
       "description": "Evaluates every cell of the sheet.",
-      "corpus": "sheet",
+      "consumes": "io/fs.FS",
+      "corpora": [
+        "sheet"
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
