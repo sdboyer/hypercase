@@ -1843,8 +1843,11 @@ its `Name`, `Description` and `Classify` fields, set as a suite's
 `Classifier`; and `hypercase.Result`, what a run produced, which a
 classifier reads.
 
+This step's snippets come from no example yet: no directory under
+`walkthrough/` holds them, and the doc golden checks none of them.
+
 ```go
-// walkthrough/sheets/step08/sheetcorpus/project.go
+// sheetcorpus/project.go
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
@@ -1861,7 +1864,7 @@ var Project = decl.Project{
 `evaluate` gains a classifier:
 
 ```go
-// walkthrough/sheets/step08/corpus_test.go: evaluate gains
+// corpus_test.go: evaluate gains
 	Classifier: hypercase.Classifier[*sheet.Graph]{
 		Name:        "div-zero",
 		Description: "Adds div-zero when some cell divides by zero.",
@@ -1933,9 +1936,11 @@ A1 -> B1 -> A1: cycle
 rejected S201
 ```
 
-Elsewhere in the corpus, a sheet with no formulas has `format`'s outcome
-`skipped no formulas`, and a sheet whose `C1` is `=A1/B1`, with `B1` at `0`,
-has `evaluate`'s outcome `accepted div-zero`.
+A sheet with no formulas has `format`'s outcome `skipped no formulas`, as
+step 5's `negative` shows. From step 6 it needs to parse as well, since
+`format` reads `parse`'s product: step 6's `negative` has `blocked parse`
+there. With the classifier, `divide`, whose `A1` is `=B1/C1` with `C1` at
+`0`, has `evaluate`'s outcome `accepted div-zero`.
 
 The archives shown in steps 3 to 6 come from their examples, which carry an
 `outcome` per cell, as every update writes from this step on. Step 7's
@@ -2007,7 +2012,7 @@ about groups of cells, at the cost of placing a built feature in a step
 whose design isn't settled.
 
 ```go
-// walkthrough/sheets/step08/corpus_test.go, registered with the rest
+// corpus_test.go, registered with the rest
 var codes = hypercase.Check{
 	Name:        "codes",
 	Description: "Every code the formula evaluator defines is the code of some rejected cell.",
