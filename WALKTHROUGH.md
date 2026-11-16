@@ -320,9 +320,9 @@ their line endings. Its `.gitattributes` holds:
   **cell** is one case run through one column. Cases and columns make a
   **matrix**. The run is a matrix with one column: step 5 adds columns, and
   the archive's own layout doesn't change.
-- What the run does is fixed in Go and said in its description: `evaluate`
-  evaluates every cell of the sheet, and no archive says so. An archive
-  carries no parameters.
+- An archive carries no parameters. What the run does is fixed in Go and
+  said in its description, and so is anything it could vary (step 6 states
+  the rule).
 - The run receives a `testing.TB` and the input view, and returns its output
   files and an error. It reports its own failures through the `testing.TB`,
   such as a fixture it can't set up. The error it returns is only what the
@@ -830,6 +830,24 @@ D1: not a number or a formula: "total"
 D1: not a number or a formula: "total"
 ```
 
+`testdata/sheet/negative.txtar`. A known gap marks one cell, and `calc` errs
+on `-3` the same wrong way as `evaluate`, so a person adds a `calc` line to
+its `gaps`; without it, `calc`'s cell fails as an error nothing expects.
+`format` skips the sheet, which has no formulas:
+
+```
+A1 is a negative number.
+-- in/sheet/A1 --
+-3
+-- gaps --
+evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
+calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+-- out/calc/error.txt --
+A1: unexpected "-"
+-- out/evaluate/error.txt --
+A1: unexpected "-"
+```
+
 The root package's registry, `step05/testdata/hypercase.json`, sketched
 (proposed):
 
@@ -1155,6 +1173,13 @@ on raw input: `hypercase.Suite[sheetcorpus.Sheet]`, with its outputs and
   past that lift are blocked and write nothing, so their old sections are
   orphans until a person removes them: `stray`'s `out/evaluate/error.txt`
   and `out/format/error.txt`.
+- A known gap moves with its error. `parse` now errs on `negative`'s `-3`,
+  so `evaluate`, past it, is blocked, and a `gaps` line naming a column that
+  didn't run fails. A person changes `negative`'s `evaluate` line to name
+  `parse`, and removes `out/evaluate/error.txt`, an orphan beside `stray`'s.
+  `calc`'s cell stays frozen, and its `error.txt` now differs, since
+  `RenderError` quotes the input, so a person deletes that file and the next
+  update writes it.
 - `error.txt` holds what `RenderError` writes.
 - `hypercase.json` gains each corpus type, each lift with the properties it
   rejects and whether the package owns it, and each suite's consumed type.
@@ -1180,6 +1205,23 @@ D1: not a number or a formula: "total"
 -- out/parse/error.txt --
 D1: not a number or a formula: "total"
   sheet/D1:1: total
+```
+
+`testdata/sheet/negative.txtar`:
+
+```
+A1 is a negative number.
+-- in/sheet/A1 --
+-3
+-- gaps --
+parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
+calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+-- out/calc/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
+-- out/parse/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
 ```
 
 ### Rules
@@ -1273,7 +1315,8 @@ every registration owns.
 **Parameters.**
 
 - Parameters are fixed in Go, or derived from the archive's name by a fixed
-  convention: `import` (step 10) reads `csv/<archive>.csv`.
+  convention. No lift of this step uses the archive's name; `import`
+  (step 10) does, and reads `csv/<archive>.csv`.
 - The archive's name is the one thing a column gets from an archive besides
   its input. It is the same for the base and every variant, so no variant
   varies a parameter.
@@ -1288,8 +1331,9 @@ declarations, carry a description, under step 3's rule.
 
 ### What can now be seen
 
-- Where on its ladder an input stops. `stray` is rejected once, by `parse`,
-  and nothing past it is expected to do anything.
+- Where on its ladder an input stops. `stray` is rejected once on the
+  ladder, by `parse`, and nothing past it is expected to do anything. `calc`,
+  which reads the raw cells, rejects it too.
 - What each column consumes, in the registry: `evaluate` reads a
   `*sheet.Graph`, and `calc` the raw sheet.
 - Each error, quoting the input it points at.
@@ -1321,10 +1365,10 @@ at the cost of two reserved top-level names and longer section paths.
 // walkthrough/sheets/step07/sheetcorpus/types.go
 var Looped = decl.Transform[Sheet]{
 	Name:        "looped",
-	Description: "The first cell, by name, replaced by a reference to itself, so the sheet has a cycle.",
+	Description: "The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.",
 	Gives:       []decl.Property{Circular},
 	Probe: func(base Sheet) (why string, ok bool) {
-		// declines a sheet whose first cell already refers to itself
+		// declines an empty sheet, and one whose first cell already refers to itself
 	},
 	Run: func(archive string, base Sheet) (fs.FS, error) {
 		// the base, with its first cell replaced
@@ -1894,8 +1938,9 @@ line or a description, links to the URL it makes.
 changes, in rank order. Under it, one line per cell: its case, its column,
 and its outcome, or the change in it. So `outcome` is never listed as a
 file. Under each cell, one line per other file of the cell that was added,
-changed or removed. For a change that adds the archive `ratio`, and words a
-cycle as `cycle: A1 -> B1 -> A1`, with the transforms' variants left out:
+changed or removed. For a change that adds the archive `ratio`, whose `C1`
+is `=A1/B1` with `A1` at `6` and `B1` at `2`, and words a cycle as
+`cycle: A1 -> B1 -> A1`, with the transforms' variants left out:
 
 ```
 appeared
@@ -2148,6 +2193,35 @@ field.
 `resolve`'s and `calc`'s `error.txt` state `Inputs: decl.FromPositions`, and
 `calc`'s `stdout.txt` and `stderr.txt` state `Inputs: decl.AllInputs`.
 
+A bytes lift's product declarations are output declarations too, so each has
+`Inputs`. `import`'s map receives each product file's path as its pattern
+matches it, such as `sheet/B1`, and gives the CSV lines that cell's field
+came from (proposed):
+
+```go
+// walkthrough/sheets/step11/sheetcorpus/types.go: Import's declarations
+	Outputs: []decl.Output{
+		{
+			Pattern:     "error.txt",
+			Description: "The line the importer can't read, and why.",
+			Inputs:      decl.FromPositions,
+		},
+	},
+	Product: []decl.Output{
+		{
+			Pattern:     "sheet/*",
+			Description: "One file per cell, as a sheet's in/sheet/ holds them.",
+			Inputs: decl.InputsFunc(func(in fs.FS, path string) ([]decl.Range, error) {
+				csv, first, last, err := sheet.FieldLines(in, path) // the CSV's path, and the lines of the cell's field
+				if err != nil {
+					return nil, err
+				}
+				return []decl.Range{{Path: csv, Start: first, End: last}}, nil
+			}),
+		},
+	},
+```
+
 ### How the files change
 
 Every cell that ran gains an `inputs` file. The archives shown in steps 3 to
@@ -2230,6 +2304,19 @@ values.txt
   via/import/sheet/A1
   via/import/sheet/B1
   via/import/sheet/C1
+```
+
+and `import`'s own `out/import/inputs`, with no files of its own to list,
+maps each product file, named by its section, to the CSV line its field came
+from (proposed):
+
+```
+via/import/sheet/A1
+  in/csv/prices.csv:1-1
+via/import/sheet/B1
+  in/csv/prices.csv:1-1
+via/import/sheet/C1
+  in/csv/prices.csv:1-1
 ```
 
 **The `inputs` format** (proposed).
@@ -2330,11 +2417,14 @@ The target text proposes:
   matching cases are rejected. Every run already checks it.
 - A hypothesis carries a description, under step 3's rule.
 
-For illustration, `circular` is P for a sheet with a cycle, anti-P for a
-sheet that parses and has none, and neither for one that doesn't parse.
+For illustration, `circular` is P for a sheet that parses and has a cycle,
+and anti-P for one that parses, has no cycle and refers to no missing cell.
+Every other sheet is neither: one that doesn't parse never reaches
+`resolve`, and `resolve` rejects a `dangling` sheet with no cycle for another
+reason, so no prediction about cycles can be made from either.
 
 - `resolve` is P: a matching cell is `rejected`, and a mismatching one
-  `accepted`. Its `Rejects` entry already states that claim.
+  `accepted`. Its `Rejects` entry already states the first half.
 - `evaluate` is P: a matching cell is `blocked resolve`.
 - `format` is neutral: both cases of a pair, a sheet with formulas and no
   cycle and its `looped` variant, have the same outcome.
