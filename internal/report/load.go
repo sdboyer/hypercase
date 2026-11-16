@@ -313,20 +313,15 @@ func (s *snapshot) addArchive(corpus, name string, data []byte) error {
 }
 
 // transformProperties returns what a transform's variant states, as the
-// registries declare the transform: what it gives, then each property it
-// keeps that the base states, in the base's order. A transform no
-// registry declares gives its variant none.
+// registries declare the transform, by [registry.VariantProperties]. A
+// transform no registry declares gives its variant none, as does one that
+// declines the base.
 func (s *snapshot) transformProperties(corpus, name string, base []string) []string {
 	tr, ok := s.transforms[corpus][name]
 	if !ok {
 		return nil
 	}
-	props := slices.Clone(tr.Gives)
-	for _, p := range base {
-		if slices.Contains(tr.Keeps, p) && !slices.Contains(props, p) {
-			props = append(props, p)
-		}
-	}
+	props, _ := registry.VariantProperties(tr.Gives, tr.Keeps, base)
 	return props
 }
 

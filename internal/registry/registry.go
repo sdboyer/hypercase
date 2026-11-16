@@ -88,6 +88,29 @@ type Transform struct {
 	Owned bool `json:"owned"`
 }
 
+// VariantProperties returns what a transform's variant of a base that
+// states base states: what the transform gives, then each property it
+// keeps that the base states, in the base's order. A transform declines a
+// base that states a property it neither gives nor keeps: neither lists
+// those, and the variant, which isn't made, states nothing.
+func VariantProperties(gives, keeps, base []string) (props, neither []string) {
+	props = slices.Clone(gives)
+	for _, p := range base {
+		switch {
+		case slices.Contains(keeps, p):
+			if !slices.Contains(props, p) {
+				props = append(props, p)
+			}
+		case !slices.Contains(gives, p):
+			neither = append(neither, p)
+		}
+	}
+	if len(neither) > 0 {
+		return nil, neither
+	}
+	return props, nil
+}
+
 // A Lift is a registered lift, which the package owns or only uses.
 type Lift struct {
 	Name        string `json:"name"`

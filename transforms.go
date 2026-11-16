@@ -14,6 +14,7 @@ import (
 	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/internal/diff"
 	"github.com/sdboyer/hypercase/internal/erase"
+	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/jenny"
 )
 
@@ -216,20 +217,8 @@ func (r *runner) planVariants(p *plan, a *archive.Archive) []*plannedVariant {
 				v.gaps = append(v.gaps, g)
 			}
 		}
-		for _, p := range tr.gives {
-			v.properties = append(v.properties, p.Name)
-		}
 		var neither []string
-		for _, name := range stated {
-			switch {
-			case slices.ContainsFunc(tr.keeps, func(p decl.Property) bool { return p.Name == name }):
-				if !slices.Contains(v.properties, name) {
-					v.properties = append(v.properties, name)
-				}
-			case !slices.ContainsFunc(tr.gives, func(p decl.Property) bool { return p.Name == name }):
-				neither = append(neither, name)
-			}
-		}
+		v.properties, neither = registry.VariantProperties(propertyNames(tr.gives), propertyNames(tr.keeps), stated)
 		if len(neither) > 0 {
 			v.declined = fmt.Sprintf("the base states %s, which %s neither gives nor keeps", andList(neither), tr.name)
 		} else {

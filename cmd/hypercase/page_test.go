@@ -145,7 +145,9 @@ func TestPageProperties(t *testing.T) {
 
 // TestPageTransformProperties: a transform's variant states what the
 // registries say its transform gives, and each property the transform
-// keeps that its base states, shown as a case's are.
+// keeps that its base states, shown as a case's are. A transform declines
+// a base that states a property it neither gives nor keeps, and the
+// variant's sections left in the archive state nothing.
 func TestPageTransformProperties(t *testing.T) {
 	t.Parallel()
 	reg := moduleRegistry()
@@ -157,6 +159,9 @@ func TestPageTransformProperties(t *testing.T) {
 	files := module(map[string]string{
 		"loop":  "A loop.\n-- in/sheet/A1 --\n=A1\n-- properties --\ncircular\n-- out/calc/outcome --\nrejected\n-- transform/kept/in/sheet/B1 --\n1\n-- transform/kept/out/calc/outcome --\nrejected\n",
 		"plain": "A number.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n-- transform/kept/in/sheet/B1 --\n1\n-- transform/kept/out/calc/outcome --\naccepted\n-- transform/looped/in/sheet/A1 --\n=A1\n-- transform/looped/out/calc/outcome --\nrejected\n",
+		// looped declines both bases: it neither gives nor keeps dangling.
+		"orphan": "A dangling reference.\n-- in/sheet/A1 --\n=B9\n-- properties --\ndangling\n-- out/calc/outcome --\nrejected\n-- transform/looped/out/calc/outcome --\nrejected\n",
+		"gap":    "A dangling reference.\n-- in/sheet/A1 --\n=B9\n-- properties --\ndangling\n-- gaps --\ntransform/looped calc Waits on sheets#5.\n-- out/calc/outcome --\nrejected\n",
 	})
 	files["testdata/hypercase.json"] = string(reg.Marshal())
 	g := gittest.New(t)
@@ -170,6 +175,10 @@ func TestPageTransformProperties(t *testing.T) {
 	head, _ = matrixRow(t, page, "sheet", "sheet/plain/transform/kept")
 	lacks(t, "plain/transform/kept's row", head, `class="prop"`)
 	holds(t, "loop/transform/kept calc's change", change(t, page, "sheet/loop/transform/kept", "calc"), circular)
+	for _, c := range []string{"sheet/orphan/transform/looped", "sheet/gap/transform/looped"} {
+		head, _ = matrixRow(t, page, "sheet", c)
+		lacks(t, c+"'s row", head, `class="prop"`)
+	}
 }
 
 // TestPageGaps: each gaps line is shown on the cell it marks, linked to

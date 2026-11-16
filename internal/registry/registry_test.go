@@ -125,3 +125,25 @@ func TestFindFS(t *testing.T) {
 		t.Errorf("FindFS = %q, want %q", got, want)
 	}
 }
+
+// TestVariantProperties: a transform's variant states what the transform
+// gives, then what it keeps that the base states, in the base's order; a
+// base that states a property the transform neither gives nor keeps is
+// declined, and its variant states nothing.
+func TestVariantProperties(t *testing.T) {
+	for _, c := range []struct {
+		name                   string
+		gives, keeps, base     []string
+		wantProps, wantNeither []string
+	}{
+		{name: "gives", gives: []string{"circular"}, wantProps: []string{"circular"}},
+		{name: "keeps in the base's order", gives: []string{"x"}, keeps: []string{"b", "a", "c"}, base: []string{"a", "b"}, wantProps: []string{"x", "a", "b"}},
+		{name: "a given property the base states", gives: []string{"a"}, keeps: []string{"b"}, base: []string{"b", "a"}, wantProps: []string{"a", "b"}},
+		{name: "declines", gives: []string{"circular"}, keeps: []string{"a"}, base: []string{"a", "dangling", "z"}, wantNeither: []string{"dangling", "z"}},
+	} {
+		props, neither := VariantProperties(c.gives, c.keeps, c.base)
+		if !slices.Equal(props, c.wantProps) || !slices.Equal(neither, c.wantNeither) {
+			t.Errorf("%s: VariantProperties = %q, %q, want %q, %q", c.name, props, neither, c.wantProps, c.wantNeither)
+		}
+	}
+}
