@@ -1,0 +1,4 @@
+poke adds a file outside any tree.
+-- in/do/out/values.txt --
+x
+-- in/tr/flat --

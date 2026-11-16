@@ -30,7 +30,18 @@ func (r *runner) ownRegistry() registry.Registry {
 		g.Properties = append(g.Properties, registry.Property{Name: p.Name, Description: p.Description})
 	}
 	for _, ct := range r.types {
-		g.Types = append(g.Types, registry.Type{Dir: ct.dir, Description: ct.description, GoType: goTypeName(ct.goType)})
+		rt := registry.Type{Dir: ct.dir, Description: ct.description, GoType: goTypeName(ct.goType)}
+		for _, tr := range ct.transforms {
+			rt.Transforms = append(rt.Transforms, registry.Transform{
+				Name:        tr.name,
+				Description: tr.description,
+				Gives:       propertyNames(tr.gives),
+				Keeps:       propertyNames(tr.keeps),
+				Probe:       tr.probe != nil,
+				Owned:       r.owned[tr],
+			})
+		}
+		g.Types = append(g.Types, rt)
 	}
 	for _, l := range r.lifts {
 		g.Lifts = append(g.Lifts, registry.Lift{

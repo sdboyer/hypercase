@@ -51,6 +51,8 @@ func Register(items ...any) {
 				reg.addType(e)
 			case *erase.Lift:
 				refuse(fmt.Sprintf("Register was given the lift %s. Pass it to hypercase.Own, in the package that owns its column, or to hypercase.Use, in a package that only reads its product.", e.Name))
+			case *erase.Transform:
+				refuse(fmt.Sprintf("Register was given the transform %s. List it in its corpus type's Transforms, and pass it to hypercase.Own in the package that owns it.", e.Name))
 			default:
 				refuse(fmt.Sprintf("Register was given a %T, which is nothing hypercase registers. Pass a decl.Project, a decl.Property, a decl.Type, a hypercase.Suite or an option, such as hypercase.Own or hypercase.Root.", item))
 			}
@@ -68,6 +70,10 @@ type Option struct {
 // Own is the option that registers the columns the package owns: suites,
 // and lifts, [decl.Lift] values. The package runs their cells, and writes
 // and judges their sections. One package owns each column.
+//
+// Own also takes the transforms the package owns, [decl.Transform] values:
+// it writes and judges their variants' inputs. A corpus type the package
+// registers lists each, and one package owns each transform.
 func Own(columns ...any) Option {
 	return Option{apply: func(r *registrations) {
 		for _, item := range columns {
@@ -76,12 +82,16 @@ func Own(columns ...any) Option {
 				continue
 			}
 			if e, _ := erase.Of(item); e != nil {
-				if l, ok := e.(*erase.Lift); ok {
-					r.addLift(newLift(l, true))
+				switch e := e.(type) {
+				case *erase.Lift:
+					r.addLift(newLift(e, true))
+					continue
+				case *erase.Transform:
+					r.ownTransform(newTransform(e))
 					continue
 				}
 			}
-			refuse(fmt.Sprintf("hypercase.Own was given a %T. It takes the columns the package owns: hypercase.Suite and decl.Lift values.", item))
+			refuse(fmt.Sprintf("hypercase.Own was given a %T. It takes the columns the package owns, hypercase.Suite and decl.Lift values, and the transforms it owns, decl.Transform values.", item))
 		}
 	}}
 }
@@ -95,9 +105,12 @@ func Use(lifts ...any) Option {
 	return Option{apply: func(r *registrations) {
 		for _, item := range lifts {
 			if e, _ := erase.Of(item); e != nil {
-				if l, ok := e.(*erase.Lift); ok {
-					r.addLift(newLift(l, false))
+				switch e := e.(type) {
+				case *erase.Lift:
+					r.addLift(newLift(e, false))
 					continue
+				case *erase.Transform:
+					refuse(fmt.Sprintf("hypercase.Use was given the transform %s. It takes lifts only: every package that runs a corpus type runs its transforms, from the type's declaration. Pass the transform to hypercase.Own in the package that owns it.", e.Name))
 				}
 			}
 			if c, ok := item.(columnDecl); ok {
@@ -144,16 +157,18 @@ func RootPackage() Option {
 var reg = registrations{root: "."}
 
 type registrations struct {
-	mu          sync.Mutex
-	started     bool
-	project     *decl.Project
-	properties  []decl.Property
-	types       []*corpusType
-	lifts       []*lift   // owned and used
-	columns     []*column // the owned suites and lifts
-	root        string    // the corpus root, relative to the module root
-	rootSet     bool
-	rootPackage bool
+	mu         sync.Mutex
+	started    bool
+	project    *decl.Project
+	properties []decl.Property
+	types      []*corpusType
+	lifts      []*lift   // owned and used
+	columns    []*column // the owned suites and lifts
+	// ownedTransforms are the transforms given to Own.
+	ownedTransforms []*transform
+	root            string // the corpus root, relative to the module root
+	rootSet         bool
+	rootPackage     bool
 }
 
 func (r *registrations) addProject(p decl.Project) {
@@ -210,7 +225,7 @@ func (r *registrations) addColumn(c *column) {
 	}
 	checkRejects("suite", c.name, c.rejects)
 	checkPatterns("suite", c.name, c.outputs)
-	r.checkColumnName(c.name, c.describe())
+	r.checkColumnName("suite", c.name, c.describe())
 	r.columns = append(r.columns, c)
 }
 
@@ -248,7 +263,7 @@ func (r *registrations) addLift(l *lift) {
 			refuse(fmt.Sprintf("the lift %s is given to both hypercase.Own and hypercase.Use. A package owns a lift, or only uses it: pass it to one.", l.name))
 		}
 	}
-	r.checkColumnName(l.name, l.describe())
+	r.checkColumnName("lift", l.name, l.describe())
 	r.lifts = append(r.lifts, l)
 	if l.owned {
 		r.columns = append(r.columns, l.column())
@@ -257,8 +272,12 @@ func (r *registrations) addLift(l *lift) {
 
 // checkColumnName refuses a second column, or lift, of one name: lifts and
 // suites share the column names, and a lift the package uses is a column
-// of the corpus root.
-func (r *registrations) checkColumnName(name, what string) {
+// of the corpus root. It refuses the names a case's subtests give its
+// variants, too.
+func (r *registrations) checkColumnName(kind, name, what string) {
+	if name == archive.Variant || name == archive.Transform {
+		refuse(fmt.Sprintf("the %s name %s is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the %s.", kind, name, kind))
+	}
 	for _, c := range r.columns {
 		if c.name == name {
 			refuse(fmt.Sprintf("two columns are named %s: %s, and %s. Column names are unique; rename one.", name, c.describe(), what))
@@ -295,6 +314,9 @@ const checksDir = "checks"
 
 func (r *registrations) addType(e *erase.Type) {
 	t := &corpusType{dir: e.Dir, description: e.Description, goType: e.GoType, new: e.New}
+	for _, tr := range e.Transforms {
+		t.transforms = append(t.transforms, newTransform(tr))
+	}
 	switch {
 	case !validName(t.dir):
 		refuse(fmt.Sprintf("the corpus type %s declares the directory %q, which breaks the naming rule: %s. Rename the directory.", t.goType, t.dir, nameRule))
@@ -316,6 +338,7 @@ func (r *registrations) addType(e *erase.Type) {
 			refuseCorpusOfType(c, t)
 		}
 	}
+	checkTransforms(t)
 	r.types = append(r.types, t)
 }
 

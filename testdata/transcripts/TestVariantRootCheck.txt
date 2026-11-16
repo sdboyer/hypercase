@@ -1,0 +1,39 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # variants
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/echo
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/echo
+            --- PASS: TestCorpus/script/twice/variant/more
+                --- PASS: TestCorpus/script/twice/variant/more/echo
+PASS
+$ edit testdata/script/twice.txtar  # a variant with no about, states and lines nothing declares, and sections no registry claims
+$ go test  # variants
+    testdata/script/twice.txtar: variant/blank/about: the variant has no description: its about section is missing or empty
+        Write each variant's description, in prose, in its about section.
+    testdata/script/twice.txtar: gaps, line 1, names transform/nope, and no corpus type of testdata/script/ lists a transform of that name.
+        List the transform, or remove the line.
+    testdata/script/twice.txtar: variant/more/properties states loopy, and no registry under the module-root corpus lists a property of that name.
+        Declare the property, or correct the line.
+    testdata/script/twice.txtar: variant/more/gaps, line 1, names format, and no registry has a column of that name over the corpus script.
+        Register the column, or remove the line.
+    testdata/script/twice.txtar: no registry claims variant/more/out/shout/values.txt: no column named shout runs over the corpus script.
+        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+    testdata/script/twice.txtar: no registry claims transform/nope/in/do/out/values.txt and transform/nope/out/echo/values.txt: no corpus type of testdata/script/ lists a transform named nope.
+        If a transform should make the variant, list it in its corpus type's Transforms. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/echo
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/echo
+            --- PASS: TestCorpus/script/twice/variant/more
+                --- PASS: TestCorpus/script/twice/variant/more/echo
+FAIL
+[exit 1]

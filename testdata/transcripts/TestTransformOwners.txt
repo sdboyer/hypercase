@@ -1,0 +1,186 @@
+$ edit b/corpus_test.go  # a package b over the corpus
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-unowned
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # tr-b
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/copy
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/copy
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/copy
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/copy
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/copy
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/copy
+PASS
+$ go test  # tr-unowned
+    the transform looped, of testdata/script/, is owned by no package, so nothing writes or judges its variants' inputs.
+        Give it to hypercase.Own in one package that registers its corpus type.
+    the transform upper, of testdata/script/, is owned by no package, so nothing writes or judges its variants' inputs.
+        Give it to hypercase.Own in one package that registers its corpus type.
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # transforms
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # tr-b-owns
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/copy
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/copy
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/copy
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/copy
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/copy
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/copy
+PASS
+$ go test  # transforms
+    the transform upper, of testdata/script/, is owned by . and ./b. One package owns each transform.
+        Own it in one of them.
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # tr-b-differs
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/copy
+            --- SKIP: TestCorpus/script/errs/transform/looped
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/copy
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/copy
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/copy
+PASS
+$ go test  # transforms
+    the corpus directory script has two different corpus types:
+          .: github.com/sdboyer/hypercase_test.Script: "Trees of instructions, under in/<tree>/, that the fixtures' columns follow."; the transform looped: "Adds do/error and resolve/error, so echo and resolve err as on a cycle.", gives [circular], keeps [], with a probe; the transform upper: "Uppercases every file under do/out/.", gives [], keeps [circular dangling], with a probe
+          ./b: github.com/sdboyer/hypercase_test.Script: "Trees of instructions, under in/<tree>/, that the fixtures' columns follow."; the transform looped: "Adds do/error and resolve/error, so echo and resolve err as on a cycle.", gives [circular], keeps [], with a probe
+        An archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration.
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+FAIL
+[exit 1]

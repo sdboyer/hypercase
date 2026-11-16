@@ -1,0 +1,5 @@
+poke fails on the base.
+-- in/do/out/values.txt --
+x
+-- in/tr/error --
+the base is too big

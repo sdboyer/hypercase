@@ -1,0 +1,83 @@
+{
+  "format": 4,
+  "updateVar": "FIXTURE_UPDATE_GOLDEN",
+  "corpusRoot": ".",
+  "rootPackage": true,
+  "issueLinks": [],
+  "properties": [
+    {
+      "name": "circular",
+      "description": "Some cell's formula refers back to itself, directly or through other cells."
+    },
+    {
+      "name": "dangling",
+      "description": "Some formula refers to a cell the sheet doesn't have."
+    },
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    }
+  ],
+  "types": [
+    {
+      "dir": "script",
+      "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
+      "goType": "github.com/sdboyer/hypercase_test.Script",
+      "transforms": [
+        {
+          "name": "poke",
+          "description": "Adds do/out/p.txt.",
+          "gives": [],
+          "keeps": [],
+          "probe": true,
+          "owned": true
+        }
+      ]
+    }
+  ],
+  "lifts": [],
+  "suites": [
+    {
+      "name": "echo",
+      "description": "Does what the case's do/ tree says.",
+      "consumes": "github.com/sdboyer/hypercase_test.Script",
+      "corpora": [
+        "script"
+      ],
+      "outputs": [
+        {
+          "pattern": "?.txt",
+          "description": "A file the case's instructions name with one letter."
+        },
+        {
+          "pattern": "archive.txt",
+          "description": "The archive's name, as the run received it."
+        },
+        {
+          "pattern": "dir.txt",
+          "description": "The path of a temp dir the run made."
+        },
+        {
+          "pattern": "error.txt",
+          "description": "The error the case's instructions give."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "What the case's instructions write to stderr."
+        },
+        {
+          "pattern": "stdout.txt",
+          "description": "What the case's instructions write to stdout."
+        },
+        {
+          "pattern": "values.txt",
+          "description": "The values the case's instructions give."
+        }
+      ],
+      "rejects": [
+        "circular",
+        "dangling"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+A1 is twice B1, which echo prints in words.
+-- in/do/out/values.txt --
+a1 six
+-- variant/cycle/about --
+The do/ tree errs, as on a cycle.
+-- variant/cycle/properties --
+circular
+-- variant/cycle/in/do/error --
+A1 -> B1 -> A1: cycle
+-- variant/blank/about --
+The do/ tree's output is gone, so echo prints nothing.
+-- variant/blank/delete --
+do/out/values.txt
+-- variant/more/about --
+The do/ tree gains a second output.
+-- variant/more/in/do/out/b.txt --
+b1 three

@@ -122,7 +122,8 @@ func TestGapsForm(t *testing.T) {
 		"gaps, line 2: the column's name is followed by more than one space",
 		"gaps, line 3: the line is blank",
 		"gaps, line 5: lines 4 and 5 both mark the cell of echo",
-		`gaps, line 6: the line starts with "transform/looped", which is not a column's name`,
+		`gaps, line 6: the line starts with "transform/Looped", which is not transform/<name> for a transform's name`,
+		"gaps, line 7: the line names transform/looped echo and has no text",
 		"testdata/script/empty.txtar has problems of form",
 		"gaps: the section is empty",
 	}

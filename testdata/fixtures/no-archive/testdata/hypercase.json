@@ -1,5 +1,5 @@
 {
-  "format": 3,
+  "format": 4,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -14,7 +14,8 @@
     {
       "dir": "script",
       "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
-      "goType": "github.com/sdboyer/hypercase_test.Script"
+      "goType": "github.com/sdboyer/hypercase_test.Script",
+      "transforms": []
     }
   ],
   "lifts": [

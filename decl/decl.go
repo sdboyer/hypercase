@@ -55,6 +55,41 @@ type Type[T ~struct{ fs.FS }] struct {
 	Dir string
 	// Description says what the type's inputs are. It is required.
 	Description string
+	// Transforms are the type's transforms. Each makes a variant of every
+	// archive's base it doesn't decline, so every package that runs the
+	// type runs them. One package owns each, by giving it to
+	// hypercase.Own, and writes and judges its variants' inputs.
+	Transforms []Transform[T]
+}
+
+// A Transform makes a variant of a case from its base: one mechanical
+// change, such as a cycle added, that makes a useful case from most bases
+// of its corpus type. An update writes the variant's inputs, under
+// transform/<Name>/ in the base's archive, and each column's cells run on
+// it.
+type Transform[T ~struct{ fs.FS }] struct {
+	// Name names the transform, and its variant's sections,
+	// transform/<Name>/. Names are unique per corpus type.
+	Name string
+	// Description says what the transform changes. It is required, and it
+	// is the description of each variant the transform makes.
+	Description string
+	// Gives lists the properties every variant has. A variant's
+	// properties are Gives, and each property of Keeps its base states.
+	Gives []Property
+	// Keeps lists the properties a variant has when its base states them.
+	// A base that states a property the transform neither gives nor keeps
+	// is declined, with that as the reason.
+	Keeps []Property
+	// Probe decides from the base's input view alone whether the transform
+	// makes a variant of it. When it says no, it gives the reason. A
+	// transform with no probe makes a variant of every base it doesn't
+	// decline for its properties.
+	Probe func(base T) (why string, ok bool)
+	// Jenny makes the variant's input view from the base's: the files it
+	// generates are the variant's whole input view, by their paths in it,
+	// with the trees as their top-level directories. It is required.
+	Jenny jenny.Jenny[T]
 }
 
 // A Lift is a registered function from one type to the next: from a corpus

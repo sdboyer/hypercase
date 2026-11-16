@@ -1,0 +1,5 @@
+poke panics on the base.
+-- in/do/out/values.txt --
+x
+-- in/tr/panic --
+boom

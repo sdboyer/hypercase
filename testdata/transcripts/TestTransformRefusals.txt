@@ -1,0 +1,48 @@
+$ go test  # tr-bare
+panic: hypercase: Register was given the transform looped. List it in its corpus type's Transforms, and pass it to hypercase.Own in the package that owns it.
+[stack]
+[exit 2]
+$ go test  # tr-use
+panic: hypercase: hypercase.Use was given the transform looped. It takes lifts only: every package that runs a corpus type runs its transforms, from the type's declaration. Pass the transform to hypercase.Own in the package that owns it.
+[stack]
+[exit 2]
+$ go test  # tr-own-twice
+panic: hypercase: the transform looped is given to hypercase.Own twice. Own it once.
+[stack]
+[exit 2]
+$ go test  # tr-bad-name
+panic: hypercase: the corpus type hypercase_test.Script lists a transform named "Looped", which breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter. Rename the transform.
+[stack]
+[exit 2]
+$ go test  # tr-two-names
+panic: hypercase: the corpus type hypercase_test.Script lists two transforms named looped. Transform names are unique per corpus type; rename one.
+[stack]
+[exit 2]
+$ go test  # tr-no-jenny
+panic: hypercase: the transform looped, of the corpus type hypercase_test.Script, has no Jenny. Give it the jenny that makes its variant's input view from the base's.
+[stack]
+[exit 2]
+$ go test  # tr-gives-keeps
+panic: hypercase: the transform looped both gives and keeps circular. Every variant has a property the transform gives: list it in Gives alone.
+[stack]
+[exit 2]
+$ go test  # tr-gives-twice
+panic: hypercase: the transform looped gives circular twice. List each property once.
+[stack]
+[exit 2]
+$ go test  # tr-keeps-twice
+panic: hypercase: the transform upper keeps dangling twice. List each property once.
+[stack]
+[exit 2]
+$ go test  # col-variant
+panic: hypercase: the suite name variant is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the suite.
+[stack]
+[exit 2]
+$ go test  # col-transform
+panic: hypercase: the suite name transform is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the suite.
+[stack]
+[exit 2]
+$ go test  # lift-variant
+panic: hypercase: the lift name variant is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the lift.
+[stack]
+[exit 2]

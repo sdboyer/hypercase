@@ -234,8 +234,6 @@ func TestProblemsOfForm(t *testing.T) {
 	want := []string{
 		"testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it:\n",
 		"ni/do/out/values.txt: ni is not one of the framework's top-level names",
-		"variant/cycle/about: the top-level name variant is reserved",
-		"transform/looped/in/sheet/A1: the top-level name transform is reserved",
 		"via/import/sheet/A1: the top-level name via is reserved",
 		"in/do/out/values.txt: the section appears twice",
 		"in/../x: the name is not a valid slash path",

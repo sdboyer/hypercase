@@ -1,0 +1,54 @@
+$ rm testdata/script/errs.txtar  # 
+$ rm testdata/script/garbled.txtar  # 
+$ edit testdata/script/twice.txtar  # a hand-written variant parse rejects
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/twice/variant/bad: resolve is blocked: the lift parse failed on the case, and testdata/script/twice.txtar, variant/bad/out/parse/error.txt, records its error.
+    what ran, in order:
+        parse ran on twice
+        resolve ran on twice
+        parse ran on twice
+        parse ran on twice
+        resolve ran on twice
+        parse ran on twice
+        resolve ran on twice
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/parse
+            --- PASS: TestCorpus/script/twice/resolve
+            --- PASS: TestCorpus/script/twice/variant/bad
+                --- PASS: TestCorpus/script/twice/variant/bad/parse
+                --- SKIP: TestCorpus/script/twice/variant/bad/resolve
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/parse
+                --- PASS: TestCorpus/script/twice/transform/looped/resolve
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/parse
+                --- PASS: TestCorpus/script/twice/transform/upper/resolve
+PASS
+$ go test  # tr-ladder
+    script/twice/variant/bad: resolve is blocked: the lift parse failed on the case, and testdata/script/twice.txtar, variant/bad/out/parse/error.txt, records its error.
+    what ran, in order:
+        parse ran on twice
+        resolve ran on twice
+        parse ran on twice
+        parse ran on twice
+        resolve ran on twice
+        parse ran on twice
+        resolve ran on twice
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/parse
+            --- PASS: TestCorpus/script/twice/resolve
+            --- PASS: TestCorpus/script/twice/variant/bad
+                --- PASS: TestCorpus/script/twice/variant/bad/parse
+                --- SKIP: TestCorpus/script/twice/variant/bad/resolve
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/parse
+                --- PASS: TestCorpus/script/twice/transform/looped/resolve
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/parse
+                --- PASS: TestCorpus/script/twice/transform/upper/resolve
+PASS
