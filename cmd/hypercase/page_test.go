@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/sdboyer/hypercase/internal/gittest"
+	"github.com/sdboyer/hypercase/internal/registry"
 )
 
 // section returns the part of a page from the first occurrence of start
@@ -140,6 +141,35 @@ func TestPageProperties(t *testing.T) {
 	lacks(t, "twice's row", head, `class="prop"`)
 	holds(t, "loop calc's change", change(t, page, "sheet/loop", "calc"), circular)
 	lacks(t, "div calc's change", change(t, page, "sheet/div", "calc"), `class="prop"`)
+}
+
+// TestPageTransformProperties: a transform's variant states what the
+// registries say its transform gives, and each property the transform
+// keeps that its base states, shown as a case's are.
+func TestPageTransformProperties(t *testing.T) {
+	t.Parallel()
+	reg := moduleRegistry()
+	reg.Properties = append(reg.Properties, registry.Property{Name: "dangling", Description: "A reference to nothing."})
+	reg.Types = []registry.Type{{Dir: "sheet", Description: "A sheet.", GoType: "example.com/m.Sheet", Transforms: []registry.Transform{
+		{Name: "looped", Description: "Adds a cycle.", Gives: []string{"circular"}, Owned: true},
+		{Name: "kept", Description: "Adds a number.", Keeps: []string{"dangling", "circular"}, Owned: true},
+	}}}
+	files := module(map[string]string{
+		"loop":  "A loop.\n-- in/sheet/A1 --\n=A1\n-- properties --\ncircular\n-- out/calc/outcome --\nrejected\n-- transform/kept/in/sheet/B1 --\n1\n-- transform/kept/out/calc/outcome --\nrejected\n",
+		"plain": "A number.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n-- transform/kept/in/sheet/B1 --\n1\n-- transform/kept/out/calc/outcome --\naccepted\n-- transform/looped/in/sheet/A1 --\n=A1\n-- transform/looped/out/calc/outcome --\nrejected\n",
+	})
+	files["testdata/hypercase.json"] = string(reg.Marshal())
+	g := gittest.New(t)
+	c := revisions(t, g, module(nil), files)
+	page := ok(t, g, "", "report", c[0], c[1])
+	const circular = `<span class="prop" title="A loop.">circular</span>`
+	head, _ := matrixRow(t, page, "sheet", "sheet/loop/transform/kept")
+	holds(t, "loop/transform/kept's row", head, circular)
+	head, _ = matrixRow(t, page, "sheet", "sheet/plain/transform/looped")
+	holds(t, "plain/transform/looped's row", head, circular)
+	head, _ = matrixRow(t, page, "sheet", "sheet/plain/transform/kept")
+	lacks(t, "plain/transform/kept's row", head, `class="prop"`)
+	holds(t, "loop/transform/kept calc's change", change(t, page, "sheet/loop/transform/kept", "calc"), circular)
 }
 
 // TestPageGaps: each gaps line is shown on the cell it marks, linked to

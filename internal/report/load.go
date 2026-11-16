@@ -23,10 +23,12 @@ type snapshot struct {
 	// columns holds each corpus's columns, by name.
 	columns map[string]map[string]string // corpus → column → description
 	props   map[string]string            // property → description
-	cases   map[caseKey]*caseAt
-	cells   map[cellKey]*cellAt
-	gaps    map[cellKey]string // the text of the gaps line that marks a cell
-	regs    int                // the registries over the corpus root
+	// transforms holds each corpus's transforms, by name.
+	transforms map[string]map[string]registry.Transform // corpus → transform → its declaration
+	cases      map[caseKey]*caseAt
+	cells      map[cellKey]*cellAt
+	gaps       map[cellKey]string // the text of the gaps line that marks a cell
+	regs       int                // the registries over the corpus root
 }
 
 // The kinds of case: the base, which an archive's in/ holds, and its
@@ -116,12 +118,13 @@ const outcomeFile = "outcome"
 // module there, and holds nothing.
 func load(rev Rev, tree fs.FS, mod, root string) (*snapshot, error) {
 	s := &snapshot{
-		rev:     rev,
-		columns: map[string]map[string]string{},
-		props:   map[string]string{},
-		cases:   map[caseKey]*caseAt{},
-		cells:   map[cellKey]*cellAt{},
-		gaps:    map[cellKey]string{},
+		rev:        rev,
+		columns:    map[string]map[string]string{},
+		props:      map[string]string{},
+		transforms: map[string]map[string]registry.Transform{},
+		cases:      map[caseKey]*caseAt{},
+		cells:      map[cellKey]*cellAt{},
+		gaps:       map[cellKey]string{},
 	}
 	if mod == "" {
 		return s, nil
@@ -149,6 +152,16 @@ func load(rev Rev, tree fs.FS, mod, root string) (*snapshot, error) {
 		for _, p := range g.Properties {
 			if _, ok := s.props[p.Name]; !ok {
 				s.props[p.Name] = p.Description
+			}
+		}
+		for _, ty := range g.Types {
+			if s.transforms[ty.Dir] == nil {
+				s.transforms[ty.Dir] = map[string]registry.Transform{}
+			}
+			for _, tr := range ty.Transforms {
+				if _, ok := s.transforms[ty.Dir][tr.Name]; !ok {
+					s.transforms[ty.Dir][tr.Name] = tr
+				}
 			}
 		}
 		addColumn := func(name, description string, corpora []string) {
@@ -291,7 +304,30 @@ func (s *snapshot) addArchive(corpus, name string, data []byte) error {
 			}
 		}
 	}
+	for k, c := range s.cases {
+		if k.kind == transform && k.corpus == corpus && k.archive == name {
+			c.properties = s.transformProperties(corpus, k.name, s.cases[baseKey].properties)
+		}
+	}
 	return nil
+}
+
+// transformProperties returns what a transform's variant states, as the
+// registries declare the transform: what it gives, then each property it
+// keeps that the base states, in the base's order. A transform no
+// registry declares gives its variant none.
+func (s *snapshot) transformProperties(corpus, name string, base []string) []string {
+	tr, ok := s.transforms[corpus][name]
+	if !ok {
+		return nil
+	}
+	props := slices.Clone(tr.Gives)
+	for _, p := range base {
+		if slices.Contains(tr.Keeps, p) && !slices.Contains(props, p) {
+			props = append(props, p)
+		}
+	}
+	return props
 }
 
 // addCellFile reads one file of a cell: rest is its path under out/, as
