@@ -14,8 +14,8 @@ root-package test (step 5), an `outcome` file per cell (step 8), and `Inputs`
 or `AllInputs` on every output declaration (step 11). Earlier steps' examples
 keep running, and gain what later steps require.
 
-Every step is shown in two toy domains, recipes and spreadsheet formulas,
-which step 1 introduces. Steps 1 to 11 show the Go an author writes at that
+Every step is shown in one toy domain, spreadsheet formulas, which step 1
+introduces. Steps 1 to 11 show the Go an author writes at that
 step, against the API the step adds. A name or format marked "proposed" is not
 settled yet.
 
@@ -27,96 +27,40 @@ A table test is a slice of rows, each with a name, an input and a want, and a
 loop that runs each row with `t.Run`. The wants are written in Go. No
 framework is involved.
 
-### The toys
+### The toy
 
-The two toys are small Go projects (proposed). Neither domain package knows
-anything of hypercase.
+The toy is a small Go project (proposed) whose domain is spreadsheet
+formulas. A sheet is a directory with one file per cell, named for the cell
+(`A1`, `B1`), holding a number or a formula such as `=B1*2`. The package
+`sheet` parses a sheet, resolves its references, evaluates it, prints its
+formulas back, and imports CSV. Its command, `calc`, prints a sheet's values.
+The domain package knows nothing of hypercase.
 
-- **Recipes.** A recipe card is a text file: a `serves:` line, then one
-  ingredient per line, `name: amount unit`, where a count has no unit. The
-  package `recipe` parses cards, scales them, tallies them into a shopping
-  list in metric units, and extracts a card from a blog post. Its command,
-  `shop`, prints a shopping list.
-- **Spreadsheet formulas.** A sheet is a directory with one file per cell,
-  named for the cell (`A1`, `B1`), holding a number or a formula such as
-  `=B1*2`. The package `sheet` parses a sheet, resolves its references,
-  evaluates it, prints its formulas back, and imports CSV. Its command,
-  `calc`, prints a sheet's values.
-
-Both toys are kept (proposed). Trade-off: two toys double every snippet and
-archive. Each meets every need of the twelve steps alone, and two show that
-hypercase isn't shaped to one domain.
-
-They live under `walkthrough/` (proposed):
+It lives under `walkthrough/` (proposed):
 
 ```
 walkthrough/
-  recipes/              a module: the recipes project
+  sheets/               a module: the sheets project
     go.mod
-    recipe/             the domain package
-    cmd/shop/
-    step01/ … step11/   one example package per step
-  sheets/               a module: the sheets project, the same shape
-    go.mod
-    sheet/
+    sheet/              the domain package
     cmd/calc/
-    step01/ … step11/
+    step01/ … step11/   one example package per step
 ```
 
-- Each toy is a module of its own. Its `go.mod` requires hypercase through
+- The toy is a module of its own. Its `go.mod` requires hypercase through
   `replace github.com/sdboyer/hypercase => ../..`, so it builds against the
   checkout, and its dependencies stay out of hypercase's `go.mod`. CI runs
-  `go test ./...` at the repository root and at each toy's root.
+  `go test ./...` at the repository root and at the toy's root.
 - Each step's example is a package of its own. From step 3, each step's
   directory also holds that step's corpus (step 5), so no two steps' cases
   meet.
-- Trade-off: a module per toy keeps toy dependencies out of hypercase's
-  `go.mod`, at the cost of one more `go test` run per toy in CI. Through the
-  `replace`, the toys build only against the checkout, never a release.
+- Trade-off: a module of its own keeps the toy's dependencies out of
+  hypercase's `go.mod`, at the cost of a second `go test` run in CI. Through
+  the `replace`, the toy builds only against the checkout, never a release.
 
 ### What the author writes
 
-```go
-// walkthrough/recipes/step01/scale_test.go
-package step01
-
-import (
-	"testing"
-
-	"github.com/sdboyer/hypercase/walkthrough/recipes/recipe"
-)
-
-func TestScale(t *testing.T) {
-	tests := []struct {
-		name string
-		card string
-		want string
-	}{
-		{
-			name: "pancakes",
-			card: "serves: 2\nflour: 100 g\nmilk: 150 ml\negg: 1\n",
-			want: "serves: 4\nflour: 200 g\nmilk: 300 ml\negg: 2\n",
-		},
-		{
-			name: "porridge",
-			card: "serves: 1\noats: 50 g\nmilk: 300 ml\n",
-			want: "serves: 4\noats: 200 g\nmilk: 1200 ml\n",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r, err := recipe.Parse([]byte(tt.card))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got := string(r.Scale(4).Format()); got != tt.want {
-				t.Errorf("got:\n%s\nwant:\n%s", got, tt.want)
-			}
-		})
-	}
-}
-```
-
+<!-- source: walkthrough/sheets/step01/evaluate_test.go -->
 ```go
 // walkthrough/sheets/step01/evaluate_test.go
 package step01
@@ -161,12 +105,11 @@ func TestEvaluate(t *testing.T) {
 
 ### How the files change
 
-Each example is one test file: `walkthrough/recipes/step01/scale_test.go` and
-`walkthrough/sheets/step01/evaluate_test.go`.
+The example is one test file, `walkthrough/sheets/step01/evaluate_test.go`.
 
 ### What can now be seen
 
-Pass or fail per named row. `go test -run 'TestScale/pancakes' ./step01` runs
+Pass or fail per named row. `go test -run 'TestEvaluate/twice' ./step01` runs
 one row.
 
 ## 2. Goldens
@@ -185,25 +128,41 @@ an update switch rewrites the goldens. Step 2's switch is Go's conventional
 step 3's variable solves, at the cost of teaching a switch the reader then
 drops.
 
+The test's rows keep their cells and lose their wants, and each row's output
+is `values.Format()`, one line per cell:
+
+<!-- source: walkthrough/sheets/step02/evaluate_test.go -->
 ```go
-// walkthrough/recipes/step02/scale_test.go
+// walkthrough/sheets/step02/evaluate_test.go
+package step02
+
+import (
+	"bytes"
+	"flag"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
+)
+
 var update = flag.Bool("update", false, "rewrite the golden files")
 
-func TestScale(t *testing.T) {
+func TestEvaluate(t *testing.T) {
 	tests := []struct {
-		name string
-		card string
+		name  string
+		cells map[string]string
 	}{
-		{"pancakes", "serves: 2\nflour: 100 g\nmilk: 150 ml\negg: 1\n"},
-		{"porridge", "serves: 1\noats: 50 g\nmilk: 300 ml\n"},
+		{"twice", map[string]string{"A1": "=B1*2", "B1": "3"}},
+		{"prices", map[string]string{"A1": "4", "B1": "6", "C1": "=A1+B1"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, err := recipe.Parse([]byte(tt.card))
+			values, err := sheet.EvalCells(tt.cells)
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := r.Scale(4).Format()
+			got := values.Format()
 			golden := filepath.Join("testdata", tt.name+".golden")
 			if *update {
 				if err := os.WriteFile(golden, got, 0o644); err != nil {
@@ -225,30 +184,14 @@ func TestScale(t *testing.T) {
 }
 ```
 
-The sheets test changes the same way. Its rows keep their cells and lose
-their wants, and each row's output is `values.Format()`, one line per cell:
-
-```go
-// walkthrough/sheets/step02/evaluate_test.go
-		t.Run(tt.name, func(t *testing.T) {
-			values, err := sheet.EvalCells(tt.cells)
-			if err != nil {
-				t.Fatal(err)
-			}
-			got := values.Format()
-			golden := filepath.Join("testdata", tt.name+".golden")
-			// compared with the golden, or written under -update, as for recipes
-		})
-```
-
 ### How the files change
 
-The wants leave the table, and each row has a golden: `testdata/pancakes.golden`
-and `testdata/porridge.golden`; `testdata/twice.golden` and
-`testdata/prices.golden`. `go test ./step02 -update` writes them.
+The wants leave the table, and each row has a golden: `testdata/twice.golden`
+and `testdata/prices.golden`. `go test ./step02 -update` writes them.
 `testdata/twice.golden` holds each cell's value, in cell order (row by row,
 then column by column):
 
+<!-- source: walkthrough/sheets/step02/testdata/twice.golden -->
 ```
 A1 6
 B1 3
@@ -285,55 +228,12 @@ project's commands can use its declarations, at the cost of a second import
 in every test file.
 
 ```go
-// walkthrough/recipes/step03/recipecorpus/project.go
-package recipecorpus
+// walkthrough/sheets/step03/sheetcorpus/project.go
+package sheetcorpus
 
 import "github.com/sdboyer/hypercase/decl"
 
-// Project is what the recipes project supplies to hypercase.
-var Project = decl.Project{
-	UpdateVar: "RECIPES_UPDATE_GOLDEN",
-}
-```
-
-```go
-// walkthrough/recipes/step03/scale_test.go
-package step03
-
-import (
-	"io/fs"
-	"testing"
-
-	"github.com/sdboyer/hypercase"
-	"github.com/sdboyer/hypercase/walkthrough/recipes/recipe"
-	"github.com/sdboyer/hypercase/walkthrough/recipes/step03/recipecorpus"
-)
-
-func init() {
-	hypercase.Register(recipecorpus.Project, scale)
-}
-
-var scale = hypercase.Run{
-	Name:        "scale",
-	Description: "Scales the recipe card to serve four.",
-	Run: func(t testing.TB, in fs.FS) ([]hypercase.File, error) {
-		src, err := recipe.ReadCard(in) // the one file under recipe/
-		if err != nil {
-			t.Fatal(err) // the archive is wrong, not the code under test
-		}
-		r, err := recipe.Parse(src)
-		if err != nil {
-			return nil, err
-		}
-		return []hypercase.File{{Path: "card.txt", Data: r.Scale(4).Format()}}, nil
-	},
-}
-
-func TestCorpus(t *testing.T) { hypercase.Test(t) }
-```
-
-```go
-// walkthrough/sheets/step03/sheetcorpus/project.go
+// Project is what the sheets project supplies to hypercase.
 var Project = decl.Project{
 	UpdateVar: "SHEETS_UPDATE_GOLDEN",
 }
@@ -341,6 +241,17 @@ var Project = decl.Project{
 
 ```go
 // walkthrough/sheets/step03/evaluate_test.go
+package step03
+
+import (
+	"io/fs"
+	"testing"
+
+	"github.com/sdboyer/hypercase"
+	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
+	"github.com/sdboyer/hypercase/walkthrough/sheets/step03/sheetcorpus"
+)
+
 func init() {
 	hypercase.Register(sheetcorpus.Project, evaluate)
 }
@@ -362,23 +273,7 @@ func TestCorpus(t *testing.T) { hypercase.Test(t) }
 
 ### How the files change
 
-Each table row and its golden become one archive. `testdata/pancakes.txtar`:
-
-```
-Pancakes for two.
--- in/recipe/pancakes.txt --
-serves: 2
-flour: 100 g
-milk: 150 ml
-egg: 1
--- out/scale/card.txt --
-serves: 4
-flour: 200 g
-milk: 300 ml
-egg: 2
-```
-
-`testdata/twice.txtar`:
+Each table row and its golden become one archive. `testdata/twice.txtar`:
 
 ```
 A1 is twice B1.
@@ -408,13 +303,12 @@ their line endings. Its `.gitattributes` holds:
 - The archive's **comment**, the text before its first `-- name --` line, is
   the case's description, in prose. It is required. It holds no `key: value`
   lines: nothing in it names the case's type or sets a parameter.
-- `in/<tree>/…` holds the case's named input trees, such as `in/recipe/` and
-  `in/sheet/`. The run sees one **input view**: everything under `in/`, with
-  the prefix removed, as an `fs.FS`. `in/recipe/pancakes.txt` is
-  `recipe/pancakes.txt` in the view.
+- `in/<tree>/…` holds the case's named input trees, such as `in/sheet/`. The
+  run sees one **input view**: everything under `in/`, with the prefix
+  removed, as an `fs.FS`. `in/sheet/A1` is `sheet/A1` in the view.
 - The top level of an archive is the framework's, a closed set: `in`, `out`,
   `via`, `properties`, `gaps`, `variant` and `transform`. Any other top-level
-  name fails the run, so a typo such as `ni/recipe/pancakes.txt` can't pass
+  name fails the run, so a typo such as `ni/sheet/A1` can't pass
   unread. Later steps give most of these names their meaning. `params` is
   reserved as a tree name under `in/` (step 6), and `checks` as a directory
   name under `testdata/` (step 8).
@@ -426,9 +320,9 @@ their line endings. Its `.gitattributes` holds:
   **cell** is one case run through one column. Cases and columns make a
   **matrix**. The run is a matrix with one column: step 5 adds columns, and
   the archive's own layout doesn't change.
-- What the run does is fixed in Go and said in its description: `scale`
-  scales every card to serve four, and no archive says so. An archive carries
-  no parameters.
+- An archive carries no parameters. What the run does is fixed in Go and
+  said in its description, and so is anything it could vary (step 6 states
+  the rule).
 - The run receives a `testing.TB` and the input view, and returns its output
   files and an error. It reports its own failures through the `testing.TB`,
   such as a fixture it can't set up. The error it returns is only what the
@@ -456,7 +350,7 @@ their line endings. Its `.gitattributes` holds:
 
 - Updates use one environment variable, whose name the project supplies as
   `UpdateVar`. One variable covers every corpus in the project.
-- An update is the whole module's: `RECIPES_UPDATE_GOLDEN=1 go test ./...`,
+- An update is the whole module's: `SHEETS_UPDATE_GOLDEN=1 go test ./...`,
   at the module root. Every message and every instruction that tells a person
   to update gives that command.
 
@@ -529,7 +423,7 @@ their line endings. Its `.gitattributes` holds:
 **Names** (proposed).
 
 - A name is lowercase ASCII letters and digits, in words joined by single
-  hyphens, starting with a letter: `pancakes`, `shopping-list`. The rule
+  hyphens, starting with a letter: `twice`, `open-quote`. The rule
   covers archive and column names here, and property names (step 4), corpus
   directories (step 6), variant and transform names (step 7) and check names
   (step 8). Such a name never collides with another on a case-insensitive
@@ -538,8 +432,8 @@ their line endings. Its `.gitattributes` holds:
 - A project can't narrow the rule. A parameter derived from an archive's
   name (step 6) follows a convention that accepts every name the rule
   admits.
-- A cell's subtest is named `<case>/<column>`: `TestCorpus/pancakes/scale`.
-  `go test -run 'TestCorpus/pancakes/'` runs one case's cells.
+- A cell's subtest is named `<case>/<column>`: `TestCorpus/twice/evaluate`.
+  `go test -run 'TestCorpus/twice/'` runs one case's cells.
 - Trade-off: one strict rule everywhere keeps names safe on every
   filesystem and in every `-run` pattern, at the cost of names that can't
   carry case or punctuation. A column that derives a parameter from an
@@ -561,16 +455,14 @@ their line endings. Its `.gitattributes` holds:
   with what to do. For illustration:
 
   ```
-  --- FAIL: TestCorpus/pancakes/scale
-      pancakes: Pancakes for two.
-      scale: Scales the recipe card to serve four.
-      out/scale/card.txt differs (-golden +got):
-        serves: 4
-      - flour: 200 g
-      + flour: 200.0 g
-        milk: 300 ml
-        egg: 2
-      If the change is intended, run RECIPES_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+  --- FAIL: TestCorpus/twice/evaluate
+      twice: A1 is twice B1.
+      evaluate: Evaluates every cell of the sheet.
+      out/evaluate/values.txt differs (-golden +got):
+      - A1 6
+      + A1 6.0
+        B1 3
+      If the change is intended, run SHEETS_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
   ```
 
 **When to add an archive** (proposed): when an input makes a point no
@@ -601,30 +493,6 @@ properties it rejects.
 Proposed names: `decl.Property`, and the run's `Rejects` field.
 
 ```go
-// walkthrough/recipes/step04/recipecorpus/properties.go
-var Garbled = decl.Property{
-	Name:        "garbled",
-	Description: "Some line after serves: is not an ingredient, name: amount unit.",
-}
-```
-
-```go
-// walkthrough/recipes/step04/scale_test.go
-func init() {
-	hypercase.Register(recipecorpus.Project, recipecorpus.Garbled, scale)
-}
-
-var scale = hypercase.Run{
-	Name:        "scale",
-	Description: "Scales the recipe card to serve four.",
-	Rejects:     []decl.Property{recipecorpus.Garbled},
-	Run: func(t testing.TB, in fs.FS) ([]hypercase.File, error) {
-		// as in step 3
-	},
-}
-```
-
-```go
 // walkthrough/sheets/step04/sheetcorpus/properties.go
 var Circular = decl.Property{
 	Name:        "circular",
@@ -651,22 +519,7 @@ var evaluate = hypercase.Run{
 ### How the files change
 
 An archive gains a `properties` section, a `gaps` section, or both. Both are
-hand-written. `testdata/crepes.txtar` is meant to be rejected:
-
-```
-A line of method among the ingredients.
--- in/recipe/crepes.txt --
-serves: 2
-flour: 100 g
-whisk until smooth
-milk: 250 ml
--- properties --
-garbled
--- out/scale/error.txt --
-line 3: not an ingredient: "whisk until smooth"
-```
-
-`testdata/loop.txtar`:
+hand-written. `testdata/loop.txtar` is meant to be rejected:
 
 ```
 A1 and B1 refer to each other.
@@ -680,23 +533,8 @@ circular
 A1 -> B1 -> A1: cycle
 ```
 
-`testdata/omelette.txtar` records a known gap whose output is wrong:
-
-```
-An omelette for three, with one egg.
--- in/recipe/omelette.txt --
-serves: 3
-egg: 1
-butter: 15 g
--- gaps --
-scale A count scales to a whole number, so egg: 1 for four. Waits on recipes#2.
--- out/scale/card.txt --
-serves: 4
-egg: 1.3333333333333333
-butter: 20 g
-```
-
-`testdata/negative.txtar` records one that errs when it shouldn't:
+`testdata/negative.txtar` records a known gap, a cell that errs when it
+shouldn't:
 
 ```
 A1 is a negative number.
@@ -821,9 +659,8 @@ columns, at the cost of not saying which column a case is aimed at; only
 ### What step 4 leaves
 
 One run answers every archive, through one function. A project tests more
-than one function or command over the same inputs: a recipe card is scaled,
-tallied into a shopping list, and given to the `shop` command; a sheet is
-evaluated, printed back, and given to `calc`. With one run per package, each
+than one function or command over the same inputs: a sheet is evaluated,
+printed back, and given to the `calc` command. With one run per package, each
 of those keeps its own copy of every input. And what a command prints to
 stdout and stderr has nowhere to go.
 
@@ -848,106 +685,8 @@ The walkthrough's examples pass their own directory as the corpus root, so
 each step's corpus stands alone. A project with one corpus at its module
 root passes nothing.
 
-```go
-// walkthrough/recipes/step05/recipecorpus/properties.go gains:
-var Vague = decl.Property{
-	Name:        "vague",
-	Description: "Some ingredient is measured in a unit with no fixed size, such as a handful.",
-}
-```
-
-```go
-// walkthrough/recipes/step05/corpus_test.go: the corpus root's package, with scale and shopping-list
-func init() {
-	hypercase.Register(
-		recipecorpus.Project,
-		hypercase.Root("step05"),
-		hypercase.RootPackage(),
-		recipecorpus.Garbled, recipecorpus.Vague,
-		scale, shoppingList,
-	)
-}
-
-var scale = hypercase.Suite{
-	Name:        "scale",
-	Description: "Scales the recipe card to serve four.",
-	Corpus:      "recipe", // testdata/recipe/*.txtar
-	Probe: func(in fs.FS) (why string, ok bool) {
-		if recipe.Serves(in) == 4 {
-			return "already serves 4", false
-		}
-		return "", true
-	},
-	Outputs: []decl.Output{
-		{Pattern: "card.txt", Description: "The card, scaled to serve four."},
-		{Pattern: "error.txt", Description: "Why the card doesn't parse."},
-	},
-	Rejects: []decl.Property{recipecorpus.Garbled},
-	Run: func(t testing.TB, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
-		// as in step 3
-	},
-}
-
-var shoppingList = hypercase.Suite{
-	Name:        "shopping-list",
-	Description: "Tallies the card's ingredients into a shopping list in metric units.",
-	Corpus:      "recipe",
-	Outputs: []decl.Output{
-		{Pattern: "list.txt", Description: "What to buy, one ingredient per line, in metric units."},
-		{Pattern: "error.txt", Description: "Why the card can't be tallied."},
-	},
-	Rejects: []decl.Property{recipecorpus.Garbled, recipecorpus.Vague},
-	Run: func(t testing.TB, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
-		src, err := recipe.ReadCard(in)
-		if err != nil {
-			t.Fatal(err)
-		}
-		r, err := recipe.Parse(src)
-		if err != nil {
-			return nil, err
-		}
-		list, err := recipe.Tally(r)
-		if err != nil {
-			return nil, err
-		}
-		return []hypercase.File{{Path: "list.txt", Data: list.Format()}}, nil
-	},
-}
-
-func TestCorpus(t *testing.T) { hypercase.Test(t) }
-```
-
-```go
-// walkthrough/recipes/step05/shop/corpus_test.go: the shop command
-func init() {
-	hypercase.Register(
-		recipecorpus.Project,
-		hypercase.Root("step05"),
-		recipecorpus.Garbled,
-		shop,
-	)
-}
-
-var shop = hypercase.Suite{
-	Name:        "shop",
-	Description: "Runs the shop command on the card.",
-	Corpus:      "recipe",
-	Outputs: []decl.Output{
-		{Pattern: "stdout.txt", Description: "The shopping list the command prints."},
-		{Pattern: "stderr.txt", Description: "A warning for each ingredient the command leaves off the list."},
-		{Pattern: "error.txt", Description: "Why the command failed."},
-	},
-	Rejects: []decl.Property{recipecorpus.Garbled},
-	Run: func(t testing.TB, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
-		return nil, recipe.Shop(in, stdout, stderr)
-	},
-}
-
-func TestCorpus(t *testing.T) { hypercase.Test(t) }
-```
-
-The sheets example has three packages over one corpus root: the root package
-owns `evaluate`, `format/` owns `format`, and `cli/` owns `calc`.
+The example has three packages over one corpus root: the root package owns
+`evaluate`, `format/` owns `format`, and `cli/` owns `calc`.
 
 ```go
 // walkthrough/sheets/step05/sheetcorpus/properties.go gains:
@@ -1041,41 +780,15 @@ var calc = hypercase.Suite{
 ### How the files change
 
 - Archives move from a package's `testdata/` to the corpus root's
-  `testdata/<corpus>/`: `step05/testdata/recipe/broth.txtar`,
-  `step05/testdata/sheet/twice.txtar`. The step 3 and step 4 examples'
-  archives move the same way, and each of their runs becomes a suite: it
-  gains `Corpus`, output declarations and the two writers.
+  `testdata/<corpus>/`: `step05/testdata/sheet/twice.txtar`. The step 3 and
+  step 4 examples' archives move the same way, and each of their runs
+  becomes a suite: it gains `Corpus`, output declarations and the two
+  writers.
 - An archive holds every column's sections, each column under its own
   `out/<suite>/`.
 - Each package writes its registry, `testdata/hypercase.json`, in its own
   directory.
 - The project's `.gitignore` gains `.hypercase.lock`.
-
-`testdata/recipe/broth.txtar`. `shop` warns about the handful and goes on;
-`shopping-list` rejects it:
-
-```
-Broth finished with a handful of parsley.
--- in/recipe/broth.txt --
-serves: 2
-stock: 500 ml
-onion: 1
-parsley: 1 handful
--- properties --
-vague
--- out/scale/card.txt --
-serves: 4
-stock: 1000 ml
-onion: 2
-parsley: 2 handful
--- out/shop/stderr.txt --
-parsley: left off: a handful has no fixed size
--- out/shop/stdout.txt --
-onion: 1
-stock: 500 ml
--- out/shopping-list/error.txt --
-line 4: parsley: a handful has no fixed size
-```
 
 `testdata/sheet/twice.txtar`:
 
@@ -1115,6 +828,24 @@ D1: not a number or a formula: "total"
 D1: not a number or a formula: "total"
 -- out/format/error.txt --
 D1: not a number or a formula: "total"
+```
+
+`testdata/sheet/negative.txtar`. A known gap marks one cell, and `calc` errs
+on `-3` the same wrong way as `evaluate`, so a person adds a `calc` line to
+its `gaps`; without it, `calc`'s cell fails as an error nothing expects.
+`format` skips the sheet, which has no formulas:
+
+```
+A1 is a negative number.
+-- in/sheet/A1 --
+-3
+-- gaps --
+evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
+calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+-- out/calc/error.txt --
+A1: unexpected "-"
+-- out/evaluate/error.txt --
+A1: unexpected "-"
 ```
 
 The root package's registry, `step05/testdata/hypercase.json`, sketched
@@ -1161,7 +892,7 @@ The root package's registry, `step05/testdata/hypercase.json`, sketched
 - Column names are unique per corpus root, not per package or per corpus
   type.
 - A case's name gains its corpus's directory (proposed): the case
-  `recipe/broth`, and the cell subtest `TestCorpus/recipe/broth/scale`. Two
+  `sheet/twice`, and the cell subtest `TestCorpus/sheet/twice/evaluate`. Two
   archives with one name in different corpora are two cases with two names
   (step 10). Trade-off: no pair of archives has to be refused, at the cost
   of a longer name for every case.
@@ -1249,7 +980,7 @@ The root package's registry, `step05/testdata/hypercase.json`, sketched
   directories they declare, and fails on:
   - a column two packages register;
   - one property name with two different entries;
-  - a section no registry claims, such as `out/nutrition/…` after that suite
+  - a section no registry claims, such as `out/<suite>/…` after that suite
     was removed;
   - a problem of an archive as a whole: a missing description, a top-level
     name outside the closed set, hand-written sections that don't sit
@@ -1282,8 +1013,8 @@ rule.
 - The matrix. One archive shows every column's outputs for its case, and a
   change shows, in the diff that causes it, how it moves other columns'
   outputs.
-- Which column rejects what: `broth` is accepted by `scale` and `shop` and
-  rejected by `shopping-list`, each stated in Go.
+- Which column rejects what: `loop` is accepted by `format` and rejected by
+  `evaluate` and `calc`, each stated in Go.
 - What each package declares, in one file per package. A change to a
   description or a `Rejects` list shows in the registry's diff.
 - What no column owns: a section left behind by a removed suite fails the
@@ -1313,9 +1044,8 @@ a registered function from one type to the next, and a **stage** is the type
 a lift reaches. Each lift is a column. A suite declares the type it
 consumes, a stage or a corpus type, and the lifts that reach it run first.
 
-The recipes ladder is `RecipeCard → *recipe.Recipe → *recipe.ShoppingList`,
-through the lifts `parse` and `tally`. The sheets ladder is
-`Sheet → *sheet.Parsed → *sheet.Graph`, through `parse` and `resolve`.
+The sheets' ladder is `Sheet → *sheet.Parsed → *sheet.Graph`, through the
+lifts `parse` and `resolve`.
 
 Proposed names: `decl.Type`, `decl.Lift`, `hypercase.Suite[T]`, whose type
 argument is the type the suite consumes, `hypercase.Own`, `hypercase.Use`,
@@ -1434,87 +1164,6 @@ var format = hypercase.Suite[*sheet.Parsed]{
 on raw input: `hypercase.Suite[sheetcorpus.Sheet]`, with its outputs and
 `Rejects` as in step 5.
 
-```go
-// walkthrough/recipes/step06/recipecorpus/types.go
-type RecipeCard struct{ fs.FS } // in/recipe/<archive>.txt
-
-var CardType = decl.Type[RecipeCard]{
-	Dir:         "recipe",
-	Description: "A recipe card: in/recipe/<archive>.txt, a serves line, then one ingredient per line.",
-}
-
-var Parse = decl.Lift[RecipeCard, *recipe.Recipe]{
-	Name:        "parse",
-	Description: "Parses the card named after the archive.",
-	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The line that isn't an ingredient."},
-	},
-	Rejects: []decl.Property{Garbled},
-	Run: func(archive string, in RecipeCard, stderr io.Writer) (*recipe.Recipe, error) {
-		return recipe.ParseFile(in, "recipe/"+archive+".txt")
-	},
-}
-
-var Tally = decl.Lift[*recipe.Recipe, *recipe.ShoppingList]{
-	Name:        "tally",
-	Description: "Tallies the ingredients into a shopping list in metric units.",
-	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The ingredient whose unit has no fixed size."},
-	},
-	Rejects: []decl.Property{Vague},
-	Run: func(archive string, r *recipe.Recipe, stderr io.Writer) (*recipe.ShoppingList, error) {
-		return recipe.Tally(r)
-	},
-}
-```
-
-```go
-// walkthrough/recipes/step06/corpus_test.go: owns both lifts, scale and shopping-list
-func init() {
-	hypercase.Register(
-		recipecorpus.Project, // with a renderError of the same shape as the sheets'
-		hypercase.Root("step06"),
-		hypercase.RootPackage(),
-		recipecorpus.Garbled, recipecorpus.Vague,
-		recipecorpus.CardType,
-		hypercase.Own(recipecorpus.Parse, recipecorpus.Tally, scale, shoppingList),
-	)
-}
-
-var scale = hypercase.Suite[*recipe.Recipe]{
-	Name:        "scale",
-	Description: "Scales the recipe to serve four.",
-	Probe: func(r *recipe.Recipe) (why string, ok bool) {
-		if r.Serves == 4 {
-			return "already serves 4", false
-		}
-		return "", true
-	},
-	Outputs: []decl.Output{
-		{Pattern: "card.txt", Description: "The card, scaled to serve four."},
-	},
-	Run: func(t testing.TB, archive string, r *recipe.Recipe, stdout, stderr io.Writer) ([]hypercase.File, error) {
-		return []hypercase.File{{Path: "card.txt", Data: r.Scale(4).Format()}}, nil
-	},
-}
-
-var shoppingList = hypercase.Suite[*recipe.ShoppingList]{
-	Name:        "shopping-list",
-	Description: "Prints the shopping list.",
-	Outputs: []decl.Output{
-		{Pattern: "list.txt", Description: "What to buy, one ingredient per line, in metric units."},
-	},
-	Run: func(t testing.TB, archive string, l *recipe.ShoppingList, stdout, stderr io.Writer) ([]hypercase.File, error) {
-		return []hypercase.File{{Path: "list.txt", Data: l.Format()}}, nil
-	},
-}
-
-func TestCorpus(t *testing.T) { hypercase.Test(t) }
-```
-
-`shop`, in `shop/`, is a `hypercase.Suite[recipecorpus.RecipeCard]`, and
-still rejects `garbled`: the command parses the card itself.
-
 ### How the files change
 
 - The ordinary package gains the corpus type and the lifts. Each suite loses
@@ -1523,7 +1172,14 @@ still rejects `garbled`: the command parses the card itself.
 - A malformed input's error moves to the lift that rejects it. The cells
   past that lift are blocked and write nothing, so their old sections are
   orphans until a person removes them: `stray`'s `out/evaluate/error.txt`
-  and `out/format/error.txt`, and `broth`'s `out/shopping-list/error.txt`.
+  and `out/format/error.txt`.
+- A known gap moves with its error. `parse` now errs on `negative`'s `-3`,
+  so `evaluate`, past it, is blocked, and a `gaps` line naming a column that
+  didn't run fails. A person changes `negative`'s `evaluate` line to name
+  `parse`, and removes `out/evaluate/error.txt`, an orphan beside `stray`'s.
+  `calc`'s cell stays frozen, and its `error.txt` now differs, since
+  `RenderError` quotes the input, so a person deletes that file and the next
+  update writes it.
 - `error.txt` holds what `RenderError` writes.
 - `hypercase.json` gains each corpus type, each lift with the properties it
   rejects and whether the package owns it, and each suite's consumed type.
@@ -1551,31 +1207,21 @@ D1: not a number or a formula: "total"
   sheet/D1:1: total
 ```
 
-`testdata/recipe/broth.txtar`. `tally` rejects the handful, and
-`shopping-list`, past it, is blocked:
+`testdata/sheet/negative.txtar`:
 
 ```
-Broth finished with a handful of parsley.
--- in/recipe/broth.txt --
-serves: 2
-stock: 500 ml
-onion: 1
-parsley: 1 handful
--- properties --
-vague
--- out/scale/card.txt --
-serves: 4
-stock: 1000 ml
-onion: 2
-parsley: 2 handful
--- out/shop/stderr.txt --
-parsley: left off: a handful has no fixed size
--- out/shop/stdout.txt --
-onion: 1
-stock: 500 ml
--- out/tally/error.txt --
-line 4: parsley: a handful has no fixed size
-  recipe/broth.txt:4: parsley: 1 handful
+A1 is a negative number.
+-- in/sheet/A1 --
+-3
+-- gaps --
+parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
+calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+-- out/calc/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
+-- out/parse/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
 ```
 
 ### Rules
@@ -1598,8 +1244,7 @@ line 4: parsley: a handful has no fixed size
 - A lift lists the properties it rejects (`Rejects`), and the expected-error
   check judges its cell as it does a suite's. `parse` rejects `malformed`, a
   cell that is neither a number nor a formula. `resolve` rejects `circular`,
-  and `dangling`, a reference to a missing cell. In the recipes, `parse`
-  rejects `garbled` and `tally` rejects `vague`.
+  and `dangling`, a reference to a missing cell.
 - A lift's function receives the archive's name, which is the same for the
   base and every variant (step 7), its typed input and a writer for stderr.
   It takes no `testing.TB`, and the error it returns is its rejection.
@@ -1670,7 +1315,8 @@ every registration owns.
 **Parameters.**
 
 - Parameters are fixed in Go, or derived from the archive's name by a fixed
-  convention: the recipes' `parse` reads `recipe/<archive>.txt`.
+  convention. No lift of this step uses the archive's name; `import`
+  (step 10) does, and reads `csv/<archive>.csv`.
 - The archive's name is the one thing a column gets from an archive besides
   its input. It is the same for the base and every variant, so no variant
   varies a parameter.
@@ -1685,9 +1331,9 @@ declarations, carry a description, under step 3's rule.
 
 ### What can now be seen
 
-- Where on its ladder an input stops. `stray` is rejected once, by `parse`,
-  and `broth` once, by `tally`; nothing past them is expected to do
-  anything.
+- Where on its ladder an input stops. `stray` is rejected once on the
+  ladder, by `parse`, and nothing past it is expected to do anything. `calc`,
+  which reads the raw cells, rejects it too.
 - What each column consumes, in the registry: `evaluate` reads a
   `*sheet.Graph`, and `calc` the raw sheet.
 - Each error, quoting the input it points at.
@@ -1698,8 +1344,8 @@ declarations, carry a description, under step 3's rule.
 
 A case that differs from another by one line is a copy of the whole archive,
 and nothing says which line matters. And each invalid case is written by
-hand, though most are a valid case with one mechanical change: a cycle added,
-or an ingredient with no fixed size.
+hand, though most are a valid case with one mechanical change, such as a
+cycle added.
 
 ### What the author writes
 
@@ -1719,10 +1365,10 @@ at the cost of two reserved top-level names and longer section paths.
 // walkthrough/sheets/step07/sheetcorpus/types.go
 var Looped = decl.Transform[Sheet]{
 	Name:        "looped",
-	Description: "The first cell, by name, replaced by a reference to itself, so the sheet has a cycle.",
+	Description: "The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.",
 	Gives:       []decl.Property{Circular},
 	Probe: func(base Sheet) (why string, ok bool) {
-		// declines a sheet whose first cell already refers to itself
+		// declines an empty sheet, and one whose first cell already refers to itself
 	},
 	Run: func(archive string, base Sheet) (fs.FS, error) {
 		// the base, with its first cell replaced
@@ -1748,122 +1394,15 @@ var SheetType = decl.Type[Sheet]{
 }
 ```
 
-```go
-// walkthrough/recipes/step07/recipecorpus/types.go
-var Garnished = decl.Transform[RecipeCard]{
-	Name:        "garnished",
-	Description: "Adds parsley: 1 handful, a unit with no fixed size, as the card's last line.",
-	Gives:       []decl.Property{Vague},
-	Probe: func(base RecipeCard) (why string, ok bool) {
-		// reads the one file under recipe/, and declines a card that already lists parsley
-	},
-	Run: func(archive string, base RecipeCard) (fs.FS, error) {
-		// the base, with one more line in recipe/<archive>.txt
-	},
-}
-
-var Doubled = decl.Transform[RecipeCard]{
-	Name:        "doubled",
-	Description: "Doubles serves and every amount, so the card makes twice as much.",
-	Keeps:       []decl.Property{Vague},
-	Run: func(archive string, base RecipeCard) (fs.FS, error) {
-		// the base, with every number in recipe/<archive>.txt doubled
-	},
-}
-
-var CardType = decl.Type[RecipeCard]{
-	Dir:         "recipe",
-	Description: "A recipe card: in/recipe/<archive>.txt, a serves line, then one ingredient per line.",
-	Transforms:  []decl.Transform[RecipeCard]{Garnished, Doubled},
-}
-```
-
-One package owns each transform. The root packages add
-`hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed)` and
-`hypercase.Own(recipecorpus.Garnished, recipecorpus.Doubled)` to their
-registrations.
+One package owns each transform. The root package adds
+`hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed)` to its
+registration.
 
 ### How the files change
 
-Archives gain variants. `testdata/recipe/pancakes.txtar`, with a hand-written
-variant and both transforms' variants. `scale` skips `transform/doubled`,
-which already serves four, and `shopping-list` is blocked on
-`transform/garnished` and `variant/method`:
-
-```
-Pancakes for two.
--- in/recipe/pancakes.txt --
-serves: 2
-flour: 100 g
-milk: 150 ml
-egg: 1
--- out/scale/card.txt --
-serves: 4
-flour: 200 g
-milk: 300 ml
-egg: 2
--- out/shop/stdout.txt --
-egg: 1
-flour: 100 g
-milk: 150 ml
--- out/shopping-list/list.txt --
-egg: 1
-flour: 100 g
-milk: 150 ml
--- variant/method/about --
-A line of method among the ingredients, which no ingredient parser reads.
--- variant/method/properties --
-garbled
--- variant/method/in/recipe/pancakes.txt --
-serves: 2
-flour: 100 g
-whisk until smooth
-milk: 150 ml
-egg: 1
--- variant/method/out/parse/error.txt --
-line 3: not an ingredient: "whisk until smooth"
-  recipe/pancakes.txt:3: whisk until smooth
--- variant/method/out/shop/error.txt --
-line 3: not an ingredient: "whisk until smooth"
-  recipe/pancakes.txt:3: whisk until smooth
--- transform/doubled/in/recipe/pancakes.txt --
-serves: 4
-flour: 200 g
-milk: 300 ml
-egg: 2
--- transform/doubled/out/shop/stdout.txt --
-egg: 2
-flour: 200 g
-milk: 300 ml
--- transform/doubled/out/shopping-list/list.txt --
-egg: 2
-flour: 200 g
-milk: 300 ml
--- transform/garnished/in/recipe/pancakes.txt --
-serves: 2
-flour: 100 g
-milk: 150 ml
-egg: 1
-parsley: 1 handful
--- transform/garnished/out/scale/card.txt --
-serves: 4
-flour: 200 g
-milk: 300 ml
-egg: 2
-parsley: 2 handful
--- transform/garnished/out/shop/stderr.txt --
-parsley: left off: a handful has no fixed size
--- transform/garnished/out/shop/stdout.txt --
-egg: 1
-flour: 100 g
-milk: 150 ml
--- transform/garnished/out/tally/error.txt --
-line 5: parsley: a handful has no fixed size
-  recipe/pancakes.txt:5: parsley: 1 handful
-```
-
-`testdata/sheet/twice.txtar`, with its `calc` and `format` sections left out.
-`evaluate` is blocked on every variant but `transform/renamed`:
+Archives gain variants. `testdata/sheet/twice.txtar`, with two hand-written
+variants and both transforms' variants, and its `calc` and `format` sections
+left out. `evaluate` is blocked on every variant but `transform/renamed`:
 
 ```
 A1 is twice B1.
@@ -1923,7 +1462,7 @@ whether each has a probe, and whether the package owns it.
   name spaces.
 - Cases are named `<archive>`, `<archive>/variant/<name>` and
   `<archive>/transform/<name>` in subtests and in the report, after the
-  corpus directory (step 5): `TestCorpus/recipe/pancakes/transform/garnished/tally`.
+  corpus directory (step 5): `TestCorpus/sheet/twice/transform/looped/resolve`.
 
 **Hand-written variants.**
 
@@ -1961,10 +1500,7 @@ whether each has a probe, and whether the package owns it.
   `resolve` is expected to err on every `looped` variant with nothing written
   by hand. `renamed` moves every cell one row down, rewriting each reference,
   and keeps `circular` and `dangling`, so it runs over bases that state
-  either; a base that states `malformed` is declined. In the recipes,
-  `garnished` gives `vague`, so `tally` is expected to err on every
-  `garnished` variant; `doubled` keeps `vague`; a base that states `garbled`
-  is declined by both.
+  either; a base that states `malformed` is declined.
 - It is materialized. An update writes `transform/<name>/in/…` and
   `transform/<name>/delete`, and a normal run checks them like goldens. In a
   normal run the variant's cells read the committed sections.
@@ -1982,13 +1518,16 @@ whether each has a probe, and whether the package owns it.
 **Known gaps in a transform's variant.** A known gap in a cell of a
 transform's variant is a line in the base's `gaps` section that names the
 transform. Its format (proposed) is `transform/<name>`, one space, the
-column's name, one space, then the text. In `omelette`, whose doubled card
-scales its eggs the same wrong way as the base:
+column's name, one space, then the text. In `negative`, whose `renamed`
+variant moves the negative number to A2 and errs the same wrong way as the
+base:
 
 ```
 -- gaps --
-scale A count scales to a whole number, so egg: 1 for four. Waits on recipes#2.
-transform/doubled scale A count scales to a whole number, so egg: 1 for four. Waits on recipes#2.
+parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
+calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+transform/renamed parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
+transform/renamed calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 ```
 
 **Section order, whole.**
@@ -2021,8 +1560,8 @@ possible later expansion.
 
 ### What can now be seen
 
-- A variant's point, as its overlay and its `about`: `variant/method` is
-  `pancakes` with one line of method added.
+- A variant's point, as its overlay and its `about`: `variant/cycle` is
+  `twice` with `B1` referring back to `A1`.
 - One mechanical change across a corpus. Every sheet that `looped` doesn't
   decline gains a `looped` row in every column, and each of its `resolve`
   cells is expected to err, with nothing written by hand.
@@ -2059,12 +1598,12 @@ its `Name`, `Description` and `Classify` fields, set as a suite's
 classifier reads.
 
 ```go
-// walkthrough/recipes/step08/recipecorpus/project.go
+// walkthrough/sheets/step08/sheetcorpus/project.go
 var Project = decl.Project{
-	UpdateVar:   "RECIPES_UPDATE_GOLDEN",
+	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
 	Codes: func(err error) []string {
-		var e *recipe.Error
+		var e *sheet.Error
 		if errors.As(err, &e) {
 			return []string{e.Code}
 		}
@@ -2073,39 +1612,7 @@ var Project = decl.Project{
 }
 ```
 
-```go
-// walkthrough/recipes/step08/corpus_test.go
-var scale = hypercase.Suite[*recipe.Recipe]{
-	Name: "scale",
-	Description: "Scales the recipe to serve four, rounding metric amounts to the unit " +
-		"and others to the quarter.",
-	Probe: servesFour, // step 6's probe
-	Outputs: []decl.Output{
-		{Pattern: "card.txt", Description: "The card, scaled to serve four."},
-		{Pattern: "stderr.txt", Description: "Each amount scale rounded, and to what."},
-	},
-	Classifier: hypercase.Classifier[*recipe.Recipe]{
-		Name:        "rounded",
-		Description: "Adds rounded when scale rounded some amount.",
-		Classify: func(r *recipe.Recipe, got hypercase.Result) (string, error) {
-			if len(got.Stderr) > 0 {
-				return "rounded", nil
-			}
-			return "", nil
-		},
-	},
-	Run: func(t testing.TB, archive string, r *recipe.Recipe, stdout, stderr io.Writer) ([]hypercase.File, error) {
-		scaled := r.Scale(4)
-		for _, note := range scaled.Rounded {
-			fmt.Fprintln(stderr, note)
-		}
-		return []hypercase.File{{Path: "card.txt", Data: scaled.Format()}}, nil
-	},
-}
-```
-
-The sheets project supplies the same `Codes`, over `*sheet.Error`, and gives
-`evaluate` a classifier:
+`evaluate` gains a classifier:
 
 ```go
 // walkthrough/sheets/step08/corpus_test.go: evaluate gains
@@ -2124,44 +1631,6 @@ The sheets project supplies the same `Codes`, over `*sheet.Error`, and gives
 ### How the files change
 
 Every cell gains an `outcome` file, skipped and blocked cells included.
-
-`testdata/recipe/scones.txtar`, with its transforms' variants left out:
-
-```
-Scones for three, in imperial measures.
--- in/recipe/scones.txt --
-serves: 3
-flour: 8 oz
-butter: 2 oz
-milk: 5 floz
--- out/parse/outcome --
-accepted
--- out/scale/card.txt --
-serves: 4
-flour: 10 3/4 oz
-butter: 2 3/4 oz
-milk: 6 3/4 floz
--- out/scale/outcome --
-accepted rounded
--- out/scale/stderr.txt --
-flour: 10 2/3 oz rounded to 10 3/4 oz
-butter: 2 2/3 oz rounded to 2 3/4 oz
-milk: 6 2/3 floz rounded to 6 3/4 floz
--- out/shop/outcome --
-accepted
--- out/shop/stdout.txt --
-butter: 57 g
-flour: 227 g
-milk: 142 ml
--- out/shopping-list/list.txt --
-butter: 57 g
-flour: 227 g
-milk: 142 ml
--- out/shopping-list/outcome --
-accepted
--- out/tally/outcome --
-accepted
-```
 
 `testdata/sheet/twice.txtar`, with its `missing` variant and its transforms'
 variants left out:
@@ -2218,9 +1687,9 @@ A1 -> B1 -> A1: cycle
 rejected S201
 ```
 
-Elsewhere in the corpora, `pancakes/transform/doubled`'s `scale` cell is
-`skipped already serves 4`, and a sheet whose `C1` is `=A1/B1`, with `B1` at
-`0`, has `evaluate`'s outcome `accepted div-zero`.
+Elsewhere in the corpus, a sheet with no formulas has `format`'s outcome
+`skipped no formulas`, and a sheet whose `C1` is `=A1/B1`, with `B1` at `0`,
+has `evaluate`'s outcome `accepted div-zero`.
 
 The archives shown in steps 3 to 7 are as their own step leaves them. Their
 examples carry an `outcome` per cell from this step on, and the next update
@@ -2240,7 +1709,7 @@ whether the project supplies `Codes`.
 - The project may supply `Codes func(err error) []string`, which gives a
   rejected cell its codes. Without it, a rejected cell carries none.
 - An optional suite classifier, with a name and a description, refines the
-  outcome: `accepted rounded`. It can't change the state, and runs only on
+  outcome: `accepted div-zero`. It can't change the state, and runs only on
   cells that ran. An error or a panic in a classifier fails the cell, and the
   update then writes nothing for that cell: an update is atomic per cell.
 - Skipped and blocked cells write an outcome, and their other committed
@@ -2315,9 +1784,7 @@ var codes = hypercase.Check{
 }
 ```
 
-The recipes project registers the same check over `recipe.Codes`, the codes
-of the card parser and of `tally`. The sheets' findings,
-`testdata/checks/codes.txt`:
+The check's findings, `testdata/checks/codes.txt`:
 
 ```
 S101
@@ -2347,8 +1814,8 @@ S202
 
 ### What can now be seen
 
-- The code's verdict on every cell, as a file: `broth`'s `shopping-list` is
-  `blocked tally`, and `scones`' `scale` is `accepted rounded`.
+- The code's verdict on every cell, as a file: `twice`'s `cycle` variant is
+  `blocked resolve` in `evaluate`, and `rejected S201` in `resolve`.
 - A change moves a cell on two axes. An outcome that changes is a different
   verdict; bytes that change under one outcome are a different rendering of
   the same verdict.
@@ -2379,8 +1846,6 @@ template.
 	},
 ```
 
-The recipes project supplies `recipes#(\d+)` the same way.
-
 ```sh
 hypercase report main HEAD > report.html
 hypercase report -text main HEAD
@@ -2391,49 +1856,9 @@ hypercase report -text main HEAD
 No archive changes. `hypercase.json` gains the link patterns. The report is
 a file the person reads; nothing commits it.
 
-The report reads each archive as each revision commits it. Two of the cells
-the samples below report, with every other column left out. In the recipes,
-`testdata/recipe/scones.txtar` at `<a>`:
-
-```
-Scones for three, in imperial measures.
--- in/recipe/scones.txt --
-serves: 3
-flour: 8 oz
-butter: 2 oz
-milk: 5 floz
--- out/scale/card.txt --
-serves: 4
-flour: 10 3/4 oz
-butter: 2 3/4 oz
-milk: 6 3/4 floz
--- out/scale/outcome --
-accepted rounded
--- out/scale/stderr.txt --
-flour: 10 2/3 oz rounded to 10 3/4 oz
-butter: 2 2/3 oz rounded to 2 3/4 oz
-milk: 6 2/3 floz rounded to 6 3/4 floz
-```
-
-and at `<b>`, where `scale` writes thirds:
-
-```
-Scones for three, in imperial measures.
--- in/recipe/scones.txt --
-serves: 3
-flour: 8 oz
-butter: 2 oz
-milk: 5 floz
--- out/scale/card.txt --
-serves: 4
-flour: 10 2/3 oz
-butter: 2 2/3 oz
-milk: 6 2/3 floz
--- out/scale/outcome --
-accepted
-```
-
-In the sheets, `testdata/sheet/loop.txtar` at `<a>`:
+The report reads each archive as each revision commits it.
+`testdata/sheet/loop.txtar` holds two of the cells the sample below reports.
+With every other column left out, at `<a>`:
 
 ```
 A1 and B1 refer to each other.
@@ -2495,7 +1920,7 @@ rejected S201
 - Each case's stated properties are shown beside it, and each `gaps` line on
   the cell it marks, linked to its issue through the patterns the project
   supplies, one per issue tracker its `gaps` lines name.
-- hypercase's own CI runs the report over the toys.
+- hypercase's own CI runs the report over the toy.
 - Step 11 adds input lines and corpus-check findings.
 
 **Flags** (proposed).
@@ -2513,24 +1938,9 @@ line or a description, links to the URL it makes.
 changes, in rank order. Under it, one line per cell: its case, its column,
 and its outcome, or the change in it. So `outcome` is never listed as a
 file. Under each cell, one line per other file of the cell that was added,
-changed or removed. For a change to the recipes that writes amounts in
-thirds as well as quarters:
-
-```
-outcome changed
-  recipe/scones scale: accepted rounded -> accepted
-    card.txt changed
-    stderr.txt removed
-  recipe/scones/transform/doubled scale: accepted rounded -> accepted
-    card.txt changed
-    stderr.txt removed
-  recipe/scones/transform/garnished scale: accepted rounded -> accepted
-    card.txt changed
-    stderr.txt removed
-```
-
-For a change to the sheets that adds the archive `ratio`, and words a cycle
-as `cycle: A1 -> B1 -> A1`, with the transforms' variants left out:
+changed or removed. For a change that adds the archive `ratio`, whose `C1`
+is `=A1/B1` with `A1` at `6` and `B1` at `2`, and words a cycle as
+`cycle: A1 -> B1 -> A1`, with the transforms' variants left out:
 
 ```
 appeared
@@ -2565,10 +1975,9 @@ bytes changed
 
 ### What step 9 leaves
 
-A blog post holds a recipe, and a CSV export holds a sheet. To run the card's
-columns on a post, a suite runs extraction and everything after it. A change
-in extraction then fails every column downstream, and the card in between is
-recorded nowhere.
+A CSV export holds a sheet. To run the sheet's columns on a CSV, a suite
+runs the import and everything after it. A change in the import then fails
+every column downstream, and the sheet in between is recorded nowhere.
 
 ### What the author writes
 
@@ -2578,37 +1987,6 @@ committed as such.
 
 Proposed names: `decl.Lift`'s `Product` field, which declares the product's
 files.
-
-```go
-// walkthrough/recipes/step10/recipecorpus/types.go gains
-type BlogPost struct{ fs.FS } // in/post/<archive>.txt
-
-var PostType = decl.Type[BlogPost]{
-	Dir:         "post",
-	Description: "A blog post: in/post/<archive>.txt, whose recipe follows a ## Recipe heading.",
-}
-
-var Recipeless = decl.Property{
-	Name:        "recipeless",
-	Description: "The post has no ## Recipe heading.",
-}
-
-var Extract = decl.Lift[BlogPost, RecipeCard]{
-	Name:        "extract",
-	Description: "Writes the post's recipe as a card named after the archive.",
-	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "Why the post yields no card."},
-	},
-	Product: []decl.Output{
-		{Pattern: "recipe/*.txt", Description: "The card, laid out as a recipe card's in/recipe/."},
-	},
-	Rejects: []decl.Property{Recipeless},
-	Run: func(archive string, in BlogPost, stderr io.Writer) (RecipeCard, error) {
-		card, err := recipe.Extract(in, "post/"+archive+".txt", "recipe/"+archive+".txt")
-		return RecipeCard{card}, err
-	},
-}
-```
 
 ```go
 // walkthrough/sheets/step10/sheetcorpus/types.go gains
@@ -2641,63 +2019,16 @@ var Import = decl.Lift[CSV, Sheet]{
 }
 ```
 
-The root packages register the new type and property, and own the new lift.
+The root package registers the new type and property, and owns the new lift.
 Each other package whose columns read past it registers the type and adds
 the lift to its `Use`: `format/` uses `sheetcorpus.Import` and
 `sheetcorpus.Parse`.
 
 ### How the files change
 
-A new corpus directory per toy, `testdata/post/` and `testdata/csv/`. Each of
-their archives holds the product under `via/<lift>/`, and the cells of every
-column the product reaches. `testdata/post/pancakes.txtar`:
-
-```
-A blog post about Sunday pancakes, with the recipe at the end.
--- in/post/pancakes.txt --
-# Sunday pancakes
-
-We make these every week, and the last one is always argued over.
-
-## Recipe
-
-- serves 2
-- 100 g flour
-- 150 ml milk
-- 1 egg
--- via/extract/recipe/pancakes.txt --
-serves: 2
-flour: 100 g
-milk: 150 ml
-egg: 1
--- out/extract/outcome --
-accepted
--- out/parse/outcome --
-accepted
--- out/scale/card.txt --
-serves: 4
-flour: 200 g
-milk: 300 ml
-egg: 2
--- out/scale/outcome --
-accepted
--- out/shop/outcome --
-accepted
--- out/shop/stdout.txt --
-egg: 1
-flour: 100 g
-milk: 150 ml
--- out/shopping-list/list.txt --
-egg: 1
-flour: 100 g
-milk: 150 ml
--- out/shopping-list/outcome --
-accepted
--- out/tally/outcome --
-accepted
-```
-
-`testdata/csv/prices.txtar`:
+A new corpus directory, `testdata/csv/`. Each of its archives holds the
+product under `via/<lift>/`, and the cells of every column the product
+reaches. `testdata/csv/prices.txtar`:
 
 ```
 Two prices and their total, exported as CSV.
@@ -2783,14 +2114,12 @@ blocked import
 - The properties a case states hold for every column the case reaches,
   through the lift too. A CSV with a quote that never closes states
   `unterminated`, which `import` rejects, and a CSV whose imported sheet has
-  a cycle states `circular`, which `resolve` rejects. A post with no recipe
-  states `recipeless`, which `extract` rejects, and a post whose recipe calls
-  for a handful of something states `vague`, which `tally` rejects.
-- One type's lift can feed another type's ladder: a `BlogPost`'s `extract`
-  makes a recipe card, and a `CSV`'s `import` makes a sheet. Paths through
-  bytes lifts count toward the one path to each consumed type.
-- A suite reaches across types by the type it consumes: `shop`, which
-  consumes `RecipeCard`, runs on every post that `extract` accepts.
+  a cycle states `circular`, which `resolve` rejects.
+- One type's lift can feed another type's ladder: a `CSV`'s `import` makes a
+  sheet. Paths through bytes lifts count toward the one path to each
+  consumed type.
+- A suite reaches across types by the type it consumes: `calc`, which
+  consumes `Sheet`, runs on every CSV that `import` accepts.
 - Past a bytes lift, a cell's input view, which `RenderError` receives, is
   that lift's product.
 - `testdata/sheet/prices.txtar` and `testdata/csv/prices.txtar` both reach
@@ -2800,10 +2129,9 @@ blocked import
 
 ### What can now be seen
 
-- The card a post yields, as committed bytes beside the post. A change to
-  extraction shows as a change to `via/extract/`, and fails `extract`'s
-  column alone until the update; the columns downstream read the committed
-  card.
+- The sheet a CSV yields, as committed bytes beside the CSV. A change to the
+  import shows as a change to `via/import/`, and fails `import`'s column
+  alone until the update; the columns downstream read the committed sheet.
 - Where a chained input stops: `open-quote` at `import`, with every column
   past it `blocked import`.
 - A CSV and a hand-written sheet with the same cells side by side in the
@@ -2814,8 +2142,8 @@ blocked import
 ### What step 10 leaves
 
 The report shows which outputs changed, not which input lines they came
-from. A reviewer reading a changed `list.txt` searches the card by hand,
-and, through a bytes lift, the post.
+from. A reviewer reading a changed `values.txt` searches the sheet's cells by
+hand, and, through a bytes lift, the CSV.
 
 ### What the author writes
 
@@ -2830,37 +2158,15 @@ ranges from `Positions`; `decl.Range`; and `decl.Project`'s `Positions`
 field.
 
 ```go
-// walkthrough/recipes/step11/recipecorpus/project.go: Project gains
+// walkthrough/sheets/step11/sheetcorpus/project.go: Project gains
 	Positions: func(err error) []decl.Range {
 		var rs []decl.Range
-		for _, p := range recipe.Positions(err) {
+		for _, p := range sheet.Positions(err) {
 			rs = append(rs, decl.Range{Path: p.Path, Start: p.Line, End: p.Line})
 		}
 		return rs
 	},
 ```
-
-```go
-// walkthrough/recipes/step11/corpus_test.go: shopping-list's declaration
-	Outputs: []decl.Output{
-		{
-			Pattern:     "list.txt",
-			Description: "What to buy, one ingredient per line, in metric units.",
-			Inputs: decl.InputsFunc(func(in fs.FS, path string) ([]decl.Range, error) {
-				card, lines, err := recipe.CardLines(in) // the card's path, and how many lines it has
-				if err != nil {
-					return nil, err
-				}
-				return []decl.Range{{Path: card, Start: 2, End: lines}}, nil // every line after serves:
-			}),
-		},
-	},
-```
-
-`scale`'s `card.txt` maps to the whole card, `Range{Path: card}`. `parse`'s
-`error.txt` states `Inputs: decl.FromPositions`. `shop`'s `stdout.txt` and
-`stderr.txt` state `Inputs: decl.AllInputs`, and its `error.txt` states
-`decl.FromPositions`.
 
 ```go
 // walkthrough/sheets/step11/corpus_test.go: evaluate's declaration
@@ -2883,10 +2189,38 @@ field.
 	},
 ```
 
-`format`'s `formulas.txt` maps to its formula cells only. The sheets project
-supplies `Positions` over `sheet.Positions`, and `parse`'s, `resolve`'s and
-`calc`'s `error.txt` state `decl.FromPositions`. `calc`'s `stdout.txt` and
-`stderr.txt` state `decl.AllInputs`.
+`format`'s `formulas.txt` maps to its formula cells only. `parse`'s,
+`resolve`'s and `calc`'s `error.txt` state `Inputs: decl.FromPositions`, and
+`calc`'s `stdout.txt` and `stderr.txt` state `Inputs: decl.AllInputs`.
+
+A bytes lift's product declarations are output declarations too, so each has
+`Inputs`. `import`'s map receives each product file's path as its pattern
+matches it, such as `sheet/B1`, and gives the CSV lines that cell's field
+came from (proposed):
+
+```go
+// walkthrough/sheets/step11/sheetcorpus/types.go: Import's declarations
+	Outputs: []decl.Output{
+		{
+			Pattern:     "error.txt",
+			Description: "The line the importer can't read, and why.",
+			Inputs:      decl.FromPositions,
+		},
+	},
+	Product: []decl.Output{
+		{
+			Pattern:     "sheet/*",
+			Description: "One file per cell, as a sheet's in/sheet/ holds them.",
+			Inputs: decl.InputsFunc(func(in fs.FS, path string) ([]decl.Range, error) {
+				csv, first, last, err := sheet.FieldLines(in, path) // the CSV's path, and the lines of the cell's field
+				if err != nil {
+					return nil, err
+				}
+				return []decl.Range{{Path: csv, Start: first, End: last}}, nil
+			}),
+		},
+	},
+```
 
 ### How the files change
 
@@ -2895,51 +2229,6 @@ Every cell that ran gains an `inputs` file. The archives shown in steps 3 to
 step on, and the next update writes them (proposed). `hypercase.json`
 records, for each output declaration, whether it maps its files with
 `Inputs`, takes its ranges from `Positions`, or states `AllInputs`.
-
-`testdata/recipe/pancakes.txtar`, with its variants left out:
-
-```
-Pancakes for two.
--- in/recipe/pancakes.txt --
-serves: 2
-flour: 100 g
-milk: 150 ml
-egg: 1
--- out/parse/inputs --
--- out/parse/outcome --
-accepted
--- out/scale/card.txt --
-serves: 4
-flour: 200 g
-milk: 300 ml
-egg: 2
--- out/scale/inputs --
-card.txt
-  in/recipe/pancakes.txt
--- out/scale/outcome --
-accepted
--- out/shop/inputs --
-stdout.txt
-  all inputs
--- out/shop/outcome --
-accepted
--- out/shop/stdout.txt --
-egg: 1
-flour: 100 g
-milk: 150 ml
--- out/shopping-list/inputs --
-list.txt
-  in/recipe/pancakes.txt:2-4
--- out/shopping-list/list.txt --
-egg: 1
-flour: 100 g
-milk: 150 ml
--- out/shopping-list/outcome --
-accepted
--- out/tally/inputs --
--- out/tally/outcome --
-accepted
-```
 
 `testdata/sheet/twice.txtar`, with its `cycle` variant's `calc`, `evaluate`
 and `parse` cells, and its other variants, left out. A range into a path the
@@ -3008,19 +2297,26 @@ rejected S201
 ```
 
 Past a bytes lift, ranges point at the product. In
-`testdata/post/pancakes.txtar`, `scale`'s `inputs` is:
+`testdata/csv/prices.txtar`, `evaluate`'s `inputs` is:
 
 ```
-card.txt
-  via/extract/recipe/pancakes.txt
+values.txt
+  via/import/sheet/A1
+  via/import/sheet/B1
+  via/import/sheet/C1
 ```
 
-and `extract`'s own `inputs` maps its product file, named by its section, to
-the post's recipe:
+and `import`'s own `out/import/inputs`, with no files of its own to list,
+maps each product file, named by its section, to the CSV line its field came
+from (proposed):
 
 ```
-via/extract/recipe/pancakes.txt
-  in/post/pancakes.txt:7-10
+via/import/sheet/A1
+  in/csv/prices.csv:1-1
+via/import/sheet/B1
+  in/csv/prices.csv:1-1
+via/import/sheet/C1
+  in/csv/prices.csv:1-1
 ```
 
 **The `inputs` format** (proposed).
@@ -3028,7 +2324,7 @@ via/extract/recipe/pancakes.txt
 - For each output file of the cell, in path order: a line holding the
   file's path, then one line per range, indented two spaces. A bytes lift's
   product files follow its own files, each named by its section.
-- A range is its archive section and its lines, `in/recipe/pancakes.txt:2-4`.
+- A range is its archive section and its lines, `in/sheet/A1:1-1`.
   A whole file is its section alone, `in/sheet/A1`. `AllInputs` is
   `all inputs`.
 - Ranges are sorted by section, then by first line, then by last. A repeated
@@ -3077,11 +2373,11 @@ via/extract/recipe/pancakes.txt
 ### What can now be seen
 
 - Each changed output beside the input lines it came from. A changed
-  `list.txt` shows lines 2 to 4 of the card beside it.
+  `values.txt` shows the sheet's cells beside it.
 - Which overlay a variant's output depends on: `cycle`'s `resolve` error
   points at `variant/cycle/in/sheet/B1`, the line the variant changed.
-- Where a declaration gives no map, and says so: `shop`'s and `calc`'s
-  stdout read `all inputs`.
+- Where a declaration gives no map, and says so: `calc`'s stdout reads
+  `all inputs`.
 
 ## 12. Hypotheses
 
@@ -3121,24 +2417,14 @@ The target text proposes:
   matching cases are rejected. Every run already checks it.
 - A hypothesis carries a description, under step 3's rule.
 
-In the recipes, for illustration, `imperial` is P for a recipe whose every
-measured amount is imperial (`scones`), anti-P when every one is metric
-(`pancakes`), and neither when they're mixed.
-
-- `scale` could be claimed P: on an imperial card it rounds,
-  `accepted rounded`, and on a metric one it gives `accepted`.
-- A suite `to-imperial`, which rewrites a card in imperial units, could be
-  claimed anti-P: it rounds on a metric card, and has nothing to round on an
-  imperial one.
-- `shopping-list` always converts to metric, so it is neutral: an imperial
-  variant's list equals its metric base's. A transform that rewrites every
-  metric amount in imperial units, and gives `imperial`, makes such pairs.
-
-In the sheets, `circular` is P for a sheet with a cycle, anti-P for a sheet
-that parses and has none, and neither for one that doesn't parse.
+For illustration, `circular` is P for a sheet that parses and has a cycle,
+and anti-P for one that parses, has no cycle and refers to no missing cell.
+Every other sheet is neither: one that doesn't parse never reaches
+`resolve`, and `resolve` rejects a `dangling` sheet with no cycle for another
+reason, so no prediction about cycles can be made from either.
 
 - `resolve` is P: a matching cell is `rejected`, and a mismatching one
-  `accepted`. Its `Rejects` entry already states that claim.
+  `accepted`. Its `Rejects` entry already states the first half.
 - `evaluate` is P: a matching cell is `blocked resolve`.
 - `format` is neutral: both cases of a pair, a sheet with formulas and no
   cycle and its `looped` variant, have the same outcome.
@@ -3153,7 +2439,7 @@ the report.
 
 ### Evidence first
 
-Two or three hypotheses, written by hand as corpus checks over the toys and
+Two or three hypotheses, written by hand as corpus checks over the toy and
 over a consuming project's corpus, show what a hypothesis has to say, what a
 violation looks like, and where it shows up. The design follows from them.
 
