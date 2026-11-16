@@ -128,7 +128,7 @@ $ go test ./b  # tr-b
         transform/upper/in/do/out/values.txt differs (-committed +made):
         - A1 SEVEN
         + A1 SIX
-        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, which no update writes. A normal run checks each frozen cell whose files differ, here copy's, again on the rewritten inputs, against its committed files. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
+        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, to which an update only adds an outcome they lack. A normal run checks each frozen cell whose files differ, here copy's, again on the rewritten inputs, against its committed files. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs
@@ -191,7 +191,7 @@ $ go test ./b  # tr-b-keep
     script/twice/transform/upper: Uppercases every file under do/out/.
         A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:
         transform/upper/in/do/probe is no longer made
-        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, which no update writes. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
+        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, to which an update only adds an outcome they lack. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs

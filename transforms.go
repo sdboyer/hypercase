@@ -361,8 +361,9 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	if m.empty() {
 		return
 	}
-	// An update writes no frozen cell, so it rewrites none of those, and
-	// one whose files differ from its run's is checked on the new inputs.
+	// An update writes a frozen cell only to add an outcome it lacks, so it
+	// rewrites none of those, and one whose files differ from its run's is
+	// checked on the new inputs.
 	cells := "the variant's cells."
 	frozen := false
 	var differs []string
@@ -375,7 +376,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		}
 	}
 	if frozen {
-		cells = "the variant's cells but the frozen ones, which no update writes."
+		cells = "the variant's cells but the frozen ones, to which an update only adds an outcome they lack."
 	}
 	if len(differs) > 0 {
 		cells += fmt.Sprintf(" A normal run checks each frozen cell whose files differ, here %s, again on the rewritten inputs, against its committed files.", andList(differs))
