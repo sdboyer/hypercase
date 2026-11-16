@@ -58,6 +58,7 @@ func Test(t *testing.T) {
 	}
 	r.runCorpora(t)
 	r.appliesToNoCase(t)
+	r.runChecks(t, found)
 }
 
 // runner is one call of Test.
@@ -80,6 +81,7 @@ type runner struct {
 	corpora     map[string][]string // each lift's and suite's corpus directories, sorted
 	stats       map[string]*colStats
 	owned       map[*transform]bool // the types' transforms the package owns
+	checks      []Check             // sorted by name
 }
 
 // colStats counts a suite's cells, for the check that it applies to some
@@ -95,7 +97,7 @@ func newRunner(t *testing.T) (*runner, bool) {
 	reg.mu.Lock()
 	project, properties, columns := reg.project, slices.Clone(reg.properties), slices.Clone(reg.columns)
 	types, lifts := slices.Clone(reg.types), slices.Clone(reg.lifts)
-	ownedTransforms := slices.Clone(reg.ownedTransforms)
+	ownedTransforms, checks := slices.Clone(reg.ownedTransforms), slices.Clone(reg.checks)
 	rootRel, rootPackage := reg.root, reg.rootPackage
 	reg.mu.Unlock()
 	if project == nil {
@@ -113,10 +115,12 @@ func newRunner(t *testing.T) (*runner, bool) {
 		types:       types,
 		lifts:       lifts,
 		columns:     columns,
+		checks:      checks,
 		corpora:     map[string][]string{},
 		stats:       map[string]*colStats{},
 	}
 	slices.SortFunc(r.columns, func(a, b *column) int { return strings.Compare(a.name, b.name) })
+	slices.SortFunc(r.checks, func(a, b Check) int { return strings.Compare(a.Name, b.Name) })
 	for _, c := range r.columns {
 		r.stats[c.name] = &colStats{}
 	}
@@ -233,6 +237,11 @@ func (r *runner) checkDescriptions(t *testing.T) {
 		r.checkColumnDescriptions(t, c.kind(), c.name, c.description, c.outputs)
 		if cl := c.classifier; cl != nil && strings.TrimSpace(cl.description) == "" {
 			t.Errorf("the suite %s's classifier %s has no description.\nAdd one: it says what the classifier's details mean, in prose.", c.name, cl.name)
+		}
+	}
+	for _, c := range r.checks {
+		if strings.TrimSpace(c.Description) == "" {
+			t.Errorf("the corpus check %s has no description.\nAdd one: it says what the check asserts, in prose.", c.Name)
 		}
 	}
 }

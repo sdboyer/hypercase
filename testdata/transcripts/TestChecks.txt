@@ -1,0 +1,521 @@
+$ edit b/corpus_test.go  # a package b over the corpus
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-checks
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- PASS: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # tr-b-checks
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/copy
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/copy
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/copy
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/copy
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/copy
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/copy
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS
+$ go test  # tr-checks
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
+        + script/errs copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+          script/errs echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+        + script/errs/transform/upper copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+          script/errs/transform/upper echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+        + script/garbled copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states [malformed]; files [outcome values.txt]
+          script/garbled echo: accepted; the suite echo of ., rejecting [circular dangling]; states [malformed]; files [outcome values.txt]
+        + script/twice copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [outcome values.txt]
+          script/twice echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [outcome values.txt]
+        + script/twice/transform/looped copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+          script/twice/transform/looped echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+        + script/twice/transform/upper copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [outcome values.txt]
+          script/twice/transform/upper echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [outcome values.txt]
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- FAIL: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- FAIL: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-checks
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- PASS: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+PASS
+$ go test  # tr-checks
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- PASS: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+PASS
+$ go test ./b  # tr-b-checks
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/copy
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/copy
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/copy
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/copy
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/copy
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/copy
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS
+$ cat testdata/checks/cells.txt
+script/errs copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+script/errs echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+script/errs/transform/upper copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+script/errs/transform/upper echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+script/garbled copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states [malformed]; files [outcome values.txt]
+script/garbled echo: accepted; the suite echo of ., rejecting [circular dangling]; states [malformed]; files [outcome values.txt]
+script/twice copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [outcome values.txt]
+script/twice echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [outcome values.txt]
+script/twice/transform/looped copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+script/twice/transform/looped echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+script/twice/transform/upper copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [outcome values.txt]
+script/twice/transform/upper echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [outcome values.txt]
+$ edit testdata/checks/cells.txt  # add a finding by hand
+$ go test  # tr-checks
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
+        - a finding by hand
+          script/errs copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+          script/errs echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+          script/errs/transform/upper copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- FAIL: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- FAIL: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-checks
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- PASS: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+PASS
+$ rm testdata/checks/unsorted.txt  # remove a check's findings
+$ go test  # tr-checks
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    testdata/checks/unsorted.txt, the corpus check unsorted's findings, has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- FAIL: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- PASS: TestCorpus/checks/cells
+        --- FAIL: TestCorpus/checks/unsorted
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-checks
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- PASS: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+PASS
+$ go test  # tr-checks
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- PASS: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+PASS
+$ edit testdata/checks/gone.txt  # leave the findings of a check that is gone
+$ go test  # tr-checks
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    testdata/checks/gone.txt is the findings of no corpus check the package registers.
+        If a check should write it, register the check. If not, delete it by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- PASS: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-checks
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- PASS: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+PASS
+$ rm testdata/checks/gone.txt  # delete it by hand
+$ edit testdata/script/twice.txtar  # record another outcome by hand
+$ go test  # tr-checks
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    script/twice: echo prints a1 six.
+        echo: Does what the case's do/ tree says.
+        out/echo/outcome differs (-golden +got):
+        - rejected
+        + accepted
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
+          script/garbled copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states [malformed]; files [outcome values.txt]
+          script/garbled echo: accepted; the suite echo of ., rejecting [circular dangling]; states [malformed]; files [outcome values.txt]
+          script/twice copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [outcome values.txt]
+        - script/twice echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [outcome values.txt]
+        + script/twice echo: rejected; the suite echo of ., rejecting [circular dangling]; states []; files [outcome values.txt]
+          script/twice/transform/looped copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+          script/twice/transform/looped echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+          script/twice/transform/upper copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [outcome values.txt]
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- FAIL: TestCorpus/script/twice
+            --- FAIL: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- FAIL: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- FAIL: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-checks
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- PASS: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+PASS
+$ go test  # tr-checks
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters
+        --- PASS: TestCorpus/checks/cells
+        --- PASS: TestCorpus/checks/unsorted
+PASS
+$ edit testdata/script/broken.txtar  # an archive with a problem of form
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-checks
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    testdata/script/broken.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    the corpus check alters can't read its cells: testdata/script/broken.txtar has problems of form:
+          in/do/out/values.txt: the section appears twice
+        Fix what the message names. No check runs, and an update writes no findings.
+    the corpus check cells can't read its cells: testdata/script/broken.txtar has problems of form:
+          in/do/out/values.txt: the section appears twice
+        Fix what the message names. No check runs, and an update writes no findings.
+    the corpus check unsorted can't read its cells: testdata/script/broken.txtar has problems of form:
+          in/do/out/values.txt: the section appears twice
+        Fix what the message names. No check runs, and an update writes no findings.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/alters
+        --- FAIL: TestCorpus/checks/cells
+        --- FAIL: TestCorpus/checks/unsorted
+FAIL
+[exit 1]

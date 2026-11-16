@@ -1,6 +1,7 @@
 package hypercase_test
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -152,5 +153,119 @@ func TestVariantOutcomes(t *testing.T) {
 		"transform/upper/out/echo/outcome":  "accepted\n",
 	})
 	s.hasSections("testdata/script/errs.txtar", map[string]string{"transform/upper/out/echo/outcome": "rejected\n"}, "transform/looped/")
+	s.done()
+}
+
+// TestChecks: a corpus check reads every cell over the corpus root, from
+// the committed files, whichever package owns the column, and its
+// findings are a golden: sorted, each once, written by an update and
+// compared by a normal run. No check sees what another changed.
+func TestChecks(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "a package b over the corpus")
+	s.passes(s.update("tr-checks"))
+	s.passes(s.run("b", "tr-b-checks", true))
+	// A check reads what is committed when it runs: the root's ran before
+	// b wrote its cells, and the next update settles it.
+	s.fails(s.normal("tr-checks"), "testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):")
+	s.passes(s.update("tr-checks"))
+	s.passes(s.normal("tr-checks"))
+	s.passes(s.run("b", "tr-b-checks", false))
+	s.cat("testdata/checks/cells.txt")
+	if root, b := s.read("testdata/checks/cells.txt"), s.read("b/testdata/checks/cells.txt"); !bytes.Equal(root, b) {
+		t.Errorf("two packages' cells checks found different cells:\n%s\n%s", root, b)
+	}
+	for _, f := range []struct{ name, want string }{
+		{"unsorted", "a\nb\n"},
+		{"alters", ""},
+	} {
+		if got := string(s.read("testdata/checks/" + f.name + ".txt")); got != f.want {
+			t.Errorf("%s's findings are %q, want %q", f.name, got, f.want)
+		}
+	}
+
+	// The findings are a golden.
+	cells := s.read("testdata/checks/cells.txt")
+	s.write("testdata/checks/cells.txt", append([]byte("a finding by hand\n"), cells...), "add a finding by hand")
+	s.fails(s.normal("tr-checks"), "testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):\n    - a finding by hand")
+	s.passes(s.update("tr-checks"))
+	s.same("testdata/checks/cells.txt", cells)
+	s.remove("testdata/checks/unsorted.txt", "remove a check's findings")
+	s.fails(s.normal("tr-checks"), "testdata/checks/unsorted.txt, the corpus check unsorted's findings, has no golden.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.")
+	s.passes(s.update("tr-checks"))
+	s.passes(s.normal("tr-checks"))
+
+	// A findings file no check writes fails a normal run, and an update
+	// leaves it.
+	s.write("testdata/checks/gone.txt", []byte("x\n"), "leave the findings of a check that is gone")
+	s.fails(s.normal("tr-checks"), "testdata/checks/gone.txt is the findings of no corpus check the package registers.\n    If a check should write it, register the check. If not, delete it by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.")
+	s.passes(s.update("tr-checks"))
+	if !s.exists("testdata/checks/gone.txt") {
+		t.Error("the update removed testdata/checks/gone.txt")
+	}
+	s.remove("testdata/checks/gone.txt", "delete it by hand")
+
+	// A check reads committed files: a hand edit to an outcome moves the
+	// findings, as well as failing the cell.
+	s.edit(twice, "record another outcome by hand", set("out/echo/outcome", "rejected\n"))
+	r := s.normal("tr-checks")
+	s.fails(r, "out/echo/outcome differs (-golden +got):", "testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):",
+		"- script/twice echo: accepted; the suite echo of .", "+ script/twice echo: rejected; the suite echo of .")
+	s.passes(s.update("tr-checks"))
+	s.passes(s.normal("tr-checks"))
+
+	// An archive no check can read fails every check, and an update writes
+	// no findings.
+	findings := s.read("testdata/checks/cells.txt")
+	s.write("testdata/script/broken.txtar", []byte("A section twice.\n-- in/do/out/values.txt --\nx\n-- in/do/out/values.txt --\ny\n"), "an archive with a problem of form")
+	const unreadable = "can't read its cells: testdata/script/broken.txtar has problems of form:\n      in/do/out/values.txt: the section appears twice\n    Fix what the message names. No check runs, and an update writes no findings."
+	r = s.update("tr-checks")
+	s.fails(r, "the corpus check alters "+unreadable, "the corpus check cells "+unreadable, "the corpus check unsorted "+unreadable)
+	s.same("testdata/checks/cells.txt", findings)
+	s.done()
+}
+
+// TestCheckFailures: a check that errs or panics, or gives a finding that
+// is empty or holds a newline, fails every run, and an update writes no
+// findings for it. A check that finds nothing writes an empty file.
+func TestCheckFailures(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "basic")
+	for _, tt := range []struct{ reg, check, want string }{
+		{"check-error", "fails", "the corpus check fails fails: no cell is rejected\n    The cells violate what the check requires. Fix the code or the corpus, or the check. An update writes no findings."},
+		{"check-panic", "boom", "the corpus check boom panicked: check boom\n    Fix the check. An update writes no findings."},
+		{"check-newline", "lines", "the corpus check lines gave a finding that holds a newline: \"one\\ntwo\".\n    Fix the check: a finding is one line. An update writes no findings."},
+		{"check-empty", "empty", "the corpus check empty gave an empty finding.\n    Fix the check: a finding says something, on one line. An update writes no findings."},
+	} {
+		s.fails(s.update(tt.reg), tt.want, "--- FAIL: TestCorpus/checks/"+tt.check)
+		if s.exists("testdata/checks/" + tt.check + ".txt") {
+			t.Errorf("%s's update wrote findings", tt.reg)
+		}
+		s.fails(s.normal(tt.reg), tt.want)
+	}
+	s.passes(s.update("check-none"))
+	if got := string(s.read("testdata/checks/none.txt")); got != "" {
+		t.Errorf("none's findings are %q, want an empty file", got)
+	}
+	s.passes(s.normal("check-none"))
+	s.done()
+}
+
+// TestCheckRefusals: a check's name follows the naming rule, and is the
+// only one of its name in the package; it has a Run, and a description.
+func TestCheckRefusals(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "basic")
+	for _, tt := range []struct{ reg, want string }{
+		{"check-bad-name", `panic: hypercase: the corpus check name "Cells" breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter. Rename the check.`},
+		{"check-no-run", "panic: hypercase: the corpus check idle has no Run. Give it the function that reads the cells and gives its findings."},
+		{"check-twice", "panic: hypercase: two corpus checks are named none. Check names are unique per package; rename one."},
+	} {
+		r := s.normal(tt.reg)
+		s.fails(r, tt.want)
+		s.lacks(r, "--- ")
+	}
+	s.fails(s.normal("check-no-description"), "the corpus check none has no description.\nAdd one: it says what the check asserts, in prose.")
 	s.done()
 }
