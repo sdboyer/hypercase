@@ -120,12 +120,12 @@ func TestDiff(t *testing.T) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 	var a, b strings.Builder
-	for range 1000 {
+	for range 300 {
 		a.WriteString("a\n")
 		b.WriteString("b\n")
 	}
-	if got, _ := Diff([]byte(a.String()), []byte(b.String())); len(got) != 2000 {
-		t.Errorf("a diff of 2,000 changed lines has %d lines, want every one", len(got))
+	if got, _ := Diff([]byte(a.String()), []byte(b.String())); len(got) != 600 {
+		t.Errorf("a diff of 600 changed lines has %d lines, want every one", len(got))
 	}
 	if got, pairs := Diff([]byte("a\n"), []byte("a\n")); got != nil || pairs != 0 {
 		t.Errorf("equal files: got %v, %d pairs", got, pairs)
@@ -170,27 +170,88 @@ func TestDiffPairs(t *testing.T) {
 	}
 }
 
-// TestDiffBudget: a change past the edit graph's budget shows as the
-// changed region removed whole, then added whole, where a minimal diff
-// would interleave them.
-func TestDiffBudget(t *testing.T) {
-	const n = 3000
-	var a, b strings.Builder
+// scattered returns n lines, each unique, with the lines at change changed.
+func scattered(n int, change ...int) []byte {
+	var b strings.Builder
 	for i := range n {
-		fmt.Fprintf(&a, "line %d\n", i)
-		if i%2 == 1 {
+		if slices.Contains(change, i) {
 			fmt.Fprintf(&b, "line %d, changed\n", i)
 			continue
 		}
 		fmt.Fprintf(&b, "line %d\n", i)
 	}
-	got, _ := Diff([]byte(a.String()), []byte(b.String()))
-	var kinds strings.Builder
-	for _, l := range got {
-		kinds.WriteByte(l.Kind)
+	return []byte(b.String())
+}
+
+// counts returns how many lines of each kind a diff holds.
+func counts(lines []Line) map[byte]int {
+	n := map[byte]int{}
+	for _, l := range lines {
+		n[l.Kind]++
 	}
-	want := " " + strings.Repeat("-", n-1) + strings.Repeat("+", n-1)
-	if kinds.String() != want {
-		t.Errorf("the diff's kinds begin %.40q, want one line of context, %d removed, then %d added", kinds.String(), n-1, n-1)
+	return n
+}
+
+// TestDiffAnchors: edits scattered over a long file, more than Myers'
+// budget covers there, are aligned on the lines each file holds once, so
+// the diff holds exactly the changed lines and their context, comparing a
+// number of pairs that grows with the files' lengths.
+func TestDiffAnchors(t *testing.T) {
+	for _, tt := range []struct {
+		n      int
+		change []int
+	}{
+		{100_000, []int{3, 17_000, 33_333, 50_001, 81_234, 99_990}},
+		{3000, func() (c []int) {
+			for i := 1; i < 3000; i += 2 {
+				c = append(c, i)
+			}
+			return c
+		}()},
+	} {
+		got, pairs := Diff(scattered(tt.n), scattered(tt.n, tt.change...))
+		n := counts(got)
+		if n['-'] != len(tt.change) || n['+'] != len(tt.change) || n[Unaligned] != 0 {
+			t.Errorf("%d lines, %d changed: the diff holds %d removed, %d added and %d unaligned, want %d, %d and 0", tt.n, len(tt.change), n['-'], n['+'], n[Unaligned], len(tt.change), len(tt.change))
+		}
+		if pairs > 100*tt.n {
+			t.Errorf("%d lines, %d changed: the diff compared %d pairs, want at most %d", tt.n, len(tt.change), pairs, 100*tt.n)
+		}
+	}
+	// Each changed line is removed, then added, in place.
+	got, _ := Diff(scattered(10), scattered(10, 4))
+	want := []Line{{Kind: ' ', Text: "line 1"}, {Kind: ' ', Text: "line 2"}, {Kind: ' ', Text: "line 3"}, {Kind: '-', Text: "line 4"}, {Kind: '+', Text: "line 4, changed"}, {Kind: ' ', Text: "line 5"}, {Kind: ' ', Text: "line 6"}, {Kind: ' ', Text: "line 7"}}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
+
+// TestDiffUnaligned: a stretch past Myers' budget with no line that both
+// files hold once is one Unaligned line, which counts its lines of each
+// file and holds none of them. Lines shows it removed whole, then added
+// whole.
+func TestDiffUnaligned(t *testing.T) {
+	const n = 10_000
+	file := func(first string, mul, mod, below int) []byte {
+		var b strings.Builder
+		b.WriteString(first + "\n")
+		for i := range n - 2 {
+			if i*mul%mod < below {
+				b.WriteString("a\n")
+			} else {
+				b.WriteString("b\n")
+			}
+		}
+		b.WriteString(first + " again\n")
+		return []byte(b.String())
+	}
+	a, b := file("first of a", 7919, 13, 6), file("first of b", 104_729, 17, 8)
+	got, _ := Diff(a, b)
+	if want := []Line{{Kind: Unaligned, Old: n, New: n}}; !slices.Equal(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+	lines := strings.Split(Lines(a, b), "\n")
+	if lines[0] != "- first of a" || lines[maxLines-1] != "- b" && lines[maxLines-1] != "- a" || lines[maxLines] != fmt.Sprintf("  ... (%d more lines of diff)", 2*n-maxLines) {
+		t.Errorf("Lines begins %q, and ends %q", lines[:3], lines[maxLines-1:])
 	}
 }
