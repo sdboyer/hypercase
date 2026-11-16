@@ -46,3 +46,7 @@ $ go test  # lift-variant
 panic: hypercase: the lift name variant is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the lift.
 [stack]
 [exit 2]
+$ go test  # lift-transform
+panic: hypercase: the lift name transform is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the lift.
+[stack]
+[exit 2]

@@ -33,7 +33,18 @@ import (
 //	                      section marker
 //	import/nest/<path>    made as <path>, and as <path>/below, a file
 //	                      below it
-//	import/error          returned as the error, less its final newline
+//	import/space/<path>   made as <path>, with a space after its name
+//	import/newline/<path> made as <path>, with a newline and x after its
+//	                      name
+//	import/dup/<path>     made as <path>, twice
+//	import/case/<path>    made as <path>, and as <path> in upper case
+//	import/render/<path>  made as <path>, a tree that fails to render
+//	import/error          returned as the error, less its final newline,
+//	                      which decl.Reject marks as the rejection
+//	import/fail           returned as the error, less its final newline,
+//	                      unmarked
+//	import/coded          a *codedError, with the code it holds, less its
+//	                      final newline, which decl.Reject marks
 //	import/panic          panicked with, less its final newline
 //
 // An export whose import/ tree has none of these is imported as an empty
@@ -45,6 +56,23 @@ type (
 
 var unterminated = decl.Property{Name: "unterminated", Description: "The export holds a quoted field it never closes."}
 
+// A codedError is an error with a code, which projectCodesAs finds by
+// errors.As, through decl.Reject and the jenny's wrapping.
+type codedError struct{ code string }
+
+func (e *codedError) Error() string { return "an error with the code " + e.code }
+
+var projectCodesAs = decl.Project{
+	UpdateVar: fixtureUpdate,
+	Codes: func(err error) []string {
+		var c *codedError
+		if errors.As(err, &c) {
+			return []string{c.code}
+		}
+		return nil
+	},
+}
+
 // steerImport is a bytes lift's jenny, which the export's <name>/ tree
 // steers.
 func steerImport(name string, in fs.FS) (jenny.Files, error) {
@@ -53,17 +81,37 @@ func steerImport(name string, in fs.FS) (jenny.Files, error) {
 		panic(strings.TrimSuffix(string(data), "\n"))
 	}
 	if data, err := fs.ReadFile(in, name+"/error"); err == nil {
+		return nil, decl.Reject(errors.New(strings.TrimSuffix(string(data), "\n")))
+	}
+	if data, err := fs.ReadFile(in, name+"/fail"); err == nil {
 		return nil, errors.New(strings.TrimSuffix(string(data), "\n"))
+	}
+	if data, err := fs.ReadFile(in, name+"/coded"); err == nil {
+		return nil, decl.Reject(&codedError{code: strings.TrimSuffix(string(data), "\n")})
 	}
 	paths, err := archive.Paths(in)
 	if err != nil {
 		return nil, err
 	}
 	files := map[string][]byte{}
+	// faulty are files jenny refuses: two at one path, or a tree that
+	// fails to render.
+	var faulty jenny.Files
 	for _, p := range paths {
 		data, err := fs.ReadFile(in, p)
 		if err != nil {
 			return nil, err
+		}
+		if rest, ok := strings.CutPrefix(p, name+"/dup/"); ok {
+			faulty = append(faulty, jenny.NewFile(rest, data), jenny.NewFile(rest, data))
+		}
+		if rest, ok := strings.CutPrefix(p, name+"/case/"); ok {
+			faulty = append(faulty, jenny.NewFile(rest, data), jenny.NewFile(strings.ToUpper(rest), data))
+		}
+		if rest, ok := strings.CutPrefix(p, name+"/render/"); ok {
+			faulty = append(faulty, jenny.NewTree(rest, data, func(d []byte) ([]byte, error) {
+				return nil, errors.New("the tree won't render")
+			}))
 		}
 		if rest, ok := strings.CutPrefix(p, name+"/out/"); ok {
 			files[rest] = data
@@ -78,12 +126,18 @@ func steerImport(name string, in fs.FS) (jenny.Files, error) {
 		if rest, ok := strings.CutPrefix(p, name+"/marker/"); ok {
 			files[rest] = append(data, "-- x --\n"...)
 		}
+		if rest, ok := strings.CutPrefix(p, name+"/space/"); ok {
+			files[rest+" "] = data
+		}
+		if rest, ok := strings.CutPrefix(p, name+"/newline/"); ok {
+			files[rest+"\nx"] = data
+		}
 	}
 	var out jenny.Files
 	for _, p := range slices.Sorted(maps.Keys(files)) {
 		out = append(out, jenny.NewFile(p, files[p]))
 	}
-	return out, nil
+	return append(out, faulty...), nil
 }
 
 var (
@@ -141,6 +195,19 @@ var (
 		Run: func(_ string, in Export, _ io.Writer) (*Parsed, error) {
 			return &Parsed{view: in.FS, trail: []string{"import-parse"}}, nil
 		},
+	}
+	// exportGrid is a bytes lift to Export, which import lifts on, so a
+	// grid reaches Script through two bytes lifts: export follows the
+	// grid's export/ tree as import does its import/.
+	exportGrid = decl.Lift[Grid, Export]{
+		Name:        "export",
+		Description: "Exports the grid, as its export/ tree says.",
+		Outputs:     []decl.Output{{Pattern: "error.txt", Description: "Why the exporter rejects the grid."}},
+		Product:     []decl.Output{{Pattern: "import/out/quote/*", Description: "What import makes as its product's quote/ tree."}},
+		Rejects:     []decl.Property{unterminated},
+		Jenny: jenny.For[Grid]().New("export", func(in Grid) (jenny.Files, error) {
+			return steerImport("export", in)
+		}),
 	}
 
 	// list lists its input view, which, past import, is import's product.
@@ -241,9 +308,11 @@ var chainRegistrations = map[string]func(){
 	"chain-check": func() {
 		chain(project, exportType, own(importLift, parse, resolve, evaluate, list, louder, exportCheck))
 	},
+	"chain-codes":     func() { chain(projectCodesAs, exportType, own(importLift, parse, resolve, evaluate, list, louder)) },
 	"chain-render":    func() { chain(projectRender, plainExportType, own(importLift, parse, resolve, evaluate)) },
 	"chain-past":      func() { chain(project, plainExportType, own(unpack, repack, parse, resolve, evaluate, list)) },
 	"chain-two-paths": func() { chain(project, plainExportType, own(importLift, parse, importParsed, format)) },
+	"chain-twice":     func() { chain(project, gridType, plainExportType, own(exportGrid, importLift, list)) },
 
 	// Packages over one export corpus: . owns import, parse and resolve,
 	// and ./b uses them, and owns evaluate, list and the transform louder.

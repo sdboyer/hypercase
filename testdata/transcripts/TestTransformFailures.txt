@@ -187,3 +187,43 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # poke-b
             --- PASS: TestCorpus/script/same/copy
             --- SKIP: TestCorpus/script/same/transform/poke
 PASS
+$ go test ./b  # poke-b
+    script/error/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/flat/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/marker/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/nest/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/panic/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/probe-no/transform/poke: poke declines the base: the base is too small
+    script/probe-none/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/probe-panic/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/same/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/error
+            --- PASS: TestCorpus/script/error/copy
+            --- SKIP: TestCorpus/script/error/transform/poke
+        --- PASS: TestCorpus/script/flat
+            --- PASS: TestCorpus/script/flat/copy
+            --- SKIP: TestCorpus/script/flat/transform/poke
+        --- PASS: TestCorpus/script/marker
+            --- PASS: TestCorpus/script/marker/copy
+            --- SKIP: TestCorpus/script/marker/transform/poke
+        --- PASS: TestCorpus/script/nest
+            --- PASS: TestCorpus/script/nest/copy
+            --- SKIP: TestCorpus/script/nest/transform/poke
+        --- PASS: TestCorpus/script/panic
+            --- PASS: TestCorpus/script/panic/copy
+            --- SKIP: TestCorpus/script/panic/transform/poke
+        --- PASS: TestCorpus/script/probe-no
+            --- PASS: TestCorpus/script/probe-no/copy
+            --- SKIP: TestCorpus/script/probe-no/transform/poke
+        --- PASS: TestCorpus/script/probe-none
+            --- PASS: TestCorpus/script/probe-none/copy
+            --- SKIP: TestCorpus/script/probe-none/transform/poke
+        --- PASS: TestCorpus/script/probe-panic
+            --- PASS: TestCorpus/script/probe-panic/copy
+            --- SKIP: TestCorpus/script/probe-panic/transform/poke
+        --- PASS: TestCorpus/script/same
+            --- PASS: TestCorpus/script/same/copy
+            --- SKIP: TestCorpus/script/same/transform/poke
+PASS

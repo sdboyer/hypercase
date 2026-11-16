@@ -410,7 +410,6 @@ type aCase struct {
 	about      []byte // the case's description
 	gapsAt     string // the section that holds the case's gaps lines
 	a          *archive.Archive
-	view       fs.FS
 	properties []string
 	gaps       []archive.Gap // the lines that mark the case's cells
 	state      *caseState
@@ -448,18 +447,14 @@ func (r *runner) newCase(p *plan, pc plannedCase, prefix string, about []byte, g
 
 // setView gives the case its input view, and the values its cells read.
 func (c *aCase) setView(r *runner, p *plan, view fs.FS) {
-	c.view = view
 	c.state = &caseState{
-		archive:  c.archive,
-		plan:     p,
-		root:     p.root.new(view),
-		view:     view,
-		update:   r.update,
-		a:        c.a,
-		prefix:   c.prefix,
-		products: r.products,
-		runs:     map[*lift]*liftRun{},
-		reads:    map[*lift]*liftRead{},
+		r:     r,
+		c:     c,
+		plan:  p,
+		root:  p.root.new(view),
+		view:  view,
+		runs:  map[*lift]*liftRun{},
+		reads: map[*lift]*liftRead{},
 	}
 }
 
@@ -488,14 +483,7 @@ func (c *aCase) out(col, p string) string { return c.outDir(col) + p }
 
 // goldens returns a column's committed files, by path under its directory.
 func (c *aCase) goldens(col string) map[string][]byte {
-	g := map[string][]byte{}
-	prefix := c.outDir(col)
-	for _, s := range c.a.Sections {
-		if p, ok := strings.CutPrefix(s.Name, prefix); ok {
-			g[p] = s.Data
-		}
-	}
-	return g
+	return committedUnder(c.a, c.outDir(col))
 }
 
 func (c *aCase) header() string {
@@ -695,8 +683,9 @@ type called struct {
 	panicked       bool
 	panicValue     any
 	stack          []byte
-	inProbe        bool // the panic was the probe's
-	noProduct      bool // a lift returned neither a product nor an error
+	inProbe        bool  // the panic was the probe's
+	noProduct      bool  // a lift returned neither a product nor an error
+	jennyErr       error // a bytes lift's jenny returned this error, which is no rejection, in place of err
 }
 
 // call runs fn, recovering a panic. A runtime.Goexit, as from t.FailNow,
@@ -722,16 +711,17 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	st.ran++
 	header := c.header() + "\n" + col.name + ": " + col.description
 	gap, marked := c.gap(col.name)
-	goldens := c.goldens(col.name)
+	cf := c.committed(col)
+	goldens := cf.goldens
 
 	in, view, by := c.state.stage(col.consumes)
 	if by != nil {
 		st.applied++
 		if by.broken {
-			t.Errorf("%s\nThe lift %s, on %s's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.\nFix %s's jenny.", header, by.lift.name, col.name, by.lift.name)
+			t.Errorf("%s\nThe update writes nothing for the cell of the lift %s, on %s's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for %s, so the update writes nothing for this cell either, and the cell runs nothing.\nFix what %s's cell reports.", header, by.lift.name, col.name, by.lift.name, by.lift.name)
 			return
 		}
-		r.blocked(t, c, header, col, by, gap, marked, goldens, res)
+		r.blocked(t, c, header, col, by, gap, marked, cf, res)
 		return
 	}
 
@@ -791,27 +781,27 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	}
 
 	m := &msg{}
-	files, unjudged, writable := r.outputs(m, c, col, view, out)
-	if o, ok := r.outcome(m, col, in, out, files); ok {
-		files[outcomeFile] = o.Format()
-	} else {
-		// The cell has no outcome, so a committed one is no orphan.
-		writable = false
-		unjudged[outcomeFile] = true
-	}
-	// A bytes lift's cell includes its product. One an archive can't hold
-	// is left uncompared: its problems come first.
 	bytesLift := col.lift != nil && col.lift.bytes
-	var product, committed map[string][]byte
+	var files map[string][]byte
+	var unjudged map[string]bool
+	var writable bool
+	if bytesLift {
+		// In an update, the cells past the lift may have asked for the
+		// verdict first, to learn whether the update writes this cell.
+		v := c.state.liftVerdict(col.lift, lr, in, view)
+		m.parts = append(m.parts, v.parts...)
+		files, unjudged, writable = maps.Clone(v.files), maps.Clone(v.unjudged), v.writable
+	} else {
+		files, unjudged, writable = r.verdict(m, c, col, in, view, out)
+	}
+	// A bytes lift's cell includes its product. A fault of its jenny
+	// leaves the product uncompared: the fault comes first.
+	var product map[string][]byte
 	held := true
 	if bytesLift {
-		product, committed = lr.product, c.product(col.lift)
-		for _, p := range lr.problems {
-			m.add("%s", p)
-			writable, held = false, false
-		}
+		product, held = lr.product, len(lr.problems) == 0
 	}
-	frozen := c.frozen(col, marked)
+	frozen := cf.frozen(marked)
 
 	if !marked {
 		r.expectedError(m, c, col, out)
@@ -825,26 +815,10 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		couldWrite := writable
 		writable = false
 		_, hasOutcome := goldens[outcomeFile]
-		var diffs []string
-		for _, p := range slices.Sorted(maps.Keys(files)) {
-			g, ok := goldens[p]
-			switch {
-			case unjudged[p]:
-			case !ok && p == outcomeFile:
-			case !ok:
-				diffs = append(diffs, fmt.Sprintf("%s is new", c.out(col.name, p)))
-			case !bytes.Equal(g, files[p]):
-				diffs = append(diffs, fmt.Sprintf("%s differs (-committed +got):\n%s", c.out(col.name, p), strings.TrimSuffix(diff.Lines(g, files[p]), "\n")))
-			}
-		}
-		for _, p := range slices.Sorted(maps.Keys(goldens)) {
-			if _, ok := files[p]; !ok && !unjudged[p] {
-				diffs = append(diffs, fmt.Sprintf("%s is no longer produced", c.out(col.name, p)))
-			}
-		}
+		diffs := frozenDiffs(c.outDir(col.name), goldens, files, unjudged)
 		var productDiffs []string
 		if bytesLift && held {
-			productDiffs = frozenDiffs(col.lift.viaDir(c.prefix), committed, product)
+			productDiffs = frozenDiffs(col.lift.viaDir(c.prefix), cf.product, product, nil)
 			diffs = append(diffs, productDiffs...)
 		}
 		_, made := files[outcomeFile]
@@ -858,8 +832,16 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			if !couldWrite {
 				closing = "The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell."
 			}
-			if len(productDiffs) > 0 {
-				closing = fmt.Sprintf("The cells past %s fail in normal runs until the frozen cell is resolved: an update writes them from the product %s makes now, and leaves its committed product in place, which a normal run reads.\n", col.name, col.name) + closing
+			// A normal run gives the cells past a bytes lift what its cell
+			// commits, and an update, which writes them unless it writes
+			// nothing for the lift's cell, what the lift makes now. They
+			// part when one outcome accepts and the other doesn't, or when
+			// both accept and the products differ.
+			if bytesLift && couldWrite {
+				was, is := accepts(goldens[outcomeFile]), accepts(files[outcomeFile])
+				if was != is || is && len(productDiffs) > 0 {
+					closing = fmt.Sprintf("The cells past %s fail in normal runs until the frozen cell is resolved: an update writes them from what %s makes now, and leaves the cell's committed outcome and product in place, which a normal run reads.\n", col.name, col.name) + closing
+				}
 			}
 			m.add("The cell is frozen by its known gap, %s line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s\n%s", c.gapsAt, gap.Line, gap.Raw, strings.Join(diffs, "\n"), closing)
 		case hasOutcome || !made || !couldWrite:
@@ -874,7 +856,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	} else {
 		r.compare(m, c, col, files, goldens, unjudged, writable)
 		if bytesLift && held {
-			r.compareProduct(m, c, col.lift, out, product, committed, writable)
+			r.compareProduct(m, c, col.lift, out, product, cf.product, writable)
 		}
 	}
 	if !m.empty() {
@@ -888,6 +870,71 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	// An update writes a frozen cell only to add its outcome.
 	res.via = bytesLift && !frozen
 	res.product = product
+}
+
+// verdict is a cell's files, what it made and what the framework writes
+// for it, with its outcome, the files left unjudged, and whether an update
+// may write the cell, its freeze aside. It adds what is wrong to m.
+func (r *runner) verdict(m *msg, c *aCase, col *column, in any, view fs.FS, out *called) (files map[string][]byte, unjudged map[string]bool, writable bool) {
+	files, unjudged, writable = r.outputs(m, c, col, view, out)
+	if o, ok := r.outcome(m, col, in, out, files); ok {
+		files[outcomeFile] = o.Format()
+	} else {
+		// The cell has no outcome, so a committed one is no orphan.
+		writable = false
+		unjudged[outcomeFile] = true
+	}
+	return files, unjudged, writable
+}
+
+// A liftVerdict is a bytes lift's cell's verdict on a case, and what the
+// cell reports of it.
+type liftVerdict struct {
+	files    map[string][]byte
+	unjudged map[string]bool
+	writable bool
+	parts    []string
+}
+
+// liftVerdict judges a bytes lift's cell on the case once, from its one
+// run: the lift's own cell reports it, and in an update the cells past
+// the lift run only when the update writes the lift's cell, whose product
+// they read. A fault of the jenny keeps the update from writing the cell.
+func (s *caseState) liftVerdict(l *lift, lr *liftRun, in any, view fs.FS) *liftVerdict {
+	if lr.verdict != nil {
+		return lr.verdict
+	}
+	m := &msg{}
+	v := &liftVerdict{}
+	v.files, v.unjudged, v.writable = s.r.verdict(m, s.c, l.column(), in, view, lr.out)
+	for _, p := range lr.problems {
+		m.add("%s", p)
+		v.writable = false
+	}
+	v.parts = m.parts
+	lr.verdict = v
+	return v
+}
+
+// cellFiles is what a case commits for a column's cell: its files, by path
+// under out/<column>/, and a bytes lift's product, by path under
+// via/<column>/, which is nil for any other column.
+type cellFiles struct{ goldens, product map[string][]byte }
+
+// committed reads what the case commits for a column's cell.
+func (c *aCase) committed(col *column) cellFiles {
+	cf := cellFiles{goldens: c.goldens(col.name)}
+	if col.lift != nil && col.lift.bytes {
+		cf.product = c.product(col.lift)
+	}
+	return cf
+}
+
+// frozen reports whether a gaps line freezes the cell: marked says whether
+// one marks it, and the cell has committed files, a bytes lift's product
+// included.
+func (cf cellFiles) frozen(marked bool) bool {
+	return marked && (len(cf.goldens) > 0 || len(cf.product) > 0)
 }
 
 // product returns a bytes lift's committed product in the case, by path in
@@ -907,34 +954,33 @@ func committedUnder(a *archive.Archive, dir string) map[string][]byte {
 	return files
 }
 
-// frozen reports whether a gaps line freezes a column's cell: marked says
-// whether one marks it, and the cell has committed files, a bytes lift's
-// product included.
-func (c *aCase) frozen(col *column, marked bool) bool {
-	if !marked {
-		return false
-	}
-	if len(c.goldens(col.name)) > 0 {
-		return true
-	}
-	return col.lift != nil && col.lift.bytes && len(c.product(col.lift)) > 0
+// accepts reports whether an outcome file's data says its cell accepted
+// the case. No data, or data that isn't an outcome, doesn't.
+func accepts(data []byte) bool {
+	o, err := archive.ParseOutcome(data)
+	return err == nil && o.State == archive.Accepted
 }
 
-// frozenDiffs says how the product a frozen bytes lift's cell made differs
-// from its committed one, under dir.
-func frozenDiffs(dir string, committed, product map[string][]byte) []string {
+// frozenDiffs says how the files a frozen cell's run made, got, differ from
+// its committed ones, each named by its path under dir: its files under
+// out/<column>/, or a bytes lift's product under via/<lift>/. A path that
+// unjudged holds is left out, and so is an outcome the cell lacks, which
+// the upgrade adds.
+func frozenDiffs(dir string, committed, got map[string][]byte, unjudged map[string]bool) []string {
 	var diffs []string
-	for _, p := range slices.Sorted(maps.Keys(product)) {
+	for _, p := range slices.Sorted(maps.Keys(got)) {
 		g, ok := committed[p]
 		switch {
+		case unjudged[p]:
+		case !ok && p == outcomeFile:
 		case !ok:
 			diffs = append(diffs, fmt.Sprintf("%s is new", dir+p))
-		case !bytes.Equal(g, product[p]):
-			diffs = append(diffs, fmt.Sprintf("%s differs (-committed +got):\n%s", dir+p, strings.TrimSuffix(diff.Lines(g, product[p]), "\n")))
+		case !bytes.Equal(g, got[p]):
+			diffs = append(diffs, fmt.Sprintf("%s differs (-committed +got):\n%s", dir+p, strings.TrimSuffix(diff.Lines(g, got[p]), "\n")))
 		}
 	}
 	for _, p := range slices.Sorted(maps.Keys(committed)) {
-		if _, ok := product[p]; !ok {
+		if _, ok := got[p]; !ok && !unjudged[p] {
 			diffs = append(diffs, fmt.Sprintf("%s is no longer produced", dir+p))
 		}
 	}
@@ -977,25 +1023,46 @@ func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why
 // one file, and its other committed files are orphans. A blocked bytes
 // lift has no product, so its owner's update removes the committed one,
 // which other cells read.
-func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, b *blockage, gap archive.Gap, marked bool, goldens map[string][]byte, res *cellResult) {
+func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, b *blockage, gap archive.Gap, marked bool, cf cellFiles, res *cellResult) {
 	m := &msg{}
 	why := b.why(col)
+	goldens := cf.goldens
 	if marked {
 		m.add("%s marks the cell, and the cell is blocked: %s, so the cell runs nothing.\nRemove the line, or fix the lift or %s.", c.gapAt(gap), why, c.inputsAt())
 	}
-	frozen := c.frozen(col, marked)
+	frozen := cf.frozen(marked)
 	r.ranNothing(m, c, col, archive.Outcome{State: archive.Blocked, Detail: b.failed}, frozen, goldens, res)
+	// A normal run reads a bytes lift's committed outcome, which may be
+	// stale, or missing. When the lift accepts the case now, the update,
+	// which reruns it, runs the cell, so its files are no orphans. Only
+	// the lift's owner runs it in a normal run, so no other package can
+	// tell. keep is the advice for files that may be no orphans.
+	var keep string
+	switch {
+	case b.outcome == "":
+	case !b.lift.owned:
+		keep = fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell whether %s accepts the case now. Run %s, which reruns it, and delete nothing by hand before it has.", b.lift.name, b.lift.name, r.updateCmd())
+	case c.state.acceptsNow(b.lift):
+		keep = fmt.Sprintf("%s accepts the case now, so %s reruns it and runs %s. Delete nothing by hand.", b.lift.name, r.updateCmd(), col.name)
+	}
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
-		if p == outcomeFile {
-			continue
+		switch {
+		case p == outcomeFile:
+		case keep != "":
+			m.add("%s is recorded, and the cell is blocked: %s.\n%s", c.out(col.name, p), why, keep)
+		default:
+			m.add("%s is recorded, and the cell is blocked: %s.\nIf the cell should run, fix the lift or %s. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), why, c.inputsAt(), r.updateCmd())
 		}
-		m.add("%s is recorded, and the cell is blocked: %s.\nIf the cell should run, fix the lift or %s. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), why, c.inputsAt(), r.updateCmd())
 	}
 	if col.lift != nil && col.lift.bytes && !frozen {
 		res.via = true
 		if !r.update {
 			dir := col.lift.viaDir(c.prefix)
-			for _, p := range slices.Sorted(maps.Keys(c.product(col.lift))) {
+			for _, p := range slices.Sorted(maps.Keys(cf.product)) {
+				if keep != "" {
+					m.add("%s is recorded, and %s is blocked: %s.\n%s", dir+p, col.name, why, keep)
+					continue
+				}
 				m.add("%s is recorded, and %s is blocked: %s, so it has no product.\nRun %s, which removes it, and read the diff before committing.", dir+p, col.name, why, r.updateCmd())
 			}
 		}
@@ -1064,6 +1131,9 @@ func (r *runner) outcome(m *msg, col *column, in any, out *called, files map[str
 		return archive.Outcome{State: archive.Panicked}, true
 	case out.noProduct:
 		m.add("%s returned no product and no error, so the cell has no outcome.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.", col.name)
+		return o, false
+	case out.jennyErr != nil:
+		// The cell's problems say why: its jenny's fault.
 		return o, false
 	case out.err != nil:
 		o.State = archive.Rejected
@@ -1246,7 +1316,7 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 		m.add("%s's probe panicked: %v\nFix the probe. A panic is never an expected error.", col.name, out.panicValue)
 	case out.panicked:
 		m.add("%s panicked: %v\nFix the code. A panic is never an expected error.", col.name, out.panicValue)
-	case out.noProduct:
+	case out.noProduct || out.jennyErr != nil:
 	case out.err != nil && len(hit) == 0 && c.tr != nil:
 		m.add("%s returned an error, but the variant states no property %s rejects:\n  %s\n%s Fix the code or %s's jenny, or give the variant the property, in %s's Gives or Keeps, and list it in %s's Rejects.", col.name, col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "), c.tr.states(), c.tr.name, c.tr.name, col.name)
 	case out.err != nil && len(hit) == 0:
@@ -1264,18 +1334,9 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[string][]byte, unjudged map[string]bool, writable bool) {
 	if !r.update {
 		for _, p := range slices.Sorted(maps.Keys(files)) {
-			g, ok := goldens[p]
-			switch {
-			case unjudged[p]:
-			case !ok && !writable:
-				// No update writes the cell, so the file isn't one to
-				// write: the cell's problems come first.
-			case !ok:
-				m.add("%s has no golden.\nRun %s to write it, and read it before committing.", c.out(col.name, p), r.updateCmd())
-			case !bytes.Equal(g, files[p]) && !writable:
-				m.add("%s differs (-golden +got):\n%s\nAn update writes nothing for this cell until the problems above are fixed.", c.out(col.name, p), strings.TrimSuffix(diff.Lines(g, files[p]), "\n"))
-			case !bytes.Equal(g, files[p]):
-				m.add("%s differs (-golden +got):\n%s\nIf the change is intended, run %s and read the diff before committing.", c.out(col.name, p), strings.TrimSuffix(diff.Lines(g, files[p]), "\n"), r.updateCmd())
+			if !unjudged[p] {
+				g, ok := goldens[p]
+				r.compareFile(m, c.out(col.name, p), g, ok, files[p], writable)
 			}
 		}
 	}
@@ -1298,6 +1359,23 @@ func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[strin
 	}
 }
 
+// compareFile compares one file a cell made with its golden, in a normal
+// run: name is its section, and ok says whether the case commits it. In a
+// cell no update writes, a file with no golden isn't one to write, so it
+// isn't reported, and one that differs says the cell's problems come
+// first.
+func (r *runner) compareFile(m *msg, name string, golden []byte, ok bool, got []byte, writable bool) {
+	switch {
+	case !ok && !writable:
+	case !ok:
+		m.add("%s has no golden.\nRun %s to write it, and read it before committing.", name, r.updateCmd())
+	case !bytes.Equal(golden, got) && !writable:
+		m.add("%s differs (-golden +got):\n%s\nAn update writes nothing for this cell until the problems above are fixed.", name, strings.TrimSuffix(diff.Lines(golden, got), "\n"))
+	case !bytes.Equal(golden, got):
+		m.add("%s differs (-golden +got):\n%s\nIf the change is intended, run %s and read the diff before committing.", name, strings.TrimSuffix(diff.Lines(golden, got), "\n"), r.updateCmd())
+	}
+}
+
 // compareProduct compares a bytes lift's product with the one the case
 // commits, under via/<lift>/, in a normal run, as compare does a cell's
 // files with its goldens. An update replaces the committed product whole,
@@ -1310,15 +1388,7 @@ func (r *runner) compareProduct(m *msg, c *aCase, l *lift, out *called, product,
 	dir := l.viaDir(c.prefix)
 	for _, p := range slices.Sorted(maps.Keys(product)) {
 		g, ok := committed[p]
-		switch {
-		case !ok && !writable:
-		case !ok:
-			m.add("%s has no golden.\nRun %s to write it, and read it before committing.", dir+p, r.updateCmd())
-		case !bytes.Equal(g, product[p]) && !writable:
-			m.add("%s differs (-golden +got):\n%s\nAn update writes nothing for this cell until the problems above are fixed.", dir+p, strings.TrimSuffix(diff.Lines(g, product[p]), "\n"))
-		case !bytes.Equal(g, product[p]):
-			m.add("%s differs (-golden +got):\n%s\nIf the change is intended, run %s and read the diff before committing.", dir+p, strings.TrimSuffix(diff.Lines(g, product[p]), "\n"), r.updateCmd())
-		}
+		r.compareFile(m, dir+p, g, ok, product[p], writable)
 	}
 	closing := fmt.Sprintf("If not, run %s, which removes it, and read the diff before committing.", r.updateCmd())
 	if !writable {

@@ -1106,8 +1106,8 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
   consumes, the corpora it runs over, its declared outputs and the
   properties it rejects. It records the package's corpus root, and whether
   the package runs the root-package check.
-- It records the name of the project's update variable, so `hypercase strip`
-  and `hypercase report` can print the update command.
+- It records the name of the project's update variable, for a tool to print
+  the update command. No tool reads it yet.
 - It carries a format version, which changes on any change to what the
   registry holds.
 - It is compared like a golden. An update writes it by temp file and rename.
@@ -1596,35 +1596,40 @@ Go code that makes a variant from the base, and the update writes its
 variant's sections.
 
 Proposed names: `decl.Transform` with its `Name`, `Description`, `Gives`,
-`Keeps`, `Probe` and `Run` fields, and `decl.Type`'s `Transforms` field. The
-variant prefixes `variant/<name>/` and `transform/<name>/` are proposed.
+`Keeps`, `Probe` and `Jenny` fields, and `decl.Type`'s `Transforms` field.
+The variant prefixes `variant/<name>/` and `transform/<name>/` are proposed.
 Trade-off: the prefix says whether a person or an update wrote the variant,
-at the cost of two reserved top-level names and longer section paths.
+at the cost of reserving two names, as top-level section names and as
+column names, and of longer section paths.
 
+A transform's `Jenny` is a
+[jenny](https://pkg.go.dev/github.com/sdboyer/jenny): a named generator
+function, which here generates the variant's whole input view from the
+base. `walkthrough/sheets/step07/sheetcorpus/types.go` declares both
+transforms and lists them in the corpus type. Beside them, `view` gives each
+file of the sheet that `sheet.Loop` or `sheet.MoveDown` returns as one of the
+jenny's files:
+
+<!-- source: walkthrough/sheets/step07/sheetcorpus/types.go#transforms -->
 ```go
-// walkthrough/sheets/step07/sheetcorpus/types.go
 var Looped = decl.Transform[Sheet]{
 	Name:        "looped",
 	Description: "The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.",
 	Gives:       []decl.Property{Circular},
-	Probe: func(base Sheet) (why string, ok bool) {
-		// declines an empty sheet, and one whose first cell already refers to itself
-	},
-	Run: func(archive string, base Sheet) (fs.FS, error) {
-		// the base, with its first cell replaced
-	},
+	Probe:       func(base Sheet) (why string, ok bool) { return sheet.Loopable(base) },
+	Jenny: jenny.For[Sheet]().New("looped", func(base Sheet) (jenny.Files, error) {
+		return view(sheet.Loop(base))
+	}),
 }
 
 var Renamed = decl.Transform[Sheet]{
 	Name:        "renamed",
 	Description: "Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.",
 	Keeps:       []decl.Property{Circular, Dangling},
-	Probe: func(base Sheet) (why string, ok bool) {
-		// declines an empty sheet
-	},
-	Run: func(archive string, base Sheet) (fs.FS, error) {
-		return sheet.MoveDown(base)
-	},
+	Probe:       func(base Sheet) (why string, ok bool) { return sheet.Movable(base) },
+	Jenny: jenny.For[Sheet]().New("renamed", func(base Sheet) (jenny.Files, error) {
+		return view(sheet.MoveDown(base))
+	}),
 }
 
 var SheetType = decl.Type[Sheet]{
@@ -1632,51 +1637,167 @@ var SheetType = decl.Type[Sheet]{
 	Description: "A spreadsheet: one file per cell under in/sheet/, holding a number or a formula.",
 	Transforms:  []decl.Transform[Sheet]{Looped, Renamed},
 }
+
+// view gives a sheet's every file as a transform's jenny returns them, by its
+// path in the sheet's input view.
+func view(fsys fs.FS, err error) (jenny.Files, error) {
+	if err != nil {
+		return nil, err
+	}
+	var files jenny.Files
+	err = fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := fs.ReadFile(fsys, p)
+		if err != nil {
+			return err
+		}
+		files = append(files, jenny.NewFile(p, data))
+		return nil
+	})
+	return files, err
+}
 ```
 
-One package owns each transform. The root package adds
-`hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed)` to its
-registration.
+One package owns each transform. The root package,
+`walkthrough/sheets/step07/corpus_test.go`, adds both to its registration:
+
+<!-- source: walkthrough/sheets/step07/corpus_test.go#register -->
+```go
+func init() {
+	hypercase.Register(
+		sheetcorpus.Project,
+		hypercase.Root("step07"),
+		hypercase.RootPackage(),
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.SheetType,
+		hypercase.Own(sheetcorpus.Parse, sheetcorpus.Resolve, evaluate),
+		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
+	)
+}
+```
+
+Every package that registers the corpus type registers the properties its
+transforms give and keep. `walkthrough/sheets/step07/format/corpus_test.go`
+adds `circular` and `dangling`, which `cli/` registers already for its
+`Rejects`:
+
+<!-- source: walkthrough/sheets/step07/format/corpus_test.go#register -->
+```go
+func init() {
+	hypercase.Register(
+		sheetcorpus.Project,
+		hypercase.Root("step07"),
+		sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.SheetType,
+		hypercase.Use(sheetcorpus.Parse), // computed here; parse's sections are left alone
+		hypercase.Own(format),
+	)
+}
+```
 
 ### How the files change
 
-Archives gain variants. `testdata/sheet/twice.txtar`, with two hand-written
-variants and both transforms' variants, and its `calc` and `format` sections
-left out. `evaluate` is blocked on every variant but `transform/renamed`:
+Archives gain variants. `testdata/sheet/twice.txtar` has two hand-written
+variants and both transforms' variants. `evaluate` is blocked on every
+variant but `transform/renamed`:
 
+<!-- source: walkthrough/sheets/step07/testdata/sheet/twice.txtar -->
 ```
 A1 is twice B1.
 -- in/sheet/A1 --
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/calc/outcome --
+accepted
+-- out/calc/stdout.txt --
+6,3
+-- out/evaluate/outcome --
+accepted
 -- out/evaluate/values.txt --
 A1 6
 B1 3
+-- out/format/formulas.txt --
+A1 =B1 * 2
+-- out/format/outcome --
+accepted
+-- out/parse/outcome --
+accepted
+-- out/resolve/outcome --
+accepted
 -- variant/cycle/about --
 B1 refers back to A1, so the sheet has a cycle.
 -- variant/cycle/properties --
 circular
 -- variant/cycle/in/sheet/B1 --
 =A1
+-- variant/cycle/out/calc/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1*2
+  sheet/B1:1: =A1
+-- variant/cycle/out/calc/outcome --
+rejected
+-- variant/cycle/out/evaluate/outcome --
+blocked resolve
+-- variant/cycle/out/format/formulas.txt --
+A1 =B1 * 2
+B1 =A1
+-- variant/cycle/out/format/outcome --
+accepted
+-- variant/cycle/out/parse/outcome --
+accepted
 -- variant/cycle/out/resolve/error.txt --
 A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1*2
   sheet/B1:1: =A1
+-- variant/cycle/out/resolve/outcome --
+rejected
 -- variant/missing/about --
 B1 is gone, so A1 refers to a cell that doesn't exist.
 -- variant/missing/properties --
 dangling
 -- variant/missing/delete --
 sheet/B1
+-- variant/missing/out/calc/error.txt --
+A1: B1 doesn't exist
+  sheet/A1:1: =B1*2
+-- variant/missing/out/calc/outcome --
+rejected
+-- variant/missing/out/evaluate/outcome --
+blocked resolve
+-- variant/missing/out/format/formulas.txt --
+A1 =B1 * 2
+-- variant/missing/out/format/outcome --
+accepted
+-- variant/missing/out/parse/outcome --
+accepted
 -- variant/missing/out/resolve/error.txt --
 A1: B1 doesn't exist
   sheet/A1:1: =B1*2
+-- variant/missing/out/resolve/outcome --
+rejected
 -- transform/looped/in/sheet/A1 --
 =A1
+-- transform/looped/out/calc/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/calc/outcome --
+rejected
+-- transform/looped/out/evaluate/outcome --
+blocked resolve
+-- transform/looped/out/format/formulas.txt --
+A1 =A1
+-- transform/looped/out/format/outcome --
+accepted
+-- transform/looped/out/parse/outcome --
+accepted
 -- transform/looped/out/resolve/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/resolve/outcome --
+rejected
 -- transform/renamed/in/sheet/A2 --
 =B2*2
 -- transform/renamed/in/sheet/B2 --
@@ -1684,9 +1805,24 @@ A1 -> A1: cycle
 -- transform/renamed/delete --
 sheet/A1
 sheet/B1
+-- transform/renamed/out/calc/outcome --
+accepted
+-- transform/renamed/out/calc/stdout.txt --
+,
+6,3
+-- transform/renamed/out/evaluate/outcome --
+accepted
 -- transform/renamed/out/evaluate/values.txt --
 A2 6
 B2 3
+-- transform/renamed/out/format/formulas.txt --
+A2 =B2 * 2
+-- transform/renamed/out/format/outcome --
+accepted
+-- transform/renamed/out/parse/outcome --
+accepted
+-- transform/renamed/out/resolve/outcome --
+accepted
 ```
 
 `hypercase.json` gains each corpus type's transforms, with `Gives`, `Keeps`,
@@ -1703,6 +1839,8 @@ whether each has a probe, and whether the package owns it.
 - Cases are named `<archive>`, `<archive>/variant/<name>` and
   `<archive>/transform/<name>` in subtests and in the report, after the
   corpus directory (step 3): `TestCorpus/sheet/twice/transform/looped/resolve`.
+- So `variant` and `transform` are reserved column names. A suite or a lift
+  given either is refused at registration.
 
 **Hand-written variants.**
 
@@ -1732,15 +1870,35 @@ whether each has a probe, and whether the package owns it.
 - Its probe decides from the input only: it receives the base's input view,
   never property names or the archive's name, and gives a reason when it
   declines.
-- Its `Run` receives the archive's name (proposed) and the base's input
-  view, and returns the variant's input view.
+- Its `Jenny` makes the variant's input view from the base's: the files it
+  generates are the variant's whole input view, by their paths in it, such
+  as `sheet/A1`. It receives the base alone, not the archive's name.
 - The registry lists `Gives` and `Keeps`, so every package computes the same
   variants without running anything.
+- A package that registers the corpus type registers each property its
+  transforms give or keep. Without one, the package's run fails before any
+  case runs, naming the property.
+- A transform can fail on a base: its jenny errs or panics, or makes a view
+  equal to the base's, or one that no archive or file tree can hold, or its
+  probe panics, or declines without a reason. The variant then fails in
+  every run of the package that owns the transform, naming the failure, and
+  no cell runs on it. Every other package skips the variant, saying that
+  the owner reports why.
 - `looped` makes the first cell refer to itself and gives `circular`, so
   `resolve` is expected to err on every `looped` variant with nothing written
   by hand. `renamed` moves every cell one row down, rewriting each reference,
   and keeps `circular` and `dangling`, so it runs over bases that state
   either; a base that states `malformed` is declined.
+- Their probes decline a base only when the transform can't apply to it,
+  which is a fact about the sheet: it has no cells; for `looped`, its first
+  cell already refers to itself; for `renamed`, a cell or a reference is on
+  the last row, with no row below. A sheet a probe can't read, or one
+  holding a file that isn't a cell, is malformed, and no reason to decline.
+  By design, the probe leaves it to the jenny, which fails on it, and so the
+  transform fails. No case in the sheets corpus reaches that: `parse`
+  rejects such a sheet, so its base states `malformed`, and both transforms
+  decline a base that states a property they neither give nor keep, before
+  their probes run.
 - It is materialized. An update writes `transform/<name>/in/…` and
   `transform/<name>/delete`, and the owner's normal run checks them like
   goldens.
@@ -1790,14 +1948,76 @@ transform's variant is a line in the base's `gaps` section that names the
 transform. Its format (proposed) is `transform/<name>`, one space, the
 column's name, one space, then the text. In `negative`, whose `renamed`
 variant moves the negative number to A2 and errs the same wrong way as the
-base:
+base, the last two lines freeze that variant's `parse` and `calc` cells.
+Its `looped` variant replaces the number with a cycle, which `resolve` and
+`calc` are expected to reject, so no line marks it:
 
+<!-- source: walkthrough/sheets/step07/testdata/sheet/negative.txtar -->
 ```
+A1 is a negative number.
+-- in/sheet/A1 --
+-3
 -- gaps --
 parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
 calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 transform/renamed parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
 transform/renamed calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+-- out/calc/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/parse/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
+-- out/parse/outcome --
+rejected
+-- out/resolve/outcome --
+blocked parse
+-- transform/looped/in/sheet/A1 --
+=A1
+-- transform/looped/out/calc/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/calc/outcome --
+rejected
+-- transform/looped/out/evaluate/outcome --
+blocked resolve
+-- transform/looped/out/format/formulas.txt --
+A1 =A1
+-- transform/looped/out/format/outcome --
+accepted
+-- transform/looped/out/parse/outcome --
+accepted
+-- transform/looped/out/resolve/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/resolve/outcome --
+rejected
+-- transform/renamed/in/sheet/A2 --
+-3
+-- transform/renamed/delete --
+sheet/A1
+-- transform/renamed/out/calc/error.txt --
+A2: unexpected "-"
+  sheet/A2:1: -3
+-- transform/renamed/out/calc/outcome --
+rejected
+-- transform/renamed/out/evaluate/outcome --
+blocked parse
+-- transform/renamed/out/format/outcome --
+blocked parse
+-- transform/renamed/out/parse/error.txt --
+A2: unexpected "-"
+  sheet/A2:1: -3
+-- transform/renamed/out/parse/outcome --
+rejected
+-- transform/renamed/out/resolve/outcome --
+blocked parse
 ```
 
 **Section order, whole.**
@@ -1867,11 +2087,11 @@ its `Name`, `Description` and `Classify` fields, set as a suite's
 `Classifier`; and `hypercase.Result`, what a run produced, which a
 classifier reads.
 
-This step's snippets come from no example yet: no directory under
-`walkthrough/` holds them, and the doc golden checks none of them.
+`walkthrough/sheets/step08/sheetcorpus/project.go` gives the project its
+`Codes`:
 
+<!-- source: walkthrough/sheets/step08/sheetcorpus/project.go#project -->
 ```go
-// sheetcorpus/project.go
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
@@ -1885,10 +2105,33 @@ var Project = decl.Project{
 }
 ```
 
-`evaluate` gains a classifier:
+`walkthrough/sheets/step08/corpus_test.go` gives `evaluate` a classifier,
+and owns the corpus check `codes` (below):
 
+<!-- source: walkthrough/sheets/step08/corpus_test.go#evaluate -->
 ```go
-// corpus_test.go: evaluate gains
+func init() {
+	hypercase.Register(
+		sheetcorpus.Project,
+		hypercase.Root("step08"),
+		hypercase.RootPackage(),
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.SheetType,
+		hypercase.Own(sheetcorpus.Parse, sheetcorpus.Resolve, evaluate),
+		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
+		hypercase.Own(codes),
+	)
+}
+
+var evaluate = hypercase.Suite[*sheet.Graph]{
+	Name:        "evaluate",
+	Description: "Evaluates every cell of the sheet.",
+	Outputs: []decl.Output{
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+	},
+	Run: func(t testing.TB, archive string, g *sheet.Graph, stdout, stderr io.Writer) ([]hypercase.File, error) {
+		return []hypercase.File{{Path: "values.txt", Data: g.Evaluate().Format()}}, nil
+	},
 	Classifier: hypercase.Classifier[*sheet.Graph]{
 		Name:        "div-zero",
 		Description: "Adds div-zero when some cell divides by zero.",
@@ -1899,79 +2142,119 @@ var Project = decl.Project{
 			return "", nil
 		},
 	},
+}
 ```
 
 ### How the files change
 
-Every cell of the sheets examples gains an `outcome` file, skipped and
-blocked cells included.
+Every cell has an `outcome` file, skipped and blocked cells included. The
+archives shown in steps 3 to 7 have them too: they come from their examples,
+which today's updates write. Their projects supply no `Codes`, so their
+rejected cells carry none.
 
-`testdata/sheet/twice.txtar`, with its `missing` variant and its transforms'
-variants left out:
+`testdata/sheet/divide.txtar`, whose `A1` is `=B1/C1` with `C1` at `0`. The
+classifier makes `evaluate`'s outcome `accepted div-zero`, on the base and
+on its `renamed` variant, and each rejected cell of its `looped` variant
+carries the cycle's code:
 
+<!-- source: walkthrough/sheets/step08/testdata/sheet/divide.txtar -->
 ```
-A1 is twice B1.
+A1 divides B1 by C1, which is zero.
 -- in/sheet/A1 --
-=B1*2
+=B1/C1
 -- in/sheet/B1 --
-3
+1
+-- in/sheet/C1 --
+0
 -- out/calc/outcome --
 accepted
+-- out/calc/stderr.txt --
+A1: divides by zero
 -- out/calc/stdout.txt --
-6,3
+#DIV/0!,1,0
 -- out/evaluate/outcome --
-accepted
+accepted div-zero
 -- out/evaluate/values.txt --
-A1 6
-B1 3
+A1 #DIV/0!
+B1 1
+C1 0
 -- out/format/formulas.txt --
-A1 =B1 * 2
+A1 =B1 / C1
 -- out/format/outcome --
 accepted
 -- out/parse/outcome --
 accepted
 -- out/resolve/outcome --
 accepted
--- variant/cycle/about --
-B1 refers back to A1, so the sheet has a cycle.
--- variant/cycle/properties --
-circular
--- variant/cycle/in/sheet/B1 --
+-- transform/looped/in/sheet/A1 --
 =A1
--- variant/cycle/out/calc/error.txt --
-A1 -> B1 -> A1: cycle
-  sheet/A1:1: =B1*2
-  sheet/B1:1: =A1
--- variant/cycle/out/calc/outcome --
+-- transform/looped/out/calc/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/calc/outcome --
 rejected S201
--- variant/cycle/out/evaluate/outcome --
+-- transform/looped/out/evaluate/outcome --
 blocked resolve
--- variant/cycle/out/format/formulas.txt --
-A1 =B1 * 2
-B1 =A1
--- variant/cycle/out/format/outcome --
+-- transform/looped/out/format/formulas.txt --
+A1 =A1
+-- transform/looped/out/format/outcome --
 accepted
--- variant/cycle/out/parse/outcome --
+-- transform/looped/out/parse/outcome --
 accepted
--- variant/cycle/out/resolve/error.txt --
-A1 -> B1 -> A1: cycle
-  sheet/A1:1: =B1*2
-  sheet/B1:1: =A1
--- variant/cycle/out/resolve/outcome --
+-- transform/looped/out/resolve/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/resolve/outcome --
 rejected S201
+-- transform/renamed/in/sheet/A2 --
+=B2/C2
+-- transform/renamed/in/sheet/B2 --
+1
+-- transform/renamed/in/sheet/C2 --
+0
+-- transform/renamed/delete --
+sheet/A1
+sheet/B1
+sheet/C1
+-- transform/renamed/out/calc/outcome --
+accepted
+-- transform/renamed/out/calc/stderr.txt --
+A2: divides by zero
+-- transform/renamed/out/calc/stdout.txt --
+,,
+#DIV/0!,1,0
+-- transform/renamed/out/evaluate/outcome --
+accepted div-zero
+-- transform/renamed/out/evaluate/values.txt --
+A2 #DIV/0!
+B2 1
+C2 0
+-- transform/renamed/out/format/formulas.txt --
+A2 =B2 / C2
+-- transform/renamed/out/format/outcome --
+accepted
+-- transform/renamed/out/parse/outcome --
+accepted
+-- transform/renamed/out/resolve/outcome --
+accepted
 ```
 
 A sheet with no formulas has `format`'s outcome `skipped no formulas`, as
 step 5's `negative` shows. From step 6 it needs to parse as well, since
 `format` reads `parse`'s product: step 6's `negative` has `blocked parse`
-there. With the classifier, `divide`, whose `A1` is `=B1/C1` with `C1` at
-`0`, has `evaluate`'s outcome `accepted div-zero`.
+there.
 
-The archives shown in steps 3 to 6 come from their examples, which carry an
-`outcome` per cell, as every update writes from this step on. Step 7's
-archives, which no example holds yet, are shown without one.
+`Codes` changes the outcome of every rejected cell whose error it gives a
+code, frozen ones included; a rejected cell whose error it gives none keeps
+`rejected`. In archives that already carry outcomes, as step 7's do, the
+committed outcome of `negative`'s four frozen cells is `rejected`, and their
+run now gives `rejected S101`. So they fail, and no update writes them. A
+person deletes those four `outcome` files, and the next update adds them, as
+step 4's upgrade does for a frozen cell whose other files match its run.
+
 `hypercase.json` records each suite's classifier, and whether the project
-supplies `Codes`: step 5's shows them unset.
+supplies `Codes`: step 5's shows them unset, and the registry of step 8's
+root package sets both.
 
 ### Rules
 
@@ -2046,8 +2329,11 @@ Trade-off: step 12 would put them beside hypotheses, the other assertions
 about groups of cells, at the cost of placing a built feature in a step
 whose design isn't settled.
 
+`walkthrough/sheets/step08/corpus_test.go` declares `codes`, which its
+`init` gives to `Own`:
+
+<!-- source: walkthrough/sheets/step08/corpus_test.go#codes -->
 ```go
-// corpus_test.go, registered with the rest
 var codes = hypercase.Check{
 	Name:        "codes",
 	Description: "Every code the formula evaluator defines is the code of some rejected cell.",
@@ -2076,6 +2362,7 @@ var codes = hypercase.Check{
 
 The check's findings, `testdata/checks/codes.txt`:
 
+<!-- source: walkthrough/sheets/step08/testdata/checks/codes.txt -->
 ```
 S101
 S201
@@ -2125,8 +2412,8 @@ S202
 
 ### What can now be seen
 
-- The code's verdict on every cell, as a file: `twice`'s `cycle` variant is
-  `blocked resolve` in `evaluate`, and `rejected S201` in `resolve`.
+- The code's verdict on every cell, as a file: `divide`'s `looped` variant
+  is `blocked resolve` in `evaluate`, and `rejected S201` in `resolve`.
 - A change moves a cell on two axes. An outcome that changes is a different
   verdict; bytes that change under one outcome are a different rendering of
   the same verdict.
@@ -2302,7 +2589,18 @@ files, and its `Jenny` field, which a bytes lift gives in place of `Run`. The
 generator function, which here generates the product's files from the lift's
 input. It receives the input alone, so `import` finds its CSV by its tree,
 not by the archive's name. `view` gives each file of the sheet that
-`sheet.ImportCSV` returns as one of the jenny's files.
+`sheet.ImportCSV` returns as one of the jenny's files. `decl.Reject` marks
+the jenny's error as the lift's rejection of the case: the importer's error
+is one, and a CSV archive without exactly one CSV is no rejection, so it
+fails the cell.
+
+This step's snippets come from no example yet: no directory under
+`walkthrough/` holds them, and the doc golden checks none of them. The
+framework's self-tests check what the framework does with the error: it
+starts with the jenny's name, and `Codes` reaches the importer's error
+through the jenny and `decl.Reject`, so the outcome carries its code. The
+rest, such as what `RenderError` quotes, is the sheets code's, and
+untested.
 
 ```go
 // walkthrough/sheets/step10/sheetcorpus/types.go gains
@@ -2333,7 +2631,11 @@ var Import = decl.Lift[CSV, Sheet]{
 		if len(paths) != 1 {
 			return nil, fmt.Errorf("%d files under csv/, not one", len(paths))
 		}
-		return view(sheet.ImportCSV(in, paths[0]))
+		s, err := sheet.ImportCSV(in, paths[0])
+		if err != nil {
+			return nil, decl.Reject(err)
+		}
+		return view(s), nil
 	}),
 }
 ```
@@ -2432,10 +2734,20 @@ lift.
   input view. A pattern of `Product` that can match no such file fails the
   run.
 - A product file outside a tree or under `params/`, one that no declaration
-  or two declarations match, and one an archive can't hold, such as a file
-  with no final newline, fails the lift's cell. An update writes nothing for
-  that cell, and every cell past the lift fails, runs nothing, and is not
-  written either.
+  or two declarations match, and one an archive can't hold fail the lift's
+  cell, and an update writes nothing for that cell. An archive can't hold a
+  file with no final newline, or one whose name doesn't read back as
+  written, such as a name with a newline in it or a space at its end.
+- A bytes lift rejects a case only with an error that `decl.Reject` marks.
+  Any other error its jenny returns is a fault of the jenny, jenny's own
+  errors among them: two files at one path, two whose paths differ only in
+  case, a file that fails to render. A fault fails the lift's cell, and an
+  update writes nothing for that cell.
+- In an update, when anything but a `gaps` line keeps a bytes lift's cell
+  from being written, such as a fault of the jenny, a product an archive
+  can't hold or a `RenderError` that panics, every cell past the lift
+  fails, runs nothing, and is not written either: a normal run reads what
+  the lift's cell commits.
 - The lift's own cell files sit in `out/<lift>/`, like any column's. A
   lift's name covers both directories.
 - A variant's product goes under `variant/<name>/via/<lift>/` or
@@ -2455,14 +2767,20 @@ lift.
   lift's own cell. A downstream column takes `blocked` from the lift's
   committed `outcome`: any outcome but `accepted`, or none, blocks it. A
   lift that is `accepted` with no product files gives its readers an empty
-  view.
+  view. When the lift accepts the case now, the committed files of a cell
+  so blocked, a bytes lift's product among them, are no orphans: the
+  update reruns the lift and runs the cell. A normal run of the package
+  that owns the lift says so. Another package's doesn't run the lift, so
+  it says to run the update before deleting any of them.
 - A bytes lift's frozen cell includes its `via/` product: no update writes
   it, and a product that differs from what the lift makes fails the cell,
-  in every run. The cells past it are written by an update from what the
-  lift makes, so they fail normal runs, which read the committed product,
-  until a person resolves the frozen cell. Deleting the cell's files
-  includes deleting its product. `hypercase strip` leaves both in place,
-  and `-frozen` strips both.
+  in every run. An update writes the cells past it from what the lift makes
+  now. So when the lift's outcome now accepts the case where the committed
+  one doesn't, or the other way round, or both accept and the products
+  differ, the cells past it fail normal runs, which read the committed
+  outcome and product, until a person resolves the frozen cell. Deleting
+  the cell's files includes deleting its product. `hypercase strip` leaves
+  both in place, and `-frozen` strips both.
 - The properties a case states hold for every column the case reaches,
   through the lift too. A CSV with a quote that never closes states
   `unterminated`, which `import` rejects, and a CSV whose imported sheet has

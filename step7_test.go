@@ -839,7 +839,7 @@ func TestTransformOwners(t *testing.T) {
 
 // TestTransformFailures: a transform that fails on a base, or makes a
 // variant that can't be one, fails in the package that owns it, and is
-// skipped in the others.
+// skipped in the others, in their updates and their normal runs.
 func TestTransformFailures(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transform-failures")
@@ -859,9 +859,18 @@ func TestTransformFailures(t *testing.T) {
 	for _, a := range []string{"error", "same", "probe-no"} {
 		s.cat("testdata/script/" + a + ".txtar")
 	}
-	b := s.run("b", "poke-b", true)
-	s.passes(b)
-	s.contains(b, "script/error/transform/poke: the transform poke failed on the base, and the package that owns it reports why.")
+	// A package that doesn't own the transform skips the variant on every
+	// failure, in its update and in its normal run, and leaves the owner to
+	// report why.
+	var skipped []string
+	for _, a := range []string{"error", "panic", "same", "flat", "marker", "nest", "probe-panic", "probe-none"} {
+		skipped = append(skipped, "script/"+a+"/transform/poke: the transform poke failed on the base, and the package that owns it reports why.")
+	}
+	for _, update := range []bool{true, false} {
+		b := s.run("b", "poke-b", update)
+		s.passes(b)
+		s.contains(b, skipped...)
+	}
 	s.done()
 }
 
@@ -881,6 +890,7 @@ func TestTransformRefusals(t *testing.T) {
 		{"col-variant", "panic: hypercase: the suite name variant is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the suite."},
 		{"col-transform", "panic: hypercase: the suite name transform is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the suite."},
 		{"lift-variant", "panic: hypercase: the lift name variant is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the lift."},
+		{"lift-transform", "panic: hypercase: the lift name transform is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the lift."},
 	} {
 		r := s.normal(tt.reg)
 		s.fails(r, tt.want)
@@ -900,6 +910,7 @@ func TestTransformRelations(t *testing.T) {
 		{"tr-own-no-type", "the package owns the transform looped, of the corpus type hypercase_test.Script, and registers no such corpus type.\nRegister the corpus type, which lists the transform in its Transforms."},
 		{"tr-own-differs", "the package owns a transform named looped that differs from the one the corpus type hypercase_test.Script lists.\nOwn the declaration the type lists: declare the transform once, and use that declaration in both places."},
 		{"tr-unregistered-gives", "the transform looped, of the corpus type hypercase_test.Script, gives circular, and the package registers no property of that name.\nRegister the property, or remove it from looped's Gives."},
+		{"tr-unregistered-keeps", "the transform upper, of the corpus type hypercase_test.Script, keeps circular, and the package registers no property of that name.\nRegister the property, or remove it from upper's Keeps."},
 		{"tr-other-description", "the transform upper, of the corpus type hypercase_test.Script, keeps a property named circular, which the package registers with another description.\nKeep one declaration of circular, with one description: register it, and list it in upper's Keeps."},
 		{"tr-other-gives", "the transform looped, of the corpus type hypercase_test.Script, gives a property named circular, which the package registers with another description.\nKeep one declaration of circular, with one description: register it, and list it in looped's Gives."},
 	} {

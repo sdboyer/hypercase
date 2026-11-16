@@ -369,7 +369,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	frozen := false
 	var differs []string
 	for i, col := range p.cols {
-		if _, marked := c.gap(col.name); c.frozen(col, marked) {
+		if _, marked := c.gap(col.name); c.committed(col).frozen(marked) {
 			frozen = true
 		}
 		if results[i].frozenDiffers {

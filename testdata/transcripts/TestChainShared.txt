@@ -196,6 +196,41 @@ $ go test ./b  # chain-b
 FAIL
 [exit 1]
 $ edit testdata/export/prices.txtar  # restore it
+$ edit testdata/export/prices.txtar  # import's cell has no committed outcome
+$ go test ./b  # chain-b
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell whether import accepts the case now. Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which reruns it, and delete nothing by hand before it has.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        list: Lists the files of the script's input view, with their bytes.
+        out/list/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell whether import accepts the case now. Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which reruns it, and delete nothing by hand before it has.
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- FAIL: TestCorpus/export/prices/evaluate
+            --- FAIL: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ edit testdata/export/prices.txtar  # restore it
 $ edit testdata/export/prices.txtar  # import no longer makes quote/B1
 $ go test  # chain-a
     export/prices: One export of prices: import makes a script whose quote/ tree list shows.

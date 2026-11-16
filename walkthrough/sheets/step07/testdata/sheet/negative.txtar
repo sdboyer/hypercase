@@ -1,0 +1,64 @@
+A1 is a negative number.
+-- in/sheet/A1 --
+-3
+-- gaps --
+parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
+calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+transform/renamed parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
+transform/renamed calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+-- out/calc/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/parse/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
+-- out/parse/outcome --
+rejected
+-- out/resolve/outcome --
+blocked parse
+-- transform/looped/in/sheet/A1 --
+=A1
+-- transform/looped/out/calc/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/calc/outcome --
+rejected
+-- transform/looped/out/evaluate/outcome --
+blocked resolve
+-- transform/looped/out/format/formulas.txt --
+A1 =A1
+-- transform/looped/out/format/outcome --
+accepted
+-- transform/looped/out/parse/outcome --
+accepted
+-- transform/looped/out/resolve/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/resolve/outcome --
+rejected
+-- transform/renamed/in/sheet/A2 --
+-3
+-- transform/renamed/delete --
+sheet/A1
+-- transform/renamed/out/calc/error.txt --
+A2: unexpected "-"
+  sheet/A2:1: -3
+-- transform/renamed/out/calc/outcome --
+rejected
+-- transform/renamed/out/evaluate/outcome --
+blocked parse
+-- transform/renamed/out/format/outcome --
+blocked parse
+-- transform/renamed/out/parse/error.txt --
+A2: unexpected "-"
+  sheet/A2:1: -3
+-- transform/renamed/out/parse/outcome --
+rejected
+-- transform/renamed/out/resolve/outcome --
+blocked parse

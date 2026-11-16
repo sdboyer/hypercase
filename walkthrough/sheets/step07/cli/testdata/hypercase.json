@@ -1,0 +1,83 @@
+{
+  "format": 6,
+  "updateVar": "SHEETS_UPDATE_GOLDEN",
+  "corpusRoot": "step07",
+  "rootPackage": false,
+  "codes": false,
+  "issueLinks": [],
+  "properties": [
+    {
+      "name": "circular",
+      "description": "Some cell's formula refers back to itself, directly or through other cells."
+    },
+    {
+      "name": "dangling",
+      "description": "Some formula refers to a cell the sheet doesn't have."
+    },
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    }
+  ],
+  "types": [
+    {
+      "dir": "sheet",
+      "description": "A spreadsheet: one file per cell under in/sheet/, holding a number or a formula.",
+      "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step07/sheetcorpus.Sheet",
+      "transforms": [
+        {
+          "name": "looped",
+          "description": "The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.",
+          "gives": [
+            "circular"
+          ],
+          "keeps": [],
+          "probe": true,
+          "owned": false
+        },
+        {
+          "name": "renamed",
+          "description": "Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.",
+          "gives": [],
+          "keeps": [
+            "circular",
+            "dangling"
+          ],
+          "probe": true,
+          "owned": false
+        }
+      ]
+    }
+  ],
+  "lifts": [],
+  "suites": [
+    {
+      "name": "calc",
+      "description": "Runs the calc command on the sheet.",
+      "consumes": "github.com/sdboyer/hypercase/walkthrough/sheets/step07/sheetcorpus.Sheet",
+      "corpora": [
+        "sheet"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why calc failed."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "A warning for each cell that divides by zero."
+        },
+        {
+          "pattern": "stdout.txt",
+          "description": "The sheet's values as CSV, one row per line."
+        }
+      ],
+      "rejects": [
+        "circular",
+        "dangling",
+        "malformed"
+      ],
+      "classifier": null
+    }
+  ]
+}

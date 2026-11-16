@@ -1,0 +1,545 @@
+$ edit testdata/export/empty.txtar  # import rejects empty
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/empty: evaluate is blocked: the lift import failed on the case, and testdata/export/empty.txtar, out/import/error.txt, records its error.
+    export/empty: list is blocked: the lift import failed on the case, and testdata/export/empty.txtar, out/import/error.txt, records its error.
+    export/empty: parse is blocked: the lift import failed on the case, and testdata/export/empty.txtar, out/import/error.txt, records its error.
+    export/empty: resolve is blocked: the lift import failed on the case, and testdata/export/empty.txtar, out/import/error.txt, records its error.
+    export/empty/transform/louder: louder declines the base: the export makes no output of evaluate
+    export/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/export/looped.txtar, out/resolve/error.txt, records its error.
+    export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
+    export/names/transform/louder: louder declines the base: the export makes no output of evaluate
+    export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
+    export/prices/variant/unclosed: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
+    export/prices/variant/unclosed: parse is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
+    export/prices/variant/unclosed: resolve is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
+    what ran, in order:
+        import ran
+        import ran
+        parse ran on looped
+        resolve ran on looped
+        import ran
+        parse ran on names
+        resolve ran on names
+        evaluate's probe ran
+        evaluate ran on names
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/empty
+            --- SKIP: TestCorpus/export/empty/evaluate
+            --- PASS: TestCorpus/export/empty/import
+            --- SKIP: TestCorpus/export/empty/list
+            --- SKIP: TestCorpus/export/empty/parse
+            --- SKIP: TestCorpus/export/empty/resolve
+            --- SKIP: TestCorpus/export/empty/transform/louder
+        --- PASS: TestCorpus/export/looped
+            --- SKIP: TestCorpus/export/looped/evaluate
+            --- PASS: TestCorpus/export/looped/import
+            --- PASS: TestCorpus/export/looped/list
+            --- PASS: TestCorpus/export/looped/parse
+            --- PASS: TestCorpus/export/looped/resolve
+            --- SKIP: TestCorpus/export/looped/transform/louder
+        --- PASS: TestCorpus/export/names
+            --- PASS: TestCorpus/export/names/evaluate
+            --- PASS: TestCorpus/export/names/import
+            --- PASS: TestCorpus/export/names/list
+            --- PASS: TestCorpus/export/names/parse
+            --- PASS: TestCorpus/export/names/resolve
+            --- SKIP: TestCorpus/export/names/transform/louder
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/unclosed
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/evaluate
+                --- PASS: TestCorpus/export/prices/variant/unclosed/import
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/list
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/parse
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+PASS
+$ edit testdata/export/empty.txtar  # a gaps line marks import's cell
+$ go test  # chain
+    export/empty: evaluate is blocked: testdata/export/empty.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/empty: list is blocked: testdata/export/empty.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/empty: parse is blocked: testdata/export/empty.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/empty: resolve is blocked: testdata/export/empty.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/empty/transform/louder: louder declines the base: the export makes no output of evaluate
+    export/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/export/looped.txtar, out/resolve/error.txt, records its error.
+    export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
+    export/names/transform/louder: louder declines the base: the export makes no output of evaluate
+    export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/variant/unclosed: parse is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/variant/unclosed: resolve is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
+    what ran, in order:
+        import ran
+        parse ran on looped
+        resolve ran on looped
+        import ran
+        parse ran on names
+        resolve ran on names
+        evaluate's probe ran
+        evaluate ran on names
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/empty
+            --- SKIP: TestCorpus/export/empty/evaluate
+            --- PASS: TestCorpus/export/empty/import
+            --- SKIP: TestCorpus/export/empty/list
+            --- SKIP: TestCorpus/export/empty/parse
+            --- SKIP: TestCorpus/export/empty/resolve
+            --- SKIP: TestCorpus/export/empty/transform/louder
+        --- PASS: TestCorpus/export/looped
+            --- SKIP: TestCorpus/export/looped/evaluate
+            --- PASS: TestCorpus/export/looped/import
+            --- PASS: TestCorpus/export/looped/list
+            --- PASS: TestCorpus/export/looped/parse
+            --- PASS: TestCorpus/export/looped/resolve
+            --- SKIP: TestCorpus/export/looped/transform/louder
+        --- PASS: TestCorpus/export/names
+            --- PASS: TestCorpus/export/names/evaluate
+            --- PASS: TestCorpus/export/names/import
+            --- PASS: TestCorpus/export/names/list
+            --- PASS: TestCorpus/export/names/parse
+            --- PASS: TestCorpus/export/names/resolve
+            --- SKIP: TestCorpus/export/names/transform/louder
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/unclosed
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/evaluate
+                --- PASS: TestCorpus/export/prices/variant/unclosed/import
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/list
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/parse
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+PASS
+$ edit testdata/export/empty.txtar  # import accepts empty again, with an empty product
+$ go test  # chain
+    export/empty: evaluate is blocked: testdata/export/empty.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
+        import: Imports the export as a script, as its import/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "import The importer reads quoted fields. Waits on sheets#9."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/import/outcome differs (-committed +got):
+        - rejected
+        + accepted
+        out/import/error.txt is no longer produced
+        The cells past import fail in normal runs until the frozen cell is resolved: an update writes them from what import makes now, and leaves the cell's committed outcome and product in place, which a normal run reads.
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/, and the next update writes them.
+    export/empty: list is blocked: testdata/export/empty.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/empty: parse is blocked: testdata/export/empty.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/empty: resolve is blocked: testdata/export/empty.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/empty/transform/louder: louder declines the base: the export makes no output of evaluate
+    export/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/export/looped.txtar, out/resolve/error.txt, records its error.
+    export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
+    export/names/transform/louder: louder declines the base: the export makes no output of evaluate
+    export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/variant/unclosed: parse is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/variant/unclosed: resolve is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
+    what ran, in order:
+        import ran
+        parse ran on looped
+        resolve ran on looped
+        import ran
+        parse ran on names
+        resolve ran on names
+        evaluate's probe ran
+        evaluate ran on names
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/empty
+            --- SKIP: TestCorpus/export/empty/evaluate
+            --- FAIL: TestCorpus/export/empty/import
+            --- SKIP: TestCorpus/export/empty/list
+            --- SKIP: TestCorpus/export/empty/parse
+            --- SKIP: TestCorpus/export/empty/resolve
+            --- SKIP: TestCorpus/export/empty/transform/louder
+        --- PASS: TestCorpus/export/looped
+            --- SKIP: TestCorpus/export/looped/evaluate
+            --- PASS: TestCorpus/export/looped/import
+            --- PASS: TestCorpus/export/looped/list
+            --- PASS: TestCorpus/export/looped/parse
+            --- PASS: TestCorpus/export/looped/resolve
+            --- SKIP: TestCorpus/export/looped/transform/louder
+        --- PASS: TestCorpus/export/names
+            --- PASS: TestCorpus/export/names/evaluate
+            --- PASS: TestCorpus/export/names/import
+            --- PASS: TestCorpus/export/names/list
+            --- PASS: TestCorpus/export/names/parse
+            --- PASS: TestCorpus/export/names/resolve
+            --- SKIP: TestCorpus/export/names/transform/louder
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/unclosed
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/evaluate
+                --- PASS: TestCorpus/export/prices/variant/unclosed/import
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/list
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/parse
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
+        import: Imports the export as a script, as its import/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "import The importer reads quoted fields. Waits on sheets#9."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/import/outcome differs (-committed +got):
+        - rejected
+        + accepted
+        out/import/error.txt is no longer produced
+        The cells past import fail in normal runs until the frozen cell is resolved: an update writes them from what import makes now, and leaves the cell's committed outcome and product in place, which a normal run reads.
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/, and the next update writes them.
+    export/empty/transform/louder: louder declines the base: the export makes no output of evaluate
+    export/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/export/looped.txtar, out/resolve/error.txt, records its error.
+    export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
+    export/names/transform/louder: louder declines the base: the export makes no output of evaluate
+    export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
+    export/prices/variant/unclosed: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
+    export/prices/variant/unclosed: parse is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
+    export/prices/variant/unclosed: resolve is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
+    what ran, in order:
+        import ran
+        parse ran on empty
+        resolve ran on empty
+        evaluate's probe ran
+        evaluate ran on empty
+        import ran
+        parse ran on looped
+        resolve ran on looped
+        import ran
+        parse ran on names
+        resolve ran on names
+        evaluate's probe ran
+        evaluate ran on names
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/empty
+            --- PASS: TestCorpus/export/empty/evaluate
+            --- FAIL: TestCorpus/export/empty/import
+            --- PASS: TestCorpus/export/empty/list
+            --- PASS: TestCorpus/export/empty/parse
+            --- PASS: TestCorpus/export/empty/resolve
+            --- SKIP: TestCorpus/export/empty/transform/louder
+        --- PASS: TestCorpus/export/looped
+            --- SKIP: TestCorpus/export/looped/evaluate
+            --- PASS: TestCorpus/export/looped/import
+            --- PASS: TestCorpus/export/looped/list
+            --- PASS: TestCorpus/export/looped/parse
+            --- PASS: TestCorpus/export/looped/resolve
+            --- SKIP: TestCorpus/export/looped/transform/louder
+        --- PASS: TestCorpus/export/names
+            --- PASS: TestCorpus/export/names/evaluate
+            --- PASS: TestCorpus/export/names/import
+            --- PASS: TestCorpus/export/names/list
+            --- PASS: TestCorpus/export/names/parse
+            --- PASS: TestCorpus/export/names/resolve
+            --- SKIP: TestCorpus/export/names/transform/louder
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/unclosed
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/evaluate
+                --- PASS: TestCorpus/export/prices/variant/unclosed/import
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/list
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/parse
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+FAIL
+[exit 1]
+$ go test  # chain
+    export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
+        import: Imports the export as a script, as its import/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "import The importer reads quoted fields. Waits on sheets#9."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/import/outcome differs (-committed +got):
+        - rejected
+        + accepted
+        out/import/error.txt is no longer produced
+        The cells past import fail in normal runs until the frozen cell is resolved: an update writes them from what import makes now, and leaves the cell's committed outcome and product in place, which a normal run reads.
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/, and the next update writes them.
+    export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
+        list: Lists the files of the script's input view, with their bytes.
+        out/list/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
+        import accepts the case now, so FIXTURE_UPDATE_GOLDEN=1 go test ./... reruns it and runs list. Delete nothing by hand.
+    export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        out/resolve/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    export/empty/transform/louder: louder declines the base: the export makes no output of evaluate
+    export/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/export/looped.txtar, out/resolve/error.txt, records its error.
+    export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
+    export/names/transform/louder: louder declines the base: the export makes no output of evaluate
+    export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/variant/unclosed: parse is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/variant/unclosed: resolve is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
+    what ran, in order:
+        import ran
+        parse ran on looped
+        resolve ran on looped
+        import ran
+        parse ran on names
+        resolve ran on names
+        evaluate's probe ran
+        evaluate ran on names
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/empty
+            --- FAIL: TestCorpus/export/empty/evaluate
+            --- FAIL: TestCorpus/export/empty/import
+            --- FAIL: TestCorpus/export/empty/list
+            --- FAIL: TestCorpus/export/empty/parse
+            --- FAIL: TestCorpus/export/empty/resolve
+            --- SKIP: TestCorpus/export/empty/transform/louder
+        --- PASS: TestCorpus/export/looped
+            --- SKIP: TestCorpus/export/looped/evaluate
+            --- PASS: TestCorpus/export/looped/import
+            --- PASS: TestCorpus/export/looped/list
+            --- PASS: TestCorpus/export/looped/parse
+            --- PASS: TestCorpus/export/looped/resolve
+            --- SKIP: TestCorpus/export/looped/transform/louder
+        --- PASS: TestCorpus/export/names
+            --- PASS: TestCorpus/export/names/evaluate
+            --- PASS: TestCorpus/export/names/import
+            --- PASS: TestCorpus/export/names/list
+            --- PASS: TestCorpus/export/names/parse
+            --- PASS: TestCorpus/export/names/resolve
+            --- SKIP: TestCorpus/export/names/transform/louder
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/unclosed
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/evaluate
+                --- PASS: TestCorpus/export/prices/variant/unclosed/import
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/list
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/parse
+                --- SKIP: TestCorpus/export/prices/variant/unclosed/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+FAIL
+[exit 1]

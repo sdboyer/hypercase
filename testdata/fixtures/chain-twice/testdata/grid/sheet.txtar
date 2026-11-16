@@ -1,0 +1,3 @@
+A grid that export makes an export of, whose import makes a script of one quoted cell.
+-- in/export/out/import/out/quote/A1 --
+3

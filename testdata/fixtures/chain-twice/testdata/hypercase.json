@@ -1,0 +1,145 @@
+{
+  "format": 6,
+  "updateVar": "FIXTURE_UPDATE_GOLDEN",
+  "corpusRoot": ".",
+  "rootPackage": true,
+  "codes": false,
+  "issueLinks": [],
+  "properties": [
+    {
+      "name": "circular",
+      "description": "Some cell's formula refers back to itself, directly or through other cells."
+    },
+    {
+      "name": "dangling",
+      "description": "Some formula refers to a cell the sheet doesn't have."
+    },
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    },
+    {
+      "name": "unterminated",
+      "description": "The export holds a quoted field it never closes."
+    }
+  ],
+  "types": [
+    {
+      "dir": "export",
+      "description": "Exports, whose import/ tree says what the importer makes of them.",
+      "goType": "github.com/sdboyer/hypercase_test.Export",
+      "transforms": []
+    },
+    {
+      "dir": "grid",
+      "description": "Trees of instructions, in a grid.",
+      "goType": "github.com/sdboyer/hypercase_test.Grid",
+      "transforms": []
+    },
+    {
+      "dir": "script",
+      "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
+      "goType": "github.com/sdboyer/hypercase_test.Script",
+      "transforms": []
+    }
+  ],
+  "lifts": [
+    {
+      "name": "export",
+      "description": "Exports the grid, as its export/ tree says.",
+      "input": "github.com/sdboyer/hypercase_test.Grid",
+      "product": "github.com/sdboyer/hypercase_test.Export",
+      "owned": true,
+      "bytes": true,
+      "corpora": [
+        "grid"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why the exporter rejects the grid."
+        }
+      ],
+      "productFiles": [
+        {
+          "pattern": "import/out/quote/*",
+          "description": "What import makes as its product's quote/ tree."
+        }
+      ],
+      "rejects": [
+        "unterminated"
+      ]
+    },
+    {
+      "name": "import",
+      "description": "Imports the export as a script, as its import/ tree says.",
+      "input": "github.com/sdboyer/hypercase_test.Export",
+      "product": "github.com/sdboyer/hypercase_test.Script",
+      "owned": true,
+      "bytes": true,
+      "corpora": [
+        "export",
+        "grid"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why the importer rejects the export."
+        }
+      ],
+      "productFiles": [
+        {
+          "pattern": "evaluate/*",
+          "description": "What evaluate does, as a script's evaluate/ tree says."
+        },
+        {
+          "pattern": "evaluate/out/*",
+          "description": "An output evaluate returns."
+        },
+        {
+          "pattern": "inputs/*",
+          "description": "A tree named as a cell's inputs file is."
+        },
+        {
+          "pattern": "names/*",
+          "description": "Files named as a cell's own files are."
+        },
+        {
+          "pattern": "parse/*",
+          "description": "What parse does, as a script's parse/ tree says."
+        },
+        {
+          "pattern": "quote/*",
+          "description": "What a renderer of errors quotes."
+        },
+        {
+          "pattern": "resolve/*",
+          "description": "What resolve does, as a script's resolve/ tree says."
+        }
+      ],
+      "rejects": [
+        "unterminated"
+      ]
+    }
+  ],
+  "suites": [
+    {
+      "name": "list",
+      "description": "Lists the files of the script's input view, with their bytes.",
+      "consumes": "github.com/sdboyer/hypercase_test.Script",
+      "corpora": [
+        "export",
+        "grid",
+        "script"
+      ],
+      "outputs": [
+        {
+          "pattern": "files.txt",
+          "description": "How many files the view holds, then each one's path and bytes, quoted."
+        }
+      ],
+      "rejects": [],
+      "classifier": null
+    }
+  ]
+}

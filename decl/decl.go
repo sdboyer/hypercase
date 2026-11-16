@@ -140,9 +140,31 @@ type Lift[In, Out any] struct {
 	Run func(archive string, in In, stderr io.Writer) (Out, error)
 	// Jenny makes a bytes lift's product, in place of Run: the files it
 	// generates from the input are the product's input view, by their
-	// paths in it. The error it returns is the lift's rejection.
+	// paths in it. An error it returns that wraps one [Reject] made is the
+	// lift's rejection. Any other error is a fault of the jenny, jenny's
+	// own included, such as two files at one path: it fails the lift's
+	// cell, and no update writes the cell.
 	Jenny jenny.Jenny[In]
 }
+
+// Reject marks err as a bytes lift's rejection of its input, for the
+// lift's jenny to return. A jenny's error has two sources, the jenny's
+// generator and jenny itself, and only an error Reject marks is a
+// rejection, so a fault of the jenny is never recorded as one. The
+// rejection's text is err's, and it wraps err, so errors.As reaches err
+// through it. Reject returns nil for a nil err.
+func Reject(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &rejection{err}
+}
+
+// A rejection is an error Reject marks.
+type rejection struct{ err error }
+
+func (r *rejection) Error() string { return r.err.Error() }
+func (r *rejection) Unwrap() error { return r.err }
 
 // A Property is a named fact about a case, such as circular: a sheet in
 // which some formula refers back to itself. A case states the properties it

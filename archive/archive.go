@@ -214,10 +214,14 @@ func checkOut(section, rest string) []Problem {
 }
 
 // checkVia reports the problems of the name of one file of a bytes lift's
-// product: section is the whole name, and rest its part below via/. The
-// product is an input view, laid out as an archive's in/ is.
+// product: section is the whole name, and rest its part below via/, empty
+// for a section named via itself. The product is an input view, laid out
+// as an archive's in/ is.
 func checkVia(section, rest string) []Problem {
 	prefix := strings.TrimSuffix(section, rest)
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
 	lift, file, _ := strings.Cut(rest, "/")
 	tree, below, _ := strings.Cut(file, "/")
 	switch {
@@ -433,4 +437,21 @@ func Holds(data []byte) error {
 		}
 	}
 	return fmt.Errorf("it doesn't read back as written")
+}
+
+// HoldsName reports why a section of the given name can't be held in an
+// archive, or nil when it can: what an archive holds reads back as
+// written, and a name ends at its marker line's end, less the spaces
+// around it.
+func HoldsName(name string) error {
+	got := Parse(txtar.Format(&txtar.Archive{Files: []txtar.File{{Name: name, Data: []byte("x\n")}}}))
+	switch {
+	case len(got.Sections) == 1 && got.Sections[0].Name == name:
+		return nil
+	case strings.Contains(name, "\n"):
+		return fmt.Errorf("its name holds a newline, which ends a section's marker line")
+	case len(got.Sections) == 1:
+		return fmt.Errorf("its name reads back as %q, since an archive trims the spaces around a section's name", got.Sections[0].Name)
+	}
+	return fmt.Errorf("its name doesn't read back as written")
 }

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/internal/erase"
 	"github.com/sdboyer/jenny"
 )
 
@@ -220,29 +221,26 @@ func pathString(ct *corpusType, path []*lift) string {
 // outcome that the archive commits for the case, and runs nothing before
 // them; an update reads the product the lift makes.
 type caseState struct {
-	archive string
-	plan    *plan
-	root    any
-	view    fs.FS // the case's input view
-	update  bool
-	// a and prefix give the case's committed sections, which a normal run
-	// reads past a bytes lift.
-	a        *archive.Archive
-	prefix   string
-	products map[*lift]*corpusType // each bytes lift's product's corpus type
-	runs     map[*lift]*liftRun
-	reads    map[*lift]*liftRead
+	r     *runner
+	c     *aCase
+	plan  *plan
+	root  any
+	view  fs.FS // the case's input view
+	runs  map[*lift]*liftRun
+	reads map[*lift]*liftRead
 }
 
 // A liftRun is what one call of a lift's function left. A bytes lift's
-// also holds its product's files, and why an archive can't hold them, if
-// it can't; only a product it can hold has a view and a value.
+// also holds its product's files, and the faults of its jenny, if any: an
+// error that is no rejection, or a product an archive can't hold. Only a
+// product with no fault has a view and a value.
 type liftRun struct {
 	value    any
 	out      *called
 	product  map[string][]byte // a bytes lift's product, by path in its view; nil when it made none
 	view     fs.FS
 	problems []string
+	verdict  *liftVerdict // a bytes lift's cell's, once judged
 }
 
 // A liftRead is what a normal run reads of a bytes lift on a case: the
@@ -268,9 +266,10 @@ type blockage struct {
 	outcome   string
 	committed string
 	missing   bool
-	// broken records that, in an update, the bytes lift's product can't be
-	// committed: the cell runs nothing, and the update writes nothing for
-	// it.
+	// broken records that, in an update, the bytes lift's cell isn't
+	// written, as a fault of its jenny or any other problem of the cell
+	// keeps it from being: the cell runs nothing, and the update writes
+	// nothing for it.
 	broken bool
 }
 
@@ -282,7 +281,7 @@ func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
 		return s.root, s.view, nil
 	}
 	l := s.plan.producer[typ]
-	if l.bytes && !s.update {
+	if l.bytes && !s.r.update {
 		rd := s.read(l)
 		return rd.value, rd.view, rd.block
 	}
@@ -291,15 +290,31 @@ func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
 		return nil, nil, b
 	}
 	lr := s.runLift(l, in)
+	// Past a bytes lift, which runs here only in an update, a cell is
+	// written only with the lift's cell: a normal run reads what that
+	// writes.
+	if l.bytes && !s.liftVerdict(l, lr, in, view).writable {
+		return nil, nil, &blockage{lift: l, failed: l.name, broken: true}
+	}
 	switch {
 	case lr.out.panicked || lr.out.err != nil || lr.out.noProduct:
 		return nil, nil, &blockage{lift: l, failed: l.name}
 	case !l.bytes:
 		return lr.value, view, nil
-	case len(lr.problems) > 0:
-		return nil, nil, &blockage{lift: l, failed: l.name, broken: true}
 	}
 	return lr.value, lr.view, nil
+}
+
+// acceptsNow reports whether the bytes lift l, run on the case as its own
+// cell runs it, accepts the case, and an update writes its cell: then the
+// update runs the cells past it, whatever the archive commits for l.
+func (s *caseState) acceptsNow(l *lift) bool {
+	in, view, b := s.stage(l.in)
+	if b != nil {
+		return false
+	}
+	v := s.liftVerdict(l, s.runLift(l, in), in, view)
+	return v.writable && accepts(v.files[archive.OutcomeFile])
 }
 
 // read reads, once, what the archive commits for a bytes lift on the
@@ -313,8 +328,8 @@ func (s *caseState) read(l *lift) *liftRead {
 	}
 	rd := &liftRead{}
 	s.reads[l] = rd
-	section := s.prefix + archive.Out + "/" + l.name + "/" + archive.OutcomeFile
-	data, ok := s.a.Section(section)
+	section := s.c.out(l.name, archive.OutcomeFile)
+	data, ok := s.c.a.Section(section)
 	if !ok {
 		rd.block = &blockage{lift: l, failed: l.name, outcome: section, missing: true}
 		return rd
@@ -324,8 +339,8 @@ func (s *caseState) read(l *lift) *liftRead {
 	case err != nil:
 		rd.block = b
 	case o.State == archive.Accepted:
-		rd.view = archive.NewFS(committedUnder(s.a, l.viaDir(s.prefix)))
-		rd.value = s.products[l].new(rd.view)
+		rd.view = archive.NewFS(s.c.product(l))
+		rd.value = s.r.products[l].new(rd.view)
 	case o.State == archive.Blocked:
 		b.failed = o.Detail
 		rd.block = b
@@ -337,7 +352,9 @@ func (s *caseState) read(l *lift) *liftRead {
 
 // runLift runs a lift on its input, once. A lift whose product type is an
 // interface can return neither a product nor an error, which is the lift's
-// own failure. A bytes lift's jenny makes its product's files.
+// own failure. A bytes lift's jenny makes its product's files, and rejects
+// the case only by an error decl.Reject marks: any other error is a fault
+// of the jenny, as a product an archive can't hold is.
 func (s *caseState) runLift(l *lift, in any) *liftRun {
 	if lr, ok := s.runs[l]; ok {
 		return lr
@@ -346,29 +363,37 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 	s.runs[l] = lr
 	if !l.bytes {
 		lr.out = call(func(o *called) {
-			lr.value, o.err = l.run(s.archive, in, &o.stderr)
+			lr.value, o.err = l.run(s.c.archive, in, &o.stderr)
 		})
 		lr.out.noProduct = !lr.out.panicked && lr.out.err == nil && lr.value == nil
 		return lr
 	}
 	var made *jenny.FS
 	lr.out = call(func(o *called) { made, o.err = l.generate(in) })
-	if lr.out.panicked || lr.out.err != nil {
+	switch {
+	case lr.out.panicked:
+		return lr
+	case lr.out.err != nil && erase.IsRejection(lr.out.err):
+		return lr
+	case lr.out.err != nil:
+		lr.out.jennyErr, lr.out.err = lr.out.err, nil
+		lr.problems = []string{fmt.Sprintf("%s's jenny failed on the case, with an error that is no rejection:\n  %s\nIf %s rejects the case, return the error as decl.Reject(err). If not, fix %s's jenny. An update writes nothing for this cell.", l.name, indent(lr.out.jennyErr.Error(), "  "), l.name, l.name)}
 		return lr
 	}
-	lr.product, lr.problems = productOf(l, s.prefix, made)
+	lr.product, lr.problems = productOf(l, s.c.prefix, made)
 	if len(lr.problems) == 0 {
 		lr.view = archive.NewFS(lr.product)
-		lr.value = s.products[l].new(lr.view)
+		lr.value = s.r.products[l].new(lr.view)
 	}
 	return lr
 }
 
 // productOf reads a bytes lift's product from what its jenny made, for a
 // case whose sections start with prefix, and says why an archive can't
-// hold it, if it can't: a file outside any tree, or in the tree params; a
-// file that is also a directory; a file no declaration matches, or two
-// do; and a file an archive would read back differently.
+// hold it, if it can't: a file whose name doesn't read back as written; a
+// file outside any tree, or in the tree params; a file that is also a
+// directory; a file no declaration matches, or two do; and a file an
+// archive would read back differently.
 func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, []string) {
 	files := map[string][]byte{}
 	var problems []string
@@ -383,7 +408,16 @@ func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, []str
 		files[f.Path()] = data
 	}
 	dir := l.viaDir(prefix)
-	paths := slices.Sorted(maps.Keys(files))
+	// A name that doesn't read back is quoted, since it may hold a
+	// newline, and isn't checked further.
+	var paths []string
+	for _, p := range slices.Sorted(maps.Keys(files)) {
+		if err := archive.HoldsName(dir + p); err != nil {
+			problems = append(problems, fmt.Sprintf("%q can't be held in an archive: %v.\nFix %s's jenny so the file's name can be held. An update writes nothing for this cell.", dir+p, err, l.name))
+			continue
+		}
+		paths = append(paths, p)
+	}
 	for _, p := range archive.CheckVia(prefix, l.name, paths) {
 		problems = append(problems, fmt.Sprintf("%s.\nFix %s's jenny: what it makes is its product's input view, with the trees as its top-level directories. An update writes nothing for this cell.", p, l.name))
 	}
