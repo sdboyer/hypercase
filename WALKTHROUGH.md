@@ -2216,23 +2216,34 @@ rejected S201
   one.
 - Each argument is one revision, which must resolve to a commit. No range is
   parsed: `A..B` and `A...B` name no commit, and a caller that wants a merge
-  base computes it and passes it. An argument that starts with `-` is a
-  revision, never a flag of git's.
+  base computes it and passes it. Flags come before the revisions: every
+  argument after `--`, or after the first revision, is a revision, even one
+  that starts with `-`, and none is ever read as a flag of git's.
 - It reads registries and archives, never Go source. At each revision it
   merges the registries that record the corpus root, so one module can hold
   several. Only `<a>` may lack them, as a revision from before the project
   used hypercase does; every cell at `<b>` then appeared. A corpus root that
   no registry records at `<b>` fails the report: the root is wrong.
 - It reads every registry format from 3 to its own, and refuses any other,
-  naming the revision, the registry and its format, and saying to run the
-  report from that revision's hypercase. A registry of an older format that
-  holds what a later format added is refused too.
-- A cell exists at a revision when its `outcome` file does. A changed cell
-  takes the first of these ranks that applies: outcome changed, at both
-  revisions; appeared, at `<b>` only; disappeared, at `<a>` only; bytes
-  changed, under the same outcome, when another of its files is added,
-  changed or removed. A change to a case's description, inputs, properties
-  or `gaps` lines alone ranks no cell.
+  naming the revision, the registry and its format: for a newer format,
+  saying to run the report from that revision's hypercase, and for one
+  older than 3, that no hypercase's report reads it. A registry of an older
+  format that holds what a later format added is refused too.
+- A cell exists at a revision when its `outcome` file does, from registry
+  format 5 on. A changed cell takes the first of these ranks that applies:
+  outcome changed, at both revisions; appeared, at `<b>` only; disappeared,
+  at `<a>` only; bytes changed, under the same outcome, when another of its
+  files is added, changed or removed. A change to a case's description,
+  inputs, properties or `gaps` lines alone ranks no cell.
+- Registry formats 3 and 4 predate `outcome` files, and a cell that wrote no
+  file committed none. At a revision whose newest registry is of such a
+  format, every case that runs has a cell under every column the registries
+  claim over its corpus, and under every column it has files of, and the
+  cell's state is unknown. A case runs there when the archive holds a
+  section of it: the base always, and a transform's variant only when a
+  corpus type lists its transform. A cell of unknown state at either
+  revision ranks on its files alone: bytes changed when one is added,
+  changed or removed, and never outcome changed.
 - Cases go by corpus type, then archive, then the base, the hand-written
   variants by name, and the transforms' variants by transform name; a case's
   cells by column; names byte by byte. Within a rank, changes go in that
@@ -2248,9 +2259,12 @@ rejected S201
   stated property no registry lists; a `gaps` line naming a column, or a
   transform, no registry has; a section it can't place in a case or a cell,
   such as `via/…` before step 10; a cell with files and no `outcome`, whose
-  files it leaves out; and a transform's variant whose transform no corpus
-  type lists. An `outcome`, `properties` or `gaps` section it can't parse, or
-  a section an archive holds twice, fails the report.
+  files it leaves out; an `outcome` at a revision whose registries predate
+  `outcome` files, which it leaves out; a transform's variant whose
+  transform no corpus type lists; and a link pattern at `<b>` that is not a
+  regular expression, which links nothing. An `outcome`, `properties` or
+  `gaps` section it can't parse, or a section an archive holds twice, fails
+  the report.
 - hypercase's own CI runs the report over the toy on each pull request, from
   its merge base to its head, once per corpus root, and keeps the pages.
 - Step 11 adds input lines and corpus-check findings.
@@ -2273,19 +2287,24 @@ styles are inline, and every archive's text is escaped. In order:
 - the changes, ranked, each file of a changed cell with how many lines it
   adds and removes, and its line diff, folded;
 - a matrix per corpus type at `<b>`, a row per case, a column per column that
-  runs on the type's archives. Each cell shows its state and detail, its rank
-  if it changed, and the `gaps` line that marks it; a marked cell that exists
-  is frozen;
+  runs on the type's archives. Each cell shows its state and detail, or that
+  its state is unknown, its rank if it changed, and the `gaps` line that
+  marks it; a marked cell that exists is frozen;
 - the descriptions of each corpus type, column, output declaration,
   classifier, transform and property, from `<b>`, or from `<a>` for what `<b>`
   lacks, marked as such; and of each archive and hand-written variant only
   at `<a>`, from its `about`.
 
 An unchanged cell carries only its state, so the page grows with the change.
-The line diff is Myers' O(ND), whose cost grows with the size of the change,
-not with the files' lengths. Past a fixed budget, a change shows as its old
-lines removed, then its new lines added. The same revisions give the same
-bytes.
+The line diff sets aside the lines both files start and end with, then
+finds the shortest edit script by Myers' algorithm, whose cost grows with
+the length of what is left times the size of its change, up to a fixed
+budget. Past the budget, it aligns the two on the lines each holds exactly
+once, in an order both share, and diffs each stretch between them the same
+way. A stretch with no such line, past the budget, is left unaligned: its
+diff is one line saying how many lines it leaves out of each file, and its
+file says it is partly unaligned in place of counts that would be wrong.
+The same revisions give the same bytes.
 
 **The plain-text format.** One heading per rank that has
 changes, in rank order. Under it, one line per cell: its case, its column,

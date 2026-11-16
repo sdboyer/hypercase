@@ -24,6 +24,10 @@ func TestUsage(t *testing.T) {
 	fails(t, g, "", 1, []string{"report", c[0], "nope"}, "hypercase report: nope names no commit in this repository\n")
 	fails(t, g, "", 1, []string{"report", "--", "-x", c[0]}, "hypercase report: -x names no commit in this repository\n")
 	fails(t, g, "", 1, []string{"report", "--", c[0], "--all"}, "hypercase report: --all names no commit in this repository\n")
+	// Flags end at the first revision, so an argument after it is one too.
+	fails(t, g, "", 1, []string{"report", c[0], "-x"}, "hypercase report: -x names no commit in this repository\n")
+	fails(t, g, "", 2, []string{"report", "-x", c[0]}, "flag provided but not defined: -x", usage)
+	fails(t, g, "", 2, []string{"report", c[0], "-text", c[1]}, "hypercase report takes two revisions, and was given 3.", usage)
 	for _, r := range []string{c[0] + ".." + c[1], c[0] + "..." + c[1], "main~1..main"} {
 		fails(t, g, "", 1, []string{"report", r, c[1]}, "hypercase report: "+r+" names no commit in this repository\n")
 		fails(t, g, "", 1, []string{"report", c[0], r}, "hypercase report: "+r+" names no commit in this repository\n")
