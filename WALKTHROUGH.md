@@ -311,6 +311,9 @@ A1 6
 B1 3
 ```
 
+`out/evaluate/outcome` holds the cell's outcome, the code's verdict on the
+case, which step 8 adds to every cell.
+
 The package also writes its registry, `testdata/hypercase.json`, which lists
 what it registers (step 5).
 
