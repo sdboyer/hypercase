@@ -131,9 +131,9 @@ var (
 	}
 )
 
-// located requires every rejected cell's error.txt to start with the
-// cell it is about, as "A1: ". A cell a gaps line marks is excused. Each
-// such cell is a finding, with its gap, whatever its outcome, so the
+// locatedCheck requires every rejected cell's error.txt to start with
+// the cell it is about, as "A1: ". A cell a gaps line marks is excused.
+// Each such cell is a finding, with its gap, whatever its outcome, so the
 // findings record every cell's Gap.
 var locatedCheck = hypercase.Check{
 	Name:        "located",
