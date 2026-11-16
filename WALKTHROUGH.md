@@ -2624,7 +2624,7 @@ var Import = decl.Lift[CSV, Sheet]{
 		if err != nil {
 			return nil, decl.Reject(err)
 		}
-		return view(s), nil
+		return view(s, nil)
 	}),
 }
 ```
@@ -2727,16 +2727,31 @@ lift.
   cell, and an update writes nothing for that cell. An archive can't hold a
   file with no final newline, or one whose name doesn't read back as
   written, such as a name with a newline in it or a space at its end.
-- A bytes lift rejects a case only with an error that `decl.Reject` marks.
-  Any other error its jenny returns is a fault of the jenny, jenny's own
-  errors among them: two files at one path, two whose paths differ only in
-  case, a file that fails to render. A fault fails the lift's cell, and an
-  update writes nothing for that cell.
+- A bytes lift rejects a case only with an error that `decl.Reject` marks
+  all of. The framework walks the error's tree, through `Unwrap() error`
+  and `Unwrap() []error`, and stops at each error `decl.Reject` made; an
+  error that wraps none, reached without passing one, makes the whole error
+  a fault of the jenny. So a join of rejections is a rejection, a join of
+  one among them, as jenny joins the error of a jenny with one input, and a
+  rejection joined with any other error is a fault, as jenny's `Pipeline`
+  joins its jennies' errors. Jenny's own errors are faults too: two files
+  at one path, two whose paths differ only in case, a file that fails to
+  render. A fault fails the lift's cell, and an update writes nothing for
+  that cell.
 - In an update, when anything but a `gaps` line keeps a bytes lift's cell
   from being written, such as a fault of the jenny, a product an archive
   can't hold or a `RenderError` that panics, every cell past the lift
   fails, runs nothing, and is not written either: a normal run reads what
-  the lift's cell commits.
+  the lift's cell commits. That is the owner's verdict, under its Project.
+  A package that only uses the lift doesn't judge the lift's cell with its
+  own Project, which may differ from the owner's: it holds the cells past
+  the lift back only on what keeps the cell from being written under any
+  Project, such as a fault of the jenny or a product an archive can't
+  hold. When the owner's Project alone keeps its update from writing the
+  lift's cell, as a `RenderError` that panics on the lift's error does,
+  the using package's update writes the cells past the lift, and its
+  normal runs, which read the lift's committed outcome, fail them until the
+  owner's update writes that cell.
 - The lift's own cell files sit in `out/<lift>/`, like any column's. A
   lift's name covers both directories.
 - A variant's product goes under `variant/<name>/via/<lift>/` or
@@ -2756,11 +2771,16 @@ lift.
   lift's own cell. A downstream column takes `blocked` from the lift's
   committed `outcome`: any outcome but `accepted`, or none, blocks it. A
   lift that is `accepted` with no product files gives its readers an empty
-  view. When the lift accepts the case now, the committed files of a cell
-  so blocked, a bytes lift's product among them, are no orphans: the
-  update reruns the lift and runs the cell. A normal run of the package
-  that owns the lift says so. Another package's doesn't run the lift, so
-  it says to run the update before deleting any of them.
+  view.
+- A cell that a normal run finds blocked past a bytes lift, by a committed
+  outcome or by a lift that fails on a committed product, may run in the
+  update, which reruns every lift on its path. Then the cell's committed
+  files, a bytes lift's product among them, are no orphans. A normal run
+  of a package that owns every bytes lift on the cell's path runs the path
+  as its update does, and says whether the update runs the cell: if it
+  does, to delete nothing by hand. Another package's normal run doesn't run
+  the lifts it doesn't own, so it says to run the update before deleting
+  any of them.
 - A bytes lift's frozen cell includes its `via/` product: no update writes
   it, and a product that differs from what the lift makes fails the cell,
   in every run. An update writes the cells past it from what the lift makes
