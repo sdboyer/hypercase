@@ -493,6 +493,50 @@ func TestMoveDownEvaluates(t *testing.T) {
 	}
 }
 
+func TestLoop(t *testing.T) {
+	tests := []struct {
+		name  string
+		cells map[string]string
+		want  string // cellsOf, or describe
+	}{
+		{"twice", map[string]string{"A1": "=B1*2\n", "B1": "3\n"}, "sheet/A1 \"=A1\\n\"\nsheet/B1 \"3\\n\"\n"},
+		{"first by row, then column", map[string]string{"A2": "1", "B1": "2", "C1": "3"}, "sheet/A2 \"1\"\nsheet/B1 \"=B1\\n\"\nsheet/C1 \"3\"\n"},
+		{"malformed others kept", map[string]string{"A1": "4", "D1": "total"}, "sheet/A1 \"=A1\\n\"\nsheet/D1 \"total\"\n"},
+		{"already a cycle elsewhere", map[string]string{"A1": "=B1", "B1": "=A1"}, "sheet/A1 \"=A1\\n\"\nsheet/B1 \"=A1\"\n"},
+		{"empty", map[string]string{}, "plain: the sheet has no cells"},
+		{"already refers to itself", map[string]string{"A1": "=A1\n", "B1": "1"}, "plain: A1 already refers to itself"},
+		{"not a cell", map[string]string{"A1": "1", "notes": "1"}, "S101 notes: not a cell name @ sheet/notes:0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			looped, err := sheet.Loop(sheetFS(tt.cells))
+			got := describe(err)
+			if err == nil {
+				got = cellsOf(t, looped)
+			}
+			if got != tt.want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, tt.want)
+			}
+		})
+	}
+}
+
+// A looped sheet fails to resolve, on a cycle through its first cell.
+func TestLoopResolves(t *testing.T) {
+	looped, err := sheet.Loop(sheetFS(map[string]string{"A1": "=B1*2", "B1": "3"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := sheet.Parse(looped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = sheet.Resolve(p)
+	if got, want := describe(err), "S201 A1 -> A1: cycle @A1 sheet/A1:1"; got != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
+}
+
 func TestHasFormula(t *testing.T) {
 	tests := []struct {
 		name string
