@@ -29,10 +29,20 @@ FAIL
 $ cat testdata/script/cycle.txtar
 -- in/resolve/error --
 A1 -> B1 -> A1: cycle
+-- out/calc/outcome --
+accepted
+-- out/evaluate/outcome --
+blocked resolve
+-- out/format/outcome --
+accepted
 -- out/format/trail.txt --
 parse
+-- out/parse/outcome --
+accepted
 -- out/resolve/error.txt --
 A1 -> B1 -> A1: cycle
+-- out/resolve/outcome --
+rejected
 $ edit testdata/script/cycle.txtar  # a person describes the case
 $ go test  # ladder
     script/cycle: evaluate is blocked: the lift resolve failed on the case, and testdata/script/cycle.txtar, out/resolve/error.txt, records its error.

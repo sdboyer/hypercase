@@ -24,10 +24,20 @@ PASS
 $ cat testdata/script/six.txtar
 -- in/calc/out/values.txt --
 6
+-- out/calc/outcome --
+accepted
 -- out/calc/values.txt --
 6
+-- out/evaluate/outcome --
+accepted
+-- out/format/outcome --
+accepted
 -- out/format/trail.txt --
 parse
+-- out/parse/outcome --
+accepted
+-- out/resolve/outcome --
+accepted
 $ go test  # ladder
     testdata/script/six.txtar: the archive has no description: its comment, the text before the first section, is empty
         Write the case's description, in prose, as the archive's comment, the text before its first section.

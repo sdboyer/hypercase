@@ -28,10 +28,20 @@ $ cat testdata/script/six.txtar
 calc gives 6.
 -- in/calc/out/values.txt --
 7
+-- out/calc/outcome --
+accepted
 -- out/calc/values.txt --
 6
+-- out/evaluate/outcome --
+accepted
+-- out/format/outcome --
+accepted
 -- out/format/trail.txt --
 parse
+-- out/parse/outcome --
+accepted
+-- out/resolve/outcome --
+accepted
 $ go test  # ladder
     script/six: calc gives 6.
         calc: Does what the case's calc/ tree says.
