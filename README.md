@@ -24,16 +24,16 @@ practice and ends at hyperproperties. Each step's idea is useful without the
 later ones, and the framework is worth having even if the last step never
 pans out.
 
-A matrix of cases × suites shows, in the change that causes it, how that
+A matrix of cases × columns shows, in the change that causes it, how that
 change moves other parts' outputs. txtar is only how a case is stored, not
 the point.
 
 ## Status
 
-In design; nothing here runs yet. The spec is a walkthrough, `WALKTHROUGH.md`,
-committed whole before the code (#2), with target snippets for the steps not
-built yet. Each step's PR adds the runnable example its snippets come from,
-which CI runs, and corrects the doc where the implementation differs.
+In design. The spec is a walkthrough, `WALKTHROUGH.md`, committed whole
+before the code (#2), with target snippets for the steps not built yet. Each
+step's PR adds the runnable example its snippets come from, which CI runs,
+and corrects the doc where the implementation differs.
 
 ## License
 
