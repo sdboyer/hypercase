@@ -1,0 +1,7 @@
+echo errs on a cycle, and prints part of its values.
+-- in/do/error --
+A1 -> A1: cycle
+-- in/do/out/values.txt --
+partial
+-- properties --
+circular

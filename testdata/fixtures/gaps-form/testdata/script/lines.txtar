@@ -7,6 +7,7 @@ format  Two spaces.
 
 echo Waits on sheets#3.
 echo Waits on sheets#4.
-transform/looped echo Waits on sheets#5.
+transform/Looped echo Waits on sheets#5.
+transform/looped echo
 -- out/echo/values.txt --
 stale

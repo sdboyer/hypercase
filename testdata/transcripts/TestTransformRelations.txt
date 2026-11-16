@@ -1,0 +1,102 @@
+$ go test  # tr-own-unlisted
+    the package owns the transform upper, and the corpus type hypercase_test.Script lists no transform of that name.
+        List the transform in the type's Transforms, or remove it from hypercase.Own.
+    No case runs until the registrations agree.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ go test  # tr-own-no-type
+    the package owns the transform looped, of the corpus type hypercase_test.Script, and registers no such corpus type.
+        Register the corpus type, which lists the transform in its Transforms.
+    No case runs until the registrations agree.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ go test  # tr-own-differs
+    the package owns a transform named looped that differs from the one the corpus type hypercase_test.Script lists.
+        Own the declaration the type lists: declare the transform once, and use that declaration in both places.
+    No case runs until the registrations agree.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ go test  # tr-unregistered-gives
+    the transform looped, of the corpus type hypercase_test.Script, gives circular, and the package registers no property of that name.
+        Register the property, or remove it from looped's Gives.
+    No case runs until the registrations agree.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ go test  # tr-other-description
+    the transform upper keeps a property named circular, which the package registers with another description.
+        List the registered property: declare it once, and use that declaration in both places.
+    No case runs until the registrations agree.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ go test  # tr-no-description
+    the transform looped, of the corpus type hypercase_test.Script, has no description.
+        Add one: it says what the transform changes, in prose, and it describes each variant the transform makes.
+    testdata/hypercase.json differs from what the package registers (-committed +registered):
+                "transforms": [
+                  {
+                    "name": "looped",
+        -           "description": "Adds do/error and resolve/error, so echo and resolve err as on a cycle.",
+        +           "description": " ",
+                    "gives": [
+                      "circular"
+                    ],
+                    "keeps": [],
+        -           "probe": true,
+        -           "owned": true
+        -         },
+        -         {
+        -           "name": "upper",
+        -           "description": "Uppercases every file under do/out/.",
+        -           "gives": [],
+        -           "keeps": [
+        -             "circular",
+        -             "dangling"
+        -           ],
+                    "probe": true,
+                    "owned": true
+                  }
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
+    script/errs: echo errs on a cycle, and prints part of its values.
+        echo: Does what the case's do/ tree says.
+        out/echo/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled: A case that states malformed, which no transform gives or keeps.
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/twice: echo prints a1 six.
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/twice/transform/looped: 
+        looped's variant of the base isn't written: the archive holds none of its inputs.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write them, and read them before committing.
+    script/twice/transform/looped: 
+        echo: Does what the case's do/ tree says.
+        transform/looped/out/echo/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        transform/looped/out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/errs
+            --- FAIL: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+        --- FAIL: TestCorpus/script/garbled
+            --- FAIL: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+        --- FAIL: TestCorpus/script/twice
+            --- FAIL: TestCorpus/script/twice/echo
+            --- FAIL: TestCorpus/script/twice/transform/looped
+                --- FAIL: TestCorpus/script/twice/transform/looped/echo
+FAIL
+[exit 1]

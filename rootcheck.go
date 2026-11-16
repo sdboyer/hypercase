@@ -62,6 +62,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	typeOrder := map[string][]string{}              // directory → type entries, in the order of the packages
 	propEntries := map[string]map[string][]string{} // property → description → packages
 	propOrder := map[string][]string{}              // property → descriptions, in the order of the packages
+	transforms := map[string]map[string][]string{}  // directory → transform → the packages that own it
 	var rootPkgs []string
 	claim := func(name string, corpora []string, pkg string) {
 		columnPkgs[name] = append(columnPkgs[name], pkg)
@@ -104,7 +105,17 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 		}
 		for _, ct := range g.reg.Types {
-			declare(ct.Dir, fmt.Sprintf("%s: %q", ct.GoType, ct.Description), g.pkg)
+			declare(ct.Dir, typeEntry(ct), g.pkg)
+			if transforms[ct.Dir] == nil {
+				transforms[ct.Dir] = map[string][]string{}
+			}
+			for _, tr := range ct.Transforms {
+				pkgs := transforms[ct.Dir][tr.Name]
+				if tr.Owned {
+					pkgs = append(pkgs, g.pkg)
+				}
+				transforms[ct.Dir][tr.Name] = pkgs
+			}
 		}
 		for _, p := range g.reg.Properties {
 			if propEntries[p.Name] == nil {
@@ -145,6 +156,16 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			fix = "A suite that names the directory as its Corpus runs over its archives' raw input views, with no type. Make the suite consume the corpus type and remove its Corpus, or move one set of archives to another directory."
 		}
 		t.Errorf("the corpus directory %s has two different corpus types:\n%s\nAn archive's directory gives its type. %s", dir, strings.Join(lines, "\n"), fix)
+	}
+	for _, dir := range slices.Sorted(maps.Keys(transforms)) {
+		for _, name := range slices.Sorted(maps.Keys(transforms[dir])) {
+			switch pkgs := transforms[dir][name]; {
+			case len(pkgs) == 0:
+				t.Errorf("the transform %s, of testdata/%s/, is owned by no package, so nothing writes or judges its variants' inputs.\nGive it to hypercase.Own in one package that registers its corpus type.", name, dir)
+			case len(pkgs) > 1:
+				t.Errorf("the transform %s, of testdata/%s/, is owned by %s. One package owns each transform.\nOwn it in one of them.", name, dir, andList(pkgs))
+			}
+		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(propEntries)) {
 		entries := propEntries[name]
@@ -203,7 +224,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	for _, corpus := range slices.Sorted(maps.Keys(archives)) {
 		cols := claimed[corpus]
 		for _, file := range archives[corpus] {
-			r.checkArchive(t, filepath.Join(td, corpus, file), corpus, cols, props)
+			r.checkArchive(t, filepath.Join(td, corpus, file), corpus, cols, transforms[corpus], props)
 		}
 	}
 }
@@ -212,8 +233,23 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 // a suite that names a Corpus consumes, as a directory's type.
 const rawEntry = "the raw input view, fs.FS, which a suite's Corpus names"
 
-// checkArchive reports the problems of one archive as a whole.
-func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bool, props func(string) bool) {
+// typeEntry is how the root-package check names a corpus type: its Go type
+// and description, and its transforms, which every package that registers
+// the type lists alike.
+func typeEntry(ct registry.Type) string {
+	e := fmt.Sprintf("%s: %q", ct.GoType, ct.Description)
+	for _, tr := range ct.Transforms {
+		e += fmt.Sprintf("; the transform %s: %q, gives [%s], keeps [%s]", tr.Name, tr.Description, strings.Join(tr.Gives, " "), strings.Join(tr.Keeps, " "))
+		if tr.Probe {
+			e += ", with a probe"
+		}
+	}
+	return e
+}
+
+// checkArchive reports the problems of one archive as a whole. cols are
+// the columns over its corpus, and transforms its corpus type's.
+func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bool, transforms map[string][]string, props func(string) bool) {
 	t.Helper()
 	rel := r.rel(p)
 	if name := strings.TrimSuffix(filepath.Base(p), ".txtar"); !validName(name) {
@@ -232,29 +268,62 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bo
 	if ps := a.Description(); len(ps) > 0 {
 		t.Errorf("%s: %s\nWrite the case's description, in prose, as the archive's comment, the text before its first section.", rel, problemLines(ps))
 	}
+	if ps := a.VariantDescriptions(); len(ps) > 0 {
+		t.Errorf("%s: %s\nWrite each variant's description, in prose, in its about section.", rel, problemLines(ps))
+	}
 	if !archive.Placed(data) {
 		t.Errorf("%s has update-written sections out of their place.\nRun %s to put them in place.", rel, r.updateCmd())
 	}
-	for _, name := range a.Properties() {
-		if !props(name) {
-			t.Errorf("%s: properties states %s, and no registry under %s lists a property of that name.\nDeclare the property, or correct the line.", rel, name, r.rootName())
-		}
-	}
-	for _, g := range a.Gaps() {
-		if !cols[g.Column] {
-			t.Errorf("%s: gaps, line %d, names %s, and no registry has a column of that name over the corpus %s.\nRegister the column, or remove the line.", rel, g.Line, g.Column, corpus)
-		}
-	}
-	unclaimed := map[string][]string{} // column → its sections
-	for _, s := range a.Sections {
-		if rest, ok := strings.CutPrefix(s.Name, archive.Out+"/"); ok {
-			if col, _, _ := strings.Cut(rest, "/"); !cols[col] {
-				unclaimed[col] = append(unclaimed[col], s.Name)
+	stated := func(section string, names []string) {
+		for _, name := range names {
+			if !props(name) {
+				t.Errorf("%s: %s states %s, and no registry under %s lists a property of that name.\nDeclare the property, or correct the line.", rel, section, name, r.rootName())
 			}
 		}
 	}
-	for _, col := range slices.Sorted(maps.Keys(unclaimed)) {
-		t.Errorf("%s: no registry claims %s: no column named %s runs over the corpus %s.\nIf a column should write them, register the column. If not, delete them by hand; %s leaves them in place.", rel, andList(unclaimed[col]), col, corpus, r.updateCmd())
+	marked := func(section string, gaps []archive.Gap) {
+		for _, g := range gaps {
+			_, listed := transforms[g.Transform]
+			switch {
+			case g.Transform != "" && !listed:
+				t.Errorf("%s: %s, line %d, names transform/%s, and no corpus type of testdata/%s/ lists a transform of that name.\nList the transform, or remove the line.", rel, section, g.Line, g.Transform, corpus)
+			case !cols[g.Column]:
+				t.Errorf("%s: %s, line %d, names %s, and no registry has a column of that name over the corpus %s.\nRegister the column, or remove the line.", rel, section, g.Line, g.Column, corpus)
+			}
+		}
+	}
+	stated(archive.Properties, a.Properties())
+	marked(archive.Gaps, a.Gaps())
+	for _, v := range a.Variants() {
+		stated(v.Prefix()+archive.Properties, v.Properties)
+		marked(v.Prefix()+archive.Gaps, v.Gaps)
+	}
+
+	// Sections no registry claims: a column's outputs, in any case, and a
+	// transform's variant, whole, when no corpus type lists the transform.
+	type claim struct{ what, why string }
+	unclaimed := map[claim][]string{}
+	for _, s := range a.Sections {
+		kind, name, rest := archive.SplitCase(s.Name)
+		if _, listed := transforms[name]; kind == archive.Transform && !listed {
+			c := claim{archive.Transform + "/" + name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s.\nIf a transform should make the variant, list it in its corpus type's Transforms", corpus, name)}
+			unclaimed[c] = append(unclaimed[c], s.Name)
+			continue
+		}
+		if out, ok := strings.CutPrefix(rest, archive.Out+"/"); ok {
+			if col, _, _ := strings.Cut(out, "/"); !cols[col] {
+				c := claim{col, fmt.Sprintf("no column named %s runs over the corpus %s.\nIf a column should write them, register the column", col, corpus)}
+				unclaimed[c] = append(unclaimed[c], s.Name)
+			}
+		}
+	}
+	claims := make([]claim, 0, len(unclaimed))
+	for c := range unclaimed {
+		claims = append(claims, c)
+	}
+	slices.SortFunc(claims, func(a, b claim) int { return strings.Compare(a.what, b.what) })
+	for _, c := range claims {
+		t.Errorf("%s: no registry claims %s: %s. If not, delete them by hand; %s leaves them in place.", rel, andList(unclaimed[c]), c.why, r.updateCmd())
 	}
 }
 

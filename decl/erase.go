@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/sdboyer/hypercase/internal/erase"
+	"github.com/sdboyer/jenny"
 )
 
 func init() { erase.Of = of }
@@ -22,12 +23,39 @@ func of(v any) (any, bool) {
 }
 
 func (t Type[T]) erase() any {
-	return &erase.Type{
+	e := &erase.Type{
 		Dir:         t.Dir,
 		Description: t.Description,
 		GoType:      reflect.TypeFor[T](),
 		New:         func(view fs.FS) any { return T(struct{ fs.FS }{view}) },
 	}
+	for _, tr := range t.Transforms {
+		e.Transforms = append(e.Transforms, tr.erase().(*erase.Transform))
+	}
+	return e
+}
+
+func (t Transform[T]) erase() any {
+	e := &erase.Transform{
+		Name:        t.Name,
+		Description: t.Description,
+		GoType:      reflect.TypeFor[T](),
+	}
+	for _, p := range t.Gives {
+		e.Gives = append(e.Gives, erase.Property(p))
+	}
+	for _, p := range t.Keeps {
+		e.Keeps = append(e.Keeps, erase.Property(p))
+	}
+	if t.Probe != nil {
+		probe := t.Probe
+		e.Probe = func(view fs.FS) (string, bool) { return probe(T(struct{ fs.FS }{view})) }
+	}
+	if !reflect.ValueOf(t.Jenny).IsZero() {
+		j := t.Jenny
+		e.Generate = func(view fs.FS) (*jenny.FS, error) { return j.GenerateFS(T(struct{ fs.FS }{view})) }
+	}
+	return e
 }
 
 func (l Lift[In, Out]) erase() any {

@@ -1,0 +1,51 @@
+$ edit b/corpus_test.go  # a package b over the corpus
+$ edit testdata/script/twice.txtar  # give the variants shout/ trees
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # variants
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/echo
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/echo
+            --- PASS: TestCorpus/script/twice/variant/more
+                --- PASS: TestCorpus/script/twice/variant/more/echo
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # variants-b
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/shout
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/shout
+            --- PASS: TestCorpus/script/twice/variant/more
+                --- PASS: TestCorpus/script/twice/variant/more/shout
+PASS
+$ go test  # variants
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/echo
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/echo
+            --- PASS: TestCorpus/script/twice/variant/more
+                --- PASS: TestCorpus/script/twice/variant/more/echo
+PASS
+$ go test ./b  # variants-b
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+            --- PASS: TestCorpus/script/twice/variant/cycle
+                --- PASS: TestCorpus/script/twice/variant/cycle/shout
+            --- PASS: TestCorpus/script/twice/variant/blank
+                --- PASS: TestCorpus/script/twice/variant/blank/shout
+            --- PASS: TestCorpus/script/twice/variant/more
+                --- PASS: TestCorpus/script/twice/variant/more/shout
+PASS

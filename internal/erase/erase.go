@@ -7,6 +7,8 @@ import (
 	"io"
 	"io/fs"
 	"reflect"
+
+	"github.com/sdboyer/jenny"
 )
 
 // An Output mirrors decl.Output.
@@ -27,7 +29,24 @@ type Type struct {
 	Description string
 	GoType      reflect.Type
 	// New wraps an input view as a value of GoType.
-	New func(view fs.FS) any
+	New        func(view fs.FS) any
+	Transforms []*Transform
+}
+
+// A Transform is a decl.Transform with its type argument erased.
+type Transform struct {
+	Name        string
+	Description string
+	Gives       []Property
+	Keeps       []Property
+	// GoType is the corpus type the transform is of.
+	GoType reflect.Type
+	// Probe calls the transform's Probe on a base's input view, or is nil
+	// when it has none.
+	Probe func(view fs.FS) (string, bool)
+	// Generate runs the transform's jenny on a base's input view, or is nil
+	// when it has none.
+	Generate func(view fs.FS) (*jenny.FS, error)
 }
 
 // A Lift is a decl.Lift with its type arguments erased.
@@ -43,6 +62,7 @@ type Lift struct {
 	Jenny bool
 }
 
-// Of returns the erased form of a decl declaration, a *Type or a *Lift, and
-// false for anything else. decl sets it when it is initialized.
+// Of returns the erased form of a decl declaration, a *Type, a *Transform
+// or a *Lift, and false for anything else. decl sets it when it is
+// initialized.
 var Of func(v any) (any, bool)

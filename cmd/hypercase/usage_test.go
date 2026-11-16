@@ -43,9 +43,10 @@ func TestArchiveForm(t *testing.T) {
 		{"a section twice", head + "-- out/calc/outcome --\naccepted\n-- out/calc/outcome --\naccepted\n", "out/calc/outcome: the section appears twice"},
 		{"a blank properties line", head + "-- properties --\ncircular\n\n", "properties, line 2: the line is blank"},
 		{"a gaps line with no text", head + "-- gaps --\ncalc Waits on sheets#1.\nevaluate\n", "gaps, line 2: the line names evaluate and has no text"},
-		{"two gaps lines for one cell", head + "-- gaps --\ncalc Waits on sheets#1.\ncalc Waits on sheets#2.\n", "gaps, line 2: lines 1 and 2 both mark one cell"},
-		{"a transform's gaps line with no column", head + "-- gaps --\ntransform/t Waits.\n", `gaps, line 1: the line starts with "Waits.", which is not a column's name`},
-		{"a transform's line in a variant's gaps", head + "-- variant/v/gaps --\ntransform/t calc Waits.\n", `variant/v/gaps, line 1: the line starts with "transform/t", which is not a column's name`},
+		{"two gaps lines for one cell", head + "-- gaps --\ncalc Waits on sheets#1.\ncalc Waits on sheets#2.\n", "gaps, line 2: lines 1 and 2 both mark the cell of calc"},
+		{"a transform's gaps line with no column", head + "-- gaps --\ntransform/t Waits.\n", `gaps, line 1: the line names transform/t, then "Waits.", which is not a column's name`},
+		{"a transform's line in a variant's gaps", head + "-- variant/v/gaps --\ntransform/t calc Waits.\n", "variant/v/gaps, line 1: the line starts with transform/t, and a hand-written variant's gaps mark its own cells"},
+		{"a blank line in a variant's properties", head + "-- variant/v/properties --\ncircular\n\n", "variant/v/properties, line 2: the line is blank"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

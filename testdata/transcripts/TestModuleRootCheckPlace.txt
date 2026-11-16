@@ -1,5 +1,5 @@
 $ go test ./b  # pkg-b-root
-    the package registers the root-package check for the module-root corpus, and is not the module's root package, /private$SANDBOX.
+    the package registers the root-package check for the module-root corpus, and is not the module's root package, $SANDBOX.
         Register hypercase.RootPackage() in the module's root package, or pass this package's corpus root with hypercase.Root.
 --- FAIL: TestCorpus
 FAIL

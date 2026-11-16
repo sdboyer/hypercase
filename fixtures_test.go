@@ -411,6 +411,10 @@ var fixturePackages = map[string][]fixturePkg{
 	"shared-ladder": {{".", "ladder-a"}, {"b", "ladder-b"}},
 	"no-archive":    {{".", "lift-only"}},
 	"no-product":    {{".", "picked"}},
+
+	"variants":           {{".", "variants"}},
+	"transforms":         {{".", "transforms"}},
+	"transform-failures": {{".", "poke"}},
 }
 
 type fixturePkg struct{ dir, registration string }

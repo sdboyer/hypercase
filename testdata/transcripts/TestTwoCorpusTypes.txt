@@ -37,7 +37,7 @@ $ go test  # two-types
 PASS
 $ cat testdata/hypercase.json
 {
-  "format": 3,
+  "format": 4,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -52,12 +52,14 @@ $ cat testdata/hypercase.json
     {
       "dir": "grid",
       "description": "Trees of instructions, in a grid.",
-      "goType": "github.com/sdboyer/hypercase_test.Grid"
+      "goType": "github.com/sdboyer/hypercase_test.Grid",
+      "transforms": []
     },
     {
       "dir": "script",
       "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
-      "goType": "github.com/sdboyer/hypercase_test.Script"
+      "goType": "github.com/sdboyer/hypercase_test.Script",
+      "transforms": []
     }
   ],
   "lifts": [

@@ -26,9 +26,10 @@ $ go test  # lift-nodesc
                 "dir": "script",
         -       "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
         +       "description": "",
-                "goType": "github.com/sdboyer/hypercase_test.Script"
+                "goType": "github.com/sdboyer/hypercase_test.Script",
+                "transforms": []
               }
-            ],
+          ...
             "lifts": [
               {
                 "name": "parse",

@@ -7,8 +7,6 @@ $ go test  # echo
           in//x: the name is not a valid slash path
         Fix the archive by hand.
     testdata/script/reserved.txtar has problems of form, so none of its cells run, and no update writes it:
-          variant/cycle/about: the top-level name variant is reserved for a later step, and this hypercase doesn't read it yet
-          transform/looped/in/sheet/A1: the top-level name transform is reserved for a later step, and this hypercase doesn't read it yet
           via/import/sheet/A1: the top-level name via is reserved for a later step, and this hypercase doesn't read it yet
         Fix the archive by hand.
     testdata/script/shape.txtar has problems of form, so none of its cells run, and no update writes it:
