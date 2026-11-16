@@ -1,8 +1,9 @@
 {
-  "format": 4,
+  "format": 5,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step07",
   "rootPackage": false,
+  "codes": false,
   "issueLinks": [],
   "properties": [
     {
@@ -83,7 +84,8 @@
           "description": "Each formula cell and its formula, in cell order."
         }
       ],
-      "rejects": []
+      "rejects": [],
+      "classifier": null
     }
   ]
 }
