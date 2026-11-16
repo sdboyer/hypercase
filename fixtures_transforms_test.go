@@ -117,6 +117,20 @@ var (
 		tr.Keeps = []decl.Property{circular, dangling}
 		return tr
 	}()
+	// upperTwice is upper with its jenny's code changed: it uppercases
+	// every file under do/out/, and doubles it. Its declaration is upper's.
+	upperTwice = func() decl.Transform[Script] {
+		tr := steeredTransform("upper", upper.Description,
+			func(files map[string][]byte) {
+				for p, data := range files {
+					if strings.HasPrefix(p, "do/out/") {
+						files[p] = bytes.Repeat(bytes.ToUpper(data), 2)
+					}
+				}
+			}, nil)
+		tr.Probe, tr.Keeps = upper.Probe, upper.Keeps
+		return tr
+	}()
 	// poke adds a file, for the ways a transform goes wrong.
 	poke = steeredTransform("poke", "Adds do/out/p.txt.", func(files map[string][]byte) { files["do/out/p.txt"] = []byte("poked\n") }, nil)
 	// trim removes a file, so its variants have a delete section, and adds
@@ -168,6 +182,10 @@ var transformRegistrations = map[string]func(){
 	},
 	"tr-b-differs": func() {
 		hypercase.Register(append([]any{project, typeWith(looped), own(withName(echoRejects, "copy"))}, sheetsProps...)...)
+	},
+	"tr-jenny": func() { transforms(typeWith(upperTwice, looped), own(echoRejects, looped, upperTwice)) },
+	"tr-b-jenny": func() {
+		hypercase.Register(append([]any{project, typeWith(upperTwice, looped), own(withName(echoRejects, "copy"))}, sheetsProps...)...)
 	},
 	"poke": func() { transforms(pokeType, own(echoRejects, poke)) },
 	"trim": func() { transforms(typeWith(trim), own(echoRejects, trim)) },

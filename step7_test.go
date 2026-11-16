@@ -351,7 +351,7 @@ func TestTransformLifts(t *testing.T) {
 
 // TestTransformsShared: one package owns each transform, and writes and
 // judges its variants' inputs. Every package that runs the type runs each
-// variant's cells: in a normal run, on the committed inputs.
+// variant's cells, on the committed inputs, but in the owner's update.
 func TestTransformsShared(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -369,12 +369,58 @@ func TestTransformsShared(t *testing.T) {
 	b := s.run("b", "tr-b", false)
 	s.fails(b, "transform/upper/out/copy/values.txt differs (-golden +got):")
 	s.lacks(b, "differs from its committed inputs")
-	// b's update runs the cells on the variant upper makes, and leaves
-	// upper's inputs to its owner.
+	// b's update runs the cells on the committed inputs too, and leaves
+	// them to upper's owner.
 	s.passes(s.run("b", "tr-b", true))
-	s.hasSections(twice, map[string]string{"transform/upper/in/do/out/values.txt": "A1 SEVEN\n", "transform/upper/out/copy/values.txt": "A1 SIX\n"})
-	s.passes(s.update("transforms"))
+	s.hasSections(twice, map[string]string{"transform/upper/in/do/out/values.txt": "A1 SEVEN\n", "transform/upper/out/copy/values.txt": "A1 SEVEN\n"})
 	s.passes(s.run("b", "tr-b", false))
+	// The owner's update rewrites them, and b's next update follows.
+	s.passes(s.update("transforms"))
+	s.fails(s.run("b", "tr-b", false), "transform/upper/out/copy/values.txt differs (-golden +got):")
+	s.passes(s.run("b", "tr-b", true))
+	s.passes(s.run("b", "tr-b", false))
+	s.done()
+}
+
+// TestTransformJennyChanges: when a transform's jenny changes, only its
+// owner's update runs the cells on the variant it now makes. Another
+// package's update runs them on the committed inputs, so its next normal
+// run passes, and a whole-module update settles over passes: the owner
+// rewrites the inputs, and on the next pass the others follow.
+func TestTransformJennyChanges(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "a package b over the corpus")
+	s.passes(s.update("transforms"))
+	s.passes(s.run("b", "tr-b", true))
+	before := s.read(twice)
+
+	// upper's jenny now doubles what it uppercases. b's update alone
+	// writes nothing, and b's normal run passes.
+	s.passes(s.run("b", "tr-b-jenny", true))
+	s.same(twice, before)
+	s.passes(s.run("b", "tr-b-jenny", false))
+
+	// The rest of a whole-module update that ran b first: the owner's
+	// update rewrites upper's inputs after b ran its cells, so b's are
+	// stale.
+	s.passes(s.update("tr-jenny"))
+	s.hasSections(twice, map[string]string{
+		"transform/upper/in/do/out/values.txt": "A1 SIX\nA1 SIX\n",
+		"transform/upper/out/echo/values.txt":  "A1 SIX\nA1 SIX\n",
+		"transform/upper/out/copy/values.txt":  "A1 SIX\n",
+	})
+	s.fails(s.run("b", "tr-b-jenny", false), "transform/upper/out/copy/values.txt differs (-golden +got):")
+	// The next pass settles it, and the one after changes nothing.
+	s.passes(s.run("b", "tr-b-jenny", true))
+	s.passes(s.update("tr-jenny"))
+	settled := s.read(twice)
+	s.hasSections(twice, map[string]string{"transform/upper/out/copy/values.txt": "A1 SIX\nA1 SIX\n"})
+	s.passes(s.run("b", "tr-b-jenny", true))
+	s.passes(s.update("tr-jenny"))
+	s.same(twice, settled)
+	s.passes(s.normal("tr-jenny"))
+	s.passes(s.run("b", "tr-b-jenny", false))
 	s.done()
 }
 

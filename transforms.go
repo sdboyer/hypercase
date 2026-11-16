@@ -356,12 +356,13 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if owner {
 			r.judgeInputs(t, c, pc, v, w)
 		}
-		view := v.made
-		if !r.update && v.committed.Inputs {
-			view = nil
-		}
-		if view != nil {
-			c.setView(p, archive.NewFS(view))
+		// Only the owner's update runs the cells on what the transform
+		// makes, as it writes those inputs. Every other run reads the
+		// inputs the archive holds, so no package writes outputs of inputs
+		// the archive doesn't hold; after the owner's update, the others'
+		// next updates follow.
+		if owner && r.update || !v.committed.Inputs {
+			c.setView(p, archive.NewFS(v.made))
 		} else {
 			c.setView(p, pc.a.VariantView(v.committed))
 		}
