@@ -18,8 +18,12 @@ var Looped = decl.Transform[Sheet]{
 	Name:        "looped",
 	Description: "The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.",
 	Gives:       []decl.Property{Circular},
-	Probe:       func(base Sheet) (why string, ok bool) { return sheet.Loopable(base) },
+	Probe: func(base Sheet) (why string, ok bool) {
+		Runs.Add("looped")
+		return sheet.Loopable(base)
+	},
 	Jenny: jenny.For[Sheet]().New("looped", func(base Sheet) (jenny.Files, error) {
+		Runs.Add("looped")
 		return view(sheet.Loop(base))
 	}),
 }
@@ -29,12 +33,14 @@ var Renamed = decl.Transform[Sheet]{
 	Description: "Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.",
 	Keeps:       []decl.Property{Circular, Dangling},
 	Probe: func(base Sheet) (why string, ok bool) {
+		Runs.Add("renamed")
 		if entries, _ := fs.ReadDir(base, "sheet"); len(entries) == 0 {
 			return "the sheet has no cells", false
 		}
 		return "", true
 	},
 	Jenny: jenny.For[Sheet]().New("renamed", func(base Sheet) (jenny.Files, error) {
+		Runs.Add("renamed")
 		return view(sheet.MoveDown(base))
 	}),
 }
@@ -76,6 +82,7 @@ var Parse = decl.Lift[Sheet, *sheet.Parsed]{
 	},
 	Rejects: []decl.Property{Malformed},
 	Run: func(archive string, in Sheet, stderr io.Writer) (*sheet.Parsed, error) {
+		Runs.Add("parse")
 		return sheet.Parse(in)
 	},
 }
@@ -88,6 +95,7 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 	},
 	Rejects: []decl.Property{Circular, Dangling},
 	Run: func(archive string, p *sheet.Parsed, stderr io.Writer) (*sheet.Graph, error) {
+		Runs.Add("resolve")
 		return sheet.Resolve(p)
 	},
 }

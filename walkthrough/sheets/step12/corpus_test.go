@@ -25,7 +25,19 @@ func init() {
 		hypercase.Own(sheetcorpus.Parse, sheetcorpus.Resolve, evaluate),
 		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
 		hypercase.Own(codes),
+		hypercase.Own(checksOf(hypotheses)...),
 	)
+}
+
+// hypotheses are #20's, written by hand, each owned as a corpus check.
+var hypotheses = []hypothesis{circular, circularRelabelled}
+
+func checksOf(hs []hypothesis) []any {
+	var checks []any
+	for _, h := range hs {
+		checks = append(checks, h.check())
+	}
+	return checks
 }
 
 var evaluate = hypercase.Suite[*sheet.Graph]{
@@ -35,12 +47,14 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
 	},
 	Run: func(t testing.TB, archive string, g *sheet.Graph, stdout, stderr io.Writer) ([]hypercase.File, error) {
+		sheetcorpus.Runs.Add("evaluate")
 		return []hypercase.File{{Path: "values.txt", Data: g.Evaluate().Format()}}, nil
 	},
 	Classifier: hypercase.Classifier[*sheet.Graph]{
 		Name:        "div-zero",
 		Description: "Adds div-zero when some cell divides by zero.",
 		Classify: func(g *sheet.Graph, got hypercase.Result) (string, error) {
+			sheetcorpus.Runs.Add("evaluate")
 			if bytes.Contains(got.File("values.txt"), []byte("#DIV/0!")) {
 				return "div-zero", nil
 			}

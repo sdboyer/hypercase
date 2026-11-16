@@ -29,6 +29,7 @@ var format = hypercase.Suite[*sheet.Parsed]{
 	Name:        "format",
 	Description: "Prints each formula back in canonical form.",
 	Probe: func(p *sheet.Parsed) (why string, ok bool) {
+		sheetcorpus.Runs.Add("format")
 		if len(p.Formulas()) == 0 {
 			return "no formulas", false
 		}
@@ -38,6 +39,7 @@ var format = hypercase.Suite[*sheet.Parsed]{
 		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order."},
 	},
 	Run: func(t testing.TB, archive string, p *sheet.Parsed, stdout, stderr io.Writer) ([]hypercase.File, error) {
+		sheetcorpus.Runs.Add("format")
 		return []hypercase.File{{Path: "formulas.txt", Data: sheet.Format(p)}}, nil
 	},
 }

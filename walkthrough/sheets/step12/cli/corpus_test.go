@@ -32,6 +32,7 @@ var calc = hypercase.Suite[sheetcorpus.Sheet]{
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling},
 	Run: func(t testing.TB, archive string, in sheetcorpus.Sheet, stdout, stderr io.Writer) ([]hypercase.File, error) {
+		sheetcorpus.Runs.Add("calc")
 		return nil, sheet.Calc(in, stdout, stderr)
 	},
 }
