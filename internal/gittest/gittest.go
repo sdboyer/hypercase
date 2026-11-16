@@ -28,16 +28,19 @@ func New(t testing.TB) *Repo {
 }
 
 // Env is the environment every git command of the test runs with: this
-// process's, less every GIT_ variable, with git's configuration files
-// switched off and the author, committer and dates fixed.
+// process's, less every GIT_ variable and the locale, with git's
+// configuration files switched off, the author, committer and dates fixed,
+// messages in English, and no repository found above the temp dir.
 func Env() []string {
 	var env []string
 	for _, kv := range os.Environ() {
-		if !strings.HasPrefix(kv, "GIT_") {
+		if !strings.HasPrefix(kv, "GIT_") && !strings.HasPrefix(kv, "LC_") && !strings.HasPrefix(kv, "LANG") {
 			env = append(env, kv)
 		}
 	}
 	return append(env,
+		"LC_ALL=C",
+		"GIT_CEILING_DIRECTORIES="+os.TempDir(),
 		"GIT_CONFIG_GLOBAL="+os.DevNull,
 		"GIT_CONFIG_NOSYSTEM=1",
 		"GIT_AUTHOR_NAME=Test",
