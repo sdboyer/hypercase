@@ -763,12 +763,13 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		}
 		_, made := files[outcomeFile]
 		switch {
-		case len(diffs) > 0 && !couldWrite:
-			res.frozenDiffers = true
-			m.add("The cell is frozen by its known gap, %s line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s\nAn update writes nothing for this cell until the problems above are fixed.", c.gapsAt, gap.Line, gap.Raw, strings.Join(diffs, "\n"))
 		case len(diffs) > 0:
 			res.frozenDiffers = true
-			m.add("The cell is frozen by its known gap, %s line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s\nIf the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.", c.gapsAt, gap.Line, gap.Raw, strings.Join(diffs, "\n"))
+			closing := "If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them."
+			if !couldWrite {
+				closing = "An update writes nothing for this cell until the problems above are fixed."
+			}
+			m.add("The cell is frozen by its known gap, %s line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s\n%s", c.gapsAt, gap.Line, gap.Raw, strings.Join(diffs, "\n"), closing)
 		case hasOutcome || !made || !couldWrite:
 		case r.update:
 			// The upgrade, the one write an update makes to a frozen cell:
