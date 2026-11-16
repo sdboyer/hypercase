@@ -17,6 +17,7 @@ import (
 	"github.com/sdboyer/hypercase/internal/diff"
 	"github.com/sdboyer/hypercase/internal/hooks"
 	"github.com/sdboyer/hypercase/internal/registry"
+	"github.com/sdboyer/hypercase/internal/root"
 )
 
 // The strip fixture: a module whose corpus root is its root, with three
@@ -724,9 +725,6 @@ func TestStripFailedRemoval(t *testing.T) {
 	}
 }
 
-// toyRoots are the corpus roots of the walkthrough's toy module.
-var toyRoots = []string{"step03", "step04", "step05", "step06"}
-
 // TestStripToys: on a copy of the walkthrough's toy module, stripping each
 // of its corpus roots, then running the update over the whole module until
 // it changes nothing, gives back every file as it was. Stale files a person
@@ -775,6 +773,26 @@ func TestStripToys(t *testing.T) {
 	}
 	goCmd(nil, "mod", "edit", "-replace=github.com/sdboyer/hypercase="+hc)
 	want := tree(t, dir)
+
+	// The toy's corpus roots, as its registries record them.
+	found, err := registry.Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var toyRoots []string
+	for _, f := range found {
+		h, err := registry.Peek([]byte(want[root.Rel(dir, f.Path)]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(toyRoots, h.CorpusRoot) {
+			toyRoots = append(toyRoots, h.CorpusRoot)
+		}
+	}
+	slices.Sort(toyRoots)
+	if len(toyRoots) < 2 {
+		t.Fatalf("the toy's registries record the corpus roots %q, and it has more", toyRoots)
+	}
 
 	stale := map[string]string{"step06/testdata/checks/gone.txt": "sheet/twice gone\n"}
 	for _, r := range toyRoots {
