@@ -984,8 +984,8 @@ check, the properties it registers, and `evaluate`: the type it consumes,
 - Columns are suites. A suite covers a class of outputs, or one command. A
   cell is one case run through one column, and its outputs go under
   `out/<suite>/…`.
-- A suite has a name, a description, a probe, its declared outputs,
-  `Rejects` and a run. Step 3 says what the run receives.
+- A suite has a name, a description, a corpus, a probe, its declared
+  outputs, `Rejects` and a run. Step 3 says what the run receives.
 - Column names are unique per corpus root, not per package or per corpus
   type.
 
