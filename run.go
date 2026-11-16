@@ -357,6 +357,7 @@ type aCase struct {
 	properties []string
 	gaps       []archive.Gap // the lines that mark the case's cells
 	state      *caseState
+	tr         *transform // the transform whose variant the case is, if any
 }
 
 // newCase makes a case of an archive, with no input view yet.
@@ -880,8 +881,12 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 		m.add("%s panicked: %v\nFix the code. A panic is never an expected error.", col.name, out.panicValue)
 	case out.noProduct:
 		m.add("%s returned no product and no error.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error.", col.name)
+	case out.err != nil && len(hit) == 0 && c.tr != nil:
+		m.add("%s returned an error, but the variant states no property %s rejects:\n  %s\n%s Fix the code or %s's jenny, or give the variant the property, in %s's Gives or Keeps, and list it in %s's Rejects.", col.name, col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "), c.tr.states(), c.tr.name, c.tr.name, col.name)
 	case out.err != nil && len(hit) == 0:
 		m.add("%s returned an error, but the case states no property %s rejects:\n  %s\nFix the code, or state the property on the case and in %s's Rejects.", col.name, col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "), col.name)
+	case out.err == nil && len(hit) > 0 && c.tr != nil:
+		m.add("%s returned no error, but the variant states %s, which %s rejects.\n%s Fix the code or %s's jenny, or correct %s's Gives or Keeps, or %s's Rejects.", col.name, andList(hit), col.name, c.tr.states(), c.tr.name, c.tr.name, col.name)
 	case out.err == nil && len(hit) > 0:
 		m.add("%s returned no error, but the case states %s, which %s rejects.\nFix the code, or correct the case's properties or %s's Rejects.", col.name, andList(hit), col.name, col.name)
 	}

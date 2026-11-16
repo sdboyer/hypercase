@@ -178,6 +178,12 @@ type plannedVariant struct {
 
 func (v *plannedVariant) caseName() string { return v.kind + "/" + v.name }
 
+// states says what the transform's variants state, for a message about
+// what one of them states.
+func (tr *transform) states() string {
+	return fmt.Sprintf("The variant states what %s gives, and each property it keeps that the base states.", tr.name)
+}
+
 // runs reports whether the variant's cells run.
 func (v *plannedVariant) runs() bool {
 	return v.tr == nil || v.declined == "" && v.problem == ""
@@ -340,6 +346,7 @@ func (v *plannedVariant) inputs(a *archive.Archive) []archive.Section {
 // transform, judges the variant's inputs.
 func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVariant, w *caseWrites) {
 	c := r.newCase(p, pc, v.kind+"/"+v.name+"/", v.about, v.gapsAt, v.properties, v.gaps)
+	c.tr = v.tr
 	owner := v.tr != nil && r.owned[v.tr]
 	switch {
 	case v.tr == nil:

@@ -349,6 +349,21 @@ func TestTransformLifts(t *testing.T) {
 	s.done()
 }
 
+// TestTransformExpectedErrors: a transform's variant states what the
+// transform gives and keeps, so the expected-error check on one of its
+// cells names those, and the transform's jenny, where a case's names its
+// properties.
+func TestTransformExpectedErrors(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	r := s.update("tr-props")
+	s.fails(r,
+		"script/twice/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.\n    echo: Does what the case's do/ tree says.\n    echo returned an error, but the variant states no property echo rejects:\n      A1 -> A1: cycle\n    The variant states what looped gives, and each property it keeps that the base states. Fix the code or looped's jenny, or give the variant the property, in looped's Gives or Keeps, and list it in echo's Rejects.",
+		"script/twice/transform/upper: Uppercases every file under do/out/.\n    echo: Does what the case's do/ tree says.\n    echo returned no error, but the variant states circular, which echo rejects.\n    The variant states what upper gives, and each property it keeps that the base states. Fix the code or upper's jenny, or correct upper's Gives or Keeps, or echo's Rejects.")
+	s.lacks(r, "the case's properties", "state the property on the case")
+	s.done()
+}
+
 // TestTransformsShared: one package owns each transform, and writes and
 // judges its variants' inputs. Every package that runs the type runs each
 // variant's cells, on the committed inputs, but in the owner's update.

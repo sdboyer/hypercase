@@ -183,6 +183,14 @@ var transformRegistrations = map[string]func(){
 	"tr-b-differs": func() {
 		hypercase.Register(append([]any{project, typeWith(looped), own(withName(echoRejects, "copy"))}, sheetsProps...)...)
 	},
+	"tr-props": func() {
+		// looped gives nothing, so its variant's error is unexpected, and
+		// upper gives circular, which echo rejects and still passes.
+		lp, up := looped, upper
+		lp.Gives = nil
+		up.Gives, up.Keeps = []decl.Property{circular}, []decl.Property{dangling}
+		transforms(typeWith(up, lp), own(echoRejects, lp, up))
+	},
 	"tr-jenny": func() { transforms(typeWith(upperTwice, looped), own(echoRejects, looped, upperTwice)) },
 	"tr-b-jenny": func() {
 		hypercase.Register(append([]any{project, typeWith(upperTwice, looped), own(withName(echoRejects, "copy"))}, sheetsProps...)...)
