@@ -312,7 +312,7 @@ func TestTransformInvalidInputs(t *testing.T) {
 		s.edit(twice, e.desc, insert(e.section, e.data, e.before))
 		r := s.normal("transforms")
 		s.fails(r, failure+e.problem+repair)
-		s.lacks(r, "problems of form", "differs from its committed inputs")
+		s.lacks(r, "problems of form", "differs from its committed inputs", "If no package owns")
 		s.fails(s.run("b", "tr-b", false), failure+e.problem+repair)
 		// b's update reads what looped makes, and leaves the inputs to
 		// looped's owner, whose update rewrites them.
@@ -585,14 +585,14 @@ func TestTransformStaleInputs(t *testing.T) {
 	})
 	r := s.run("b", "tr-b-keep", false)
 	s.fails(r, "gaps, line 1, marks the cell, and copy's probe says the case isn't for it: not for copy",
-		"A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, which no update writes.\n")
+		"A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, which no update writes. If no package owns upper, the root-package check says so, and no update rewrites them.\n")
 	s.lacks(r, "A normal run checks each frozen cell that failed", "keep's", "--- FAIL: TestCorpus/script/twice/transform/upper/keep")
 	s.done()
 }
 
-// TestTransformUnowned: when no package owns a transform, no update
-// rewrites its variants' inputs, and a message that would name the update
-// in the package that owns it says so instead.
+// TestTransformUnowned: a package that doesn't own a transform can't know
+// whether another does, so a message that names the update in the package
+// that owns it says what happens when none does, and is true either way.
 func TestTransformUnowned(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -605,11 +605,11 @@ func TestTransformUnowned(t *testing.T) {
 
 	s.edit(twice, "edit upper's input by hand", set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n"))
 	s.fails(s.run("b", "tr-b", false), "transform/upper/out/copy/values.txt differs (-golden +got):",
-		"A normal run reads the inputs, and an update what upper makes. upper is owned by no package, so no update rewrites them. Give it to hypercase.Own in one package that registers its corpus type, and the module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them there, and the variant's cells.")
+		"A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells. If no package owns upper, the root-package check says so, and no update rewrites them.")
 
 	s.write(twice, settled, "restore the archive")
 	s.edit(twice, "give upper an empty delete by hand", insert("transform/upper/delete", "", "transform/upper/out/"))
-	s.fails(s.run("b", "tr-b", false), "script/twice/transform/upper: Uppercases every file under do/out/.\n    The archive's inputs for upper's variant are invalid, and no cell runs on them:\n      transform/upper/delete: the section is empty; a variant that removes nothing has no delete section\n    upper is owned by no package, so no update rewrites them. Give it to hypercase.Own in one package that registers its corpus type, and the module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them there.")
+	s.fails(s.run("b", "tr-b", false), "script/twice/transform/upper: Uppercases every file under do/out/.\n    The archive's inputs for upper's variant are invalid, and no cell runs on them:\n      transform/upper/delete: the section is empty; a variant that removes nothing has no delete section\n    The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites them.")
 	s.done()
 }
 

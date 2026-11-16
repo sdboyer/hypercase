@@ -83,7 +83,7 @@ $ go test ./b  # tr-b
         transform/upper/in/do/out/values.txt differs (-committed +made):
         - A1 SEVEN
         + A1 SIX
-        A normal run reads the inputs, and an update what upper makes. upper is owned by no package, so no update rewrites them. Give it to hypercase.Own in one package that registers its corpus type, and the module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them there, and the variant's cells.
+        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells. If no package owns upper, the root-package check says so, and no update rewrites them.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs
@@ -112,7 +112,7 @@ $ go test ./b  # tr-b
     script/twice/transform/upper: Uppercases every file under do/out/.
         The archive's inputs for upper's variant are invalid, and no cell runs on them:
           transform/upper/delete: the section is empty; a variant that removes nothing has no delete section
-        upper is owned by no package, so no update rewrites them. Give it to hypercase.Own in one package that registers its corpus type, and the module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them there.
+        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites them.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs
