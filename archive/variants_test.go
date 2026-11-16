@@ -90,9 +90,10 @@ func TestVariantsWellFormed(t *testing.T) {
 		"transform/looped":  {"sheet/A1": "=A1\n", "sheet/B1": "3\n"},
 		"transform/renamed": {"sheet/A2": "=B2*2\n", "sheet/B2": "3\n"},
 	}
+	base := a.Base()
 	for _, v := range vs {
 		want := views[v.Case()]
-		view := a.VariantView(v)
+		view := base.VariantView(v)
 		var paths []string
 		for p := range want {
 			paths = append(paths, p)
@@ -117,7 +118,7 @@ func TestVariantsWellFormed(t *testing.T) {
 			files[p] = []byte(d)
 		}
 		var names, held []string
-		for _, s := range a.VariantSections(v.Kind, v.Name, files) {
+		for _, s := range base.VariantSections(v.Kind, v.Name, files) {
 			names = append(names, s.Name)
 			if d, ok := a.Section(s.Name); !ok || string(d) != string(s.Data) {
 				t.Errorf("%s: VariantSections gives %s as %q, and the archive holds %q", v.Case(), s.Name, s.Data, d)
@@ -132,7 +133,7 @@ func TestVariantsWellFormed(t *testing.T) {
 			t.Errorf("%s: VariantSections names %q, and the archive's inputs are %q", v.Case(), names, held)
 		}
 	}
-	if got := a.VariantSections(Transform, "same", map[string][]byte{"sheet/A1": []byte("=B1*2\n"), "sheet/B1": []byte("3\n")}); len(got) != 0 {
+	if got := base.VariantSections(Transform, "same", map[string][]byte{"sheet/A1": []byte("=B1*2\n"), "sheet/B1": []byte("3\n")}); len(got) != 0 {
 		t.Errorf("a view equal to the base's gives sections %v", got)
 	}
 }

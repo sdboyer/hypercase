@@ -144,13 +144,16 @@ type plannedVariant struct {
 	properties []string
 	gaps       []archive.Gap
 	committed  archive.VariantCase
-	view       fs.FS // a hand-written variant's
+	// view is the committed input view: a hand-written variant's, or a
+	// transform's when the archive holds its inputs.
+	view fs.FS
 
 	// A transform's variant.
 	tr       *transform
 	declined string            // why the transform declines the base
 	problem  string            // what went wrong making the variant
 	made     map[string][]byte // the input view the transform made
+	sections []archive.Section // the sections that record it
 }
 
 func (v *plannedVariant) caseName() string { return v.kind + "/" + v.name }
@@ -170,6 +173,7 @@ func (v *plannedVariant) runs() bool {
 // order written, then one per transform of its corpus type, by name.
 func (r *runner) planVariants(p *plan, a *archive.Archive) []*plannedVariant {
 	var vs []*plannedVariant
+	base := a.Base()
 	committed := map[string]archive.VariantCase{}
 	for _, v := range a.Variants() {
 		if v.Kind == archive.Transform {
@@ -184,12 +188,13 @@ func (r *runner) planVariants(p *plan, a *archive.Archive) []*plannedVariant {
 			properties: v.Properties,
 			gaps:       v.Gaps,
 			committed:  v,
-			view:       a.VariantView(v),
+			view:       base.VariantView(v),
 		})
 	}
 	trs := slices.Clone(p.root.transforms)
 	slices.SortFunc(trs, func(a, b *transform) int { return strings.Compare(a.name, b.name) })
-	base := a.Properties()
+	stated, gaps := a.Properties(), a.Gaps()
+	var baseView fs.FS // what each transform reads, made once
 	for _, tr := range trs {
 		v := &plannedVariant{
 			kind:      archive.Transform,
@@ -199,7 +204,10 @@ func (r *runner) planVariants(p *plan, a *archive.Archive) []*plannedVariant {
 			committed: committed[tr.name],
 			tr:        tr,
 		}
-		for _, g := range a.Gaps() {
+		if v.committed.Inputs {
+			v.view = base.VariantView(v.committed)
+		}
+		for _, g := range gaps {
 			if g.Transform == tr.name {
 				v.gaps = append(v.gaps, g)
 			}
@@ -208,7 +216,7 @@ func (r *runner) planVariants(p *plan, a *archive.Archive) []*plannedVariant {
 			v.properties = append(v.properties, p.Name)
 		}
 		var neither []string
-		for _, name := range base {
+		for _, name := range stated {
 			switch {
 			case slices.ContainsFunc(tr.keeps, func(p decl.Property) bool { return p.Name == name }):
 				if !slices.Contains(v.properties, name) {
@@ -221,17 +229,20 @@ func (r *runner) planVariants(p *plan, a *archive.Archive) []*plannedVariant {
 		if len(neither) > 0 {
 			v.declined = fmt.Sprintf("the base states %s, which %s neither gives nor keeps", andList(neither), tr.name)
 		} else {
-			r.makeVariant(v, a)
+			if baseView == nil {
+				baseView = base.View()
+			}
+			r.makeVariant(v, base, baseView)
 		}
 		vs = append(vs, v)
 	}
 	return vs
 }
 
-// makeVariant runs a transform on a base: its probe, then its jenny.
-func (r *runner) makeVariant(v *plannedVariant, a *archive.Archive) {
+// makeVariant runs a transform on a base, whose input view is view: its
+// probe, then its jenny.
+func (r *runner) makeVariant(v *plannedVariant, base archive.Base, view fs.FS) {
 	tr := v.tr
-	view := a.View()
 	if tr.probe != nil {
 		var why string
 		var ok bool
@@ -280,30 +291,19 @@ func (r *runner) makeVariant(v *plannedVariant, a *archive.Archive) {
 		v.problem = fmt.Sprintf("%s made an input view no file tree holds: it holds %s.\nFix its jenny.", tr.name, strings.Join(ns, "; "))
 		return
 	}
-	sections := a.VariantSections(archive.Transform, tr.name, files)
+	sections := base.VariantSections(archive.Transform, tr.name, files)
 	if len(sections) == 0 {
 		v.problem = fmt.Sprintf("%s made an input view equal to the base's. A variant changes the base.\nMake its probe decline such a base.", tr.name)
 		return
 	}
-	// The variant's sections, beside the base's, are an archive of their
-	// own, with no problem of form.
-	scratch := &archive.Archive{}
-	for _, s := range a.Sections {
-		if kind, _, _ := archive.SplitCase(s.Name); kind == "" {
-			scratch.Sections = append(scratch.Sections, s)
-		}
-	}
-	scratch.Sections = append(scratch.Sections, sections...)
-	if ps := scratch.Check(); len(ps) > 0 {
+	// The variant's sections, as an archive of their own, have no problem
+	// of form. The base's are left out: the archive's check passed them,
+	// and it reads a transform's variant apart from the base.
+	if ps := (&archive.Archive{Sections: sections}).Check(); len(ps) > 0 {
 		v.problem = fmt.Sprintf("%s made a variant an archive can't hold:\n%s\nFix its jenny: what it makes is the variant's whole input view, with the trees as its top-level directories.", tr.name, problemList(ps))
 		return
 	}
-	v.made = files
-}
-
-// madeSections are the sections that record the transform's variant.
-func (v *plannedVariant) madeSections(a *archive.Archive) []archive.Section {
-	return a.VariantSections(archive.Transform, v.name, v.made)
+	v.made, v.sections = files, sections
 }
 
 // inputs returns the committed sections that record a transform's
@@ -348,7 +348,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if owner && r.update || !v.committed.Inputs {
 			c.setView(p, archive.NewFS(v.made))
 		} else {
-			c.setView(p, pc.a.VariantView(v.committed))
+			c.setView(p, v.view)
 		}
 	}
 	r.runCells(t, c, p.cols, w)
@@ -358,7 +358,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 // as goldens, in the package that owns it. An update writes them whole.
 func (r *runner) judgeInputs(t *testing.T, c *aCase, pc plannedCase, v *plannedVariant, w *caseWrites) {
 	t.Helper()
-	made := v.madeSections(pc.a)
+	made := v.sections
 	if r.update {
 		w.replaceInputs(v.name, made)
 		return

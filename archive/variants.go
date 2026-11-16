@@ -146,10 +146,22 @@ func (a *Archive) variantOrder() []string {
 	return append(names, rest...)
 }
 
+// A Base is an archive's base input view, read once, from which the views
+// of its variants and the sections that record them are made.
+type Base struct {
+	files map[string][]byte
+}
+
+// Base reads the archive's base input view.
+func (a *Archive) Base() Base { return Base{files: a.baseFiles()} }
+
+// View returns the base's input view.
+func (b Base) View() fs.FS { return NewFS(b.files) }
+
 // VariantView returns a variant's input view: the base's, with the overlay
 // laid over it path by path and the deleted paths removed.
-func (a *Archive) VariantView(v VariantCase) fs.FS {
-	return NewFS(variantFiles(a.baseFiles(), v))
+func (b Base) VariantView(v VariantCase) fs.FS {
+	return NewFS(variantFiles(b.files, v))
 }
 
 func variantFiles(base map[string][]byte, v VariantCase) map[string][]byte {
@@ -163,13 +175,13 @@ func variantFiles(base map[string][]byte, v VariantCase) map[string][]byte {
 	return files
 }
 
-// VariantSections returns the sections that record a variant whose input
-// view is view, made from the archive's base: its in/ sections, for each
-// path whose bytes differ from the base's or that the base lacks, sorted,
-// then its delete section, for the base's paths the view lacks. Equal views
-// give no sections.
-func (a *Archive) VariantSections(kind, name string, view map[string][]byte) []Section {
-	base := a.baseFiles()
+// VariantSections returns the sections that record a variant of the base
+// whose input view is view: its in/ sections, for each path whose bytes
+// differ from the base's or that the base lacks, sorted, then its delete
+// section, for the base's paths the view lacks. Equal views give no
+// sections.
+func (b Base) VariantSections(kind, name string, view map[string][]byte) []Section {
+	base := b.files
 	prefix := kind + "/" + name + "/"
 	var ss []Section
 	for _, p := range slices.Sorted(maps.Keys(view)) {
