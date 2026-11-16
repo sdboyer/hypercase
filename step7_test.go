@@ -235,6 +235,51 @@ func TestTransformInputs(t *testing.T) {
 	s.done()
 }
 
+// TestTransformBaseEdited: a base edited by hand can leave a transform's
+// committed inputs ones no update would write: a delete line naming a path
+// the base no longer has, or a view equal to the base's. Those are inputs
+// that differ from what the transform makes, which its owner judges and
+// its update rewrites, never problems of form, which stop the archive and
+// which no update repairs.
+func TestTransformBaseEdited(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.passes(s.update("trim"))
+	s.hasSections(twice, map[string]string{"transform/trim/delete": "do/out/values.txt\n"})
+	s.edit(twice, "rename the base's values.txt, which trim's delete names, and its golden", func(a *archive.Archive) {
+		for i := range a.Sections {
+			switch a.Sections[i].Name {
+			case "in/do/out/values.txt":
+				a.Sections[i].Name = "in/do/out/v.txt"
+			case "out/echo/values.txt":
+				a.Sections[i].Name = "out/echo/v.txt"
+			}
+		}
+	})
+	r := s.normal("trim")
+	s.fails(r, "script/twice/transform/trim: Removes do/out/values.txt, and adds do/out/k.txt.\n    trim's variant of the base differs from its committed inputs:\n    transform/trim/delete is no longer made")
+	s.lacks(r, "problems of form")
+	s.passes(s.update("trim"))
+	s.hasSections(twice, map[string]string{"transform/trim/out/echo/v.txt": "a1 six\n"}, "transform/trim/delete")
+	s.passes(s.normal("trim"))
+
+	for _, a := range []string{twice, "testdata/script/errs.txtar"} {
+		s.edit(a, "drop trim's variant, which the next registrations don't list", drop("transform/trim/"))
+	}
+	s.passes(s.update("transforms"))
+	s.edit(twice, "give the base what looped adds, so looped's committed variant equals it", func(a *archive.Archive) {
+		insert("in/do/error", "A1 -> A1: cycle\n", "in/do/out/")(a)
+		insert("in/resolve/error", "A1 -> A1: cycle\n", "out/")(a)
+		insert("properties", "circular\n", "out/")(a)
+	})
+	r = s.normal("transforms")
+	s.fails(r, "transform/looped/in/do/error and transform/looped/in/resolve/error are written, and looped declines the base: the base's do/ tree already errs\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to remove them.")
+	s.lacks(r, "problems of form")
+	s.fails(s.update("transforms"), "transform/looped/out/echo/error.txt is recorded, and looped declines the base")
+	s.hasSections(twice, nil, "transform/looped/in/")
+	s.done()
+}
+
 // TestTransformDeclines: when a transform no longer applies to a base, its
 // owner's update removes the variant's inputs, and what is left under
 // transform/<name>/out/ is each column's orphan.
@@ -366,6 +411,7 @@ func TestTransformFailures(t *testing.T) {
 		"script/same/transform/poke: Adds do/out/p.txt.\n    poke made an input view equal to the base's. A variant changes the base.\n    Make its probe decline such a base.",
 		"script/flat/transform/poke: Adds do/out/p.txt.\n    poke made a variant an archive can't hold:\n      transform/poke/in/flat: an input belongs in a tree, as transform/poke/in/<tree>/<file>",
 		"script/marker/transform/poke: Adds do/out/p.txt.\n    poke made files an archive can't hold:\n      do/out/m.txt: its line 2 is shaped like a section marker",
+		"script/nest/transform/poke: Adds do/out/p.txt.\n    poke made an input view no file tree holds: it holds tr/nest, and tr/nest/x below it.\n    Fix its jenny.",
 		"script/probe-panic/transform/poke: Adds do/out/p.txt.\n    poke's probe panicked on the base: probe boom\n    Fix the probe.",
 		"script/probe-none/transform/poke: Adds do/out/p.txt.\n    poke's probe said the base isn't for it, and gave no reason.\n    Fix the probe: when it says no, it says why.",
 	}

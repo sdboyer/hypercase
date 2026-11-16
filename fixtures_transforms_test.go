@@ -29,6 +29,7 @@ import (
 //	tr/flat         the jenny adds a file outside any tree
 //	tr/marker       the jenny adds do/out/m.txt, with a line shaped like a
 //	                section marker
+//	tr/nest         the jenny adds tr/nest/x, below the file tr/nest
 func steeredTransform(name, description string, change func(files map[string][]byte), decline func(in fs.FS) (string, bool)) decl.Transform[Script] {
 	return decl.Transform[Script]{
 		Name:        name,
@@ -67,6 +68,9 @@ func steeredTransform(name, description string, change func(files map[string][]b
 			}
 			if _, ok := files["tr/marker"]; ok {
 				files["do/out/m.txt"] = []byte("a\n-- x --\n")
+			}
+			if _, ok := files["tr/nest"]; ok {
+				files["tr/nest/x"] = []byte("x\n")
 			}
 			var out jenny.Files
 			for _, p := range slices.Sorted(maps.Keys(files)) {
@@ -115,6 +119,17 @@ var (
 	}()
 	// poke adds a file, for the ways a transform goes wrong.
 	poke = steeredTransform("poke", "Adds do/out/p.txt.", func(files map[string][]byte) { files["do/out/p.txt"] = []byte("poked\n") }, nil)
+	// trim removes a file, so its variants have a delete section, and adds
+	// one, so it makes a variant of any base.
+	trim = func() decl.Transform[Script] {
+		tr := steeredTransform("trim", "Removes do/out/values.txt, and adds do/out/k.txt.",
+			func(files map[string][]byte) {
+				delete(files, "do/out/values.txt")
+				files["do/out/k.txt"] = []byte("kept\n")
+			}, nil)
+		tr.Keeps = []decl.Property{circular}
+		return tr
+	}()
 
 	transformType = decl.Type[Script]{Dir: "script", Description: scriptType.Description, Transforms: []decl.Transform[Script]{upper, looped}}
 	pokeType      = decl.Type[Script]{Dir: "script", Description: scriptType.Description, Transforms: []decl.Transform[Script]{poke}}
@@ -155,6 +170,7 @@ var transformRegistrations = map[string]func(){
 		hypercase.Register(append([]any{project, typeWith(looped), own(withName(echoRejects, "copy"))}, sheetsProps...)...)
 	},
 	"poke": func() { transforms(pokeType, own(echoRejects, poke)) },
+	"trim": func() { transforms(typeWith(trim), own(echoRejects, trim)) },
 	"poke-b": func() {
 		hypercase.Register(append([]any{project, pokeType, own(withName(echoRejects, "copy"))}, sheetsProps...)...)
 	},

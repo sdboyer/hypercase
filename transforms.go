@@ -293,6 +293,10 @@ func (r *runner) makeVariant(v *plannedVariant, a *archive.Archive) {
 		v.problem = fmt.Sprintf("%s made files an archive can't hold:\n%s\nFix its jenny.", tr.name, strings.Join(held, "\n"))
 		return
 	}
+	if ns := archive.Nested(files); len(ns) > 0 {
+		v.problem = fmt.Sprintf("%s made an input view no file tree holds: it holds %s.\nFix its jenny.", tr.name, strings.Join(ns, "; "))
+		return
+	}
 	sections := a.VariantSections(archive.Transform, tr.name, files)
 	if len(sections) == 0 {
 		v.problem = fmt.Sprintf("%s made an input view equal to the base's. A variant changes the base.\nMake its probe decline such a base.", tr.name)

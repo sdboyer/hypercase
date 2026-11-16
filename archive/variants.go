@@ -225,14 +225,18 @@ func checkVariant(s Section, kind, name, rest string) []Problem {
 	return []Problem{{Section: s.Name, Msg: fmt.Sprintf("%s is not one of a transform's sections: in, delete and out, which an update writes", top)}}
 }
 
-// checkVariants reports the problems of the variants as wholes: a delete
-// line the base can't satisfy, a view equal to the base's, and hand-written
-// sections that don't sit with their case's.
+// checkVariants reports the problems of the variants as wholes: a
+// hand-written variant's delete line the base can't satisfy, and its view
+// equal to the base's or one no file tree holds; and hand-written sections
+// that don't sit with their case's. A transform's in/ and delete are
+// update-written: how they differ from what the base now gives is for the
+// package that owns the transform to judge and rewrite, never a problem of
+// form, which no update repairs.
 func (a *Archive) checkVariants() []Problem {
 	var ps []Problem
 	base := a.baseFiles()
 	for _, v := range a.Variants() {
-		if !ValidName(v.Name) {
+		if !ValidName(v.Name) || v.Kind == Transform {
 			continue
 		}
 		before := len(ps)
@@ -259,21 +263,15 @@ func (a *Archive) checkVariants() []Problem {
 				seen[p] = n
 			}
 		}
-		if len(ps) > before || !v.Inputs && v.Kind == Transform {
-			continue // a delete it can't satisfy, or a transform's leftover outputs
+		if len(ps) > before {
+			continue // a delete it can't satisfy
 		}
 		view := variantFiles(base, v)
 		if maps.EqualFunc(view, base, bytes.Equal) {
 			ps = append(ps, Problem{Section: v.Case(), Msg: "the variant's input view equals the base's; a variant changes a file or two of the base"})
 		}
-		names := slices.Sorted(maps.Keys(view))
-		for _, p := range names {
-			for d := path.Dir(p); d != "."; d = path.Dir(d) {
-				if _, ok := view[d]; ok {
-					ps = append(ps, Problem{Section: v.Case(), Msg: fmt.Sprintf("the variant's input view holds %s, and %s below it", d, p)})
-					break
-				}
-			}
+		for _, n := range Nested(view) {
+			ps = append(ps, Problem{Section: v.Case(), Msg: "the variant's input view holds " + n})
 		}
 	}
 
@@ -300,6 +298,22 @@ func (a *Archive) checkVariants() []Problem {
 		seen[c], last = true, c
 	}
 	return ps
+}
+
+// Nested reports each path of an input view that is the directory of
+// another, as "<path>, and <other> below it", by the other's path. No file
+// tree holds such a view.
+func Nested(view map[string][]byte) []string {
+	var ns []string
+	for _, p := range slices.Sorted(maps.Keys(view)) {
+		for d := path.Dir(p); d != "."; d = path.Dir(d) {
+			if _, ok := view[d]; ok {
+				ns = append(ns, fmt.Sprintf("%s, and %s below it", d, p))
+				break
+			}
+		}
+	}
+	return ns
 }
 
 // VariantDescriptions checks each hand-written variant's about, which
