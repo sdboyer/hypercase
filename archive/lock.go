@@ -65,9 +65,12 @@ func Modify(lockPath, path string, fn func(current *Archive) (*Archive, error)) 
 	return nil
 }
 
-// RemoveFile removes the named file under the lock on the file at
-// lockPath, which it holds as [Modify] does, around the removal alone. A
-// file that is already gone is no error.
+// RemoveFile removes the named file while it holds the lock on the file at
+// lockPath, as [Modify] does, around the removal alone. The lock orders the
+// removal only with what else takes it, [Modify]'s writes and other
+// removals: an update writes registries and findings files with
+// [WriteFile], which takes no lock. A file that is already gone is no
+// error.
 func RemoveFile(lockPath, name string) error {
 	hook("lock")
 	unlock, err := lockedfile.MutexAt(lockPath).Lock()
