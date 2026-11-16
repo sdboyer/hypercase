@@ -520,10 +520,12 @@ func TestTransformJennyChanges(t *testing.T) {
 // the module's update settling a jenny's change. No update writes it, so
 // when the change moves its output, every update of the package that owns
 // its column fails on it, and so does each of that package's normal runs
-// once the transform's owner has rewritten the inputs. Before that, another
-// package's normal run reads the old inputs, and the cell passes. It fails
-// until a person deletes its files, which the next update writes, or
-// removes its gaps line, after which the next update writes the cell.
+// once the transform's owner has rewritten the inputs. Before that, the
+// cell reads the old inputs and passes: another package's normal run
+// passes, and the owner's fails on the inputs, which differ from what the
+// transform makes. It fails until a person deletes its files or removes
+// its gaps line; then the next update of the package that owns its column
+// writes the cell, and no other package's update does.
 func TestTransformJennyFrozen(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -543,6 +545,11 @@ func TestTransformJennyFrozen(t *testing.T) {
 	}
 	s.fails(s.run("b", "tr-b-jenny", true), frozen("copy", "2"))
 	s.passes(s.run("b", "tr-b-jenny", false))
+	// The owner's normal run, on the old inputs too, passes its frozen
+	// cell, and fails on the inputs.
+	r := s.normal("tr-jenny")
+	s.fails(r, "upper's variant of the base differs from its committed inputs:")
+	s.lacks(r, "The cell is frozen by its known gap")
 
 	// The owner's update rewrites the inputs, and leaves its frozen cell.
 	s.fails(s.update("tr-jenny"), frozen("echo", "1"))
@@ -555,18 +562,21 @@ func TestTransformJennyFrozen(t *testing.T) {
 	s.fails(s.normal("tr-jenny"), frozen("echo", "1"))
 	s.fails(s.run("b", "tr-b-jenny", false), frozen("copy", "2"))
 
-	// A person deletes echo's frozen files, and removes copy's gaps line,
-	// and the next updates write both cells.
+	// A person deletes echo's frozen files, and removes copy's gaps line.
+	// The root package's update writes echo's cell, and leaves copy's to
+	// b, whose normal run fails until its update writes it.
 	s.edit(twice, "delete upper's frozen cell of echo, and close copy's gap", func(a *archive.Archive) {
 		drop("transform/upper/out/echo/")(a)
 		set("gaps", "transform/upper echo Waits on sheets#9.\n")(a)
 	})
 	s.passes(s.update("tr-jenny"))
-	s.passes(s.run("b", "tr-b-jenny", true))
 	s.hasSections(twice, map[string]string{
 		"transform/upper/out/echo/values.txt": "A1 SIX\nA1 SIX\n",
-		"transform/upper/out/copy/values.txt": "A1 SIX\nA1 SIX\n",
+		"transform/upper/out/copy/values.txt": "A1 SIX\n",
 	})
+	s.fails(s.run("b", "tr-b-jenny", false), "transform/upper/out/copy/values.txt differs (-golden +got):")
+	s.passes(s.run("b", "tr-b-jenny", true))
+	s.hasSections(twice, map[string]string{"transform/upper/out/copy/values.txt": "A1 SIX\nA1 SIX\n"})
 	s.passes(s.normal("tr-jenny"))
 	s.passes(s.run("b", "tr-b-jenny", false))
 	s.done()
@@ -614,14 +624,21 @@ func TestTransformStaleInputs(t *testing.T) {
 	})
 	r := s.run("b", "tr-b-keep", false)
 	s.fails(r, "gaps, line 1, marks the cell, and copy's probe says the case isn't for it: not for copy",
-		"A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, which no update writes. If no package owns upper, the root-package check says so, and no update rewrites them.\n")
+		"A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, which no update writes. If no package owns upper, the root-package check says so, and no update rewrites the inputs.\n")
 	s.lacks(r, "A normal run checks each frozen cell whose files differ", "keep's", "--- FAIL: TestCorpus/script/twice/transform/upper/keep")
 	s.done()
 }
 
 // TestTransformUnowned: a package that doesn't own a transform can't know
 // whether another does, so a message that names the update in the package
-// that owns it says what happens when none does, and is true either way.
+// that owns it adds what happens when none does: the root-package check
+// says so, and no update rewrites the inputs. Here the root package gives
+// its transforms up, and its check reports them. The sentence also holds
+// when the only owner's package has no tests (TestTransformOwnerUntested),
+// and, once its update runs, when the owner dropped the transform from Own
+// (TestTransformOwnerDropped); until then that package's normal run fails
+// on its registry. With no root-package check registered, every normal
+// run fails for the missing check (TestRootCheckRequired).
 func TestTransformUnowned(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -630,15 +647,62 @@ func TestTransformUnowned(t *testing.T) {
 	s.passes(s.run("b", "tr-b", true))
 	// The root package gives up its transforms, and its update records it.
 	s.passes(s.update("tr-unowned"))
+	s.fails(s.normal("tr-unowned"), "the transform upper, of testdata/script/, is owned by no package")
 	settled := s.read(twice)
 
 	s.edit(twice, "edit upper's input by hand", set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n"))
 	s.fails(s.run("b", "tr-b", false), "transform/upper/out/copy/values.txt differs (-golden +got):",
-		"A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells. If no package owns upper, the root-package check says so, and no update rewrites them.")
+		"A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells. If no package owns upper, the root-package check says so, and no update rewrites the inputs.")
 
 	s.write(twice, settled, "restore the archive")
 	s.edit(twice, "give upper an empty delete by hand", insert("transform/upper/delete", "", "transform/upper/out/"))
-	s.fails(s.run("b", "tr-b", false), "script/twice/transform/upper: Uppercases every file under do/out/.\n    The archive's inputs for upper's variant are invalid, and no cell runs on them:\n      transform/upper/delete: the section is empty; a variant that removes nothing has no delete section\n    The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites them.")
+	s.fails(s.run("b", "tr-b", false), "script/twice/transform/upper: Uppercases every file under do/out/.\n    The archive's inputs for upper's variant are invalid, and no cell runs on them:\n      transform/upper/delete: the section is empty; a variant that removes nothing has no delete section\n    The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites the inputs.")
+	s.done()
+}
+
+// TestTransformOwnerUntested: a registry in a package with no _test.go
+// records what no test runs, so its package owns no transform: the
+// root-package check reports the transform as owned by no package, beside
+// the registry no test compares.
+func TestTransformOwnerUntested(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "a package b over the corpus")
+	s.passes(s.update("tr-owns-looped"))
+	s.passes(s.run("b", "tr-b-owns", true))
+	s.passes(s.normal("tr-owns-looped"))
+	s.passes(s.run("b", "tr-b-owns", false))
+
+	s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
+	r := s.normal("tr-owns-looped")
+	s.fails(r,
+		"b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.",
+		"the transform upper, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.")
+	s.lacks(r, "the transform looped, of testdata/script/, is owned by no package")
+	s.done()
+}
+
+// TestTransformOwnerDropped: a package that drops a transform from Own,
+// with no update, leaves its registry recording that it owns it, so the
+// root-package check, which reads the registries, still counts it as the
+// owner. The state reports itself: the package's own normal run fails on
+// its registry, and names the update, after which the root-package check
+// reports the transform owned by no package.
+func TestTransformOwnerDropped(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "a package b over the corpus")
+	s.passes(s.update("tr-owns-looped"))
+	s.passes(s.run("b", "tr-b-owns", true))
+	s.passes(s.normal("tr-owns-looped"))
+
+	// b drops upper from Own, and runs no update.
+	s.fails(s.run("b", "tr-b", false), "b/testdata/hypercase.json differs from what the package registers (-committed +registered):",
+		"-           \"owned\": true\n+           \"owned\": false",
+		"Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.")
+	s.passes(s.normal("tr-owns-looped"))
+	s.passes(s.run("b", "tr-b", true))
+	s.fails(s.normal("tr-owns-looped"), "the transform upper, of testdata/script/, is owned by no package")
 	s.done()
 }
 

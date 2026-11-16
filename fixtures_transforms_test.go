@@ -176,6 +176,8 @@ var transformRegistrations = map[string]func(){
 	// evaluate's cell of looped's variant is blocked: resolve errs on it.
 	"tr-ladder-eval": func() { transforms(transformType, own(parse, resolve, evaluate, looped, upper)) },
 	"tr-unowned":     func() { transforms(transformType, own(echoRejects)) },
+	// tr-owns-looped leaves upper to another package.
+	"tr-owns-looped": func() { transforms(transformType, own(echoRejects, looped)) },
 	"tr-b": func() {
 		hypercase.Register(append([]any{project, transformType, own(withName(echoRejects, "copy"))}, sheetsProps...)...)
 	},

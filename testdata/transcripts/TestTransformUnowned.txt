@@ -67,6 +67,33 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-unowned
             --- PASS: TestCorpus/script/twice/transform/upper
                 --- PASS: TestCorpus/script/twice/transform/upper/echo
 PASS
+$ go test  # tr-unowned
+    the transform looped, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
+        Give it to hypercase.Own in one package that registers its corpus type.
+    the transform upper, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
+        Give it to hypercase.Own in one package that registers its corpus type.
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+FAIL
+[exit 1]
 $ edit testdata/script/twice.txtar  # edit upper's input by hand
 $ go test ./b  # tr-b
     script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
@@ -83,7 +110,7 @@ $ go test ./b  # tr-b
         transform/upper/in/do/out/values.txt differs (-committed +made):
         - A1 SEVEN
         + A1 SIX
-        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells. If no package owns upper, the root-package check says so, and no update rewrites them.
+        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs
@@ -112,7 +139,7 @@ $ go test ./b  # tr-b
     script/twice/transform/upper: Uppercases every file under do/out/.
         The archive's inputs for upper's variant are invalid, and no cell runs on them:
           transform/upper/delete: the section is empty; a variant that removes nothing has no delete section
-        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites them.
+        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs

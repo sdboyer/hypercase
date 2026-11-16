@@ -391,7 +391,7 @@ func (r *runner) ifUnowned(v *plannedVariant) string {
 	if r.owned[v.tr] {
 		return ""
 	}
-	return fmt.Sprintf(" If no package owns %s, the root-package check says so, and no update rewrites them.", v.name)
+	return fmt.Sprintf(" If no package owns %s, the root-package check says so, and no update rewrites the inputs.", v.name)
 }
 
 // inputDiffs says how the committed inputs of a transform's variant differ
