@@ -1,0 +1,5 @@
+echo errs with no code.
+-- in/do/error --
+A1 -> A1: cycle
+-- properties --
+circular

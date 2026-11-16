@@ -64,7 +64,7 @@ PASS
 $ go test  # ladder-a
     the column parse is owned by ./b and ./c, each as a suite, and by . as a lift. Lifts share the suites' column names, which are unique per corpus root, and one package owns each column.
         Rename one of the columns, or remove one.
-    testdata/script/x.txtar: no registry claims out/outline/values.txt: no column named outline runs over the corpus script.
+    testdata/script/x.txtar: no registry claims out/outline/outcome and out/outline/values.txt: no column named outline runs over the corpus script.
         If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
     script/x: The root package, ., owns parse, resolve and evaluate, and ./b uses parse for outline.
         parse: Parses the script, as its parse/ tree says.
@@ -103,7 +103,7 @@ $ go test  # ladder-a-useonly
         Rename the suite or the lift.
     the lift parse is used by ., and no package owns it, so its error is recorded nowhere.
         Once the suite and the lift have different names, own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
-    testdata/script/x.txtar: no registry claims out/outline/values.txt: no column named outline runs over the corpus script.
+    testdata/script/x.txtar: no registry claims out/outline/outcome and out/outline/values.txt: no column named outline runs over the corpus script.
         If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
     what ran, in order:
         parse ran on x

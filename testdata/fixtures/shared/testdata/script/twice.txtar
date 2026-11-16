@@ -3,7 +3,11 @@ A1 is twice B1. The root package, ., prints it with echo, and ./b with shout.
 A1 6
 -- in/shout/out/values.txt --
 A1 SIX
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 A1 6
+-- out/shout/outcome --
+accepted
 -- out/shout/values.txt --
 A1 SIX

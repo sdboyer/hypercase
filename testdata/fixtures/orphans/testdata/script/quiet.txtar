@@ -3,6 +3,8 @@ The run once erred and printed, and now does neither.
 A1 6
 -- out/echo/error.txt --
 A1: unexpected "-"
+-- out/echo/outcome --
+accepted
 -- out/echo/stderr.txt --
 warning
 -- out/echo/stdout.txt --

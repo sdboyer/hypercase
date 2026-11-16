@@ -1,0 +1,64 @@
+$ go test  # cl-bad-name
+panic: hypercase: the suite echo's classifier name "Steered" breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter. Rename the classifier.
+[stack]
+[exit 2]
+$ go test  # cl-no-classify
+panic: hypercase: the suite echo's classifier steered has no Classify. Give it the function that gives a cell's detail.
+[stack]
+[exit 2]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # outcomes
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/skipped: echo's probe says the case isn't for it: the case is for no one
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/accepted
+            --- PASS: TestCorpus/script/accepted/echo
+        --- PASS: TestCorpus/script/codes
+            --- PASS: TestCorpus/script/codes/echo
+        --- PASS: TestCorpus/script/detail
+            --- PASS: TestCorpus/script/detail/echo
+        --- PASS: TestCorpus/script/file-detail
+            --- PASS: TestCorpus/script/file-detail/echo
+        --- PASS: TestCorpus/script/no-codes
+            --- PASS: TestCorpus/script/no-codes/echo
+        --- PASS: TestCorpus/script/panicked
+            --- PASS: TestCorpus/script/panicked/echo
+        --- PASS: TestCorpus/script/rejected-detail
+            --- PASS: TestCorpus/script/rejected-detail/echo
+        --- PASS: TestCorpus/script/skipped
+            --- SKIP: TestCorpus/script/skipped/echo
+PASS
+$ go test  # cl-no-description
+    the suite echo's classifier steered has no description.
+        Add one: it says what the classifier's details mean, in prose.
+    testdata/hypercase.json differs from what the package registers (-committed +registered):
+                ],
+                "classifier": {
+                  "name": "steered",
+        -         "description": "Gives the detail the case's cl/ tree says."
+        +         "description": " "
+                }
+              }
+            ]
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
+    script/skipped: echo's probe says the case isn't for it: the case is for no one
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/accepted
+            --- PASS: TestCorpus/script/accepted/echo
+        --- PASS: TestCorpus/script/codes
+            --- PASS: TestCorpus/script/codes/echo
+        --- PASS: TestCorpus/script/detail
+            --- PASS: TestCorpus/script/detail/echo
+        --- PASS: TestCorpus/script/file-detail
+            --- PASS: TestCorpus/script/file-detail/echo
+        --- PASS: TestCorpus/script/no-codes
+            --- PASS: TestCorpus/script/no-codes/echo
+        --- PASS: TestCorpus/script/panicked
+            --- PASS: TestCorpus/script/panicked/echo
+        --- PASS: TestCorpus/script/rejected-detail
+            --- PASS: TestCorpus/script/rejected-detail/echo
+        --- PASS: TestCorpus/script/skipped
+            --- SKIP: TestCorpus/script/skipped/echo
+FAIL
+[exit 1]

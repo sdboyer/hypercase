@@ -76,18 +76,28 @@ evaluate 1
 format 1
 -- in/parse/archive --
 yes
+-- out/calc/outcome --
+accepted
 -- out/calc/values.txt --
 calc 1
 -- out/evaluate/archive.txt --
 fine
+-- out/evaluate/outcome --
+accepted
 -- out/evaluate/values.txt --
 evaluate 1
+-- out/format/outcome --
+accepted
 -- out/format/trail.txt --
 parse
 -- out/format/values.txt --
 format 1
+-- out/parse/outcome --
+accepted
 -- out/parse/stderr.txt --
 archive: fine
+-- out/resolve/outcome --
+accepted
 $ cat testdata/script/stray.txtar
 parse rejects the script, which states malformed. calc reads the raw trees, and rejects it too.
 -- in/parse/error --
@@ -100,8 +110,18 @@ evaluate's probe says no, if it is called.
 malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
 -- out/parse/error.txt --
 D1: not a number or a formula: "total"
+-- out/parse/outcome --
+rejected
+-- out/resolve/outcome --
+blocked parse
 $ cat testdata/script/loop.txtar
 resolve rejects the script, which states circular. format reads the parsed script, and runs.
 -- in/resolve/error --
@@ -110,12 +130,22 @@ A1 -> A1: cycle
 format 2
 -- properties --
 circular
+-- out/calc/outcome --
+accepted
+-- out/evaluate/outcome --
+blocked resolve
+-- out/format/outcome --
+accepted
 -- out/format/trail.txt --
 parse
 -- out/format/values.txt --
 format 2
+-- out/parse/outcome --
+accepted
 -- out/resolve/error.txt --
 A1 -> A1: cycle
+-- out/resolve/outcome --
+rejected
 $ cat testdata/script/both.txtar
 The script is malformed and circular. parse rejects it, so resolve's cell is blocked, and nothing expects it to err.
 -- in/parse/error --
@@ -129,16 +159,36 @@ malformed
 circular
 -- out/calc/error.txt --
 D1: not a number
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
 -- out/parse/error.txt --
 D1: not a number
+-- out/parse/outcome --
+rejected
+-- out/resolve/outcome --
+blocked parse
 $ cat testdata/script/noisy.txtar
 parse warns on stderr, and goes on.
 -- in/parse/stderr --
 parse: a warning
+-- out/calc/outcome --
+accepted
+-- out/evaluate/outcome --
+accepted
+-- out/format/outcome --
+accepted
 -- out/format/trail.txt --
 parse
+-- out/parse/outcome --
+accepted
 -- out/parse/stderr.txt --
 parse: a warning
+-- out/resolve/outcome --
+accepted
 $ go test  # ladder
     script/both: evaluate is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
     script/both: format is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.

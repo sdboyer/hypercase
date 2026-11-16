@@ -25,6 +25,8 @@ $ cat testdata/script/twice.txtar
 echo prints a1 six.
 -- in/do/out/values.txt --
 a1 six
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 a1 six
 -- transform/looped/in/do/error --
@@ -33,10 +35,14 @@ A1 -> A1: cycle
 A1 -> A1: cycle
 -- transform/looped/out/echo/error.txt --
 A1 -> A1: cycle
+-- transform/looped/out/echo/outcome --
+rejected
 -- transform/looped/out/echo/values.txt --
 a1 six
 -- transform/upper/in/do/out/values.txt --
 A1 SIX
+-- transform/upper/out/echo/outcome --
+accepted
 -- transform/upper/out/echo/values.txt --
 A1 SIX
 $ cat testdata/script/errs.txtar
@@ -49,12 +55,16 @@ partial
 circular
 -- out/echo/error.txt --
 A1 -> A1: cycle
+-- out/echo/outcome --
+rejected
 -- out/echo/values.txt --
 partial
 -- transform/upper/in/do/out/values.txt --
 PARTIAL
 -- transform/upper/out/echo/error.txt --
 A1 -> A1: cycle
+-- transform/upper/out/echo/outcome --
+rejected
 -- transform/upper/out/echo/values.txt --
 PARTIAL
 $ cat testdata/script/garbled.txtar
@@ -63,14 +73,17 @@ A case that states malformed, which no transform gives or keeps.
 x
 -- properties --
 malformed
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 x
 $ cat testdata/hypercase.json
 {
-  "format": 4,
+  "format": 5,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
+  "codes": false,
   "issueLinks": [],
   "properties": [
     {
@@ -158,7 +171,8 @@ $ cat testdata/hypercase.json
       "rejects": [
         "circular",
         "dangling"
-      ]
+      ],
+      "classifier": null
     }
   ]
 }

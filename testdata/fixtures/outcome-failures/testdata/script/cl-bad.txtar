@@ -1,0 +1,5 @@
+The classifier gives a detail with a space at its start.
+-- in/cl/detail --
+ padded
+-- in/do/out/values.txt --
+A1 6

@@ -304,10 +304,15 @@ A1 is twice B1.
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/evaluate/outcome --
+accepted
 -- out/evaluate/values.txt --
 A1 6
 B1 3
 ```
+
+`out/evaluate/outcome` holds the cell's outcome, the code's verdict on the
+case, which step 8 adds to every cell.
 
 The package also writes its registry, `testdata/hypercase.json`, which lists
 what it registers (step 5).
@@ -375,6 +380,10 @@ Its `.gitignore` names the corpus root's lock, which an update takes
   since none of its cases errs: an error there also fails as an undeclared
   output, and an update writes nothing for its cell. When the run errs, the
   outputs it did produce are still compared.
+- A cell an update writes nothing for fails on its problems first. A normal
+  run doesn't ask for the golden a file of it lacks, which no update would
+  write, and a file that differs from its golden says the update writes
+  nothing until those problems are fixed.
 - `error.txt`, `stdout.txt` and `stderr.txt` directly under a column's
   directory are the framework's, and so are the names later steps add there:
   `outcome` (step 8) and `inputs` (step 11). A run that returns an output at
@@ -603,6 +612,8 @@ A1 and B1 refer to each other.
 circular
 -- out/evaluate/error.txt --
 A1 -> B1 -> A1: cycle
+-- out/evaluate/outcome --
+rejected
 ```
 
 `testdata/sheet/negative.txtar` records a known gap, a cell that errs when
@@ -617,6 +628,8 @@ A1 is a negative number.
 evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/evaluate/error.txt --
 A1: unexpected "-"
+-- out/evaluate/outcome --
+rejected
 ```
 
 `hypercase.json` gains the property, and `evaluate`'s `error.txt` and
@@ -687,11 +700,19 @@ column rejects.
   cell fails, in every run, updates included.
 - The one exception is for upgrades. An update adds to a frozen cell a
   framework file the cell lacks (`outcome` at step 8, `inputs` at step 11),
-  only when the cell's existing files match today's run. It never changes or
-  removes a file the cell has.
+  only when the cell's existing files match today's run and nothing else in
+  the run keeps an update from writing the cell. It never changes or removes
+  a file the cell has.
 - A person resolves a failing frozen cell: remove the line (the gap is
   closed, and the next update writes the cell), or delete the cell's files
   (the wrong behavior changed shape, and the next update writes them).
+- Any problem that keeps an update from writing a cell, such as an output
+  no declaration matches (step 3) or a failing classifier (step 8), fails a
+  frozen cell first, and its message says an update writes nothing for the
+  cell. If the cell's files match the run, those messages are all the cell
+  reports. If they differ, it also lists the differences, and promises no
+  write: the problems keep an update from writing the cell, and so does the
+  line while it freezes the cell.
 - A marked cell with no committed files is written by an update like any
   other.
 - The expected-error check doesn't fail a marked cell. The freeze does that
@@ -888,13 +909,19 @@ A1 is twice B1.
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/calc/outcome --
+accepted
 -- out/calc/stdout.txt --
 6,3
+-- out/evaluate/outcome --
+accepted
 -- out/evaluate/values.txt --
 A1 6
 B1 3
 -- out/format/formulas.txt --
 A1 =B1 * 2
+-- out/format/outcome --
+accepted
 ```
 
 `testdata/sheet/stray.txtar`. Every column reads the raw cells, so each one
@@ -915,10 +942,16 @@ total
 malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
+-- out/calc/outcome --
+rejected
 -- out/evaluate/error.txt --
 D1: not a number or a formula: "total"
+-- out/evaluate/outcome --
+rejected
 -- out/format/error.txt --
 D1: not a number or a formula: "total"
+-- out/format/outcome --
+rejected
 ```
 
 `testdata/sheet/negative.txtar`. A known gap marks one cell, and `calc` errs
@@ -936,23 +969,32 @@ evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
 calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/calc/error.txt --
 A1: unexpected "-"
+-- out/calc/outcome --
+rejected
 -- out/evaluate/error.txt --
 A1: unexpected "-"
+-- out/evaluate/outcome --
+rejected
+-- out/format/outcome --
+skipped no formulas
 ```
 
 The root package's registry, `step05/testdata/hypercase.json`, holds the
 update variable, the corpus root, that the package runs the root-package
 check, the properties it registers, and `evaluate`: the type it consumes,
 `io/fs.FS`, its corpora, its outputs and what it rejects. Its `types` and
-`lifts` stay empty until step 6, and `issueLinks` until step 9:
+`lifts` stay empty until step 6, and `issueLinks` until step 9. `codes`,
+whether the project supplies `Codes`, stays `false`, and `evaluate`'s
+`classifier` stays `null`, until step 8:
 
 <!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 4,
+  "format": 5,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
+  "codes": false,
   "issueLinks": [],
   "properties": [
     {
@@ -992,7 +1034,8 @@ check, the properties it registers, and `evaluate`: the type it consumes,
         "circular",
         "dangling",
         "malformed"
-      ]
+      ],
+      "classifier": null
     }
   ]
 }
@@ -1035,21 +1078,23 @@ check, the properties it registers, and `evaluate`: the type it consumes,
 
 **Registration.**
 
-- Everything a registry lists is registered when its package is
+- Everything a package registers is registered when the package is
   initialized, before any test runs: properties, corpus types, lifts,
-  suites, transforms, corpus checks and the root-package check. A test
-  function runs what was registered, and registers nothing. So the registry
-  and the orphan checks don't depend on `-run`.
+  suites, transforms, the root-package check and corpus checks (step 8).
+  Its registry lists all but the corpus checks. A test function runs what
+  was registered, and registers nothing. So the registry and the orphan
+  checks don't depend on `-run`.
 - A refusal at registration, such as two properties with one name, panics
   during package initialization with the message the framework would
   otherwise print. So it doesn't depend on `-run` either.
 
 **The registry.** It is each package's `testdata/hypercase.json`.
 
-- It lists everything the package registers, each with its description,
-  and for each column the type it consumes, the corpora it runs over, its
-  declared outputs and the properties it rejects. It records the package's
-  corpus root, and whether the package runs the root-package check.
+- It lists everything the package registers but its corpus checks
+  (step 8), each with its description, and for each column the type it
+  consumes, the corpora it runs over, its declared outputs and the
+  properties it rejects. It records the package's corpus root, and whether
+  the package runs the root-package check.
 - It records the name of the project's update variable, so `hypercase strip`
   and `hypercase report` can print the update command.
 - It carries a format version, which changes on any change to what the
@@ -1316,9 +1361,10 @@ on raw input: `hypercase.Suite[sheetcorpus.Sheet]`, with its outputs and
   names its `Corpus` runs over that directory's raw input views, with no
   corpus type. No archive moves.
 - A malformed input's error moves to the lift that rejects it. The cells
-  past that lift are blocked and write nothing, so their old sections are
-  orphans until a person removes them: `stray`'s `out/evaluate/error.txt`
-  and `out/format/error.txt`.
+  past that lift are blocked, and write no outputs, only the `outcome` step
+  8 adds, `blocked parse`. So their old outputs are orphans until a person
+  removes them: `stray`'s `out/evaluate/error.txt` and
+  `out/format/error.txt`.
 - A known gap moves with its error. `parse` now errs on `negative`'s `-3`,
   so `evaluate`, past it, is blocked, and a `gaps` line naming a column that
   didn't run fails. A person changes `negative`'s `evaluate` line to name
@@ -1355,9 +1401,19 @@ malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
   sheet/D1:1: total
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
 -- out/parse/error.txt --
 D1: not a number or a formula: "total"
   sheet/D1:1: total
+-- out/parse/outcome --
+rejected
+-- out/resolve/outcome --
+blocked parse
 ```
 
 `testdata/sheet/negative.txtar`:
@@ -1373,9 +1429,19 @@ calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/calc/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
 -- out/parse/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/parse/outcome --
+rejected
+-- out/resolve/outcome --
+blocked parse
 ```
 
 ### Rules
@@ -1456,7 +1522,8 @@ package owns every column it registers.
 **Blocked cells.**
 
 - When a lift on a cell's path fails, the cell is **blocked**: it writes no
-  outputs, and its old outputs are orphans.
+  outputs, only its `outcome` from step 8 on, and its old outputs are
+  orphans.
 - A blocked cell is not checked for an expected error, because it did not
   run. So a case that is invalid in more than one way states each property,
   the first lift to meet one rejects the case, and nothing is expected of
@@ -1669,16 +1736,17 @@ whether each has a probe, and whether the package owns it.
   makes, and every normal run on the committed sections. What an update
   writes depends only on the inputs and the code, so one pass of the
   module's update settles, whichever package runs first. A frozen cell is
-  the exception: no update writes it. When a transform's change moves its
-  output, every update of the package that owns its column fails on it,
-  and so does each of that package's normal runs once the transform's
-  owner has rewritten the inputs. Before then, the cell reads the old
-  inputs, and that package's run of the frozen cell passes, while the
-  transform owner's normal run fails on the inputs, which differ from
-  what the transform makes. It fails until a person deletes its files or
-  removes its `gaps` line, and then the package that owns its column runs
-  its update, which writes the cell. Until then, that package's normal
-  run still fails on it, since no other package's update writes it.
+  the exception: no update writes it, but for step 4's upgrades. When a
+  transform's change moves its output, every update of the package that
+  owns its column fails on it, and so does each of that package's normal
+  runs once the transform's owner has rewritten the inputs. Before then,
+  the cell reads the old inputs, and that package's run of the frozen cell
+  passes, while the transform owner's normal run fails on the inputs, which
+  differ from what the transform makes. It fails until a person deletes its
+  files or removes its `gaps` line, and then the package that owns its
+  column runs its update, which writes the cell. Until then, that
+  package's normal run still fails on it, since no other package's update
+  writes it.
 - The update of a package that doesn't own the transform, alone, after the
   transform changed, writes the variant's cells on what the transform
   makes, while its normal run reads the sections the owner has yet to
@@ -1786,8 +1854,11 @@ its `Name`, `Description` and `Classify` fields, set as a suite's
 `Classifier`; and `hypercase.Result`, what a run produced, which a
 classifier reads.
 
+This step's snippets come from no example yet: no directory under
+`walkthrough/` holds them, and the doc golden checks none of them.
+
 ```go
-// walkthrough/sheets/step08/sheetcorpus/project.go
+// sheetcorpus/project.go
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
@@ -1804,7 +1875,7 @@ var Project = decl.Project{
 `evaluate` gains a classifier:
 
 ```go
-// walkthrough/sheets/step08/corpus_test.go: evaluate gains
+// corpus_test.go: evaluate gains
 	Classifier: hypercase.Classifier[*sheet.Graph]{
 		Name:        "div-zero",
 		Description: "Adds div-zero when some cell divides by zero.",
@@ -1819,7 +1890,8 @@ var Project = decl.Project{
 
 ### How the files change
 
-Every cell gains an `outcome` file, skipped and blocked cells included.
+Every cell of the sheets examples gains an `outcome` file, skipped and
+blocked cells included.
 
 `testdata/sheet/twice.txtar`, with its `missing` variant and its transforms'
 variants left out:
@@ -1876,14 +1948,17 @@ A1 -> B1 -> A1: cycle
 rejected S201
 ```
 
-Elsewhere in the corpus, a sheet with no formulas has `format`'s outcome
-`skipped no formulas`, and a sheet whose `C1` is `=A1/B1`, with `B1` at `0`,
-has `evaluate`'s outcome `accepted div-zero`.
+A sheet with no formulas has `format`'s outcome `skipped no formulas`, as
+step 5's `negative` shows. From step 6 it needs to parse as well, since
+`format` reads `parse`'s product: step 6's `negative` has `blocked parse`
+there. With the classifier, `divide`, whose `A1` is `=B1/C1` with `C1` at
+`0`, has `evaluate`'s outcome `accepted div-zero`.
 
-The archives shown in steps 3 to 7 are as their own step leaves them. Their
-examples carry an `outcome` per cell from this step on, and the next update
-writes them (proposed). `hypercase.json` gains each suite's classifier, and
-whether the project supplies `Codes`.
+The archives shown in steps 3 to 6 come from their examples, which carry an
+`outcome` per cell, as every update writes from this step on. Step 7's
+archives, which no example holds yet, are shown without one.
+`hypercase.json` records each suite's classifier, and whether the project
+supplies `Codes`: step 5's shows them unset.
 
 ### Rules
 
@@ -1891,7 +1966,8 @@ whether the project supplies `Codes`.
 
 - Each cell has an `outcome` file in its column's directory:
   `out/<column>/outcome`, and the same under a variant's prefix. The
-  framework writes it and compares it byte for byte.
+  framework writes it and compares it byte for byte. A cell that can't
+  have one fails, as below.
 - It holds the code's verdict, not the test's: `accepted`,
   `rejected <codes>`, `panicked`, `blocked <lift>` or `skipped <why>`. The
   first word is the state, and the rest is detail.
@@ -1902,16 +1978,28 @@ whether the project supplies `Codes`.
   cells that ran. An error or a panic in a classifier fails the cell, and the
   update then writes nothing for that cell: an update is atomic per cell.
 - Skipped and blocked cells write an outcome, and their other committed
-  files are orphans.
+  files are orphans. A frozen one keeps the files it has, outcome
+  included: its `gaps` line fails it already.
+- A lift whose function returns neither a product nor an error gives its
+  cell no outcome, since the code gave no verdict. The cell fails, an
+  update writes nothing for it, and the cells on the lift's product are
+  `blocked`.
+- A cell with no outcome fails whether or not a `gaps` line marks it: the
+  line freezes a cell's files, its outcome among them, and such a cell has
+  none. That holds for the lift's cell above, and for a cell whose
+  classifier or `Codes` fails, or whose code, reason or detail an outcome
+  can't hold (below).
 - The expected-error check reads what the run did, never the committed
   outcome. A cell that erred has the outcome `rejected`, so the two agree. A
   `panicked` cell fails unless a `gaps` line marks it.
 - A frozen cell's `outcome` is one of its files. A cell frozen before this
   step has none: a normal run fails on the missing file and says to run the
   update, and the update adds it when the cell's other files match the run.
-  A cell whose files differ gains nothing and fails as before. That upgrade,
-  of `outcome` here and `inputs` at step 11, is the one write an update makes
-  to a frozen cell, and it never changes or removes a file the cell has.
+  A cell whose files differ gains nothing and fails as before, and so does
+  one whose run fails in a way that keeps an update from writing a cell,
+  such as an output no declaration matches. That upgrade, of `outcome` here
+  and `inputs` at step 11, is the one write an update makes to a frozen
+  cell, and it never changes or removes a file the cell has.
 - Between two revisions, a cell moves on two axes: outcome and bytes.
 
 **The `outcome` format** (proposed).
@@ -1926,10 +2014,10 @@ whether the project supplies `Codes`.
   to fail, whether or not it is the lift whose product the column consumes.
 - `skipped`, then the probe's reason.
 - `panicked`, alone.
-- A code holds no space, semicolon or newline. A reason or a classifier's
-  detail is one line, not empty, with no space at either end. A cell whose
-  code, reason or detail breaks this fails, naming it, and an update writes
-  nothing for that cell.
+- A code holds no space, semicolon, carriage return or newline. A reason or
+  a classifier's detail is one line, not empty, with no space at either end.
+  A cell whose code, reason or detail breaks this fails, naming it, and an
+  update writes nothing for that cell.
 
 **Descriptions.** Classifiers carry a description, under step 3's rule.
 
@@ -1946,7 +2034,7 @@ about groups of cells, at the cost of placing a built feature in a step
 whose design isn't settled.
 
 ```go
-// walkthrough/sheets/step08/corpus_test.go, registered with the rest
+// corpus_test.go, registered with the rest
 var codes = hypercase.Check{
 	Name:        "codes",
 	Description: "Every code the formula evaluator defines is the code of some rejected cell.",
@@ -1982,20 +2070,41 @@ S202
 ```
 
 - A corpus check has a name, a description and a `Run` over every cell, and
-  is registered when its package is initialized. A test function runs it:
-  `hypercase.Test` runs each as the subtest `checks/<name>` (proposed).
+  is registered when its package is initialized, given to `Register` or to
+  `Own`. The package that registers it owns it, and no registry lists it.
+  A test function runs it: `hypercase.Test` runs each as the subtest
+  `checks/<name>` (proposed).
 - A cell, as a check sees it, exposes its committed outcome, its committed
-  sections, its column's registry entry and its case's stated properties.
-  `hypercase.Cell` holds (proposed) `Type`, `Archive`, `Case` and `Column`;
-  `Outcome`, with its `State`, `Codes` and `Detail`; `Entry`; `Properties`;
-  and `Files`, the cell's committed files under its `out/<column>/`.
+  sections, its column's registry entry, its case's stated properties and
+  its known gap. `hypercase.Cell` holds (proposed) `Type`, `Archive`,
+  `Case` and `Column`; `Outcome`, with its `State`, `Codes` and `Detail`;
+  `Entry`; `Properties`; `Files`, the cell's committed files under its
+  `out/<column>/`; and `Gap`, the text of the `gaps` line that marks the
+  cell, or empty when none does. A transform's variant's `Gap` is read from
+  the base's `gaps`, from the line that starts `transform/<name>`.
+- A check sees every cell, frozen ones included: the framework exempts
+  none, and each check decides. One that states a requirement over cells
+  can excuse a cell with a `Gap`, so that a known gap and the requirement
+  coexist: it passes while every cell that violates it is frozen, and
+  fails once a line is removed. One that counts what the corpus reaches,
+  such as `codes`, counts frozen cells too.
 - A check reads only committed files, and never runs a suite, a lift or a
-  transform.
+  transform. An archive that can't be read fails every check of the
+  package, and an update writes no findings. So does a transform's variant
+  whose properties can't be known: one no corpus type lists, or one its
+  transform declines.
+- A check reads the cells as they are committed when it runs. The module's
+  update runs packages at once, so a check can run before another package
+  writes its cells: its findings can take a second update to settle, and a
+  normal run between the two fails on them.
 - Its findings are committed as a golden at `<pkg>/testdata/checks/<name>.txt`
-  in the package that owns the check.
+  in the package that owns the check. A file under `testdata/checks/` that
+  is no registered check's findings fails a normal run, and an update
+  leaves it in place.
 - The findings format (proposed): one finding per line, each ending with a
   newline, sorted byte by byte, each once. An empty list is an empty file. A
-  finding that holds a newline fails the check.
+  finding that is empty or holds a newline fails the check, and an update
+  writes no findings.
 - An error from `Run` is a violated requirement: it fails every run, updates
   included, and an update writes no findings.
 - Corpus checks carry a description, under step 3's rule.

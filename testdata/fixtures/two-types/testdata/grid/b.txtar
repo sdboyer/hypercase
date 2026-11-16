@@ -1,3 +1,5 @@
 A grid, which grid-parse makes a *Parsed of.
 -- in/format/out/values.txt --
 format b
+-- out/grid-parse/outcome --
+accepted

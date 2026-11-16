@@ -24,7 +24,7 @@ func TestUse(t *testing.T) {
 	b := s.run("b", "ladder-b", true)
 	s.passes(b)
 	s.contains(b, "script/bad: outline is blocked: the lift parse failed on the case, and testdata/script/bad.txtar, out/parse/error.txt, records its error.")
-	s.hasSections("testdata/script/bad.txtar", nil, "out/")
+	s.hasSections("testdata/script/bad.txtar", map[string]string{"out/outline/outcome": "blocked parse\n"}, "out/")
 	s.passes(s.run("b", "ladder-b", false))
 	s.fails(s.normal("ladder-a"), "parse returned an error, but the case states no property parse rejects:")
 	// The owner's update fails on the cell too, and writes it.
@@ -102,6 +102,7 @@ func TestRootCheckLiftOwnerUntested(t *testing.T) {
 func TestRootCheckLiftUsedUntested(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared-ladder")
+	s.edit("testdata/script/x.txtar", "remove the outcomes of the root package's lifts, which it owns no longer", drop("out/"))
 	// The root package registers no corpus type, and b uses parse, which
 	// no package owns.
 	s.passes(s.update("root-only"))

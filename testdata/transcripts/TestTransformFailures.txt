@@ -124,6 +124,8 @@ poke fails on the base.
 x
 -- in/tr/error --
 the base is too big
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 x
 $ cat testdata/script/same.txtar
@@ -131,6 +133,8 @@ poke makes the base, unchanged.
 -- in/do/out/values.txt --
 x
 -- in/tr/same --
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 x
 $ cat testdata/script/probe-no.txtar
@@ -139,6 +143,8 @@ poke's probe says no, with a reason.
 x
 -- in/tr/probe --
 the base is too small
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 x
 $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # poke-b

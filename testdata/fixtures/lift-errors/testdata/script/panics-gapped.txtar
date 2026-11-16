@@ -3,5 +3,15 @@ parse panics on the script, a known gap.
 parse: boom
 -- gaps --
 parse panics on any script with a panic tree. Waits on sheets#5.
+-- out/calc/outcome --
+accepted
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
 -- out/parse/error.txt --
 parse: boom
+-- out/parse/outcome --
+panicked
+-- out/resolve/outcome --
+blocked parse

@@ -1,0 +1,5 @@
+echo errs with two codes, one of them twice.
+-- in/do/error --
+codes S2,S1,S2
+-- properties --
+circular

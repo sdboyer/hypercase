@@ -8,6 +8,16 @@ malformed
 -- out/calc/error.txt --
 notes: not a cell name
   sheet/notes
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
 -- out/parse/error.txt --
 notes: not a cell name
   sheet/notes
+-- out/parse/outcome --
+rejected
+-- out/resolve/outcome --
+blocked parse

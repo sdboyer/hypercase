@@ -5,6 +5,8 @@ B1 3.0
 C1 9
 D1 12
 E1 15
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 A1 6
 B1 3

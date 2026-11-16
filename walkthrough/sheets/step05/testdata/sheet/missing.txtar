@@ -5,7 +5,13 @@ A1 refers to B1, which the sheet lacks.
 dangling
 -- out/calc/error.txt --
 A1: B1 doesn't exist
+-- out/calc/outcome --
+rejected
 -- out/evaluate/error.txt --
 A1: B1 doesn't exist
+-- out/evaluate/outcome --
+rejected
 -- out/format/formulas.txt --
 A1 =B1 + 1
+-- out/format/outcome --
+accepted

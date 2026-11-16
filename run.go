@@ -58,6 +58,7 @@ func Test(t *testing.T) {
 	}
 	r.runCorpora(t)
 	r.appliesToNoCase(t)
+	r.runChecks(t, found)
 }
 
 // runner is one call of Test.
@@ -65,6 +66,7 @@ type runner struct {
 	update      bool
 	updateVar   string
 	renderError func(in fs.FS, err error) []byte
+	codes       func(err error) []string
 	issueLinks  []decl.IssueLink
 	moduleRoot  string
 	pkgDir      string
@@ -79,6 +81,7 @@ type runner struct {
 	corpora     map[string][]string // each lift's and suite's corpus directories, sorted
 	stats       map[string]*colStats
 	owned       map[*transform]bool // the types' transforms the package owns
+	checks      []Check             // sorted by name
 }
 
 // colStats counts a suite's cells, for the check that it applies to some
@@ -94,7 +97,7 @@ func newRunner(t *testing.T) (*runner, bool) {
 	reg.mu.Lock()
 	project, properties, columns := reg.project, slices.Clone(reg.properties), slices.Clone(reg.columns)
 	types, lifts := slices.Clone(reg.types), slices.Clone(reg.lifts)
-	ownedTransforms := slices.Clone(reg.ownedTransforms)
+	ownedTransforms, checks := slices.Clone(reg.ownedTransforms), slices.Clone(reg.checks)
 	rootRel, rootPackage := reg.root, reg.rootPackage
 	reg.mu.Unlock()
 	if project == nil {
@@ -104,6 +107,7 @@ func newRunner(t *testing.T) (*runner, bool) {
 	r := &runner{
 		updateVar:   project.UpdateVar,
 		renderError: project.RenderError,
+		codes:       project.Codes,
 		issueLinks:  slices.Clone(project.IssueLinks),
 		rootRel:     rootRel,
 		rootPackage: rootPackage,
@@ -111,10 +115,12 @@ func newRunner(t *testing.T) (*runner, bool) {
 		types:       types,
 		lifts:       lifts,
 		columns:     columns,
+		checks:      checks,
 		corpora:     map[string][]string{},
 		stats:       map[string]*colStats{},
 	}
 	slices.SortFunc(r.columns, func(a, b *column) int { return strings.Compare(a.name, b.name) })
+	slices.SortFunc(r.checks, func(a, b Check) int { return strings.Compare(a.Name, b.Name) })
 	for _, c := range r.columns {
 		r.stats[c.name] = &colStats{}
 	}
@@ -229,6 +235,14 @@ func (r *runner) checkDescriptions(t *testing.T) {
 	}
 	for _, c := range r.columns {
 		r.checkColumnDescriptions(t, c.kind(), c.name, c.description, c.outputs)
+		if cl := c.classifier; cl != nil && strings.TrimSpace(cl.description) == "" {
+			t.Errorf("the suite %s's classifier %s has no description.\nAdd one: it says what the classifier's details mean, in prose.", c.name, cl.name)
+		}
+	}
+	for _, c := range r.checks {
+		if strings.TrimSpace(c.Description) == "" {
+			t.Errorf("the corpus check %s has no description.\nAdd one: it says what the check asserts, in prose.", c.Name)
+		}
 	}
 }
 
@@ -372,6 +386,16 @@ type aCase struct {
 	gaps       []archive.Gap // the lines that mark the case's cells
 	state      *caseState
 	tr         *transform // the transform whose variant the case is, if any
+}
+
+// inputsAt names what to fix for the case's inputs to change: the case,
+// or, for a transform's variant, which an update rewrites, the jenny that
+// makes it.
+func (c *aCase) inputsAt() string {
+	if c.tr != nil {
+		return c.tr.name + "'s jenny, which makes the variant"
+	}
+	return "the case"
 }
 
 // newCase makes a case of an archive, with no input view yet.
@@ -595,7 +619,7 @@ const (
 	errorFile   = "error.txt"
 	stdoutFile  = "stdout.txt"
 	stderrFile  = "stderr.txt"
-	outcomeFile = "outcome"
+	outcomeFile = archive.OutcomeFile
 	inputsFile  = "inputs"
 )
 
@@ -641,7 +665,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	in, by := c.state.stage(col.consumes)
 	if by != nil {
 		st.applied++
-		r.blocked(t, c, header, col, by, gap, marked, goldens)
+		r.blocked(t, c, header, col, by, gap, marked, goldens, res)
 		return
 	}
 
@@ -663,7 +687,12 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			t.Errorf("%s\n%s's probe said the case isn't for it, and gave no reason.\nFix the probe: when it says no, it says why.", header, col.name)
 			return
 		case !ok:
-			r.skipped(t, c, header, col, why, gap, marked, goldens)
+			if err := archive.CheckDetail(why); err != nil {
+				st.applied++
+				t.Errorf("%s\n%s's probe said the case isn't for it, with a reason an outcome can't hold: %v.\nFix the probe. An update writes nothing for this cell.", header, col.name, err)
+				return
+			}
+			r.skipped(t, c, header, col, why, gap, marked, goldens, res)
 			return
 		}
 	}
@@ -695,19 +724,32 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 
 	m := &msg{}
 	files, unjudged, writable := r.outputs(m, c, col, out)
+	if o, ok := r.outcome(m, col, in, out, files); ok {
+		files[outcomeFile] = o.Format()
+	} else {
+		// The cell has no outcome, so a committed one is no orphan.
+		writable = false
+		unjudged[outcomeFile] = true
+	}
 
 	if !marked {
 		r.expectedError(m, c, col, out)
 	}
 	if marked && len(goldens) > 0 {
 		// The known gap freezes the cell: its committed files record
-		// today's behavior, and no update writes to it.
+		// today's behavior, and no update writes to it, but to add the
+		// outcome of a cell frozen before outcomes were written, when
+		// nothing else keeps an update from writing the cell. couldWrite
+		// is true when nothing else does.
+		couldWrite := writable
 		writable = false
+		_, hasOutcome := goldens[outcomeFile]
 		var diffs []string
 		for _, p := range slices.Sorted(maps.Keys(files)) {
 			g, ok := goldens[p]
 			switch {
 			case unjudged[p]:
+			case !ok && p == outcomeFile:
 			case !ok:
 				diffs = append(diffs, fmt.Sprintf("%s is new", c.out(col.name, p)))
 			case !bytes.Equal(g, files[p]):
@@ -715,16 +757,30 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			}
 		}
 		for _, p := range slices.Sorted(maps.Keys(goldens)) {
-			if _, ok := files[p]; !ok {
+			if _, ok := files[p]; !ok && !unjudged[p] {
 				diffs = append(diffs, fmt.Sprintf("%s is no longer produced", c.out(col.name, p)))
 			}
 		}
-		if len(diffs) > 0 {
+		_, made := files[outcomeFile]
+		switch {
+		case len(diffs) > 0:
 			res.frozenDiffers = true
-			m.add("The cell is frozen by its known gap, %s line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s\nIf the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.", c.gapsAt, gap.Line, gap.Raw, strings.Join(diffs, "\n"))
+			closing := "If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them."
+			if !couldWrite {
+				closing = "The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell."
+			}
+			m.add("The cell is frozen by its known gap, %s line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s\n%s", c.gapsAt, gap.Line, gap.Raw, strings.Join(diffs, "\n"), closing)
+		case hasOutcome || !made || !couldWrite:
+		case r.update:
+			// The upgrade, the one write an update makes to a frozen cell:
+			// it adds the outcome, and changes nothing the cell has.
+			writable = true
+			files = map[string][]byte{outcomeFile: files[outcomeFile]}
+		default:
+			m.add("The cell is frozen by its known gap, %s line %d: %q\nIts committed files match the run, and it has no %s, which every cell has.\nRun %s to add it. The update adds the outcome and changes nothing else.", c.gapsAt, gap.Line, gap.Raw, c.out(col.name, outcomeFile), r.updateCmd())
 		}
 	} else {
-		r.compare(m, c, col, files, goldens, unjudged)
+		r.compare(m, c, col, files, goldens, unjudged, writable)
 	}
 	if !m.empty() {
 		t.Errorf("%s\n%s", header, m)
@@ -746,13 +802,17 @@ func (r *runner) failedTest(t *testing.T, header string) {
 
 // skipped finishes a cell whose probe said the case isn't for its column.
 // The cell runs nothing, so it isn't checked for an expected error; its
-// committed files are orphans.
-func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why string, gap archive.Gap, marked bool, goldens map[string][]byte) {
+// outcome is its one file, and its other committed files are orphans.
+func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why string, gap archive.Gap, marked bool, goldens map[string][]byte, res *cellResult) {
 	m := &msg{}
 	if marked {
 		m.add("%s marks the cell, and %s's probe says the case isn't for it: %s\nRemove the line, or fix the probe.", c.gapAt(gap), col.name, why)
 	}
+	r.ranNothing(m, c, col, archive.Outcome{State: archive.Skipped, Detail: why}, marked, goldens, res)
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
+		if p == outcomeFile {
+			continue
+		}
 		m.add("%s is recorded, and %s's probe says the case isn't for it: %s\nIf the suite should run on the case, fix the probe. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), col.name, why, r.updateCmd())
 	}
 	if !m.empty() {
@@ -764,14 +824,19 @@ func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why
 
 // blocked finishes a cell that a lift on its path blocked, by failing on
 // the case. The cell runs nothing, so it isn't checked for an expected
-// error; its committed files are orphans.
-func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, by *lift, gap archive.Gap, marked bool, goldens map[string][]byte) {
+// error; its outcome is its one file, and its other committed files are
+// orphans.
+func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, by *lift, gap archive.Gap, marked bool, goldens map[string][]byte, res *cellResult) {
 	m := &msg{}
 	if marked {
-		m.add("%s marks the cell, and the cell is blocked: the lift %s, on %s's path, failed on the case, so the cell runs nothing.\nRemove the line, or fix the lift or the case.", c.gapAt(gap), by.name, col.name)
+		m.add("%s marks the cell, and the cell is blocked: the lift %s, on %s's path, failed on the case, so the cell runs nothing.\nRemove the line, or fix the lift or %s.", c.gapAt(gap), by.name, col.name, c.inputsAt())
 	}
+	r.ranNothing(m, c, col, archive.Outcome{State: archive.Blocked, Detail: by.name}, marked, goldens, res)
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
-		m.add("%s is recorded, and the cell is blocked: the lift %s, on %s's path, failed on the case.\nIf the cell should run, fix the lift or the case. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), by.name, col.name, r.updateCmd())
+		if p == outcomeFile {
+			continue
+		}
+		m.add("%s is recorded, and the cell is blocked: the lift %s, on %s's path, failed on the case.\nIf the cell should run, fix the lift or %s. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), by.name, col.name, c.inputsAt(), r.updateCmd())
 	}
 	if !m.empty() {
 		t.Errorf("%s\n%s", header, m)
@@ -781,6 +846,105 @@ func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, by 
 		t.Skipf("%s: %s is blocked: the lift %s failed on the case: it returned no product and no error.", c.name, col.name, by.name)
 	}
 	t.Skipf("%s: %s is blocked: the lift %s failed on the case, and %s, %s, records its error.", c.name, col.name, by.name, r.rel(c.path), c.out(by.name, errorFile))
+}
+
+// ranNothing records the outcome of a cell that ran nothing, its one file:
+// a normal run compares it with its golden, and an update writes it. A
+// frozen cell, one a gaps line marks that has committed files, keeps them
+// as they are: its line fails it already, and since the run made none of
+// its files but the outcome, the upgrade that adds a missing outcome to a
+// frozen cell whose files match the run's doesn't apply.
+func (r *runner) ranNothing(m *msg, c *aCase, col *column, o archive.Outcome, marked bool, goldens map[string][]byte, res *cellResult) {
+	data := o.Format()
+	res.ran, res.writable, res.files = true, true, map[string][]byte{outcomeFile: data}
+	if marked && len(goldens) > 0 {
+		res.writable = false
+		return
+	}
+	if r.update {
+		return
+	}
+	switch g, ok := goldens[outcomeFile]; {
+	case !ok:
+		m.add("%s has no golden.\nRun %s to write it, and read it before committing.", c.out(col.name, outcomeFile), r.updateCmd())
+	case !bytes.Equal(g, data):
+		m.add("%s differs (-golden +got):\n%s\nIf the change is intended, run %s and read the diff before committing.", c.out(col.name, outcomeFile), strings.TrimSuffix(diff.Lines(g, data), "\n"), r.updateCmd())
+	}
+}
+
+// outcome is a cell's outcome, from what its run did, which its column's
+// classifier, if any, refines. It reports a code, a classifier or a detail
+// that fails, and a lift that returned neither a product nor an error; the
+// cell then has no outcome, and an update writes nothing for it. Each fails
+// the cell whether or not a gaps line marks it: the line freezes the code's
+// verdict, and such a cell has none.
+func (r *runner) outcome(m *msg, col *column, in any, out *called, files map[string][]byte) (archive.Outcome, bool) {
+	var o archive.Outcome
+	switch {
+	case out.panicked:
+		return archive.Outcome{State: archive.Panicked}, true
+	case out.noProduct:
+		m.add("%s returned no product and no error, so the cell has no outcome.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.", col.name)
+		return o, false
+	case out.err != nil:
+		o.State = archive.Rejected
+		codes, ok := r.errorCodes(m, col, out.err)
+		if !ok {
+			return o, false
+		}
+		o.Codes = codes
+	default:
+		o.State = archive.Accepted
+	}
+	cl := col.classifier
+	if cl == nil {
+		return o, true
+	}
+	var detail string
+	var err error
+	p := call(func(*called) { detail, err = cl.classify(in, newResult(files, out.err)) })
+	switch {
+	case p.panicked:
+		m.add("%s's classifier %s panicked: %v\nFix the classifier. An update writes nothing for this cell.", col.name, cl.name, p.panicValue)
+		return o, false
+	case err != nil:
+		m.add("%s's classifier %s failed: %v\nFix the classifier. An update writes nothing for this cell.", col.name, cl.name, err)
+		return o, false
+	case detail == "":
+	default:
+		if err := archive.CheckDetail(detail); err != nil {
+			m.add("%s's classifier %s gave a detail an outcome can't hold: %v.\nFix the classifier. An update writes nothing for this cell.", col.name, cl.name, err)
+			return o, false
+		}
+		o.Detail = detail
+	}
+	return o, true
+}
+
+// errorCodes gives an error's codes, through the project's Codes: sorted,
+// each once. It reports a Codes that panics, or gives a code an outcome
+// can't hold.
+func (r *runner) errorCodes(m *msg, col *column, err error) ([]string, bool) {
+	if r.codes == nil {
+		return nil, true
+	}
+	var codes []string
+	p := call(func(*called) { codes = r.codes(err) })
+	if p.panicked {
+		m.add("The project's Codes panicked on %s's error: %v\nFix Codes. An update writes nothing for this cell.", col.name, p.panicValue)
+		return nil, false
+	}
+	for _, code := range codes {
+		if err := archive.CheckCode(code); err != nil {
+			m.add("The project's Codes gave %s's error a code an outcome can't hold: %v.\nFix Codes. An update writes nothing for this cell.", col.name, err)
+			return nil, false
+		}
+	}
+	codes = slices.Compact(slices.Sorted(slices.Values(codes)))
+	if len(codes) == 0 {
+		return nil, true
+	}
+	return codes, true
 }
 
 // outputs collects a cell's files: what its function returned, and what the
@@ -824,7 +988,7 @@ func (r *runner) outputs(m *msg, c *aCase, col *column, out *called) (files map[
 			unjudged[errorFile] = true
 		}
 	}
-	names := make([]string, 0, len(files))
+	names := []string{c.out(col.name, outcomeFile)} // every cell has one
 	for _, p := range slices.Sorted(maps.Keys(files)) {
 		names = append(names, c.out(col.name, p))
 	}
@@ -902,7 +1066,6 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 	case out.panicked:
 		m.add("%s panicked: %v\nFix the code. A panic is never an expected error.", col.name, out.panicValue)
 	case out.noProduct:
-		m.add("%s returned no product and no error.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error.", col.name)
 	case out.err != nil && len(hit) == 0 && c.tr != nil:
 		m.add("%s returned an error, but the variant states no property %s rejects:\n  %s\n%s Fix the code or %s's jenny, or give the variant the property, in %s's Gives or Keeps, and list it in %s's Rejects.", col.name, col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "), c.tr.states(), c.tr.name, c.tr.name, col.name)
 	case out.err != nil && len(hit) == 0:
@@ -915,21 +1078,28 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 }
 
 // compare compares a cell's files with its goldens, and reports orphans.
-func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[string][]byte, unjudged map[string]bool) {
+// In a cell no update writes, a file with no golden isn't reported, and
+// one that differs says the cell's problems come first.
+func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[string][]byte, unjudged map[string]bool, writable bool) {
 	if !r.update {
 		for _, p := range slices.Sorted(maps.Keys(files)) {
 			g, ok := goldens[p]
 			switch {
 			case unjudged[p]:
+			case !ok && !writable:
+				// No update writes the cell, so the file isn't one to
+				// write: the cell's problems come first.
 			case !ok:
 				m.add("%s has no golden.\nRun %s to write it, and read it before committing.", c.out(col.name, p), r.updateCmd())
+			case !bytes.Equal(g, files[p]) && !writable:
+				m.add("%s differs (-golden +got):\n%s\nAn update writes nothing for this cell until the problems above are fixed.", c.out(col.name, p), strings.TrimSuffix(diff.Lines(g, files[p]), "\n"))
 			case !bytes.Equal(g, files[p]):
 				m.add("%s differs (-golden +got):\n%s\nIf the change is intended, run %s and read the diff before committing.", c.out(col.name, p), strings.TrimSuffix(diff.Lines(g, files[p]), "\n"), r.updateCmd())
 			}
 		}
 	}
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
-		if _, ok := files[p]; ok {
+		if _, ok := files[p]; ok || unjudged[p] {
 			continue
 		}
 		var what string

@@ -5,3 +5,9 @@ D1: not a number
 parse: boom
 -- properties --
 malformed
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/resolve/outcome --
+blocked parse
