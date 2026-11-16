@@ -949,7 +949,7 @@ check, the properties it registers, and `evaluate`: the type it consumes,
 <!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 3,
+  "format": 4,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
