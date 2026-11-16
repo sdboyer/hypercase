@@ -136,14 +136,14 @@ func TestOutcomeFailures(t *testing.T) {
 	s.same(clError, committed)
 
 	// A frozen cell no update writes still reports what its run makes that
-	// differs from what it holds, and promises no write: the update writes
-	// nothing for it, closed gap or not, until its problems are fixed.
+	// differs from what it holds, and promises no write: its problems keep
+	// an update from writing it, and so does the line while it freezes it.
 	frozen := clFails + "\n    The cell is frozen by its known gap, gaps line 1: \"echo The classifier gives a detail. Waits on sheets#10.\"\n    Its committed files record today's behavior, and the run now produces different ones:\n"
 	s.edit(clError, "commit a values.txt the run no longer gives", set("out/echo/values.txt", "A1 7\n"))
 	committed = s.read(clError)
 	for _, update := range []bool{false, true} {
 		r := s.run(".", "outcomes", update)
-		s.fails(r, frozen+"    out/echo/values.txt differs (-committed +got):\n    - A1 7\n    + A1 6\n    An update writes nothing for this cell until the problems above are fixed.")
+		s.fails(r, frozen+"    out/echo/values.txt differs (-committed +got):\n    - A1 7\n    + A1 6\n    The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.")
 		s.lacks(r, "the next update writes")
 	}
 	s.same(clError, committed)
@@ -151,7 +151,7 @@ func TestOutcomeFailures(t *testing.T) {
 	committed = s.read(clError)
 	for _, update := range []bool{false, true} {
 		r := s.run(".", "outcomes", update)
-		s.fails(r, frozen+"    out/echo/values.txt is new\n    An update writes nothing for this cell until the problems above are fixed.")
+		s.fails(r, frozen+"    out/echo/values.txt is new\n    The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.")
 		s.lacks(r, "the next update writes")
 	}
 	s.same(clError, committed)

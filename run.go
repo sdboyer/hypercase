@@ -767,7 +767,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			res.frozenDiffers = true
 			closing := "If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them."
 			if !couldWrite {
-				closing = "An update writes nothing for this cell until the problems above are fixed."
+				closing = "The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell."
 			}
 			m.add("The cell is frozen by its known gap, %s line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s\n%s", c.gapsAt, gap.Line, gap.Raw, strings.Join(diffs, "\n"), closing)
 		case hasOutcome || !made || !couldWrite:
