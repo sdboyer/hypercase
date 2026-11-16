@@ -1,0 +1,19 @@
+A1 is a negative number, which the code wrongly rejects, with an error that starts with no cell.
+-- in/do/error --
+unexpected "-" in A1
+-- gaps --
+echo A negative number is valid, and evaluates to itself. Waits on sheets#3.
+-- out/echo/error.txt --
+unexpected "-" in A1
+-- out/echo/outcome --
+rejected
+-- variant/dangling/about --
+A1 refers to B1, which isn't defined.
+-- variant/dangling/properties --
+dangling
+-- variant/dangling/in/do/error --
+A1: B1 is not defined
+-- variant/dangling/out/echo/error.txt --
+A1: B1 is not defined
+-- variant/dangling/out/echo/outcome --
+rejected

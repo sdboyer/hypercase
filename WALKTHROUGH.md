@@ -2064,10 +2064,19 @@ S202
   A test function runs it: `hypercase.Test` runs each as the subtest
   `checks/<name>` (proposed).
 - A cell, as a check sees it, exposes its committed outcome, its committed
-  sections, its column's registry entry and its case's stated properties.
-  `hypercase.Cell` holds (proposed) `Type`, `Archive`, `Case` and `Column`;
-  `Outcome`, with its `State`, `Codes` and `Detail`; `Entry`; `Properties`;
-  and `Files`, the cell's committed files under its `out/<column>/`.
+  sections, its column's registry entry, its case's stated properties and
+  its known gap. `hypercase.Cell` holds (proposed) `Type`, `Archive`,
+  `Case` and `Column`; `Outcome`, with its `State`, `Codes` and `Detail`;
+  `Entry`; `Properties`; `Files`, the cell's committed files under its
+  `out/<column>/`; and `Gap`, the text of the `gaps` line that marks the
+  cell, or empty when none does. A transform's variant's `Gap` is read from
+  the base's `gaps`, from the line that starts `transform/<name>`.
+- A check sees every cell, frozen ones included: the framework exempts
+  none, and each check decides. One that states a requirement over cells
+  can excuse a cell with a `Gap`, so that a known gap and the requirement
+  coexist: it passes while every cell that violates it is frozen, and
+  fails once a line is removed. One that counts what the corpus reaches,
+  such as `codes`, counts frozen cells too.
 - A check reads only committed files, and never runs a suite, a lift or a
   transform. An archive that can't be read fails every check of the
   package, and an update writes no findings. So does a transform's variant

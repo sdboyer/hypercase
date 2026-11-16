@@ -32,8 +32,8 @@ type Check struct {
 	Name string
 	// Description says what the check asserts. It is required.
 	Description string
-	// Run reads every cell over the corpus root, and returns the check's
-	// findings, each one line, not empty. An error is a requirement the
+	// Run reads every cell over the corpus root, frozen ones included,
+	// and returns the check's findings, each one line, not empty. An error is a requirement the
 	// cells violate: it fails every run, updates included, and an update
 	// then writes no findings. So does a panic.
 	Run func(cells []Cell) ([]string, error)
@@ -64,6 +64,14 @@ type Cell struct {
 	// Files are the cell's committed files, the outcome among them, by
 	// their paths under out/<Column>/.
 	Files map[string][]byte
+	// Gap is the text of the gaps line that marks the cell, and so
+	// freezes it while it has committed files: what is right, and the
+	// issue it waits on. It is "" when no line marks the cell. A
+	// hand-written variant's lines are its own gaps'; a transform's
+	// variant's are the base's that start transform/<name>. The framework
+	// exempts no frozen cell from a check: each check decides whether a
+	// known gap excuses a cell.
+	Gap string
 }
 
 // An Entry is a column as its package's registry records it.
@@ -292,12 +300,14 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 			type checkedCase struct {
 				name, prefix string
 				properties   []string
+				gaps         map[string]string // column → the text of the line that marks its cell
 			}
-			stated := a.Properties()
-			cases := []checkedCase{{properties: stated}}
+			stated, gaps := a.Properties(), a.Gaps()
+			cases := []checkedCase{{properties: stated, gaps: gapTexts("", gaps)}}
 			for _, v := range a.Variants() {
-				c := checkedCase{name: v.Case(), prefix: v.Prefix(), properties: v.Properties}
+				c := checkedCase{name: v.Case(), prefix: v.Prefix(), properties: v.Properties, gaps: gapTexts("", v.Gaps)}
 				if v.Kind == archive.Transform {
+					c.gaps = gapTexts(v.Name, gaps)
 					tr, ok := transforms[corpus][v.Name]
 					if !ok {
 						return nil, fmt.Errorf("%s holds %s, and no corpus type of testdata/%s/ lists a transform named %s", r.rel(p), v.Case(), corpus, v.Name)
@@ -311,7 +321,7 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 			}
 			for _, c := range cases {
 				for _, col := range cols {
-					cell := Cell{Type: corpus, Archive: name, Case: c.name, Column: col.Name, Entry: col, Properties: c.properties, Files: map[string][]byte{}}
+					cell := Cell{Type: corpus, Archive: name, Case: c.name, Column: col.Name, Entry: col, Properties: c.properties, Files: map[string][]byte{}, Gap: c.gaps[col.Name]}
 					for _, s := range a.Sections {
 						if f, ok := strings.CutPrefix(s.Name, c.prefix+archive.Out+"/"+col.Name+"/"); ok {
 							cell.Files[f] = s.Data
@@ -328,6 +338,18 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 		}
 	}
 	return cells, nil
+}
+
+// gapTexts gives the text of each line of gaps that marks a cell of the
+// named transform's variant, or, for "", of the case's own, by column.
+func gapTexts(transform string, gaps []archive.Gap) map[string]string {
+	m := map[string]string{}
+	for _, g := range gaps {
+		if g.Transform == transform {
+			m[g.Column] = g.Text
+		}
+	}
+	return m
 }
 
 // cloneCells copies cells deeply, so no check sees what another changed.

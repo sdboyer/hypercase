@@ -351,6 +351,35 @@ func TestChecks(t *testing.T) {
 	s.done()
 }
 
+// TestCheckGaps: a cell carries the text of the gaps line that marks it:
+// the case's own, or for a transform's variant, the base's line that names
+// the transform. The framework exempts no frozen cell from a check, and a
+// check that excuses a known gap passes while each cell that violates it
+// is frozen, and fails once a line is removed.
+func TestCheckGaps(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "check-gaps")
+	s.passes(s.normal("check-gaps"))
+	s.cat("testdata/checks/located.txt")
+	for _, tt := range []struct {
+		archive, why string
+		edit         func(*archive.Archive)
+		cell         string
+	}{
+		{"negative", "remove the line that marks the base's cell", drop("gaps"), "script/negative echo"},
+		{"loop", "remove the line that marks the hand-written variant's cell", drop("variant/neg/gaps"), "script/loop/variant/neg echo"},
+		{"loop", "remove the base's line that marks looped's cell", drop("gaps"), "script/loop/transform/looped echo"},
+	} {
+		p := "testdata/script/" + tt.archive + ".txtar"
+		before := s.read(p)
+		s.edit(p, tt.why, tt.edit)
+		s.fails(s.normal("check-gaps"), "the corpus check located fails: the error.txt of "+tt.cell+" starts with no cell\n    The cells violate what the check requires.")
+		s.write(p, before, "restore the line")
+	}
+	s.passes(s.normal("check-gaps"))
+	s.done()
+}
+
 // TestCheckFailures: a check that errs or panics, or gives a finding that
 // is empty or holds a newline, fails every run, and an update writes no
 // findings for it. A check that finds nothing writes an empty file.

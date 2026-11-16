@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/sdboyer/hypercase"
+	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
 )
 
@@ -129,6 +131,39 @@ var (
 	}
 )
 
+// located requires every rejected cell's error.txt to start with the
+// cell it is about, as "A1: ". A cell a gaps line marks is excused: its
+// finding names it, with its gap.
+var locatedCheck = hypercase.Check{
+	Name:        "located",
+	Description: "Every rejected cell's error starts with the cell it is about, but a known gap's.",
+	Run: func(cells []hypercase.Cell) ([]string, error) {
+		var findings, unlocated []string
+		for _, c := range cells {
+			if c.Outcome.State != archive.Rejected {
+				continue
+			}
+			name := c.Type + "/" + c.Archive
+			if c.Case != "" {
+				name += "/" + c.Case
+			}
+			name += " " + c.Column
+			switch {
+			case c.Gap != "":
+				findings = append(findings, name+" is a known gap: "+c.Gap)
+			case !cellLead.Match(c.Files["error.txt"]):
+				unlocated = append(unlocated, name)
+			}
+		}
+		if len(unlocated) > 0 {
+			return nil, fmt.Errorf("the error.txt of %s starts with no cell", strings.Join(unlocated, ", "))
+		}
+		return findings, nil
+	},
+}
+
+var cellLead = regexp.MustCompile(`^[A-Z]+[0-9]+: `)
+
 func checks(items ...any) {
 	hypercase.Register(append([]any{project, rootPkg, scriptType}, items...)...)
 }
@@ -158,6 +193,7 @@ var outcomeRegistrations = map[string]func(){
 	"tr-checks": func() {
 		transforms(transformType, own(echoRejects, looped, upper), cellsCheck, unsortedCheck, mutatingCheck)
 	},
+	"check-gaps": func() { transforms(transformType, own(echoRejects, looped, upper), locatedCheck) },
 	"tr-b-checks": func() {
 		hypercase.Register(append([]any{project, transformType, own(withName(echoRejects, "copy"), cellsCheck)}, sheetsProps...)...)
 	},

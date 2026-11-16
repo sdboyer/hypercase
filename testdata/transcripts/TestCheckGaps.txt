@@ -1,0 +1,139 @@
+$ go test  # check-gaps
+    script/negative/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/negative/transform/upper: upper declines the base: the base's do/ tree has no output
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+            --- PASS: TestCorpus/script/loop/variant/neg
+                --- PASS: TestCorpus/script/loop/variant/neg/echo
+            --- PASS: TestCorpus/script/loop/transform/looped
+                --- PASS: TestCorpus/script/loop/transform/looped/echo
+            --- PASS: TestCorpus/script/loop/transform/upper
+                --- PASS: TestCorpus/script/loop/transform/upper/echo
+        --- PASS: TestCorpus/script/negative
+            --- PASS: TestCorpus/script/negative/echo
+            --- PASS: TestCorpus/script/negative/variant/dangling
+                --- PASS: TestCorpus/script/negative/variant/dangling/echo
+            --- SKIP: TestCorpus/script/negative/transform/looped
+            --- SKIP: TestCorpus/script/negative/transform/upper
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/located
+PASS
+$ cat testdata/checks/located.txt
+script/loop/transform/looped echo is a known gap: A cycle's error starts with the cell where it starts. Waits on sheets#4.
+script/loop/variant/neg echo is a known gap: A negative number is valid, and evaluates to itself. Waits on sheets#3.
+script/negative echo is a known gap: A negative number is valid, and evaluates to itself. Waits on sheets#3.
+$ edit testdata/script/negative.txtar  # remove the line that marks the base's cell
+$ go test  # check-gaps
+    script/negative: A1 is a negative number, which the code wrongly rejects, with an error that starts with no cell.
+        echo: Does what the case's do/ tree says.
+        echo returned an error, but the case states no property echo rejects:
+          unexpected "-" in A1
+        Fix the code, or state the property on the case and in echo's Rejects.
+    script/negative/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/negative/transform/upper: upper declines the base: the base's do/ tree has no output
+    the corpus check located fails: the error.txt of script/negative echo starts with no cell
+        The cells violate what the check requires. Fix the code or the corpus, or the check. An update writes no findings.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+            --- PASS: TestCorpus/script/loop/variant/neg
+                --- PASS: TestCorpus/script/loop/variant/neg/echo
+            --- PASS: TestCorpus/script/loop/transform/looped
+                --- PASS: TestCorpus/script/loop/transform/looped/echo
+            --- PASS: TestCorpus/script/loop/transform/upper
+                --- PASS: TestCorpus/script/loop/transform/upper/echo
+        --- FAIL: TestCorpus/script/negative
+            --- FAIL: TestCorpus/script/negative/echo
+            --- PASS: TestCorpus/script/negative/variant/dangling
+                --- PASS: TestCorpus/script/negative/variant/dangling/echo
+            --- SKIP: TestCorpus/script/negative/transform/looped
+            --- SKIP: TestCorpus/script/negative/transform/upper
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/located
+FAIL
+[exit 1]
+$ edit testdata/script/negative.txtar  # restore the line
+$ edit testdata/script/loop.txtar  # remove the line that marks the hand-written variant's cell
+$ go test  # check-gaps
+    script/loop/variant/neg: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        echo returned an error, but the case states no property echo rejects:
+          unexpected "-" in A1
+        Fix the code, or state the property on the case and in echo's Rejects.
+    script/negative/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/negative/transform/upper: upper declines the base: the base's do/ tree has no output
+    the corpus check located fails: the error.txt of script/loop/variant/neg echo starts with no cell
+        The cells violate what the check requires. Fix the code or the corpus, or the check. An update writes no findings.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+            --- FAIL: TestCorpus/script/loop/variant/neg
+                --- FAIL: TestCorpus/script/loop/variant/neg/echo
+            --- PASS: TestCorpus/script/loop/transform/looped
+                --- PASS: TestCorpus/script/loop/transform/looped/echo
+            --- PASS: TestCorpus/script/loop/transform/upper
+                --- PASS: TestCorpus/script/loop/transform/upper/echo
+        --- PASS: TestCorpus/script/negative
+            --- PASS: TestCorpus/script/negative/echo
+            --- PASS: TestCorpus/script/negative/variant/dangling
+                --- PASS: TestCorpus/script/negative/variant/dangling/echo
+            --- SKIP: TestCorpus/script/negative/transform/looped
+            --- SKIP: TestCorpus/script/negative/transform/upper
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/located
+FAIL
+[exit 1]
+$ edit testdata/script/loop.txtar  # restore the line
+$ edit testdata/script/loop.txtar  # remove the base's line that marks looped's cell
+$ go test  # check-gaps
+    script/negative/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/negative/transform/upper: upper declines the base: the base's do/ tree has no output
+    the corpus check located fails: the error.txt of script/loop/transform/looped echo starts with no cell
+        The cells violate what the check requires. Fix the code or the corpus, or the check. An update writes no findings.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+            --- PASS: TestCorpus/script/loop/variant/neg
+                --- PASS: TestCorpus/script/loop/variant/neg/echo
+            --- PASS: TestCorpus/script/loop/transform/looped
+                --- PASS: TestCorpus/script/loop/transform/looped/echo
+            --- PASS: TestCorpus/script/loop/transform/upper
+                --- PASS: TestCorpus/script/loop/transform/upper/echo
+        --- PASS: TestCorpus/script/negative
+            --- PASS: TestCorpus/script/negative/echo
+            --- PASS: TestCorpus/script/negative/variant/dangling
+                --- PASS: TestCorpus/script/negative/variant/dangling/echo
+            --- SKIP: TestCorpus/script/negative/transform/looped
+            --- SKIP: TestCorpus/script/negative/transform/upper
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/located
+FAIL
+[exit 1]
+$ edit testdata/script/loop.txtar  # restore the line
+$ go test  # check-gaps
+    script/negative/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/negative/transform/upper: upper declines the base: the base's do/ tree has no output
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+            --- PASS: TestCorpus/script/loop/variant/neg
+                --- PASS: TestCorpus/script/loop/variant/neg/echo
+            --- PASS: TestCorpus/script/loop/transform/looped
+                --- PASS: TestCorpus/script/loop/transform/looped/echo
+            --- PASS: TestCorpus/script/loop/transform/upper
+                --- PASS: TestCorpus/script/loop/transform/upper/echo
+        --- PASS: TestCorpus/script/negative
+            --- PASS: TestCorpus/script/negative/echo
+            --- PASS: TestCorpus/script/negative/variant/dangling
+                --- PASS: TestCorpus/script/negative/variant/dangling/echo
+            --- SKIP: TestCorpus/script/negative/transform/looped
+            --- SKIP: TestCorpus/script/negative/transform/upper
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/located
+PASS
