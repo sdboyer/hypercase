@@ -1,8 +1,11 @@
 package hypercase_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/sdboyer/hypercase/internal/registry"
 )
 
 // Step 5: the root-package check, over the fixture shared.
@@ -107,7 +110,28 @@ func TestRootCheckRegistries(t *testing.T) {
 	s.fails(s.normal("pkg-a"), "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests.")
 	s.write("b/corpus_test.go", []byte(packageTestFile), "restore b's tests")
 	s.write("b/testdata/hypercase.json", []byte("{\n  \"format\": 9\n}\n"), "a registry from a later hypercase")
-	s.fails(s.normal("pkg-a"), "b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format 2.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.")
+	s.fails(s.normal("pkg-a"), "b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format 3.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.")
+	s.done()
+}
+
+// TestRootCheckOtherRoots: a registry of another corpus root is that
+// root's check's to read, whatever its format: an older one, as an earlier
+// step's example commits, or a newer one. This root's update and its
+// normal run agree on it, and pass.
+func TestRootCheckOtherRoots(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.write("sib/corpus_test.go", []byte(packageTestFile), "a package over the corpus root sib")
+	for _, tt := range []struct{ why, data string }{
+		{"its registry, in format 1", `{"format": 1, "updateVar": "FIXTURE_UPDATE_GOLDEN", "corpusRoot": "sib", "rootPackage": true, "properties": [],` +
+			` "suites": [{"name": "calc", "description": "Runs calc.", "corpus": "sheet", "outputs": [], "rejects": []}]}` + "\n"},
+		{"its registry, from a later hypercase", fmt.Sprintf(`{"format": %d, "corpusRoot": "sib", "a field of a later hypercase": {}}`+"\n", registry.Format+1)},
+	} {
+		s.write("sib/testdata/hypercase.json", []byte(tt.data), tt.why)
+		s.passes(s.update("pkg-a"))
+		s.passes(s.normal("pkg-a"))
+		s.passes(s.run("b", "pkg-b", false))
+	}
 	s.done()
 }
 

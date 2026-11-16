@@ -326,6 +326,26 @@ var registrations = map[string]func(){
 	"pkg-b-later":    func() { hypercase.Register(project, laterType, own(steered[Later]("shout", "shout"))) },
 	"corp-a":         func() { hypercase.Register(project, hypercase.Root("corp"), rootPkg, scriptType, own(echo)) },
 	"corp-b":         func() { hypercase.Register(project, hypercase.Root("corp"), rootPkg, scriptType, own(shout)) },
+
+	// Issue links, given out of order.
+	"echo-links": func() {
+		p := project
+		p.IssueLinks = []decl.IssueLink{
+			{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/issues/$1"},
+			{Pattern: `recipes#(\d+)`, URL: "https://example.com/recipes/issues/$1"},
+		}
+		hypercase.Register(p, rootPkg, scriptType, own(echo))
+	},
+	"bad-link-pattern": func() {
+		p := project
+		p.IssueLinks = []decl.IssueLink{{Pattern: `sheets#(\d+`, URL: "https://example.com/sheets/issues/$1"}}
+		hypercase.Register(p, rootPkg, scriptType, own(echo))
+	},
+	"link-no-url": func() {
+		p := project
+		p.IssueLinks = []decl.IssueLink{{Pattern: `sheets#(\d+)`, URL: " "}}
+		hypercase.Register(p, rootPkg, scriptType, own(echo))
+	},
 }
 
 // duringTest are what some fixtures do in the child's test, before

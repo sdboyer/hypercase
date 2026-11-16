@@ -33,13 +33,15 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			t.Errorf("reading %s: %v", rel, err)
 			continue
 		}
+		// Another corpus root's registry is left to that root's check,
+		// whatever its format.
+		if h, err := registry.Peek(data); err == nil && h.CorpusRoot != r.rootRel {
+			otherRoots[filepath.Join(r.moduleRoot, filepath.FromSlash(h.CorpusRoot))] = true
+			continue
+		}
 		g, err := registry.Parse(data)
 		if err != nil {
 			t.Errorf("%s can't be read: %v.\nRun %s to write it.", rel, err, r.updateCmd())
-			continue
-		}
-		if g.CorpusRoot != r.rootRel {
-			otherRoots[filepath.Join(r.moduleRoot, filepath.FromSlash(g.CorpusRoot))] = true
 			continue
 		}
 		regs = append(regs, pkgReg{pkg: r.pkgName(f.Pkg), reg: g})
@@ -86,7 +88,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 		for _, s := range g.reg.Suites {
 			claim(s.Name, s.Corpora, g.pkg)
-			if s.Consumes == rawConsumes {
+			if s.Consumes == registry.RawInput {
 				for _, dir := range s.Corpora {
 					declare(dir, rawEntry, g.pkg)
 				}
@@ -204,11 +206,8 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	}
 }
 
-// rawConsumes is what a registry records a suite that names a Corpus as
-// consuming, the raw input view, and rawEntry is how the root-package
-// check names that view as a directory's type.
-var rawConsumes = goTypeName(fsType)
-
+// rawEntry is how the root-package check names the raw input view, which
+// a suite that names a Corpus consumes, as a directory's type.
 const rawEntry = "the raw input view, fs.FS, which a suite's Corpus names"
 
 // checkArchive reports the problems of one archive as a whole.

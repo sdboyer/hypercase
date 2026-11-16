@@ -23,6 +23,9 @@ func (r *runner) ownRegistry() registry.Registry {
 		CorpusRoot:  r.rootRel,
 		RootPackage: r.rootPackage,
 	}
+	for _, l := range r.issueLinks {
+		g.IssueLinks = append(g.IssueLinks, registry.IssueLink{Pattern: l.Pattern, URL: l.URL})
+	}
 	for _, p := range r.properties {
 		g.Properties = append(g.Properties, registry.Property{Name: p.Name, Description: p.Description})
 	}
@@ -45,10 +48,14 @@ func (r *runner) ownRegistry() registry.Registry {
 		if c.lift != nil {
 			continue
 		}
+		consumes := goTypeName(c.consumes)
+		if c.corpus != "" {
+			consumes = registry.RawInput
+		}
 		g.Suites = append(g.Suites, registry.Suite{
 			Name:        c.name,
 			Description: c.description,
-			Consumes:    goTypeName(c.consumes),
+			Consumes:    consumes,
 			Corpora:     r.corpora[c.name],
 			Outputs:     registryOutputs(c.outputs),
 			Rejects:     propertyNames(c.rejects),

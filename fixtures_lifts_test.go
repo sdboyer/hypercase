@@ -307,9 +307,9 @@ var liftRegistrations = map[string]func(){
 		hypercase.Register(project, scriptType, hypercase.Use(parse))
 		hypercase.Register(own(parse))
 	},
-	"bare-lift":  func() { hypercase.Register(project, scriptType, parse) },
-	"use-suite":  func() { hypercase.Register(project, scriptType, hypercase.Use(calc)) },
-	"own-other":  func() { hypercase.Register(project, scriptType, own(malformed)) },
+	"bare-lift": func() { hypercase.Register(project, scriptType, parse) },
+	"use-suite": func() { hypercase.Register(project, scriptType, hypercase.Use(calc)) },
+	"own-other": func() { hypercase.Register(project, scriptType, own(malformed)) },
 
 	// Relations and descriptions.
 	"lift-rejects-unregistered": func() { hypercase.Register(project, rootPkg, scriptType, own(parse)) },

@@ -6,7 +6,7 @@ $ go test  # lift-nodesc
     the lift parse declares the output error.txt with no description.
         Add one: it says what the files hold, in prose.
     testdata/hypercase.json differs from what the package registers (-committed +registered):
-            "rootPackage": true,
+            "issueLinks": [],
             "properties": [
               {
         -       "name": "circular",
