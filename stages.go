@@ -217,9 +217,10 @@ func pathString(ct *corpusType, path []*lift) string {
 
 // A caseState holds a case's values: its corpus type's, and each stage's,
 // memoized, so a lift runs at most once per case however many cells read
-// its product. Past a bytes lift, a normal run reads the product and the
-// outcome that the archive commits for the case, and runs nothing before
-// them; an update reads the product the lift makes.
+// its product, but for a normal run's asUpdate. Past a bytes lift, a
+// normal run reads the product and the outcome that the archive commits
+// for the case, and runs nothing before them; an update reads the product
+// the lift makes.
 type caseState struct {
 	r     *runner
 	c     *aCase
@@ -228,6 +229,17 @@ type caseState struct {
 	view  fs.FS // the case's input view
 	runs  map[*lift]*liftRun
 	reads map[*lift]*liftRead
+	// update says how the state stages the types past a bytes lift: by
+	// running the lift, as an update does, or by reading what the archive
+	// commits for it, as a normal run does.
+	update bool
+	// asUpdate is, in a normal run, the case staged as the package's
+	// update stages it, made when a cell first asks whether the update
+	// runs it. Its normal is the normal run's state, whose runs it shares
+	// for each lift no bytes lift precedes: such a lift's input is the same
+	// in both. A lift past a bytes lift runs once in each.
+	asUpdate *caseState
+	normal   *caseState
 }
 
 // A liftRun is what one call of a lift's function left. A bytes lift's
@@ -241,6 +253,7 @@ type liftRun struct {
 	view     fs.FS
 	problems []string
 	verdict  *liftVerdict // a bytes lift's cell's, once judged
+	bare     *liftVerdict // a bytes lift's cell's under a bare Project, once judged
 }
 
 // A liftRead is what a normal run reads of a bytes lift on a case: the
@@ -281,7 +294,7 @@ func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
 		return s.root, s.view, nil
 	}
 	l := s.plan.producer[typ]
-	if l.bytes && !s.r.update {
+	if l.bytes && !s.update {
 		rd := s.read(l)
 		return rd.value, rd.view, rd.block
 	}
@@ -293,7 +306,7 @@ func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
 	// Past a bytes lift, which runs here only in an update, a cell is
 	// written only with the lift's cell: a normal run reads what that
 	// writes.
-	if l.bytes && !s.liftVerdict(l, lr, in, view).writable {
+	if l.bytes && s.heldBack(l, lr, in, view) {
 		return nil, nil, &blockage{lift: l, failed: l.name, broken: true}
 	}
 	switch {
@@ -305,16 +318,63 @@ func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
 	return lr.value, lr.view, nil
 }
 
-// acceptsNow reports whether the bytes lift l, run on the case as its own
-// cell runs it, accepts the case, and an update writes its cell: then the
-// update runs the cells past it, whatever the archive commits for l.
-func (s *caseState) acceptsNow(l *lift) bool {
-	in, view, b := s.stage(l.in)
-	if b != nil {
-		return false
+// heldBack reports whether, in an update, the cells past the bytes lift l
+// wait for its cell: whether the update writes nothing for the cell, whose
+// outcome and product a normal run reads. The package that owns l holds
+// them back on the cell's verdict. Another package's Project doesn't judge
+// l's cell, and the owner's may differ, so it holds them back on the
+// cell's verdict under a bare Project, which fails no cell: on what keeps
+// the update from writing the cell whatever the owner's Project, such as a
+// fault of the jenny or a product an archive can't hold.
+func (s *caseState) heldBack(l *lift, lr *liftRun, in any, view fs.FS) bool {
+	if l.owned {
+		return !s.liftVerdict(l, lr, in, view).writable
 	}
-	v := s.liftVerdict(l, s.runLift(l, in), in, view)
-	return v.writable && accepts(v.files[archive.OutcomeFile])
+	if lr.bare == nil {
+		lr.bare = s.judgeLift(s.r.bare(), l, lr, in, view)
+	}
+	return !lr.bare.writable
+}
+
+// updateRuns reports, in a normal run, whether the package's update runs a
+// cell that consumes typ: whether the case, staged as the update stages it,
+// running each bytes lift where a normal run reads what the archive
+// commits for it, reaches typ with nothing to block it. A normal run runs
+// only the lifts the package owns, so only a package that owns every bytes
+// lift on the way asks.
+func (s *caseState) updateRuns(typ reflect.Type) bool {
+	if s.asUpdate == nil {
+		s.asUpdate = &caseState{
+			r:      s.r,
+			c:      s.c,
+			plan:   s.plan,
+			root:   s.root,
+			view:   s.view,
+			runs:   map[*lift]*liftRun{},
+			reads:  map[*lift]*liftRead{},
+			update: true,
+			normal: s,
+		}
+	}
+	_, _, b := s.asUpdate.stage(typ)
+	return b == nil
+}
+
+// bytesOnPath returns the last bytes lift on the plan's path to typ, and
+// the last there that the package doesn't own, each nil when there is
+// none.
+func (p *plan) bytesOnPath(typ reflect.Type) (last, unowned *lift) {
+	for typ != p.root.goType {
+		l := p.producer[typ]
+		if l.bytes && last == nil {
+			last = l
+		}
+		if l.bytes && !l.owned && unowned == nil {
+			unowned = l
+		}
+		typ = l.in
+	}
+	return last, unowned
 }
 
 // read reads, once, what the archive commits for a bytes lift on the
@@ -356,6 +416,11 @@ func (s *caseState) read(l *lift) *liftRead {
 // the case only by an error decl.Reject marks: any other error is a fault
 // of the jenny, as a product an archive can't hold is.
 func (s *caseState) runLift(l *lift, in any) *liftRun {
+	if s.normal != nil {
+		if last, _ := s.plan.bytesOnPath(l.in); last == nil {
+			return s.normal.runLift(l, in)
+		}
+	}
 	if lr, ok := s.runs[l]; ok {
 		return lr
 	}

@@ -1,7 +1,6 @@
 package decl
 
 import (
-	"errors"
 	"io"
 	"io/fs"
 	"reflect"
@@ -12,10 +11,32 @@ import (
 
 func init() {
 	erase.Of = of
-	erase.IsRejection = func(err error) bool {
-		var r *rejection
-		return errors.As(err, &r)
+	erase.IsRejection = isRejection
+}
+
+// isRejection reports whether Reject marks all of err. It walks err's
+// tree, through Unwrap() error and Unwrap() []error, and stops at each
+// error Reject made, whose own Unwrap leads to the unmarked error it
+// marks: a path that reaches an error that wraps none without passing
+// one is unmarked, and makes err a fault. So a join is a rejection when
+// each of its errors is, a join of one included, as jenny joins the error
+// of a jenny with one input.
+func isRejection(err error) bool {
+	switch e := err.(type) {
+	case *rejection:
+		return true
+	case interface{ Unwrap() error }:
+		return isRejection(e.Unwrap())
+	case interface{ Unwrap() []error }:
+		errs := e.Unwrap()
+		for _, err := range errs {
+			if !isRejection(err) {
+				return false
+			}
+		}
+		return len(errs) > 0
 	}
+	return false
 }
 
 // erasable is implemented by the generic declarations, and only by them.

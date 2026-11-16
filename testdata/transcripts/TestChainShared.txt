@@ -205,7 +205,7 @@ $ go test ./b  # chain-b
         + blocked import
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, out/import/outcome, which a normal run reads.
-        Only the package that owns import runs it in a normal run, so this one can't tell whether import accepts the case now. Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which reruns it, and delete nothing by hand before it has.
+        Only the package that owns import runs it in a normal run, so this one can't tell whether an update runs evaluate. Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which reruns import, and delete nothing by hand before it has.
     export/prices: One export of prices: import makes a script whose quote/ tree list shows.
         list: Lists the files of the script's input view, with their bytes.
         out/list/outcome differs (-golden +got):
@@ -213,7 +213,7 @@ $ go test ./b  # chain-b
         + blocked import
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.
-        Only the package that owns import runs it in a normal run, so this one can't tell whether import accepts the case now. Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which reruns it, and delete nothing by hand before it has.
+        Only the package that owns import runs it in a normal run, so this one can't tell whether an update runs list. Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which reruns import, and delete nothing by hand before it has.
     what ran, in order:
         parse ran on prices
         resolve ran on prices

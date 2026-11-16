@@ -1,0 +1,237 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-a-render
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+PASS
+$ edit testdata/export/prices.txtar  # import now rejects prices, and projectRender panics on its error
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-a-render
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        import: Imports the export as a script, as its import/ tree says.
+        The project's RenderError panicked on import's error: the renderer panicked
+        Fix RenderError. An update writes nothing for this cell.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        parse: Parses the script, as its parse/ tree says.
+        The update writes nothing for the cell of the lift import, on parse's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        The update writes nothing for the cell of the lift import, on resolve's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        import: Imports the export as a script, as its import/ tree says.
+        The project's RenderError panicked on import's error: the renderer panicked
+        Fix RenderError. An update writes nothing for this cell.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        parse: Parses the script, as its parse/ tree says.
+        The update writes nothing for the cell of the lift import, on parse's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        The update writes nothing for the cell of the lift import, on resolve's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
+    what ran, in order:
+        import ran
+        import ran
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- FAIL: TestCorpus/export/prices/import
+            --- FAIL: TestCorpus/export/prices/parse
+            --- FAIL: TestCorpus/export/prices/resolve
+            --- FAIL: TestCorpus/export/prices/transform/louder
+                --- FAIL: TestCorpus/export/prices/transform/louder/import
+                --- FAIL: TestCorpus/export/prices/transform/louder/parse
+                --- FAIL: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-b
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        list: Lists the files of the script's input view, with their bytes.
+        out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        transform/louder/out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, failed on the case.
+        If the cell should run, fix the lift or louder's jenny, which makes the variant. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        list: Lists the files of the script's input view, with their bytes.
+        transform/louder/out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, failed on the case.
+        If the cell should run, fix the lift or louder's jenny, which makes the variant. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    what ran, in order:
+        import ran
+        import ran
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- FAIL: TestCorpus/export/prices/evaluate
+            --- FAIL: TestCorpus/export/prices/list
+            --- FAIL: TestCorpus/export/prices/transform/louder
+                --- FAIL: TestCorpus/export/prices/transform/louder/evaluate
+                --- FAIL: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ go test ./b  # chain-b
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/outcome differs (-golden +got):
+        - blocked import
+        + accepted
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        list: Lists the files of the script's input view, with their bytes.
+        out/list/outcome differs (-golden +got):
+        - blocked import
+        + accepted
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        transform/louder/out/evaluate/outcome differs (-golden +got):
+        - blocked import
+        + accepted
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        list: Lists the files of the script's input view, with their bytes.
+        transform/louder/out/list/outcome differs (-golden +got):
+        - blocked import
+        + accepted
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- FAIL: TestCorpus/export/prices/evaluate
+            --- FAIL: TestCorpus/export/prices/list
+            --- FAIL: TestCorpus/export/prices/transform/louder
+                --- FAIL: TestCorpus/export/prices/transform/louder/evaluate
+                --- FAIL: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ edit testdata/export/prices.txtar  # projectRender no longer panics, and the cells' orphans are deleted by hand
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-a-render
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/prices: parse is blocked: the lift import failed on the case, and testdata/export/prices.txtar, out/import/error.txt, records its error.
+    export/prices: resolve is blocked: the lift import failed on the case, and testdata/export/prices.txtar, out/import/error.txt, records its error.
+    export/prices/transform/louder: parse is blocked: the lift import failed on the case, and testdata/export/prices.txtar, transform/louder/out/import/error.txt, records its error.
+    export/prices/transform/louder: resolve is blocked: the lift import failed on the case, and testdata/export/prices.txtar, transform/louder/out/import/error.txt, records its error.
+    what ran, in order:
+        import ran
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- SKIP: TestCorpus/export/prices/parse
+            --- SKIP: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- SKIP: TestCorpus/export/prices/transform/louder/parse
+                --- SKIP: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-b
+    export/prices: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, out/import/error.txt, records its error.
+    export/prices: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, out/import/error.txt, records its error.
+    export/prices/transform/louder: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, transform/louder/out/import/error.txt, records its error.
+    export/prices/transform/louder: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, transform/louder/out/import/error.txt, records its error.
+    what ran, in order:
+        import ran
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- SKIP: TestCorpus/export/prices/evaluate
+            --- SKIP: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- SKIP: TestCorpus/export/prices/transform/louder/evaluate
+                --- SKIP: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+PASS
+$ go test  # chain-a-render
+    export/prices: parse is blocked: testdata/export/prices.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices: resolve is blocked: testdata/export/prices.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/transform/louder: parse is blocked: testdata/export/prices.txtar, transform/louder/out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/transform/louder: resolve is blocked: testdata/export/prices.txtar, transform/louder/out/import/outcome, records the lift import's outcome as "rejected".
+    what ran, in order:
+        import ran
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- SKIP: TestCorpus/export/prices/parse
+            --- SKIP: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- SKIP: TestCorpus/export/prices/transform/louder/parse
+                --- SKIP: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+PASS
+$ go test ./b  # chain-b
+    export/prices: evaluate is blocked: testdata/export/prices.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices: list is blocked: testdata/export/prices.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/transform/louder: evaluate is blocked: testdata/export/prices.txtar, transform/louder/out/import/outcome, records the lift import's outcome as "rejected".
+    export/prices/transform/louder: list is blocked: testdata/export/prices.txtar, transform/louder/out/import/outcome, records the lift import's outcome as "rejected".
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- SKIP: TestCorpus/export/prices/evaluate
+            --- SKIP: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- SKIP: TestCorpus/export/prices/transform/louder/evaluate
+                --- SKIP: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+PASS
