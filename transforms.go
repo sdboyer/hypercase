@@ -251,8 +251,10 @@ func (r *runner) makeVariant(v *plannedVariant, base archive.Base, view fs.FS) {
 	files := map[string][]byte{}
 	var held []string
 	for _, f := range made.AsFiles() {
-		// A jenny's FS renders each file it adds, so AsFiles gives them
-		// all as bytes, and nothing a transform does reaches this.
+		// A jenny's FS renders each file it adds, and AsFiles gives each
+		// one as Bytes, so no transform reaches this, and no test does: it
+		// guards against a change to jenny, which would otherwise record
+		// an unrendered file as empty bytes.
 		data, ok := jenny.BytesOf(f)
 		if !ok {
 			v.problem = fmt.Sprintf("%s made %s, which its FS gave as a %T, not as rendered bytes. An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase.", tr.name, f.Path(), f)
