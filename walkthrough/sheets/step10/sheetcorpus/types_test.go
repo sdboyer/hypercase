@@ -2,10 +2,13 @@ package sheetcorpus_test
 
 import (
 	"errors"
+	"io/fs"
+	"reflect"
 	"slices"
 	"testing"
 	"testing/fstest"
 
+	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus"
 )
@@ -49,4 +52,34 @@ func TestImportCount(t *testing.T) {
 	if want := []string{"sheet/A1=4\n", "sheet/B1=6\n"}; !slices.Equal(got, want) {
 		t.Errorf("one CSV: got %q, want %q", got, want)
 	}
+}
+
+// TestImportReadFault: import rejects a case only with the importer's own
+// error. A CSV it can't read is a fault, returned unmarked.
+func TestImportReadFault(t *testing.T) {
+	in := unreadable{fstest.MapFS{"csv/a.csv": {Data: []byte("4,6\n")}}}
+	_, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: in})
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Fatalf("got %v, want the read's error", err)
+	}
+	if rejected(err) {
+		t.Errorf("import rejects the case with a read error: %v", err)
+	}
+}
+
+// unreadable is a view that lists csv/a.csv, and can't open it.
+type unreadable struct{ files fstest.MapFS }
+
+func (u unreadable) Open(name string) (fs.File, error) {
+	if name == "csv/a.csv" {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrPermission}
+	}
+	return u.files.Open(name)
+}
+
+// rejected reports whether err carries decl.Reject's mark. The mark's type
+// is decl's own, so it is taken from a mark Reject makes.
+func rejected(err error) bool {
+	mark := reflect.New(reflect.TypeOf(decl.Reject(errors.New("a rejection"))))
+	return errors.As(err, mark.Interface())
 }

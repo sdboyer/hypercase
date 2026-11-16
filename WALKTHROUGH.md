@@ -2579,9 +2579,10 @@ generator function, which here generates the product's files from the lift's
 input. It receives the input alone, so `import` finds its CSV by its tree,
 not by the archive's name. `view` gives each file of the sheet that
 `sheet.ImportCSV` returns as one of the jenny's files. `decl.Reject` marks
-the jenny's error as the lift's rejection of the case: the importer's error
-is one, and a CSV archive without exactly one CSV is no rejection, so it
-fails the cell.
+the jenny's error as the lift's rejection of the case: the importer's own
+error, a `*sheet.Error`, is one. Any other error is no rejection, so it
+fails the cell: a CSV archive without exactly one CSV, and a CSV the jenny
+can't read.
 
 `walkthrough/sheets/step10/sheetcorpus/types.go` declares the corpus type,
 its property and the lift:
@@ -2616,8 +2617,12 @@ var Import = decl.Lift[CSV, Sheet]{
 			return nil, fmt.Errorf("%d files under csv/, not one", len(paths))
 		}
 		s, err := sheet.ImportCSV(in, paths[0])
-		if err != nil {
+		var e *sheet.Error
+		if errors.As(err, &e) {
 			return nil, decl.Reject(err)
+		}
+		if err != nil {
+			return nil, err
 		}
 		return view(s, nil)
 	}),

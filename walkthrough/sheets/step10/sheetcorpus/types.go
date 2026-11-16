@@ -2,6 +2,7 @@
 package sheetcorpus
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -113,8 +114,12 @@ var Import = decl.Lift[CSV, Sheet]{
 			return nil, fmt.Errorf("%d files under csv/, not one", len(paths))
 		}
 		s, err := sheet.ImportCSV(in, paths[0])
-		if err != nil {
+		var e *sheet.Error
+		if errors.As(err, &e) {
 			return nil, decl.Reject(err)
+		}
+		if err != nil {
+			return nil, err
 		}
 		return view(s, nil)
 	}),
