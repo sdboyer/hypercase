@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -138,6 +139,58 @@ func Parse(data []byte) (*Registry, error) {
 	return &r, nil
 }
 
+// ParseAny parses a registry of any format version this package reads,
+// from 1 to [Format], as a tool reads registries that other revisions
+// committed. An older format is given in today's form, with its own
+// Format. A newer one is a [*FormatError].
+func ParseAny(data []byte) (*Registry, error) {
+	var head struct {
+		Format int `json:"format"`
+	}
+	if err := json.Unmarshal(data, &head); err != nil {
+		return nil, fmt.Errorf("it is not a registry: %w", err)
+	}
+	switch {
+	case head.Format > Format:
+		return nil, &FormatError{Format: head.Format}
+	case head.Format == Format:
+		return Parse(data)
+	case head.Format == 1:
+		var r v1
+		if err := decodeStrict(data, &r); err != nil {
+			return nil, err
+		}
+		return &Registry{
+			Format:      r.Format,
+			UpdateVar:   r.UpdateVar,
+			CorpusRoot:  r.CorpusRoot,
+			RootPackage: r.RootPackage,
+			Properties:  r.Properties,
+			Suites:      r.Suites,
+		}, nil
+	}
+	return nil, fmt.Errorf("it is not a registry: format %d is no version of the registry's format", head.Format)
+}
+
+// v1 is format 1, before the project's issue links.
+type v1 struct {
+	Format      int        `json:"format"`
+	UpdateVar   string     `json:"updateVar"`
+	CorpusRoot  string     `json:"corpusRoot"`
+	RootPackage bool       `json:"rootPackage"`
+	Properties  []Property `json:"properties"`
+	Suites      []Suite    `json:"suites"`
+}
+
+func decodeStrict(data []byte, v any) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		return fmt.Errorf("it is not a registry: %w", err)
+	}
+	return nil
+}
+
 // A Found is a registry file under a module root.
 type Found struct {
 	Path string // the registry file
@@ -149,30 +202,43 @@ type Found struct {
 // Go files: every directory under the root except those named testdata or
 // vendor, those whose names start with . or _, and nested modules.
 func Find(moduleRoot string) ([]Found, error) {
+	pkgs, err := FindFS(os.DirFS(moduleRoot))
 	var found []Found
-	err := filepath.WalkDir(moduleRoot, func(p string, d fs.DirEntry, err error) error {
+	for _, p := range pkgs {
+		dir := filepath.Join(moduleRoot, filepath.FromSlash(p))
+		found = append(found, Found{Path: filepath.Join(dir, "testdata", Name), Pkg: dir})
+	}
+	return found, err
+}
+
+// FindFS is [Find] over a file system whose root is the module root, such
+// as a revision's tree. It returns the directory of each registry's
+// package, as a slash path: "." for the module root.
+func FindFS(fsys fs.FS) ([]string, error) {
+	var pkgs []string
+	err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if !d.IsDir() {
 			return nil
 		}
-		if p != moduleRoot {
+		if p != "." {
 			name := d.Name()
 			if name == "testdata" || name == "vendor" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
-				return filepath.SkipDir
+				return fs.SkipDir
 			}
-			if _, err := os.Stat(filepath.Join(p, "go.mod")); err == nil {
-				return filepath.SkipDir
+			if _, err := fs.Stat(fsys, path.Join(p, "go.mod")); err == nil {
+				return fs.SkipDir
 			}
 		}
-		reg := filepath.Join(p, "testdata", Name)
-		if fi, err := os.Stat(reg); err == nil && fi.Mode().IsRegular() {
-			found = append(found, Found{Path: reg, Pkg: p})
+		reg := path.Join(p, "testdata", Name)
+		if fi, err := fs.Stat(fsys, reg); err == nil && fi.Mode().IsRegular() {
+			pkgs = append(pkgs, p)
 		} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
 		return nil
 	})
-	return found, err
+	return pkgs, err
 }
