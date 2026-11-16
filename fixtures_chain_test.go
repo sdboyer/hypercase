@@ -43,6 +43,8 @@ import (
 //	                      which decl.Reject marks as the rejection
 //	import/fail           returned as the error, less its final newline,
 //	                      unmarked
+//	import/coded          a *codedError, with the code it holds, less its
+//	                      final newline, which decl.Reject marks
 //	import/panic          panicked with, less its final newline
 //
 // An export whose import/ tree has none of these is imported as an empty
@@ -53,6 +55,23 @@ type (
 )
 
 var unterminated = decl.Property{Name: "unterminated", Description: "The export holds a quoted field it never closes."}
+
+// A codedError is an error with a code, which projectCodesAs finds by
+// errors.As, through decl.Reject and the jenny's wrapping.
+type codedError struct{ code string }
+
+func (e *codedError) Error() string { return "an error with the code " + e.code }
+
+var projectCodesAs = decl.Project{
+	UpdateVar: fixtureUpdate,
+	Codes: func(err error) []string {
+		var c *codedError
+		if errors.As(err, &c) {
+			return []string{c.code}
+		}
+		return nil
+	},
+}
 
 // steerImport is a bytes lift's jenny, which the export's <name>/ tree
 // steers.
@@ -66,6 +85,9 @@ func steerImport(name string, in fs.FS) (jenny.Files, error) {
 	}
 	if data, err := fs.ReadFile(in, name+"/fail"); err == nil {
 		return nil, errors.New(strings.TrimSuffix(string(data), "\n"))
+	}
+	if data, err := fs.ReadFile(in, name+"/coded"); err == nil {
+		return nil, decl.Reject(&codedError{code: strings.TrimSuffix(string(data), "\n")})
 	}
 	paths, err := archive.Paths(in)
 	if err != nil {
@@ -273,6 +295,7 @@ var chainRegistrations = map[string]func(){
 	"chain-check": func() {
 		chain(project, exportType, own(importLift, parse, resolve, evaluate, list, louder, exportCheck))
 	},
+	"chain-codes":     func() { chain(projectCodesAs, exportType, own(importLift, parse, resolve, evaluate, list, louder)) },
 	"chain-render":    func() { chain(projectRender, plainExportType, own(importLift, parse, resolve, evaluate)) },
 	"chain-past":      func() { chain(project, plainExportType, own(unpack, repack, parse, resolve, evaluate, list)) },
 	"chain-two-paths": func() { chain(project, plainExportType, own(importLift, parse, importParsed, format)) },

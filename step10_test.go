@@ -451,6 +451,24 @@ func TestChainJennyFaults(t *testing.T) {
 	s.done()
 }
 
+// TestChainCodesThroughJenny: a bytes lift's rejection wraps the error its
+// generator returned, through decl.Reject and the jenny's own wrapping, so
+// the project's Codes finds it with errors.As.
+func TestChainCodesThroughJenny(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "chain")
+	coded := "testdata/export/coded.txtar"
+	s.write(coded, []byte("import rejects the export with an error that has a code.\n-- properties --\nunterminated\n-- in/import/coded --\nC101\n"), "an export import rejects with a *codedError")
+	s.passes(s.update("chain-codes"))
+	s.cat(coded)
+	s.hasSections(coded, map[string]string{
+		"out/import/outcome":   "rejected C101\n",
+		"out/import/error.txt": "import: an error with the code C101\n",
+	}, "via/")
+	s.passes(s.normal("chain-codes"))
+	s.done()
+}
+
 // TestChainCheck: a corpus check's Cell holds a bytes lift's committed
 // product, which it reads when the lift now makes another.
 func TestChainCheck(t *testing.T) {
