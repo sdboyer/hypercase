@@ -1,34 +1,37 @@
 $ go test  # echo
-    marker: The output holds a line shaped like a section marker.
+    script/marker: The output holds a line shaped like a section marker.
         echo: Does what the case's do/ tree says.
         out/echo/values.txt can't be held in an archive: its line 2 is shaped like a section marker, which starts another section when the archive is read.
         Fix the code so the output can be held. An update writes nothing for this cell.
-    no-newline: The output has no final newline.
+    script/no-newline: The output has no final newline.
         echo: Does what the case's do/ tree says.
         out/echo/values.txt can't be held in an archive: it has no final newline, which an archive adds.
         Fix the code so the output can be held. An update writes nothing for this cell.
-        out/echo/other.txt has no golden.
+        out/echo/b.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
 --- FAIL: TestCorpus
-    --- FAIL: TestCorpus/marker
-        --- FAIL: TestCorpus/marker/echo
-    --- FAIL: TestCorpus/no-newline
-        --- FAIL: TestCorpus/no-newline/echo
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/marker
+            --- FAIL: TestCorpus/script/marker/echo
+        --- FAIL: TestCorpus/script/no-newline
+            --- FAIL: TestCorpus/script/no-newline/echo
 FAIL
 [exit 1]
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
-    marker: The output holds a line shaped like a section marker.
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/marker: The output holds a line shaped like a section marker.
         echo: Does what the case's do/ tree says.
         out/echo/values.txt can't be held in an archive: its line 2 is shaped like a section marker, which starts another section when the archive is read.
         Fix the code so the output can be held. An update writes nothing for this cell.
-    no-newline: The output has no final newline.
+    script/no-newline: The output has no final newline.
         echo: Does what the case's do/ tree says.
         out/echo/values.txt can't be held in an archive: it has no final newline, which an archive adds.
         Fix the code so the output can be held. An update writes nothing for this cell.
 --- FAIL: TestCorpus
-    --- FAIL: TestCorpus/marker
-        --- FAIL: TestCorpus/marker/echo
-    --- FAIL: TestCorpus/no-newline
-        --- FAIL: TestCorpus/no-newline/echo
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/marker
+            --- FAIL: TestCorpus/script/marker/echo
+        --- FAIL: TestCorpus/script/no-newline
+            --- FAIL: TestCorpus/script/no-newline/echo
 FAIL
 [exit 1]

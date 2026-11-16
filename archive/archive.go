@@ -31,12 +31,14 @@ type Section struct {
 }
 
 // Parse parses an archive. txtar has no syntax errors, so Parse always
-// succeeds; [Archive.Check] reports problems of the archive's form.
+// succeeds; [Archive.Check] reports problems of the archive's form. The
+// comment and the sections' data share data's bytes, each clipped to its
+// length, so an append to one never writes over the next.
 func Parse(data []byte) *Archive {
 	ta := txtar.Parse(data)
-	a := &Archive{Comment: ta.Comment}
+	a := &Archive{Comment: slices.Clip(ta.Comment)}
 	for _, f := range ta.Files {
-		a.Sections = append(a.Sections, Section{Name: f.Name, Data: f.Data})
+		a.Sections = append(a.Sections, Section{Name: f.Name, Data: slices.Clip(f.Data)})
 	}
 	return a
 }

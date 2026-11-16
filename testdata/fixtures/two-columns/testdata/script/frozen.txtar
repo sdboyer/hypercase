@@ -1,0 +1,11 @@
+shout prints A1 wrongly, a known gap in its cell alone.
+-- in/do/out/values.txt --
+A1 6
+-- in/shout/out/values.txt --
+A1 SIX!
+-- gaps --
+shout A1 is SIX, not SIX!. Waits on sheets#11.
+-- out/echo/values.txt --
+A1 6
+-- out/shout/values.txt --
+A1 SIX!

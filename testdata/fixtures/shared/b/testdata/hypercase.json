@@ -1,0 +1,41 @@
+{
+  "format": 1,
+  "updateVar": "FIXTURE_UPDATE_GOLDEN",
+  "corpusRoot": ".",
+  "rootPackage": false,
+  "properties": [],
+  "suites": [
+    {
+      "name": "shout",
+      "description": "Does what the case's shout/ tree says.",
+      "corpus": "script",
+      "outputs": [
+        {
+          "pattern": "?.txt",
+          "description": "A file the case's instructions name with one letter."
+        },
+        {
+          "pattern": "dir.txt",
+          "description": "The path of a temp dir the run made."
+        },
+        {
+          "pattern": "error.txt",
+          "description": "The error the case's instructions give."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "What the case's instructions write to stderr."
+        },
+        {
+          "pattern": "stdout.txt",
+          "description": "What the case's instructions write to stdout."
+        },
+        {
+          "pattern": "values.txt",
+          "description": "The values the case's instructions give."
+        }
+      ],
+      "rejects": []
+    }
+  ]
+}

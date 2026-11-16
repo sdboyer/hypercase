@@ -1,0 +1,9 @@
+A1 is twice B1, which both columns print.
+-- in/do/out/values.txt --
+A1 6
+-- in/shout/out/values.txt --
+A1 SIX
+-- out/echo/values.txt --
+A1 6
+-- out/shout/values.txt --
+A1 SIX

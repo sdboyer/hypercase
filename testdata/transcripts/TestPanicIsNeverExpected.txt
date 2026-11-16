@@ -1,5 +1,5 @@
 $ go test  # rejects
-    loop: A1 and B1 refer to each other, and the code panics instead of rejecting the sheet.
+    script/loop: A1 and B1 refer to each other, and the code panics instead of rejecting the sheet.
         echo: Does what the case's do/ tree says.
         echo panicked: stack overflow
         Fix the code. A panic is never an expected error.
@@ -7,22 +7,25 @@ $ go test  # rejects
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     stack of the panic: [stack]
 --- FAIL: TestCorpus
-    --- FAIL: TestCorpus/loop
-        --- FAIL: TestCorpus/loop/echo
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/loop
+            --- FAIL: TestCorpus/script/loop/echo
 FAIL
 [exit 1]
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
-    loop: A1 and B1 refer to each other, and the code panics instead of rejecting the sheet.
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/loop: A1 and B1 refer to each other, and the code panics instead of rejecting the sheet.
         echo: Does what the case's do/ tree says.
         echo panicked: stack overflow
         Fix the code. A panic is never an expected error.
     stack of the panic: [stack]
 --- FAIL: TestCorpus
-    --- FAIL: TestCorpus/loop
-        --- FAIL: TestCorpus/loop/echo
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/loop
+            --- FAIL: TestCorpus/script/loop/echo
 FAIL
 [exit 1]
-$ cat testdata/loop.txtar
+$ cat testdata/script/loop.txtar
 A1 and B1 refer to each other, and the code panics instead of rejecting the sheet.
 -- in/do/panic --
 stack overflow
@@ -30,9 +33,10 @@ stack overflow
 circular
 -- out/echo/error.txt --
 stack overflow
-$ edit testdata/loop.txtar  # mark the cell as a known gap
+$ edit testdata/script/loop.txtar  # mark the cell as a known gap
 $ go test  # rejects
 --- PASS: TestCorpus
-    --- PASS: TestCorpus/loop
-        --- PASS: TestCorpus/loop/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
 PASS

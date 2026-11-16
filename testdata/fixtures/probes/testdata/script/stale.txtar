@@ -1,0 +1,5 @@
+The probe now says no, and the cell has files from when it said yes.
+-- in/do/probe --
+no formulas
+-- out/echo/values.txt --
+A1 6

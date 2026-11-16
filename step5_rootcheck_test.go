@@ -1,0 +1,145 @@
+package hypercase_test
+
+import (
+	"strings"
+	"testing"
+)
+
+// Step 5: the root-package check, over the fixture shared.
+
+func TestRootCheckRemovedSuite(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	before := s.read(twice)
+	s.passes(s.run("b", "pkg-b-gone", true))
+	want := "testdata/script/twice.txtar: no registry claims out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place."
+	s.fails(s.normal("pkg-a"), want)
+	s.passes(s.update("pkg-a"))
+	s.same(twice, before)
+	s.fails(s.normal("pkg-a"), want)
+	s.done()
+}
+
+func TestRootCheckColumnTwice(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.run("b", "pkg-b-echo", true)
+	s.fails(s.normal("pkg-a"), "the column echo is registered by . and ./b. Column names are unique per corpus root.\nRename one of the columns, or remove one.")
+	s.done()
+}
+
+func TestRootCheckPropertyEntries(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.passes(s.update("pkg-a-circular"))
+	s.passes(s.run("b", "pkg-b-circular", true))
+	// One property declared once and registered by both is one property.
+	s.passes(s.normal("pkg-a-circular"))
+	s.passes(s.run("b", "pkg-b-loop", true))
+	s.fails(s.normal("pkg-a-circular"), "the property circular has two different entries:\n  .: \"Some cell's formula refers back to itself, directly or through other cells.\"\n  ./b: \"A loop.\"\nDeclare the property once, in a package the others import, and register that declaration.")
+	s.done()
+}
+
+// TestStatementsOfAnotherPackage: a package checks its cells against the
+// properties a case states and the gaps lines naming its own columns, and
+// leaves the rest to the package that registers them.
+func TestStatementsOfAnotherPackage(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.write("testdata/script/loop.txtar", []byte("A1 refers to itself, which only b's shout rejects.\n-- in/do/out/values.txt --\nA1 0\n-- in/shout/error --\nA1 -> A1: cycle\n-- properties --\ncircular\n-- out/echo/values.txt --\nA1 0\n-- out/shout/error.txt --\nA1 -> A1: cycle\n"), "a case that states a property only b registers")
+	s.write("testdata/script/gapped.txtar", []byte("shout prints A1 wrongly, a known gap in b's cell.\n-- in/do/out/values.txt --\nA1 6\n-- in/shout/out/values.txt --\nA1 SEVEN\n-- gaps --\nshout A1 is SIX. Waits on sheets#15.\n-- out/echo/values.txt --\nA1 6\n-- out/shout/values.txt --\nA1 SIX\n"), "a gaps line naming b's column, whose cell now differs")
+	// b's update writes loop's cell, and fails on its frozen one, as committed.
+	s.fails(s.run("b", "pkg-b-circular", true), "The cell is frozen by its known gap")
+	s.cat("testdata/script/gapped.txtar")
+	s.passes(s.normal("pkg-a"))
+	s.fails(s.run("b", "pkg-b-circular", false), "--- PASS: TestCorpus/script/loop/shout", "--- FAIL: TestCorpus/script/gapped/shout", "The cell is frozen by its known gap")
+	s.done()
+}
+
+// TestRootCheckArchives: the problems of an archive as a whole fail the
+// root-package check alone, and no package's cells.
+func TestRootCheckArchives(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	data := string(s.read(twice))
+	s.write("testdata/script/nameless.txtar", []byte(data[strings.Index(data, "-- "):]), "an archive with no description")
+	s.write("testdata/script/loopy.txtar", []byte("A case that states a property nothing declares.\n-- in/do/out/values.txt --\nA1 6\n-- properties --\nloopy\n-- gaps --\nformat A1 prints as =6. Waits on sheets#8.\n-- out/echo/values.txt --\nA1 6\n"), "a case with a property and a gaps line nothing declares")
+	s.write("testdata/script/typo.txtar", []byte("A section outside the closed set.\n-- ni/do/out/values.txt --\nA1 6\n"), "an archive with a problem of form")
+	s.write("testdata/script/old/x.txtar", []byte("An archive in a directory below a corpus's.\n"), "an archive in no corpus's directory")
+	s.write("testdata/renamed/x.txtar", []byte("An archive of a corpus whose directory was renamed in Go.\n"), "an archive in a directory no registry declares")
+	s.write("testdata/x.txtar", []byte("An archive directly in testdata/.\n"), "an archive directly in testdata/")
+	typo := s.read("testdata/script/typo.txtar")
+	b := s.run("b", "pkg-b", false)
+	s.passes(b)
+	s.contains(b, "testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.")
+	s.fails(s.normal("pkg-a"),
+		"testdata/script/nameless.txtar: the archive has no description",
+		"testdata/script/loopy.txtar: properties states loopy, and no registry under the module-root corpus lists a property of that name.",
+		"testdata/script/loopy.txtar: gaps, line 1, names format, and no registry has a column of that name over the corpus script.",
+		"testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it:\n  ni/do/out/values.txt: ni is not one of the framework's top-level names",
+		"testdata/script/old/ holds archives, and no registry declares it as a corpus.",
+		"testdata/renamed/ holds archives, and no registry declares it as a corpus.\nDeclare the directory as a suite's corpus, or move or delete the archives.",
+		"testdata/ holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.\nMove the archives into one.",
+		"--- PASS: TestCorpus/script/nameless/echo",
+		"--- PASS: TestCorpus/script/loopy/echo")
+	s.passes(s.run("b", "pkg-b", true))
+	s.same("testdata/script/typo.txtar", typo)
+	s.done()
+}
+
+// TestRootCheckDeclaredDirectory: a directory a registry declares, and
+// that doesn't exist yet, is fine.
+func TestRootCheckDeclaredDirectory(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.run("b", "pkg-b-later", true)
+	s.remove("testdata/script/twice.txtar", "")
+	s.write(twice, []byte("A1 is twice B1, and only echo prints it.\n-- in/do/out/values.txt --\nA1 6\n-- out/echo/values.txt --\nA1 6\n"), "")
+	r := s.normal("pkg-a")
+	s.passes(r)
+	s.done()
+}
+
+func TestRootCheckRegistries(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.remove("b/corpus_test.go", "b's tests are deleted, and its registry left behind")
+	s.fails(s.normal("pkg-a"), "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests.")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "restore b's tests")
+	s.write("b/testdata/hypercase.json", []byte("{\n  \"format\": 9\n}\n"), "a registry from a later hypercase")
+	s.fails(s.normal("pkg-a"), "b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format 1.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.")
+	s.done()
+}
+
+// TestRootCheckRequired: every package's normal run over a corpus root
+// fails while no registry records a root-package check for it.
+func TestRootCheckRequired(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	want := "no registry records a root-package check for the module-root corpus, so nothing reports what no column there owns.\nRegister hypercase.RootPackage() in one package over it, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... to record it in the package's registry."
+	s.passes(s.update("pkg-a-noroot"))
+	s.fails(s.normal("pkg-a-noroot"), want)
+	s.fails(s.run("b", "pkg-b", false), want)
+	s.passes(s.run("b", "pkg-b", true))
+
+	// A package over another corpus root needs that root's check.
+	s.write("other/testdata/script/twice.txtar", s.read(twice), "a corpus under the root other")
+	s.passes(s.update("pkg-a"))
+	s.passes(s.run("b", "pkg-b-other", true))
+	s.fails(s.run("b", "pkg-b-other", false), "no registry records a root-package check for the corpus root other")
+	// a's root has its check. What it reports is b's sections, which no column over it claims now.
+	r := s.normal("pkg-a")
+	s.fails(r, "no registry claims out/shout/values.txt")
+	s.lacks(r, "no registry records a root-package check")
+	s.done()
+}
+
+func TestTwoRootPackages(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.write("corp/testdata/script/twice.txtar", s.read(twice), "a corpus under the root corp")
+	s.passes(s.update("corp-a"))
+	s.passes(s.run("b", "corp-b", true))
+	s.fails(s.normal("corp-a"), ". and ./b register the root-package check for the corpus root corp. It runs once per corpus root.\nRegister it in one package.")
+	s.done()
+}

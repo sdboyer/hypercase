@@ -1,12 +1,14 @@
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo-nodesc
     the suite echo has no description.
         Add one: it says what the suite does, in prose.
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
 --- FAIL: TestCorpus
-    --- PASS: TestCorpus/twice
-        --- PASS: TestCorpus/twice/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
 FAIL
 [exit 1]
-$ cat testdata/twice.txtar
+$ cat testdata/script/twice.txtar
 A1 is twice B1, with no golden yet.
 -- in/do/out/values.txt --
 A1 6
@@ -18,7 +20,8 @@ $ go test  # echo-nodesc
     the suite echo has no description.
         Add one: it says what the suite does, in prose.
 --- FAIL: TestCorpus
-    --- PASS: TestCorpus/twice
-        --- PASS: TestCorpus/twice/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
 FAIL
 [exit 1]

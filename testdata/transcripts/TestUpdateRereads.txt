@@ -1,0 +1,111 @@
+$ edit testdata/script/twice.txtar  # echo's run adds a line to in/note/text, as a person's edit during the update would
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    testdata/script/twice.txtar changed while the update ran: its comment or hand-written sections differ from those its cells ran on, so the update wrote nothing to it.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ edit testdata/script/twice.txtar  # echo's run adds a line to comment, as a person's edit during the update would
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    testdata/script/twice.txtar changed while the update ran: its comment or hand-written sections differ from those its cells ran on, so the update wrote nothing to it.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ edit testdata/script/twice.txtar  # echo's run adds a line to properties, as a person's edit during the update would
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    testdata/script/twice.txtar changed while the update ran: its comment or hand-written sections differ from those its cells ran on, so the update wrote nothing to it.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ edit testdata/script/twice.txtar  # echo's run adds a line to gaps, as a person's edit during the update would
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    testdata/script/twice.txtar changed while the update ran: its comment or hand-written sections differ from those its cells ran on, so the update wrote nothing to it.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ cat testdata/script/twice.txtar
+A1 is twice B1. The root package, ., prints it with echo, and ./b with shout.
+-- in/note/text --
+A note.
+-- properties --
+circular
+-- gaps --
+shout A1 is SIX. Waits on sheets#14.
+format A1 prints as =6. Waits on sheets#8.
+-- in/do/out/values.txt --
+A1 6
+-- in/shout/out/values.txt --
+A1 SIX
+-- in/do/edit --
+gaps
+format A1 prints as =6. Waits on sheets#8.
+-- out/echo/values.txt --
+A1 6
+$ edit testdata/script/twice.txtar  # echo's run adds a line to b's section
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ cat testdata/script/twice.txtar
+A1 is twice B1. The root package, ., prints it with echo, and ./b with shout.
+-- in/do/out/values.txt --
+A1 6
+-- in/shout/out/values.txt --
+A1 SIX
+-- in/do/edit --
+out/shout/values.txt
+-- out/echo/values.txt --
+A1 6
+-- out/shout/values.txt --
+A1 SIX
+edited

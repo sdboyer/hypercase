@@ -1,5 +1,6 @@
-$ go test -run=TestCorpus/calm/echo  # echo
+$ go test -run=TestCorpus/script/calm/echo  # echo
 --- PASS: TestCorpus
-    --- PASS: TestCorpus/calm
-        --- PASS: TestCorpus/calm/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/calm
+            --- PASS: TestCorpus/script/calm/echo
 PASS

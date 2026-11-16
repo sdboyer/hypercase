@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -92,8 +93,17 @@ func newSandbox(t *testing.T, fixture string) *sandbox {
 	if err := os.WriteFile(filepath.Join(s.dir, "go.mod"), []byte("module example.com/fixture\n\ngo 1.27\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// The root package's test file: the root-package check requires one
+	// beside every registry. A fixture's other packages commit their own.
+	if err := os.WriteFile(filepath.Join(s.dir, "corpus_test.go"), []byte(packageTestFile), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	return s
 }
+
+// packageTestFile marks a fixture's directory as a package with tests. The
+// child is this package's test binary, so the file is never compiled.
+const packageTestFile = "package fixture\n"
 
 // result is what one child run left.
 type result struct {
@@ -117,12 +127,54 @@ func (s *sandbox) run(pkg, registration string, update bool, args ...string) res
 // runEnv runs the child with extra environment variables.
 func (s *sandbox) runEnv(pkg, registration string, extra []string, args ...string) result {
 	s.t.Helper()
+	r := s.exec(pkg, registration, extra, args...)
+	s.record(pkg, registration, extra, args, r)
+	return r
+}
+
+// parallel runs several children at once, as go test ./... runs packages,
+// and records them in the order given.
+func (s *sandbox) parallel(runs ...childRun) []result {
+	s.t.Helper()
+	results := make([]result, len(runs))
+	done := make(chan struct{})
+	for i, c := range runs {
+		go func() {
+			defer func() { done <- struct{}{} }()
+			results[i] = s.exec(c.pkg, c.registration, c.env())
+		}()
+	}
+	for range runs {
+		<-done
+	}
+	for i, c := range runs {
+		s.record(c.pkg, c.registration, c.env(), nil, results[i])
+	}
+	return results
+}
+
+// A childRun is one child of a parallel run.
+type childRun struct {
+	pkg, registration string
+	update            bool
+}
+
+func (c childRun) env() []string {
+	if c.update {
+		return []string{fixtureUpdate + "=1"}
+	}
+	return nil
+}
+
+// exec runs the child, and returns its normalized output and exit code.
+// It only reports a failure to start it, so it can run on any goroutine.
+func (s *sandbox) exec(pkg, registration string, extra []string, args ...string) result {
 	cmd := exec.Command(os.Args[0], append([]string{"-test.run=^TestCorpus$", "-test.v", "-test.count=1"}, args...)...)
 	cmd.Dir = filepath.Join(s.dir, pkg)
 	var env []string
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
-		if k != fixtureEnv && k != fixtureUpdate && k != transcriptsVar && k != "GOFLAGS" {
+		if k != fixtureEnv && k != fixtureUpdate && k != transcriptsVar && k != "GOFLAGS" && k != "PWD" {
 			env = append(env, kv)
 		}
 	}
@@ -135,9 +187,13 @@ func (s *sandbox) runEnv(pkg, registration string, extra []string, args ...strin
 	if errors.As(err, &exit) {
 		r.code = exit.ExitCode()
 	} else if err != nil {
-		s.t.Fatalf("running the child: %v", err)
+		r.code = -1
+		r.out += fmt.Sprintf("running the child: %v\n", err)
 	}
+	return r
+}
 
+func (s *sandbox) record(pkg, registration string, extra, args []string, r result) {
 	cmdline := strings.Join(append(slices.Clone(extra), "go test"), " ")
 	if pkg != "" && pkg != "." {
 		cmdline += " ./" + pkg
@@ -149,7 +205,6 @@ func (s *sandbox) runEnv(pkg, registration string, extra []string, args ...strin
 	if r.code != 0 {
 		fmt.Fprintf(&s.transcript, "[exit %d]\n", r.code)
 	}
-	return r
 }
 
 func (s *sandbox) normal(registration string, args ...string) result {
@@ -231,6 +286,63 @@ func (s *sandbox) write(rel string, data []byte, why string) {
 func (s *sandbox) cat(rel string) {
 	s.t.Helper()
 	fmt.Fprintf(&s.transcript, "$ cat %s\n%s", rel, s.read(rel))
+}
+
+// remove removes a file in the sandbox, as a person's edit, and notes it.
+func (s *sandbox) remove(rel, why string) {
+	s.t.Helper()
+	if err := os.Remove(s.path(rel)); err != nil {
+		s.t.Fatal(err)
+	}
+	fmt.Fprintf(&s.transcript, "$ rm %s  # %s\n", rel, why)
+}
+
+// exists reports whether a file is in the sandbox.
+func (s *sandbox) exists(rel string) bool {
+	_, err := os.Stat(s.path(rel))
+	return err == nil
+}
+
+// snapshot returns every file in the sandbox, by slash path.
+func (s *sandbox) snapshot() map[string][]byte {
+	s.t.Helper()
+	files := map[string][]byte{}
+	err := filepath.WalkDir(s.dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(s.dir, p)
+		files[filepath.ToSlash(rel)] = data
+		return nil
+	})
+	if err != nil {
+		s.t.Fatal(err)
+	}
+	return files
+}
+
+// unchanged checks the sandbox holds the files of a snapshot, and no
+// others.
+func (s *sandbox) unchanged(before map[string][]byte) {
+	s.t.Helper()
+	after := s.snapshot()
+	for _, p := range slices.Sorted(maps.Keys(before)) {
+		data := before[p]
+		if got, ok := after[p]; !ok {
+			s.t.Errorf("%s was removed", p)
+		} else if !bytes.Equal(got, data) {
+			s.t.Errorf("%s changed (-before +after):\n%s", p, diff.Lines(data, got))
+		}
+	}
+	for _, p := range slices.Sorted(maps.Keys(after)) {
+		if _, ok := before[p]; !ok {
+			s.t.Errorf("%s was created", p)
+		}
+	}
 }
 
 // note records a line in the transcript.
