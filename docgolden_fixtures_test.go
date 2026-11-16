@@ -130,6 +130,36 @@ func TestDocGoldenRegion(t *testing.T) {
 	checkDoc(t, root, false)
 }
 
+// A region is shown without the blank lines at its start and end, which
+// gofmt puts between a declaration and a delimiter after it, and with those
+// inside it. Blank lines that a nested delimiter leaves at an edge go too.
+func TestDocGoldenRegionTrimsBlankLines(t *testing.T) {
+	source := "package a\n" +
+		"\n" +
+		"// doc:begin f\n" +
+		"\n" +
+		"// doc:begin g\n" +
+		"func f() {\n" +
+		"\tx()\n" +
+		"\n" +
+		"\ty()\n" +
+		"}\n" +
+		" \t\n" +
+		"// doc:end g\n" +
+		"\n" +
+		"// doc:end f\n"
+	block := func(src string) string { return "<!-- source: walkthrough/a/x.go" + src + " -->\n```go\nstale\n```\n" }
+	root := docFixture(t, map[string]string{"doc.md": block("#f") + block("#g"), "walkthrough/a/x.go": source})
+
+	checkDoc(t, root, true)
+	shown := "```go\nfunc f() {\n\tx()\n\n\ty()\n}\n```\n"
+	want := "<!-- source: walkthrough/a/x.go#f -->\n" + shown + "<!-- source: walkthrough/a/x.go#g -->\n" + shown
+	if got := readDoc(t, root); got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+	checkDoc(t, root, false)
+}
+
 // An update rewrites the marked blocks and nothing else: prose, unmarked
 // blocks and the doc's last line, without a newline, keep their bytes.
 func TestDocGoldenUpdateKeepsTheRest(t *testing.T) {

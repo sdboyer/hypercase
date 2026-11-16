@@ -40,6 +40,15 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Gofmt
+        run: |
+          # gofmt -l lists each file it would change, the toy's included.
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "$unformatted"
+            exit 1
+          fi
+
       - name: Test
         run: go test ./...
 

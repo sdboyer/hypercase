@@ -9,10 +9,10 @@ useful without the later ones, and hypercase is worth having even if step 12
 never pans out.
 
 hypercase is one framework, with everything on. It has no levels to opt into.
-A project that upgrades to a later commit carries what later steps add: a
-root-package test (step 5), an `outcome` file per cell (step 8), and `Inputs`
-or `AllInputs` on every output declaration (step 11). Earlier steps' examples
-keep running, and gain what later steps require.
+A project that upgrades to a later commit carries what later steps add: an
+`outcome` file per cell (step 8), and `Inputs` or `AllInputs` on every output
+declaration (step 11). Earlier steps' examples keep running, and gain what
+later steps require.
 
 Every step is shown in one toy domain, spreadsheet formulas, which step 1
 introduces. Steps 1 to 11 show the Go an author writes at that
@@ -52,8 +52,7 @@ walkthrough/
   checkout, and its dependencies stay out of hypercase's `go.mod`. CI runs
   `go test ./...` at the repository root and at the toy's root.
 - Each step's example is a package of its own. From step 3, each step's
-  directory also holds that step's corpus (step 5), so no two steps' cases
-  meet.
+  directory is also that step's corpus root, so no two steps' cases meet.
 - Trade-off: a module of its own keeps the toy's dependencies out of
   hypercase's `go.mod`, at the cost of a second `go test` run in CI. Through
   the `replace`, the toy builds only against the checkout, never a release.
@@ -216,50 +215,72 @@ define the flag, such as `step01`.
 
 A **case** is one input to the code under test. An **archive** is one
 [txtar](https://pkg.go.dev/golang.org/x/tools/txtar) file holding one case:
-its description, its inputs and its goldens. The **run** is the Go that
-answers every archive: it reads a case's inputs and returns the outputs to
-compare.
+its description, its inputs and its goldens. A **corpus** is a directory of
+archives, `testdata/<corpus>/` under the **corpus root**. A **suite** is the
+Go that answers every archive of a corpus: its run reads a case's inputs and
+returns the outputs to compare.
 
-Proposed names: `hypercase.Run`, `hypercase.File`, `hypercase.Register`,
-`hypercase.Test`, and `decl.Project` with its `UpdateVar` field. `decl` is
-hypercase's package for declarations. It doesn't import `testing`, so a
-project's ordinary packages can hold what they declare. Trade-off: a
-project's commands can use its declarations, at the cost of a second import
-in every test file.
+Proposed names: `hypercase.Suite` with its `Name`, `Description`, `Corpus`,
+`Outputs` and `Run` fields; `hypercase.File`; `decl.Output`;
+`hypercase.Register`; `hypercase.Root`, the option that passes a corpus root
+as a path relative to the module root; `hypercase.RootPackage`, which
+registers the root-package check (step 5); `hypercase.Test`; and
+`decl.Project` with its `UpdateVar` field. `decl` is hypercase's package for
+declarations. It doesn't import `testing`, so a project's ordinary packages
+can hold what they declare. Trade-off: a project's commands can use its
+declarations, at the cost of a second import in every test file.
 
+A suite's type argument is the type it consumes. Through step 5 it is
+`fs.FS`, the case's input view, and the suite names its corpus as `Corpus`:
+`sheet`, for the archives under `testdata/sheet/`. Step 6 adds the other
+types a suite can consume.
+
+The corpus root is the module root unless a package passes another with
+`hypercase.Root`. The walkthrough's examples pass their own directory, so
+each step's corpus stands alone. A project with one corpus at its module
+root passes nothing. One package per corpus root registers
+`hypercase.RootPackage()`.
+
+<!-- source: walkthrough/sheets/step03/sheetcorpus/project.go -->
 ```go
 // walkthrough/sheets/step03/sheetcorpus/project.go
 package sheetcorpus
 
 import "github.com/sdboyer/hypercase/decl"
 
-// Project is what the sheets project supplies to hypercase.
 var Project = decl.Project{
 	UpdateVar: "SHEETS_UPDATE_GOLDEN",
 }
 ```
 
+<!-- source: walkthrough/sheets/step03/evaluate_test.go -->
 ```go
 // walkthrough/sheets/step03/evaluate_test.go
 package step03
 
 import (
+	"io"
 	"io/fs"
 	"testing"
 
 	"github.com/sdboyer/hypercase"
+	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step03/sheetcorpus"
 )
 
 func init() {
-	hypercase.Register(sheetcorpus.Project, evaluate)
+	hypercase.Register(sheetcorpus.Project, hypercase.Root("step03"), hypercase.RootPackage(), evaluate)
 }
 
-var evaluate = hypercase.Run{
+var evaluate = hypercase.Suite[fs.FS]{
 	Name:        "evaluate",
 	Description: "Evaluates every cell of the sheet.",
-	Run: func(t testing.TB, in fs.FS) ([]hypercase.File, error) {
+	Corpus:      "sheet",
+	Outputs: []decl.Output{
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+	},
+	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		values, err := sheet.Eval(in) // the cells under sheet/
 		if err != nil {
 			return nil, err
@@ -273,8 +294,10 @@ func TestCorpus(t *testing.T) { hypercase.Test(t) }
 
 ### How the files change
 
-Each table row and its golden become one archive. `testdata/twice.txtar`:
+Each table row and its golden become one archive of the corpus `sheet`.
+`testdata/sheet/twice.txtar`:
 
+<!-- source: walkthrough/sheets/step03/testdata/sheet/twice.txtar -->
 ```
 A1 is twice B1.
 -- in/sheet/A1 --
@@ -286,20 +309,32 @@ A1 6
 B1 3
 ```
 
+The package also writes its registry, `testdata/hypercase.json`, which lists
+what it registers (step 5).
+
 The project tells git that archives are not text, so no checkout rewrites
 their line endings. Its `.gitattributes` holds:
 
+<!-- source: walkthrough/sheets/.gitattributes -->
 ```
 *.txtar -text
+```
+
+Its `.gitignore` names the corpus root's lock, which an update takes
+(step 5):
+
+<!-- source: walkthrough/sheets/.gitignore -->
+```
+.hypercase.lock
 ```
 
 ### Rules
 
 **The archive.**
 
-- A case is one archive. Its file name, less `.txtar`, is the archive's name,
-  which names the case. At this step a package's archives are its own
-  `testdata/*.txtar`; step 5 moves them under a corpus root.
+- A case is one archive. Its file name, less `.txtar`, is the archive's
+  name. A corpus's archives are `testdata/<corpus>/*.txtar` under the corpus
+  root.
 - The archive's **comment**, the text before its first `-- name --` line, is
   the case's description, in prose. It is required. It holds no `key: value`
   lines: nothing in it names the case's type or sets a parameter.
@@ -313,32 +348,49 @@ their line endings. Its `.gitattributes` holds:
   reserved as a tree name under `in/` (step 6), and `checks` as a directory
   name under `testdata/` (step 8).
 
-**The run.**
+**The suite.**
 
-- A run has a name and a description, and its outputs are under
-  `out/<run>/…`. A **column** is something every case runs through, and a
+- A suite has a name and a description, and its outputs are under
+  `out/<suite>/…`. A **column** is something every case runs through, and a
   **cell** is one case run through one column. Cases and columns make a
-  **matrix**. The run is a matrix with one column: step 5 adds columns, and
-  the archive's own layout doesn't change.
-- An archive carries no parameters. What the run does is fixed in Go and
+  **matrix**, and each suite is a column. A package may register several
+  suites over one corpus; step 3's example registers one, so its matrix has
+  one column. Each column's outputs sit under its own `out/<suite>/`, so the
+  archive's layout holds any number of them.
+- An archive carries no parameters. What the suite does is fixed in Go and
   said in its description, and so is anything it could vary (step 6 states
   the rule).
-- The run receives a `testing.TB` and the input view, and returns its output
-  files and an error. It reports its own failures through the `testing.TB`,
-  such as a fixture it can't set up. The error it returns is only what the
-  code under test rejected.
+- Its run receives a `testing.TB`, the archive's name, the input view, and
+  one `io.Writer` each for stdout and stderr, and returns its output files
+  and an error. It reports its own failures through the `testing.TB`, such
+  as a fixture it can't set up. The error it returns is only what the code
+  under test rejected.
+- What the run writes to stdout and stderr is compared as the `stdout.txt`
+  and `stderr.txt` goldens. Each of those files exists when the run wrote to
+  its stream. The process's `os.Stdout` is never replaced.
 - At this step an error fails its case; step 4 lets a case expect one. The
-  error is recorded as `out/<run>/error.txt`: its text, with a final newline.
-  When the run errs, the outputs it did produce are still compared.
-- `error.txt` directly under a column's directory is the framework's, and so
-  are the names later steps add there: `stdout.txt` and `stderr.txt`
-  (step 5), `outcome` (step 8) and `inputs` (step 11). A run that returns an
-  output at one of them fails its case.
+  error is recorded as `out/<suite>/error.txt`, its text with a final
+  newline, when the suite declares `error.txt` (below), and an update writes
+  it there though the cell still fails. Step 3's example declares none,
+  since none of its cases errs: an error there also fails as an undeclared
+  output, and an update writes nothing for its cell. When the run errs, the
+  outputs it did produce are still compared.
+- `error.txt`, `stdout.txt` and `stderr.txt` directly under a column's
+  directory are the framework's, and so are the names later steps add there:
+  `outcome` (step 8) and `inputs` (step 11). A run that returns an output at
+  one of them fails its case.
 - Making output deterministic, such as paths, times or addresses, is the
   run's job. The framework normalizes nothing.
-- The run is registered when its package is initialized, before any test
+- The suite is registered when its package is initialized, before any test
   runs. A test function runs what was registered, and registers nothing.
   Step 5 states the rule for everything a registry lists.
+
+**Declared outputs.**
+
+- Every output is declared with a description, `stdout.txt`, `stderr.txt`
+  and `error.txt` included. An undeclared output fails the cell.
+- A declaration's pattern matches paths under the column's directory. A file
+  that two declarations match fails the cell, naming both.
 
 **Comparison.**
 
@@ -423,17 +475,21 @@ their line endings. Its `.gitattributes` holds:
 **Names** (proposed).
 
 - A name is lowercase ASCII letters and digits, in words joined by single
-  hyphens, starting with a letter: `twice`, `open-quote`. The rule
-  covers archive and column names here, and property names (step 4), corpus
-  directories (step 6), variant and transform names (step 7) and check names
+  hyphens, starting with a letter: `twice`, `open-quote`. The rule covers
+  the names of archives, columns and corpus directories here, and property
+  names (step 4), variant and transform names (step 7) and check names
   (step 8). Such a name never collides with another on a case-insensitive
   filesystem, never needs quoting in `-run`, and never holds the space that
   ends a column's name in a `gaps` line (step 4).
 - A project can't narrow the rule. A parameter derived from an archive's
   name (step 6) follows a convention that accepts every name the rule
   admits.
-- A cell's subtest is named `<case>/<column>`: `TestCorpus/twice/evaluate`.
-  `go test -run 'TestCorpus/twice/'` runs one case's cells.
+- A case is named for its corpus's directory and its archive: the case
+  `sheet/twice`. A cell's subtest is named `<case>/<column>`:
+  `TestCorpus/sheet/twice/evaluate`. `go test -run 'TestCorpus/sheet/twice/'`
+  runs one case's cells. Two archives with one name in different corpora are
+  two cases with two names (step 10). Trade-off: no pair of archives has to
+  be refused, at the cost of a longer name for every case.
 - Trade-off: one strict rule everywhere keeps names safe on every
   filesystem and in every `-run` pattern, at the cost of names that can't
   carry case or punctuation. A column that derives a parameter from an
@@ -441,10 +497,10 @@ their line endings. Its `.gitattributes` holds:
 
 **Descriptions.**
 
-- The archive's comment and the run's description are required. A missing
-  description fails the run, but does not stop an update from writing
-  outputs. Each later step names what else needs a description, under the
-  same rule.
+- The archive's comment, the suite's description and each output
+  declaration's description are required. A missing description fails the
+  run, but does not stop an update from writing outputs. Each later step
+  names what else needs a description, under the same rule.
 
 ### What can now be seen
 
@@ -455,8 +511,8 @@ their line endings. Its `.gitattributes` holds:
   with what to do. For illustration:
 
   ```
-  --- FAIL: TestCorpus/twice/evaluate
-      twice: A1 is twice B1.
+  --- FAIL: TestCorpus/sheet/twice/evaluate
+      sheet/twice: A1 is twice B1.
       evaluate: Evaluates every cell of the sheet.
       out/evaluate/values.txt differs (-golden +got):
       - A1 6
@@ -467,11 +523,10 @@ their line endings. Its `.gitattributes` holds:
 
 **When to add an archive** (proposed): when an input makes a point no
 existing archive makes. A further behavior of an existing input is another
-output of the run (from step 5, perhaps another column), never a copy of the
-archive. From step 7, an input that is an existing one with a file or two
-changed is a variant of it. Trade-off: the corpus stays small and every
-column sees every input, at the cost of a judgment call about what counts as
-a new point.
+output of the suite, or another suite, never a copy of the archive. From
+step 7, an input that is an existing one with a file or two changed is a
+variant of it. Trade-off: the corpus stays small and every column sees every
+input, at the cost of a judgment call about what counts as a new point.
 
 ## 4. Expected errors and known gaps
 
@@ -487,31 +542,47 @@ hand, with properties, where no update writes.
 
 A **property** is a named fact about a case, such as `circular`: a sheet in
 which some formula refers back to itself. The author declares properties in
-Go, states on each case the properties it has, and lists on the run the
+Go, states on each case the properties it has, and lists on the suite the
 properties it rejects.
 
-Proposed names: `decl.Property`, and the run's `Rejects` field.
+Proposed names: `decl.Property`, and the suite's `Rejects` field.
 
+`walkthrough/sheets/step04/sheetcorpus/project.go` declares the property,
+beside the project:
+
+<!-- source: walkthrough/sheets/step04/sheetcorpus/project.go#properties -->
 ```go
-// walkthrough/sheets/step04/sheetcorpus/properties.go
 var Circular = decl.Property{
 	Name:        "circular",
 	Description: "Some cell's formula refers back to itself, directly or through other cells.",
 }
 ```
 
+`walkthrough/sheets/step04/evaluate_test.go` registers the property, lists it
+in `evaluate`'s `Rejects`, and declares `error.txt`, which a cell that errs
+writes:
+
+<!-- source: walkthrough/sheets/step04/evaluate_test.go#suite -->
 ```go
-// walkthrough/sheets/step04/evaluate_test.go
 func init() {
-	hypercase.Register(sheetcorpus.Project, sheetcorpus.Circular, evaluate)
+	hypercase.Register(sheetcorpus.Project, hypercase.Root("step04"), hypercase.RootPackage(), sheetcorpus.Circular, evaluate)
 }
 
-var evaluate = hypercase.Run{
+var evaluate = hypercase.Suite[fs.FS]{
 	Name:        "evaluate",
 	Description: "Evaluates every cell of the sheet.",
-	Rejects:     []decl.Property{sheetcorpus.Circular},
-	Run: func(t testing.TB, in fs.FS) ([]hypercase.File, error) {
-		// as in step 3
+	Corpus:      "sheet",
+	Outputs: []decl.Output{
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated."},
+	},
+	Rejects: []decl.Property{sheetcorpus.Circular},
+	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
+		values, err := sheet.Eval(in) // as in step 3
+		if err != nil {
+			return nil, err
+		}
+		return []hypercase.File{{Path: "values.txt", Data: values.Format()}}, nil
 	},
 }
 ```
@@ -519,8 +590,9 @@ var evaluate = hypercase.Run{
 ### How the files change
 
 An archive gains a `properties` section, a `gaps` section, or both. Both are
-hand-written. `testdata/loop.txtar` is meant to be rejected:
+hand-written. `testdata/sheet/loop.txtar` is meant to be rejected:
 
+<!-- source: walkthrough/sheets/step04/testdata/sheet/loop.txtar -->
 ```
 A1 and B1 refer to each other.
 -- in/sheet/A1 --
@@ -533,9 +605,10 @@ circular
 A1 -> B1 -> A1: cycle
 ```
 
-`testdata/negative.txtar` records a known gap, a cell that errs when it
-shouldn't:
+`testdata/sheet/negative.txtar` records a known gap, a cell that errs when
+it shouldn't:
 
+<!-- source: walkthrough/sheets/step04/testdata/sheet/negative.txtar -->
 ```
 A1 is a negative number.
 -- in/sheet/A1 --
@@ -545,6 +618,9 @@ evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/evaluate/error.txt --
 A1: unexpected "-"
 ```
+
+`hypercase.json` gains the property, and `evaluate`'s `error.txt` and
+`Rejects`.
 
 ### Rules
 
@@ -562,7 +638,7 @@ A1: unexpected "-"
   line, a name stated twice, and an empty section each fail the run, naming
   the archive and the line. Trade-off: a careless hand edit fails loudly,
   at the cost of no blank lines or comments to group names.
-- The run lists the properties it rejects, in Go, as `Rejects`.
+- The suite lists the properties it rejects, in Go, as `Rejects`.
 
 **The expected-error check.** It runs per cell, in every run, updates
 included. A cell is expected to err exactly when its case has a property its
@@ -638,8 +714,8 @@ under step 3's rule.
 - For illustration, after a change that stops `evaluate` finding cycles:
 
   ```
-  --- FAIL: TestCorpus/loop/evaluate
-      loop: A1 and B1 refer to each other.
+  --- FAIL: TestCorpus/sheet/loop/evaluate
+      sheet/loop: A1 and B1 refer to each other.
       evaluate: Evaluates every cell of the sheet.
       evaluate returned no error, but the case states circular, which evaluate rejects.
       Fix the code, or correct the case's properties or evaluate's Rejects.
@@ -658,38 +734,33 @@ columns, at the cost of not saying which column a case is aimed at; only
 
 ### What step 4 leaves
 
-One run answers every archive, through one function. A project tests more
-than one function or command over the same inputs: a sheet is evaluated,
-printed back, and given to the `calc` command. With one run per package, each
-of those keeps its own copy of every input. And what a command prints to
-stdout and stderr has nowhere to go.
+Every suite runs on every case, all from one package over the corpus root.
+A project tests more than one function or command over the same inputs: a
+sheet is evaluated, printed back, and given to the `calc` command. Printing
+back has nothing to show for a sheet with no formulas. And each of those is
+tested in a package of its own, while step 4 says nothing of how packages
+share one corpus root.
 
 ### What the author writes
 
-Columns are **suites**. A suite covers a class of outputs, or one command. It
-has a name, a description, a probe, its declared outputs, `Rejects` and a
-run. A **probe** decides whether a case is for the suite.
+Each function or command under test is a suite, in a package of its own,
+and the packages share one corpus root. A **probe** decides whether a case
+is for the suite.
 
-A suite runs over a **corpus**, a directory of archives under the **corpus
-root**. Packages over one corpus root share its archives, and each writes
-its own columns' sections. One package per corpus root registers the
-**root-package check**, which reads every package's registry and every
-archive, and reports what no column owns.
+Packages over one corpus root share its archives, and each writes only its
+own columns' sections. The package that registers `hypercase.RootPackage()`
+runs the **root-package check**, which reads every package's registry and
+every archive, and reports what no column owns.
 
-Proposed names: `hypercase.Suite` with its `Corpus`, `Probe`, `Outputs`,
-`Rejects` and `Run` fields; `decl.Output`; `hypercase.Root`, the option that
-passes a corpus root as a path relative to the module root; and
-`hypercase.RootPackage`, which registers the root-package check.
-
-The walkthrough's examples pass their own directory as the corpus root, so
-each step's corpus stands alone. A project with one corpus at its module
-root passes nothing.
+Proposed names: the suite's `Probe` field.
 
 The example has three packages over one corpus root: the root package owns
 `evaluate`, `format/` owns `format`, and `cli/` owns `calc`.
 
+`walkthrough/sheets/step05/sheetcorpus/project.go` gains two properties:
+
+<!-- source: walkthrough/sheets/step05/sheetcorpus/project.go#properties -->
 ```go
-// walkthrough/sheets/step05/sheetcorpus/properties.go gains:
 var Malformed = decl.Property{
 	Name:        "malformed",
 	Description: "Some cell holds neither a number nor a formula.",
@@ -701,8 +772,11 @@ var Dangling = decl.Property{
 }
 ```
 
+`walkthrough/sheets/step05/corpus_test.go`, the root package, registers the
+root-package check and owns `evaluate`:
+
+<!-- source: walkthrough/sheets/step05/corpus_test.go#evaluate -->
 ```go
-// walkthrough/sheets/step05/corpus_test.go: the corpus root's package, with evaluate
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
@@ -713,7 +787,7 @@ func init() {
 	)
 }
 
-var evaluate = hypercase.Suite{
+var evaluate = hypercase.Suite[fs.FS]{
 	Name:        "evaluate",
 	Description: "Evaluates every cell of the sheet.",
 	Corpus:      "sheet",
@@ -722,18 +796,28 @@ var evaluate = hypercase.Suite{
 		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated."},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling},
-	Run: func(t testing.TB, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
-		// as in step 3
+	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
+		values, err := sheet.Eval(in)
+		if err != nil {
+			return nil, err
+		}
+		return []hypercase.File{{Path: "values.txt", Data: values.Format()}}, nil
 	},
 }
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }
 ```
 
+`walkthrough/sheets/step05/format/corpus_test.go` owns `format`, whose probe
+skips a sheet with no formulas:
+
+<!-- source: walkthrough/sheets/step05/format/corpus_test.go#format -->
 ```go
-// walkthrough/sheets/step05/format/corpus_test.go registers sheetcorpus.Project,
-// hypercase.Root("step05"), sheetcorpus.Malformed and format.
-var format = hypercase.Suite{
+func init() {
+	hypercase.Register(sheetcorpus.Project, hypercase.Root("step05"), sheetcorpus.Malformed, format)
+}
+
+var format = hypercase.Suite[fs.FS]{
 	Name:        "format",
 	Description: "Prints each formula back in canonical form.",
 	Corpus:      "sheet",
@@ -748,7 +832,7 @@ var format = hypercase.Suite{
 		{Pattern: "error.txt", Description: "Why the sheet doesn't parse."},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed},
-	Run: func(t testing.TB, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
+	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		p, err := sheet.Parse(in)
 		if err != nil {
 			return nil, err
@@ -758,10 +842,21 @@ var format = hypercase.Suite{
 }
 ```
 
+`walkthrough/sheets/step05/cli/corpus_test.go` owns `calc`, which hands the
+command its stdout and stderr:
+
+<!-- source: walkthrough/sheets/step05/cli/corpus_test.go#calc -->
 ```go
-// walkthrough/sheets/step05/cli/corpus_test.go registers sheetcorpus.Project,
-// hypercase.Root("step05"), the three properties and calc.
-var calc = hypercase.Suite{
+func init() {
+	hypercase.Register(
+		sheetcorpus.Project,
+		hypercase.Root("step05"),
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		calc,
+	)
+}
+
+var calc = hypercase.Suite[fs.FS]{
 	Name:        "calc",
 	Description: "Runs the calc command on the sheet.",
 	Corpus:      "sheet",
@@ -771,7 +866,7 @@ var calc = hypercase.Suite{
 		{Pattern: "error.txt", Description: "Why calc failed."},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling},
-	Run: func(t testing.TB, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
+	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		return nil, sheet.Calc(in, stdout, stderr)
 	},
 }
@@ -779,19 +874,14 @@ var calc = hypercase.Suite{
 
 ### How the files change
 
-- Archives move from a package's `testdata/` to the corpus root's
-  `testdata/<corpus>/`: `step05/testdata/sheet/twice.txtar`. The step 3 and
-  step 4 examples' archives move the same way, and each of their runs
-  becomes a suite: it gains `Corpus`, output declarations and the two
-  writers.
 - An archive holds every column's sections, each column under its own
   `out/<suite>/`.
-- Each package writes its registry, `testdata/hypercase.json`, in its own
-  directory.
-- The project's `.gitignore` gains `.hypercase.lock`.
+- Each package writes its own registry, `testdata/hypercase.json`, in its
+  own directory.
 
 `testdata/sheet/twice.txtar`:
 
+<!-- source: walkthrough/sheets/step05/testdata/sheet/twice.txtar -->
 ```
 A1 is twice B1.
 -- in/sheet/A1 --
@@ -810,6 +900,7 @@ A1 =B1 * 2
 `testdata/sheet/stray.txtar`. Every column reads the raw cells, so each one
 meets the malformed cell and records the same error:
 
+<!-- source: walkthrough/sheets/step05/testdata/sheet/stray.txtar -->
 ```
 D1 holds a word, which is neither a number nor a formula.
 -- in/sheet/A1 --
@@ -835,6 +926,7 @@ on `-3` the same wrong way as `evaluate`, so a person adds a `calc` line to
 its `gaps`; without it, `calc`'s cell fails as an error nothing expects.
 `format` skips the sheet, which has no formulas:
 
+<!-- source: walkthrough/sheets/step05/testdata/sheet/negative.txtar -->
 ```
 A1 is a negative number.
 -- in/sheet/A1 --
@@ -848,30 +940,59 @@ A1: unexpected "-"
 A1: unexpected "-"
 ```
 
-The root package's registry, `step05/testdata/hypercase.json`, sketched
-(proposed):
+The root package's registry, `step05/testdata/hypercase.json`, holds the
+update variable, the corpus root, that the package runs the root-package
+check, the properties it registers, and `evaluate`: the type it consumes,
+`io/fs.FS`, its corpora, its outputs and what it rejects. Its `types` and
+`lifts` stay empty until step 6, and `issueLinks` until step 9:
 
+<!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 1,
+  "format": 3,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
+  "issueLinks": [],
   "properties": [
-    {"name": "circular", "description": "Some cell's formula refers back to itself, directly or through other cells."},
-    {"name": "dangling", "description": "Some formula refers to a cell the sheet doesn't have."},
-    {"name": "malformed", "description": "Some cell holds neither a number nor a formula."}
+    {
+      "name": "circular",
+      "description": "Some cell's formula refers back to itself, directly or through other cells."
+    },
+    {
+      "name": "dangling",
+      "description": "Some formula refers to a cell the sheet doesn't have."
+    },
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    }
   ],
+  "types": [],
+  "lifts": [],
   "suites": [
     {
       "name": "evaluate",
       "description": "Evaluates every cell of the sheet.",
-      "corpus": "sheet",
-      "outputs": [
-        {"pattern": "error.txt", "description": "Why the sheet can't be evaluated."},
-        {"pattern": "values.txt", "description": "Each cell's value, one per line, in cell order."}
+      "consumes": "io/fs.FS",
+      "corpora": [
+        "sheet"
       ],
-      "rejects": ["circular", "dangling", "malformed"]
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why the sheet can't be evaluated."
+        },
+        {
+          "pattern": "values.txt",
+          "description": "Each cell's value, one per line, in cell order."
+        }
+      ],
+      "rejects": [
+        "circular",
+        "dangling",
+        "malformed"
+      ]
     }
   ]
 }
@@ -881,21 +1002,13 @@ The root package's registry, `step05/testdata/hypercase.json`, sketched
 
 **Suites and cells.**
 
-- Columns are suites. Step 3's run is a suite with one column from here on.
-  A suite covers a class of outputs, or one command. A cell is one case run
-  through one column, and its outputs go under `out/<suite>/…`.
-- A suite has a name, a description, a probe, its declared outputs,
-  `Rejects` and a run. The run receives a `testing.TB`, the input view, and
-  one `io.Writer` each for stdout and stderr, compared as the `stdout.txt`
-  and `stderr.txt` goldens. Each of those files exists when the run wrote to
-  its stream. The process's `os.Stdout` is never replaced.
+- Columns are suites. A suite covers a class of outputs, or one command. A
+  cell is one case run through one column, and its outputs go under
+  `out/<suite>/…`.
+- A suite has a name, a description, a corpus, a probe, its declared
+  outputs, `Rejects` and a run. Step 3 says what the run receives.
 - Column names are unique per corpus root, not per package or per corpus
   type.
-- A case's name gains its corpus's directory (proposed): the case
-  `sheet/twice`, and the cell subtest `TestCorpus/sheet/twice/evaluate`. Two
-  archives with one name in different corpora are two cases with two names
-  (step 10). Trade-off: no pair of archives has to be refused, at the cost
-  of a longer name for every case.
 
 **Probes.**
 
@@ -907,13 +1020,6 @@ The root package's registry, `step05/testdata/hypercase.json`, sketched
 - A suite that applies to no case fails the run, a suite whose corpus has no
   archives included.
 - There is no way to skip a cell by name. Probes decide applicability.
-
-**Declared outputs.**
-
-- Every output is declared with a description, `stdout.txt`, `stderr.txt`
-  and `error.txt` included. An undeclared output fails the cell.
-- A declaration's pattern matches paths under the column's directory. A file
-  that two declarations match fails the cell, naming both.
 
 **Per cell.**
 
@@ -940,8 +1046,10 @@ The root package's registry, `step05/testdata/hypercase.json`, sketched
 
 **The registry.** It is each package's `testdata/hypercase.json`.
 
-- It lists everything the package registers, each with its description, the
-  properties each column rejects, and each column's corpus root and corpus.
+- It lists everything the package registers, each with its description,
+  and for each column the type it consumes, the corpora it runs over, its
+  declared outputs and the properties it rejects. It records the package's
+  corpus root, and whether the package runs the root-package check.
 - It records the name of the project's update variable, so `hypercase strip`
   and `hypercase report` can print the update command.
 - It carries a format version, which changes on any change to what the
@@ -952,10 +1060,8 @@ The root package's registry, `step05/testdata/hypercase.json`, sketched
 
 **Shared corpora.**
 
-- Corpora live under the corpus root, the module root unless the project
-  passes another, at `testdata/<corpus>/*.txtar`. At this step a suite names
-  its corpus by a directory under `testdata/`; step 6 makes that the corpus
-  type's directory.
+- Every package over a corpus root shares its corpora,
+  `testdata/<corpus>/*.txtar` (step 3).
 - A package owns the columns it registers, and writes and judges only their
   sections. It reads the comment, `in/`, `properties` and `gaps` as input.
 - A normal run only reads.
@@ -1004,10 +1110,6 @@ which leaves the others unjudged. Trade-off: from step 8 every skip writes a
 committed outcome, so no `-short` skip can disagree with the files, at the
 cost of no built-in fast lane.
 
-**Descriptions.** Each suite and every output declaration, `stdout.txt`,
-`stderr.txt` and `error.txt` included, carries a description, under step 3's
-rule.
-
 ### What can now be seen
 
 - The matrix. One archive shows every column's outputs for its case, and a
@@ -1041,19 +1143,21 @@ a parsed sheet has no way to say so.
 
 A **corpus type** is a directory of archives, given a Go type. A **lift** is
 a registered function from one type to the next, and a **stage** is the type
-a lift reaches. Each lift is a column. A suite declares the type it
-consumes, a stage or a corpus type, and the lifts that reach it run first.
+a lift reaches. Each lift is a column. A suite's type argument can now be a
+stage or a corpus type in place of `fs.FS`, and the lifts that reach the
+type it consumes run first.
 
 The sheets' ladder is `Sheet → *sheet.Parsed → *sheet.Graph`, through the
 lifts `parse` and `resolve`.
 
-Proposed names: `decl.Type`, `decl.Lift`, `hypercase.Suite[T]`, whose type
-argument is the type the suite consumes, `hypercase.Own`, `hypercase.Use`,
-and `decl.Project`'s `RenderError` field. A suite's run receives the
-archive's name from this step. Its probe receives the input only.
+Proposed names: `decl.Type`, `decl.Lift`, `hypercase.Own`, `hypercase.Use`,
+and `decl.Project`'s `RenderError` field.
 
+`walkthrough/sheets/step06/sheetcorpus/types.go` declares the corpus type and
+both lifts:
+
+<!-- source: walkthrough/sheets/step06/sheetcorpus/types.go#types -->
 ```go
-// walkthrough/sheets/step06/sheetcorpus/types.go
 type Sheet struct{ fs.FS } // in/sheet/A1, in/sheet/B1, …
 
 var SheetType = decl.Type[Sheet]{
@@ -1086,25 +1190,40 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 }
 ```
 
+`walkthrough/sheets/step06/sheetcorpus/project.go` gives the project its
+`RenderError`:
+
+<!-- source: walkthrough/sheets/step06/sheetcorpus/project.go#project -->
 ```go
-// walkthrough/sheets/step06/sheetcorpus/project.go
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
 }
 
-// renderError writes the error's text, then quotes each line it points at.
+// renderError writes the error's text, then quotes each line it points at. A
+// position about a file as a whole names only the file.
 func renderError(in fs.FS, err error) []byte {
 	out := []byte(err.Error() + "\n")
 	for _, p := range sheet.Positions(err) {
-		out = fmt.Appendf(out, "  %s:%d: %s\n", p.Path, p.Line, lineAt(in, p.Path, p.Line))
+		if p.Line == 0 {
+			out = fmt.Appendf(out, "  %s\n", p.Path)
+			continue
+		}
+		if line := lineAt(in, p.Path, p.Line); line != "" {
+			out = fmt.Appendf(out, "  %s:%d: %s\n", p.Path, p.Line, line)
+		} else {
+			out = fmt.Appendf(out, "  %s:%d\n", p.Path, p.Line)
+		}
 	}
 	return out
 }
 ```
 
+`walkthrough/sheets/step06/corpus_test.go` registers the corpus type, and
+owns both lifts and `evaluate`:
+
+<!-- source: walkthrough/sheets/step06/corpus_test.go#evaluate -->
 ```go
-// walkthrough/sheets/step06/corpus_test.go: owns both lifts and evaluate
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
@@ -1130,8 +1249,11 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 func TestCorpus(t *testing.T) { hypercase.Test(t) }
 ```
 
+`walkthrough/sheets/step06/format/corpus_test.go` uses `parse` and owns
+`format`:
+
+<!-- source: walkthrough/sheets/step06/format/corpus_test.go#format -->
 ```go
-// walkthrough/sheets/step06/format/corpus_test.go: uses parse, owns format
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
@@ -1166,9 +1288,14 @@ on raw input: `hypercase.Suite[sheetcorpus.Sheet]`, with its outputs and
 
 ### How the files change
 
-- The ordinary package gains the corpus type and the lifts. Each suite loses
-  `Corpus`, gains its consumed type, and lists only what it rejects itself.
-- The step 3 to 5 examples gain a corpus type each, and no archive moves.
+- The ordinary package gains the corpus type and the lifts, in
+  `sheetcorpus/types.go`. Each suite drops `Corpus`, consumes a stage or the
+  corpus type in place of `fs.FS`, and lists only what it rejects itself.
+  `evaluate` and `format`, which no longer err, drop their `error.txt`
+  declarations.
+- The step 3 to 5 examples run as written: a `hypercase.Suite[fs.FS]` that
+  names its `Corpus` runs over that directory's raw input views, with no
+  corpus type. No archive moves.
 - A malformed input's error moves to the lift that rejects it. The cells
   past that lift are blocked and write nothing, so their old sections are
   orphans until a person removes them: `stray`'s `out/evaluate/error.txt`
@@ -1180,13 +1307,20 @@ on raw input: `hypercase.Suite[sheetcorpus.Sheet]`, with its outputs and
   `calc`'s cell stays frozen, and its `error.txt` now differs, since
   `RenderError` quotes the input, so a person deletes that file and the next
   update writes it.
-- `error.txt` holds what `RenderError` writes.
-- `hypercase.json` gains each corpus type, each lift with the properties it
-  rejects and whether the package owns it, and each suite's consumed type.
+- `error.txt` holds what `RenderError` writes. Two new archives show its
+  other forms. `notes` holds a file under `in/sheet/` that is not a cell,
+  and its error, about the file as a whole, names only `sheet/notes`.
+  `blank`'s `A1` is empty, and its error names the line by number alone,
+  `sheet/A1:1`.
+- `hypercase.json` lists each corpus type under `types`, with its Go type,
+  and each lift under `lifts`, with its input and product types, the
+  properties it rejects and whether the package owns it. Each suite's
+  `consumes` names the type it consumes.
 
 `testdata/sheet/stray.txtar`. `parse` rejects the sheet once; `calc` still
 reads the raw cells:
 
+<!-- source: walkthrough/sheets/step06/testdata/sheet/stray.txtar -->
 ```
 D1 holds a word, which is neither a number nor a formula.
 -- in/sheet/A1 --
@@ -1209,6 +1343,7 @@ D1: not a number or a formula: "total"
 
 `testdata/sheet/negative.txtar`:
 
+<!-- source: walkthrough/sheets/step06/testdata/sheet/negative.txtar -->
 ```
 A1 is a negative number.
 -- in/sheet/A1 --
@@ -1272,19 +1407,24 @@ A1: unexpected "-"
 - A suite declares the type it consumes: one stage, or a corpus type for
   the raw trees, as for a command tested on bad input. It runs over every
   archive whose root type reaches that type.
+- A `Suite[fs.FS]` names its `Corpus` (step 3), a directory that no corpus
+  type declares, and runs over its archives' raw input views. A suite that
+  consumes any other type names no `Corpus`: the type says which archives it
+  runs over.
 - There must be exactly one path to each consumed type, or the run fails
   before any case runs.
 - Probes are distinct from corpus types: the type decides what a suite
   receives, and the probe decides whether a case is for it.
 - A suite's probe receives the value of the type the suite consumes, and
-  nothing else. Its run receives the archive's name too, and the stdout and
-  stderr writers.
+  nothing else. Its run receives that value where step 3's receives the
+  input view.
 
-**Ownership** (proposed). This step refines step 5's rules, under which
-every registration owns.
+**Ownership** (proposed). This step refines step 5's rules, under which a
+package owns every column it registers.
 
-- From here, a package owns the columns it registers with `Own`, and writes
-  and judges their sections.
+- A package owns the suites it registers, directly or with `Own`, and the
+  lifts it registers with `Own`, and writes and judges their sections.
+- A lift is registered with `Own` or `Use`, never directly.
 - `Use` takes lifts, and registers a lift only so its product is computed
   in process. A package that uses a lift neither writes nor judges the
   lift's sections.
@@ -1462,7 +1602,7 @@ whether each has a probe, and whether the package owns it.
   name spaces.
 - Cases are named `<archive>`, `<archive>/variant/<name>` and
   `<archive>/transform/<name>` in subtests and in the report, after the
-  corpus directory (step 5): `TestCorpus/sheet/twice/transform/looped/resolve`.
+  corpus directory (step 3): `TestCorpus/sheet/twice/transform/looped/resolve`.
 
 **Hand-written variants.**
 
@@ -2124,7 +2264,7 @@ blocked import
   that lift's product.
 - `testdata/sheet/prices.txtar` and `testdata/csv/prices.txtar` both reach
   `evaluate`, the second through `import`. Their cases are `sheet/prices` and
-  `csv/prices` (step 5), and their cells' subtests
+  `csv/prices` (step 3), and their cells' subtests
   `TestCorpus/sheet/prices/evaluate` and `TestCorpus/csv/prices/evaluate`.
 
 ### What can now be seen
