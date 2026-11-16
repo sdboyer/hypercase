@@ -145,9 +145,6 @@ type plannedVariant struct {
 	properties []string
 	gaps       []archive.Gap
 	committed  archive.VariantCase
-	// view is the committed input view: a hand-written variant's, or a
-	// transform's when the archive holds its inputs and they make one.
-	view fs.FS
 	// invalid is what leaves a transform's committed inputs no input view.
 	invalid []archive.Problem
 
@@ -190,7 +187,6 @@ func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []
 			properties: v.Properties,
 			gaps:       v.Gaps,
 			committed:  v,
-			view:       base.VariantView(v),
 		})
 	}
 	trs := slices.Clone(p.root.transforms)
@@ -207,9 +203,7 @@ func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []
 			tr:        tr,
 		}
 		if v.committed.Inputs {
-			if v.invalid = a.InputProblems(base, v.committed); len(v.invalid) == 0 {
-				v.view = base.VariantView(v.committed)
-			}
+			v.invalid = a.InputProblems(base, v.committed)
 		}
 		for _, g := range gaps {
 			if g.Transform == tr.name {
@@ -321,7 +315,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	owner := v.tr != nil && r.owned[v.tr]
 	switch {
 	case v.tr == nil:
-		c.setView(p, v.view)
+		c.setView(p, pc.base.VariantView(v.committed))
 	case v.problem != "" && owner:
 		t.Errorf("%s\n%s", c.header(), v.problem)
 		return
@@ -350,7 +344,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if !owner && !v.inputDiffs(pc.a).empty() {
 			c.stale = fmt.Sprintf("The archive's inputs for %s's variant differ from what %s makes now: a normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and this cell.", v.name, v.name, v.name, r.updateCmd(), v.name)
 		}
-		c.setView(p, v.view)
+		c.setView(p, pc.base.VariantView(v.committed))
 	}
 	r.runCells(t, c, p.cols, w)
 }
