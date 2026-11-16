@@ -1086,8 +1086,8 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 - It lists everything the package registers but its corpus checks
   (step 8), each with its description, and for each column the type it
   consumes, the corpora it runs over, its declared outputs and the
-  properties it rejects. It records the package's corpus root, and whether the package
-  runs the root-package check.
+  properties it rejects. It records the package's corpus root, and whether
+  the package runs the root-package check.
 - It records the name of the project's update variable, so `hypercase strip`
   and `hypercase report` can print the update command.
 - It carries a format version, which changes on any change to what the

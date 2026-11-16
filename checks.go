@@ -33,9 +33,9 @@ type Check struct {
 	// Description says what the check asserts. It is required.
 	Description string
 	// Run reads every cell over the corpus root, frozen ones included,
-	// and returns the check's findings, each one line, not empty. An error is a requirement the
-	// cells violate: it fails every run, updates included, and an update
-	// then writes no findings. So does a panic.
+	// and returns the check's findings, each one line, not empty. An error
+	// is a requirement the cells violate: it fails every run, updates
+	// included, and an update then writes no findings. So does a panic.
 	Run func(cells []Cell) ([]string, error)
 }
 
