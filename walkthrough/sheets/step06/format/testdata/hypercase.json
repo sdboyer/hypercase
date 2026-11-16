@@ -1,5 +1,5 @@
 {
-  "format": 4,
+  "format": 3,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step06",
   "rootPackage": false,
@@ -9,8 +9,7 @@
     {
       "dir": "sheet",
       "description": "A spreadsheet: one file per cell under in/sheet/, holding a number or a formula.",
-      "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step06/sheetcorpus.Sheet",
-      "transforms": []
+      "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step06/sheetcorpus.Sheet"
     }
   ],
   "lifts": [
