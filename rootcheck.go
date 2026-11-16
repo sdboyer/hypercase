@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -117,17 +119,17 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	if len(rootPkgs) > 1 {
 		t.Errorf("%s register the root-package check for %s. It runs once per corpus root.\nRegister it in one package.", andList(rootPkgs), r.rootName())
 	}
-	for _, name := range sortedKeys(columnPkgs) {
+	for _, name := range slices.Sorted(maps.Keys(columnPkgs)) {
 		if pkgs := columnPkgs[name]; len(pkgs) > 1 {
 			t.Errorf("the column %s is owned by %s. Column names are unique per corpus root, and one package owns each column.\nRename one of the columns, or remove one. A package that only reads a lift's product gives the lift to hypercase.Use.", name, andList(pkgs))
 		}
 	}
-	for _, name := range sortedKeys(usedPkgs) {
+	for _, name := range slices.Sorted(maps.Keys(usedPkgs)) {
 		if _, owned := columnPkgs[name]; !owned {
 			t.Errorf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.\nOwn the lift in one of them: give it to hypercase.Own in place of hypercase.Use.", name, andList(usedPkgs[name]))
 		}
 	}
-	for _, dir := range sortedKeys(typeEntries) {
+	for _, dir := range slices.Sorted(maps.Keys(typeEntries)) {
 		entries := typeEntries[dir]
 		if len(entries) < 2 {
 			continue
@@ -144,7 +146,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 		t.Errorf("the corpus directory %s has two different corpus types:\n%s\nAn archive's directory gives its type. %s", dir, strings.Join(lines, "\n"), fix)
 	}
-	for _, name := range sortedKeys(propEntries) {
+	for _, name := range slices.Sorted(maps.Keys(propEntries)) {
 		entries := propEntries[name]
 		if len(entries) < 2 {
 			continue
@@ -188,7 +190,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	if err != nil {
 		t.Errorf("reading %s: %v", r.rel(td), err)
 	}
-	for _, dir := range sortedKeys(undeclared) {
+	for _, dir := range slices.Sorted(maps.Keys(undeclared)) {
 		rel := r.rel(filepath.Join(td, filepath.FromSlash(dir))) + "/"
 		if dir == "." {
 			t.Errorf("%s holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.\nMove the archives into one.", rel)
@@ -198,7 +200,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	}
 
 	props := func(name string) bool { _, ok := propEntries[name]; return ok }
-	for _, corpus := range sortedKeys(archives) {
+	for _, corpus := range slices.Sorted(maps.Keys(archives)) {
 		cols := claimed[corpus]
 		for _, file := range archives[corpus] {
 			r.checkArchive(t, filepath.Join(td, corpus, file), corpus, cols, props)
@@ -251,7 +253,7 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bo
 			}
 		}
 	}
-	for _, col := range sortedKeys(unclaimed) {
+	for _, col := range slices.Sorted(maps.Keys(unclaimed)) {
 		t.Errorf("%s: no registry claims %s: no column named %s runs over the corpus %s.\nIf a column should write them, register the column. If not, delete them by hand; %s leaves them in place.", rel, andList(unclaimed[col]), col, corpus, r.updateCmd())
 	}
 }

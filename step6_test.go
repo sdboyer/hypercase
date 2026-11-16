@@ -231,6 +231,31 @@ func TestTwoCorpusTypes(t *testing.T) {
 	s.done()
 }
 
+// TestLiftNoProduct: a lift that returns no product and no error fails at
+// its own cell, and blocks the columns over its product, whose type is an
+// interface: a suite with a probe, and a lift.
+func TestLiftNoProduct(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "no-product")
+	none := s.read("testdata/script/none.txtar")
+	want := []string{
+		"script/none: pick returns no product.\npick: Picks the script's view, as its pick/ tree says.\npick returned no product and no error.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error.",
+		"script/none: walk is blocked: the lift pick failed on the case: it returned no product and no error.",
+		"script/none: unpick is blocked: the lift pick failed on the case: it returned no product and no error.",
+		"script/none: format is blocked: the lift pick failed on the case: it returned no product and no error.",
+		"--- FAIL: TestCorpus/script/none/pick",
+		"--- SKIP: TestCorpus/script/none/walk",
+		"--- SKIP: TestCorpus/script/none/unpick",
+		"--- SKIP: TestCorpus/script/none/format",
+		"--- PASS: TestCorpus/script/some/walk",
+		"--- PASS: TestCorpus/script/some/format",
+	}
+	s.fails(s.normal("picked"), want...)
+	s.fails(s.update("picked"), want...)
+	s.same("testdata/script/none.txtar", none)
+	s.done()
+}
+
 func TestLiftRefusals(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "ladder")

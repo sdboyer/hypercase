@@ -1,6 +1,7 @@
 package report
 
 import (
+	"maps"
 	"slices"
 	"strings"
 )
@@ -53,7 +54,7 @@ func matrices(b *snapshot, changes []Change, links *linker) []Matrix {
 		}
 	}
 	var out []Matrix
-	for _, corpus := range sortedKeys(b.columns) {
+	for _, corpus := range slices.Sorted(maps.Keys(b.columns)) {
 		m := Matrix{Corpus: corpus}
 		cols := map[string]bool{}
 		for name := range b.columns[corpus] {
@@ -69,7 +70,7 @@ func matrices(b *snapshot, changes []Change, links *linker) []Matrix {
 				cols[k.column] = true
 			}
 		}
-		for _, name := range sortedKeys(cols) {
+		for _, name := range slices.Sorted(maps.Keys(cols)) {
 			m.Columns = append(m.Columns, Column{Name: name, Description: links.text(b.columns[corpus][name])})
 		}
 		var cases []caseKey

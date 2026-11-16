@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime/debug"
 	"slices"
@@ -222,21 +222,33 @@ func (r *runner) checkColumnDescriptions(t *testing.T, kind, name, description s
 	}
 }
 
-// requireRootCheck fails unless some registry records the root-package
-// check for the package's corpus root, since nothing else reports what no
-// column owns. Updates write registries, so only a normal run checks.
+// requireRootCheck fails unless the registry of some package with tests
+// records the root-package check for the package's corpus root, since
+// nothing else reports what no column owns. A registry in a package with
+// no _test.go file records a check no test runs, as the root-package check
+// itself holds. Updates write registries, so only a normal run checks.
 func (r *runner) requireRootCheck(t *testing.T, found []registry.Found) {
 	t.Helper()
+	var stale []registry.Found
 	for _, f := range found {
 		data, err := os.ReadFile(f.Path)
 		if err != nil {
 			continue
 		}
 		if h, err := registry.Peek(data); err == nil && h.CorpusRoot == r.rootRel && h.RootPackage {
-			return
+			if hasTestFile(f.Pkg) {
+				return
+			}
+			stale = append(stale, f)
 		}
 	}
-	t.Errorf("no registry records a root-package check for %s, so nothing reports what no column there owns.\nRegister hypercase.RootPackage() in one package over it, then run %s to record it in the package's registry.", r.rootName(), r.updateCmd())
+	if len(stale) == 0 {
+		t.Errorf("no registry records a root-package check for %s, so nothing reports what no column there owns.\nRegister hypercase.RootPackage() in one package over it, then run %s to record it in the package's registry.", r.rootName(), r.updateCmd())
+		return
+	}
+	for _, f := range stale {
+		t.Errorf("%s records the root-package check for %s, and %s holds no _test.go file, so no test runs the check, and nothing reports what no column there owns.\nRestore the package's tests, or register hypercase.RootPackage() in another package over it, then run %s to record it in that package's registry.", r.rel(f.Path), r.rootName(), r.rel(f.Pkg), r.updateCmd())
+	}
 }
 
 // A plannedCase is an archive whose cells run.
@@ -407,7 +419,7 @@ func (r *runner) write(t *testing.T, pc plannedCase, cols []*column, results []*
 	}
 	apply := func(a *archive.Archive) *archive.Archive {
 		next := a.Clone()
-		for _, name := range sortedKeys(own) {
+		for _, name := range slices.Sorted(maps.Keys(own)) {
 			setSection(next, name, own[name])
 		}
 		return next.Place()
@@ -473,6 +485,7 @@ type called struct {
 	panicValue     any
 	stack          []byte
 	inProbe        bool // the panic was the probe's
+	noProduct      bool // a lift returned neither a product nor an error
 }
 
 // call runs fn, recovering a panic. A runtime.Goexit, as from t.FailNow,
@@ -566,7 +579,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		// today's behavior, and no update writes to it.
 		writable = false
 		var diffs []string
-		for _, p := range sortedKeys(files) {
+		for _, p := range slices.Sorted(maps.Keys(files)) {
 			g, ok := goldens[p]
 			switch {
 			case unjudged[p]:
@@ -576,7 +589,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 				diffs = append(diffs, fmt.Sprintf("out/%s/%s differs (-committed +got):\n%s", col.name, p, strings.TrimSuffix(diff.Lines(g, files[p]), "\n")))
 			}
 		}
-		for _, p := range sortedKeys(goldens) {
+		for _, p := range slices.Sorted(maps.Keys(goldens)) {
 			if _, ok := files[p]; !ok {
 				diffs = append(diffs, fmt.Sprintf("out/%s/%s is no longer produced", col.name, p))
 			}
@@ -613,7 +626,7 @@ func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why
 	if marked {
 		m.add("gaps, line %d, marks the cell, and %s's probe says the case isn't for it: %s\nRemove the line, or fix the probe.", gap.Line, col.name, why)
 	}
-	for _, p := range sortedKeys(goldens) {
+	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		m.add("out/%s/%s is recorded, and %s's probe says the case isn't for it: %s\nIf the suite should run on the case, fix the probe. If not, delete the section by hand; %s leaves it in place.", col.name, p, col.name, why, r.updateCmd())
 	}
 	if !m.empty() {
@@ -631,12 +644,15 @@ func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, by 
 	if marked {
 		m.add("gaps, line %d, marks the cell, and the cell is blocked: the lift %s, on %s's path, failed on the case, so the cell runs nothing.\nRemove the line, or fix the lift or the case.", gap.Line, by.name, col.name)
 	}
-	for _, p := range sortedKeys(goldens) {
+	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		m.add("out/%s/%s is recorded, and the cell is blocked: the lift %s, on %s's path, failed on the case.\nIf the cell should run, fix the lift or the case. If not, delete the section by hand; %s leaves it in place.", col.name, p, by.name, col.name, r.updateCmd())
 	}
 	if !m.empty() {
 		t.Errorf("%s\n%s", header, m)
 		return
+	}
+	if c.state.runs[by].out.noProduct {
+		t.Skipf("%s: %s is blocked: the lift %s failed on the case: it returned no product and no error.", c.name, col.name, by.name)
 	}
 	t.Skipf("%s: %s is blocked: the lift %s failed on the case, and %s, out/%s/%s, records its error.", c.name, col.name, by.name, r.rel(c.path), by.name, errorFile)
 }
@@ -665,10 +681,6 @@ func (r *runner) outputs(m *msg, c *aCase, col *column, out *called) (files map[
 			}
 		}
 	}
-	if p, q, ok := fileDirConflict(files); ok {
-		m.add("The run returned an output at %s and another at %s, below it.\nFix the code. An update writes nothing for this cell.", p, q)
-		writable = false
-	}
 	if out.stdout.Len() > 0 {
 		files[stdoutFile] = out.stdout.Bytes()
 	}
@@ -686,7 +698,15 @@ func (r *runner) outputs(m *msg, c *aCase, col *column, out *called) (files map[
 			unjudged[errorFile] = true
 		}
 	}
-	for _, p := range sortedKeys(files) {
+	names := make([]string, 0, len(files))
+	for _, p := range slices.Sorted(maps.Keys(files)) {
+		names = append(names, archive.Out+"/"+col.name+"/"+p)
+	}
+	for _, p := range archive.Conflicts(names) {
+		m.add("%s can't be held in an archive: %s.\nFix the code. An update writes nothing for this cell.", p.Section, p.Msg)
+		writable = false
+	}
+	for _, p := range slices.Sorted(maps.Keys(files)) {
 		if unjudged[p] {
 			continue
 		}
@@ -702,7 +722,7 @@ func (r *runner) outputs(m *msg, c *aCase, col *column, out *called) (files map[
 			unjudged[p] = true
 		}
 	}
-	for _, p := range sortedKeys(files) {
+	for _, p := range slices.Sorted(maps.Keys(files)) {
 		if err := archive.Holds(files[p]); err != nil && !unjudged[p] {
 			m.add("out/%s/%s can't be held in an archive: %v.\nFix the code so the output can be held. An update writes nothing for this cell.", col.name, p, err)
 			writable = false
@@ -755,6 +775,8 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 		m.add("%s's probe panicked: %v\nFix the probe. A panic is never an expected error.", col.name, out.panicValue)
 	case out.panicked:
 		m.add("%s panicked: %v\nFix the code. A panic is never an expected error.", col.name, out.panicValue)
+	case out.noProduct:
+		m.add("%s returned no product and no error.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error.", col.name)
 	case out.err != nil && len(hit) == 0:
 		m.add("%s returned an error, but the case states no property %s rejects:\n  %s\nFix the code, or state the property on the case and in %s's Rejects.", col.name, col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "), col.name)
 	case out.err == nil && len(hit) > 0:
@@ -765,7 +787,7 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 // compare compares a cell's files with its goldens, and reports orphans.
 func (r *runner) compare(m *msg, col *column, files, goldens map[string][]byte, unjudged map[string]bool) {
 	if !r.update {
-		for _, p := range sortedKeys(files) {
+		for _, p := range slices.Sorted(maps.Keys(files)) {
 			g, ok := goldens[p]
 			switch {
 			case unjudged[p]:
@@ -776,7 +798,7 @@ func (r *runner) compare(m *msg, col *column, files, goldens map[string][]byte, 
 			}
 		}
 	}
-	for _, p := range sortedKeys(goldens) {
+	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		if _, ok := files[p]; ok {
 			continue
 		}
@@ -836,18 +858,6 @@ func andList(items []string) string {
 	return strings.Join(items[:len(items)-1], ", ") + " and " + items[len(items)-1]
 }
 
-// fileDirConflict reports an output that is also the directory of another.
-func fileDirConflict(files map[string][]byte) (string, string, bool) {
-	for _, p := range sortedKeys(files) {
-		for d := path.Dir(p); d != "."; d = path.Dir(d) {
-			if _, ok := files[d]; ok {
-				return d, p, true
-			}
-		}
-	}
-	return "", "", false
-}
-
 // msg collects the problems of one failure, each ending with what to do.
 type msg struct{ parts []string }
 
@@ -875,13 +885,4 @@ func problemLines(ps []archive.Problem) string {
 		lines[i] = p.String()
 	}
 	return strings.Join(lines, "\n")
-}
-
-func sortedKeys[V any](m map[string]V) []string {
-	ks := make([]string, 0, len(m))
-	for k := range m {
-		ks = append(ks, k)
-	}
-	slices.Sort(ks)
-	return ks
 }

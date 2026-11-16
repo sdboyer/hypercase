@@ -184,7 +184,7 @@ func (a *Archive) Check() []Problem {
 			}
 		}
 	}
-	ps = append(ps, conflicts(names)...)
+	ps = append(ps, Conflicts(names)...)
 	return ps
 }
 
@@ -197,9 +197,9 @@ func topLevelList() string {
 	return strings.Join(names, ", ")
 }
 
-// conflicts reports a section that is also a directory of another, which no
-// file tree can hold.
-func conflicts(names []string) []Problem {
+// Conflicts reports each section name that is also a directory of another,
+// which no file tree can hold.
+func Conflicts(names []string) []Problem {
 	set := map[string]bool{}
 	for _, n := range names {
 		set[n] = true

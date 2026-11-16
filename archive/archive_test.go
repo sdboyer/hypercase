@@ -133,6 +133,38 @@ func TestFailedWriteLeavesTheFile(t *testing.T) {
 	}
 }
 
+// TestWriteFileKeepsMode: a write replaces a file's bytes and keeps its
+// mode, and a new file is 0644.
+func TestWriteFileKeepsMode(t *testing.T) {
+	dir := t.TempDir()
+	for _, mode := range []fs.FileMode{0o600, 0o664, 0o755} {
+		name := filepath.Join(dir, mode.String()+".txtar")
+		if err := os.WriteFile(name, []byte(wellFormed), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(name, mode); err != nil {
+			t.Fatal(err)
+		}
+		if err := WriteFile(name, []byte("A case.\n")); err != nil {
+			t.Fatal(err)
+		}
+		if fi, err := os.Stat(name); err != nil {
+			t.Fatal(err)
+		} else if fi.Mode() != mode {
+			t.Errorf("a write over a file of mode %v left it %v", mode, fi.Mode())
+		}
+	}
+	name := filepath.Join(dir, "new.txtar")
+	if err := WriteFile(name, []byte("A case.\n")); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(name); err != nil {
+		t.Fatal(err)
+	} else if fi.Mode() != 0o644 {
+		t.Errorf("a new file's mode is %v, not %v", fi.Mode(), fs.FileMode(0o644))
+	}
+}
+
 func TestView(t *testing.T) {
 	a := Parse([]byte(`A sheet.
 -- in/sheet/A1 --

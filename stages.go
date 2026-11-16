@@ -238,13 +238,15 @@ func (s *caseState) stage(typ reflect.Type) (any, *lift) {
 		return nil, by
 	}
 	lr := s.runLift(l, in)
-	if lr.out.panicked || lr.out.err != nil {
+	if lr.out.panicked || lr.out.err != nil || lr.out.noProduct {
 		return nil, l
 	}
 	return lr.value, nil
 }
 
-// runLift runs a lift on its input, once.
+// runLift runs a lift on its input, once. A lift whose product type is an
+// interface can return neither a product nor an error, which is the lift's
+// own failure.
 func (s *caseState) runLift(l *lift, in any) *liftRun {
 	if lr, ok := s.runs[l]; ok {
 		return lr
@@ -253,6 +255,7 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 	lr.out = call(func(o *called) {
 		lr.value, o.err = l.run(s.archive, in, &o.stderr)
 	})
+	lr.out.noProduct = !lr.out.panicked && lr.out.err == nil && lr.value == nil
 	s.runs[l] = lr
 	return lr
 }

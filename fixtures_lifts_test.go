@@ -149,6 +149,43 @@ func staged[T any](name, tree string, view func(T) fs.FS) hypercase.Suite[T] {
 
 func parsedView(p *Parsed) fs.FS { return p.view }
 func graphView(g *Graph) fs.FS   { return g.view }
+func pickedView(p Picked) fs.FS  { return p.View() }
+
+// Picked is a stage whose type is an interface, which pick makes. A lift
+// of such a product can return neither a product nor an error.
+type Picked interface{ View() fs.FS }
+
+type picked struct{ view fs.FS }
+
+func (p picked) View() fs.FS { return p.view }
+
+var (
+	// pick returns no product and no error when the case's pick/none says
+	// so.
+	pick = decl.Lift[Script, Picked]{
+		Name:        "pick",
+		Description: "Picks the script's view, as its pick/ tree says.",
+		Outputs:     liftOutputs,
+		Run: func(archiveName string, in Script, stderr io.Writer) (Picked, error) {
+			if err := steerLift("pick", archiveName, in, stderr); err != nil {
+				return nil, err
+			}
+			if _, err := fs.Stat(in, "pick/none"); err == nil {
+				return nil, nil
+			}
+			return picked{in.FS}, nil
+		},
+	}
+	unpick = decl.Lift[Picked, *Parsed]{
+		Name:        "unpick",
+		Description: "Parses the picked view.",
+		Outputs:     liftOutputs,
+		Run: func(archiveName string, p Picked, stderr io.Writer) (*Parsed, error) {
+			return &Parsed{view: p.View(), trail: []string{"unpick"}}, nil
+		},
+	}
+	walk = staged("walk", "walk", pickedView)
+)
 
 var (
 	evaluate = staged("evaluate", "evaluate", graphView)
@@ -244,6 +281,7 @@ var liftRegistrations = map[string]func(){
 	"split-second": func() { ladder(project, direct, evaluate) },
 	"cycle":        func() { ladder(project, parse, resolve, back, evaluate) },
 	"unreached":    func() { ladder(project, evaluate) },
+	"picked":       func() { ladder(project, pick, walk, unpick, format) },
 	"fs-lift": func() {
 		hypercase.Register(project, rootPkg, scriptType, own(decl.Lift[fs.FS, *Parsed]{
 			Name: "parse-raw", Description: "Parses the raw view.",

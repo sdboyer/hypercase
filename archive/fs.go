@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"io"
 	"io/fs"
+	"maps"
 	"path"
 	"slices"
 	"time"
+
+	"github.com/sdboyer/hypercase/internal/dirs"
 )
 
 // NewFS returns a read-only file system holding the given files, keyed by
@@ -14,30 +17,9 @@ import (
 // copy of each file, so what a reader does to the bytes it reads changes
 // nothing for the next reader.
 func NewFS(files map[string][]byte) fs.FS {
-	m := &memFS{files: map[string][]byte{}, dirs: map[string][]string{}}
-	kids := map[string]map[string]bool{".": {}}
+	m := &memFS{files: map[string][]byte{}, dirs: dirs.Index(maps.Keys(files))}
 	for name, data := range files {
 		m.files[name] = bytes.Clone(data)
-		for child := name; child != "."; child = path.Dir(child) {
-			dir := path.Dir(child)
-			set, known := kids[dir]
-			if !known {
-				set = map[string]bool{}
-				kids[dir] = set
-			}
-			set[path.Base(child)] = true
-			if known {
-				break
-			}
-		}
-	}
-	for dir, set := range kids {
-		names := make([]string, 0, len(set))
-		for n := range set {
-			names = append(names, n)
-		}
-		slices.Sort(names)
-		m.dirs[dir] = names
 	}
 	return m
 }

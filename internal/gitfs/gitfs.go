@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os/exec"
 	"path"
 	"slices"
@@ -21,6 +22,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sdboyer/hypercase/internal/dirs"
 )
 
 // A Repo is a git repository, as seen from a directory in its working
@@ -76,8 +79,7 @@ func (r *Repo) Tree(commit string) (fs.FS, error) {
 	if err != nil {
 		return nil, err
 	}
-	t := &tree{repo: r, files: map[string]entry{}, dirs: map[string][]string{".": nil}}
-	kids := map[string]map[string]bool{".": {}}
+	t := &tree{repo: r, files: map[string]entry{}}
 	for _, rec := range bytes.Split(bytes.TrimSuffix(out, []byte{0}), []byte{0}) {
 		if len(rec) == 0 {
 			continue
@@ -103,27 +105,8 @@ func (r *Repo) Tree(commit string) (fs.FS, error) {
 			return nil, fmt.Errorf("git ls-tree gave %s the mode %s, which it doesn't document", name, mode)
 		}
 		t.files[name] = entry{mode: m, hash: hash}
-		for child := name; child != "."; child = path.Dir(child) {
-			dir := path.Dir(child)
-			set, known := kids[dir]
-			if !known {
-				set = map[string]bool{}
-				kids[dir] = set
-			}
-			set[path.Base(child)] = true
-			if known {
-				break
-			}
-		}
 	}
-	for dir, set := range kids {
-		names := make([]string, 0, len(set))
-		for n := range set {
-			names = append(names, n)
-		}
-		slices.Sort(names)
-		t.dirs[dir] = names
-	}
+	t.dirs = dirs.Index(maps.Keys(t.files))
 	return t, nil
 }
 

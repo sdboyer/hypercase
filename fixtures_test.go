@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -289,6 +290,10 @@ var registrations = map[string]func(){
 	"probe-none": func() {
 		hypercase.Register(project, rootPkg, circular, scriptType, own(withRejects(echo, circular)))
 	},
+	"nested": func() {
+		hypercase.Register(project, rootPkg, scriptType, own(withOutputs(echo, append(slices.Clone(steeredOutputs),
+			decl.Output{Pattern: "*/*", Description: "A file one directory down."})...)))
+	},
 	"narrow": func() {
 		hypercase.Register(project, rootPkg, scriptType, own(withOutputs(echo,
 			decl.Output{Pattern: "values.txt", Description: "The values."},
@@ -395,6 +400,7 @@ var fixturePackages = map[string][]fixturePkg{
 	"no-case":      {{".", "probe"}},
 	"empty-corpus": {{".", "echo"}},
 	"outputs":      {{".", "narrow"}},
+	"file-dir":     {{".", "nested"}},
 	"shared":       {{".", "pkg-a"}, {"b", "pkg-b"}},
 
 	"ladder":        {{".", "ladder"}},
@@ -404,6 +410,7 @@ var fixturePackages = map[string][]fixturePkg{
 	"two-types":     {{".", "two-types"}},
 	"shared-ladder": {{".", "ladder-a"}, {"b", "ladder-b"}},
 	"no-archive":    {{".", "lift-only"}},
+	"no-product":    {{".", "picked"}},
 }
 
 type fixturePkg struct{ dir, registration string }
