@@ -484,6 +484,7 @@ type called struct {
 	panicValue     any
 	stack          []byte
 	inProbe        bool // the panic was the probe's
+	noProduct      bool // a lift returned neither a product nor an error
 }
 
 // call runs fn, recovering a panic. A runtime.Goexit, as from t.FailNow,
@@ -649,6 +650,9 @@ func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, by 
 		t.Errorf("%s\n%s", header, m)
 		return
 	}
+	if c.state.runs[by].out.noProduct {
+		t.Skipf("%s: %s is blocked: the lift %s failed on the case: it returned no product and no error.", c.name, col.name, by.name)
+	}
 	t.Skipf("%s: %s is blocked: the lift %s failed on the case, and %s, out/%s/%s, records its error.", c.name, col.name, by.name, r.rel(c.path), by.name, errorFile)
 }
 
@@ -770,6 +774,8 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 		m.add("%s's probe panicked: %v\nFix the probe. A panic is never an expected error.", col.name, out.panicValue)
 	case out.panicked:
 		m.add("%s panicked: %v\nFix the code. A panic is never an expected error.", col.name, out.panicValue)
+	case out.noProduct:
+		m.add("%s returned no product and no error.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error.", col.name)
 	case out.err != nil && len(hit) == 0:
 		m.add("%s returned an error, but the case states no property %s rejects:\n  %s\nFix the code, or state the property on the case and in %s's Rejects.", col.name, col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "), col.name)
 	case out.err == nil && len(hit) > 0:
