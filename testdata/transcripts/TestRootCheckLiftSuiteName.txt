@@ -18,9 +18,37 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # ladder-b-suite
             --- PASS: TestCorpus/script/x/parse
 PASS
 $ go test  # ladder-a-useonly
-    the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root, and one package owns each column.
-        Rename the suite or the lift, or remove one.
+    the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root. No package owns the lift, and owning it would add a column of the name.
+        Rename the suite or the lift, or remove one. To remove the lift, drop it from hypercase.Use in every package that uses it.
     the lift parse is used by ., and no package owns it, so its error is recorded nowhere.
+        Once no suite shares the lift's name, own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]
+$ edit c/corpus_test.go  # a package c over the corpus
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./c  # ladder-b
+    what ran, in order:
+        parse ran on x
+        outline's probe ran
+        outline ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/outline
+PASS
+$ go test  # ladder-a-useonly
+    the column parse is owned by ./b as a suite, and used by . and ./c, each as a lift. Lifts share the suites' column names, which are unique per corpus root. No package owns the lift, and owning it would add a column of the name.
+        Rename the suite or the lift, or remove one. To remove the lift, drop it from hypercase.Use in every package that uses it.
+    the lift parse is used by . and ./c, and no package owns it, so its error is recorded nowhere.
         Once no suite shares the lift's name, own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
     what ran, in order:
         parse ran on x

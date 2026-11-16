@@ -25,7 +25,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # ladder-b-owns
 PASS
 $ go test  # ladder-a
     the column parse is owned by . and ./b, each as a lift. Column names are unique per corpus root, and one package owns each column.
-        Rename one of the lifts, or remove one. A package that only reads the lift's product gives it to hypercase.Use in place of hypercase.Own.
+        Rename one of the lifts, or remove one. Of . and ./b, which own the lift, one that only reads its product removes its column by giving the lift to hypercase.Use in place of hypercase.Own.
     what ran, in order:
         parse ran on x
         resolve ran on x
@@ -120,7 +120,7 @@ $ go test  # ladder-a
     the column outline is owned by ./b and ./c, each as a suite. Column names are unique per corpus root, and one package owns each column.
         Rename one of the suites, or remove one.
     the column parse is owned by ., ./b and ./c, each as a lift. Column names are unique per corpus root, and one package owns each column.
-        Rename or remove all but one of the lifts. A package that only reads the lift's product gives it to hypercase.Use in place of hypercase.Own.
+        Rename or remove all but one of the lifts. Of ., ./b and ./c, which own the lift, one that only reads its product removes its column by giving the lift to hypercase.Use in place of hypercase.Own.
     what ran, in order:
         parse ran on x
         resolve ran on x

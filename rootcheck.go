@@ -171,10 +171,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	if len(rootPkgs) > 1 {
 		t.Errorf("%s register the root-package check for %s. It runs once per corpus root.\nRegister it in one package.", andList(rootPkgs), r.rootName())
 	}
-	// Lifts share the suites' column names, so the duplicate-column check
-	// runs over both. A lift that no package owns still takes its name
-	// from the suites, since owning it makes it a column, so its users
-	// stand in for its owners.
+	// Lifts and suites draw their names from one set, the column names,
+	// so the duplicate-column check runs over both. A lift that no package
+	// owns draws from it too, since owning it would make it a column.
 	columns := map[string]bool{}
 	for name := range suitePkgs {
 		columns[name] = true
@@ -183,13 +182,8 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		columns[name] = true
 	}
 	for _, name := range slices.Sorted(maps.Keys(columns)) {
-		suites, lifts := suitePkgs[name], liftPkgs[name]
-		var users []string
-		if len(lifts) == 0 {
-			users = usedPkgs[name]
-		}
-		if len(suites)+len(lifts) > 1 || len(suites) > 0 && len(users) > 0 {
-			t.Error(duplicateColumn(name, suites, lifts, users))
+		if msg := duplicateColumn(name, suitePkgs[name], liftPkgs[name], usedPkgs[name]); msg != "" {
+			t.Error(msg)
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(usedPkgs)) {
@@ -307,18 +301,32 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	}
 }
 
-// duplicateColumn words the failure of a name that more than one column
-// holds: suites are the packages that own it as a suite, and lifts those
-// that own it as a lift. When no package owns the lift, lifts is empty,
-// and users are the packages that use it: the lift is one column still,
-// the one owning it makes. Each package that owns the name holds one
-// column, and the fix leaves one of them all. Only a lift's owners are
-// offered hypercase.Use, and only when more than one owns the lift, since
-// a lift that one package owns has an owner it needs.
+// duplicateColumn words the failure of a name that two or more columns
+// hold, or returns "" when fewer do. suites are the packages that own the
+// name as a suite, lifts those that own it as a lift, and users those
+// that use the lift. Each suite's owner counts as one column, and each
+// lift's owner as one. When no package owns the lift, its users together
+// count as one column, the one owning the lift would make; when one does,
+// they count for nothing. The fix leaves one column of the name. Only a
+// lift's owners are offered hypercase.Use, and only when more than one
+// owns the lift, since a lift that one package owns has an owner it
+// needs.
 func duplicateColumn(name string, suites, lifts, users []string) string {
+	if len(lifts) > 0 {
+		users = nil
+	}
 	n := len(suites) + len(lifts)
 	if len(users) > 0 {
 		n++
+	}
+	if n < 2 {
+		return ""
+	}
+	// A lift owner that only reads the lift's product removes its column
+	// with hypercase.Use, so that is how the fix says to remove one.
+	useHint := ""
+	if len(lifts) > 1 {
+		useHint = fmt.Sprintf(" Of %s, which own the lift, one that only reads its product removes its column by giving the lift to hypercase.Use in place of hypercase.Own.", andList(lifts))
 	}
 	var holders, why, fix string
 	switch {
@@ -329,19 +337,15 @@ func duplicateColumn(name string, suites, lifts, users []string) string {
 	case len(suites) == 0:
 		holders = "owned by " + pkgsAs(lifts, "lift")
 		why = "Column names are unique per corpus root, and one package owns each column."
-		fix = leaveOne(n, "one of the lifts", "the lifts") + " A package that only reads the lift's product gives it to hypercase.Use in place of hypercase.Own."
-	default:
-		holders = "owned by " + pkgsAs(suites, "suite")
-		if len(lifts) > 0 {
-			holders += ", and by " + pkgsAs(lifts, "lift")
-		} else {
-			holders += ", and used by " + pkgsAs(users, "lift")
-		}
+		fix = leaveOne(n, "one of the lifts", "the lifts") + useHint
+	case len(lifts) > 0:
+		holders = "owned by " + pkgsAs(suites, "suite") + ", and by " + pkgsAs(lifts, "lift")
 		why = "Lifts share the suites' column names, which are unique per corpus root, and one package owns each column."
-		fix = leaveOne(n, "the suite or the lift", "the columns")
-		if len(lifts) > 1 {
-			fix += fmt.Sprintf(" Of %s, which own the lift, a package that only reads its product gives it to hypercase.Use in place of hypercase.Own.", andList(lifts))
-		}
+		fix = leaveOne(n, "the suite or the lift", "the columns") + useHint
+	default:
+		holders = "owned by " + pkgsAs(suites, "suite") + ", and used by " + pkgsAs(users, "lift")
+		why = "Lifts share the suites' column names, which are unique per corpus root. No package owns the lift, and owning it would add a column of the name."
+		fix = leaveOne(n, "the suite or the lift", "the suites and the lift") + " To remove the lift, drop it from hypercase.Use in every package that uses it."
 	}
 	return fmt.Sprintf("the column %s is %s. %s\n%s", name, holders, why, fix)
 }

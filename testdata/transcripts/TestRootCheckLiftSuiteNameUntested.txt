@@ -33,8 +33,8 @@ PASS
 $ go test  # ladder-a-useonly
     c/testdata/hypercase.json is a registry, and c holds no _test.go file, so no test compares it, and it still claims sections.
         Delete it, or restore the package's tests.
-    the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root, and one package owns each column.
-        Rename the suite or the lift, or remove one.
+    the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root. No package owns the lift, and owning it would add a column of the name.
+        Rename the suite or the lift, or remove one. To remove the lift, drop it from hypercase.Use in every package that uses it.
     the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registry of ./c records that its package owns the lift, and ./c holds no _test.go file, so no test runs the lift there.
         Once no suite shares the lift's name, restore the tests of ./c, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.
     what ran, in order:
@@ -72,8 +72,8 @@ $ go test  # ladder-a-useonly
         Delete it, or restore the package's tests.
     d/testdata/hypercase.json is a registry, and d holds no _test.go file, so no test compares it, and it still claims sections.
         Delete it, or restore the package's tests.
-    the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root, and one package owns each column.
-        Rename the suite or the lift, or remove one.
+    the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root. No package owns the lift, and owning it would add a column of the name.
+        Rename the suite or the lift, or remove one. To remove the lift, drop it from hypercase.Use in every package that uses it.
     the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registries of ./c and ./d record that their packages own the lift, and they hold no _test.go file, so no test runs the lift there.
         Once no suite shares the lift's name, restore the tests of one of them and delete the others' registries, or delete all their registries and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.
     what ran, in order:
