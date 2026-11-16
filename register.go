@@ -227,6 +227,14 @@ func (r *registrations) addColumn(c *column) {
 			refuseCorpusOfType(c, t)
 		}
 	}
+	if cl := c.classifier; cl != nil {
+		switch {
+		case !validName(cl.name):
+			refuse(fmt.Sprintf("the suite %s's classifier name %q breaks the naming rule: %s. Rename the classifier.", c.name, cl.name, nameRule))
+		case cl.classify == nil:
+			refuse(fmt.Sprintf("the suite %s's classifier %s has no Classify. Give it the function that gives a cell's detail.", c.name, cl.name))
+		}
+	}
 	checkListed("the suite "+c.name, "Rejects", c.rejects)
 	checkPatterns("suite", c.name, c.outputs)
 	r.checkColumnName("suite", c.name, c.describe())

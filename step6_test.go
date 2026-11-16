@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/sdboyer/hypercase/archive"
 )
 
 // Step 6: corpus types and lifts, over the ladder of fixtures_lifts_test.go.
 
 // hasSections checks an archive holds each section, with its bytes, and
-// lacks each section named in lacking.
+// lacks each section whose name starts with one in lacking, but a cell's
+// outcome, which every cell has: lacking out/evaluate/ says the cell holds
+// nothing but its outcome.
 func (s *sandbox) hasSections(rel string, want map[string]string, lacking ...string) {
 	s.t.Helper()
 	data := s.read(rel)
@@ -19,10 +23,21 @@ func (s *sandbox) hasSections(rel string, want map[string]string, lacking ...str
 		}
 	}
 	for _, name := range lacking {
-		if bytes.Contains(data, []byte("-- "+name)) {
-			s.t.Errorf("%s holds %s, and shouldn't:\n%s", rel, name, data)
+		for _, sec := range archive.Parse(data).Sections {
+			if strings.HasPrefix(sec.Name, name) && !isOutcome(sec.Name) {
+				s.t.Errorf("%s holds %s, and shouldn't:\n%s", rel, name, data)
+				break
+			}
 		}
 	}
+}
+
+// isOutcome reports whether a section is a cell's outcome: out/<column>/outcome,
+// under a case's prefix.
+func isOutcome(section string) bool {
+	_, _, rest := archive.SplitCase(section)
+	col, file, _ := strings.Cut(strings.TrimPrefix(rest, archive.Out+"/"), "/")
+	return strings.HasPrefix(rest, archive.Out+"/") && col != "" && file == archive.OutcomeFile
 }
 
 func TestLadder(t *testing.T) {
@@ -34,14 +49,20 @@ func TestLadder(t *testing.T) {
 	}
 	// A lift's cell records its function's error once, and its stderr.
 	s.hasSections("testdata/script/stray.txtar", map[string]string{
-		"out/parse/error.txt": "D1: not a number or a formula: \"total\"\n",
-		"out/calc/error.txt":  "D1: not a number or a formula: \"total\"\n",
+		"out/parse/error.txt":  "D1: not a number or a formula: \"total\"\n",
+		"out/parse/outcome":    "rejected\n",
+		"out/calc/error.txt":   "D1: not a number or a formula: \"total\"\n",
+		"out/evaluate/outcome": "blocked parse\n",
+		"out/format/outcome":   "blocked parse\n",
+		"out/resolve/outcome":  "blocked parse\n",
 	}, "out/evaluate/", "out/format/", "out/resolve/")
 	s.hasSections("testdata/script/loop.txtar", map[string]string{
 		"out/resolve/error.txt": "A1 -> A1: cycle\n",
 		"out/format/trail.txt":  "parse\n",
+		"out/evaluate/outcome":  "blocked resolve\n",
+		"out/parse/outcome":     "accepted\n",
 	}, "out/evaluate/", "out/parse/")
-	s.hasSections("testdata/script/both.txtar", map[string]string{"out/parse/error.txt": "D1: not a number\n"}, "out/resolve/")
+	s.hasSections("testdata/script/both.txtar", map[string]string{"out/parse/error.txt": "D1: not a number\n", "out/resolve/outcome": "blocked parse\n"}, "out/resolve/")
 	s.hasSections("testdata/script/noisy.txtar", map[string]string{"out/parse/stderr.txt": "parse: a warning\n"}, "out/parse/error.txt")
 	// A lift and a suite's run receive the archive's name.
 	s.hasSections("testdata/script/fine.txtar", map[string]string{
@@ -239,7 +260,7 @@ func TestLiftNoProduct(t *testing.T) {
 	s := newSandbox(t, "no-product")
 	none := s.read("testdata/script/none.txtar")
 	want := []string{
-		"script/none: pick returns no product.\npick: Picks the script's view, as its pick/ tree says.\npick returned no product and no error.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error.",
+		"script/none: pick returns no product.\npick: Picks the script's view, as its pick/ tree says.\npick returned no product and no error, so the cell has no outcome.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.",
 		"script/none: walk is blocked: the lift pick failed on the case: it returned no product and no error.",
 		"script/none: unpick is blocked: the lift pick failed on the case: it returned no product and no error.",
 		"script/none: format is blocked: the lift pick failed on the case: it returned no product and no error.",

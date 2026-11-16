@@ -38,6 +38,8 @@ func TestArchiveForm(t *testing.T) {
 		{"panicked with detail", head + "-- out/calc/outcome --\npanicked boom\n", "out/calc/outcome: panicked stands alone"},
 		{"blocked by nothing", head + "-- out/calc/outcome --\nblocked\n", "out/calc/outcome: blocked is followed by the lift that failed"},
 		{"skipped for no reason", head + "-- out/calc/outcome --\nskipped\n", "out/calc/outcome: skipped is followed by the probe's reason"},
+		{"codes out of order", head + "-- out/calc/outcome --\nrejected S2 S1\n", "out/calc/outcome: a rejected outcome's codes are sorted byte by byte, each once, and S1 follows S2"},
+		{"a detail with a space at its end", head + "-- out/calc/outcome --\naccepted div-zero \n", `out/calc/outcome: "div-zero " can't be held in an outcome: it is one line, not empty, with no space at either end`},
 		{"no column", head + "-- out/outcome --\naccepted\n", "out/outcome: an output belongs under its column, as out/<column>/<file>"},
 		{"a variant with no name", head + "-- variant//out/calc/outcome --\naccepted\n", "variant//out/calc/outcome: a variant's section belongs under its name"},
 		{"a section twice", head + "-- out/calc/outcome --\naccepted\n-- out/calc/outcome --\naccepted\n", "out/calc/outcome: the section appears twice"},

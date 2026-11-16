@@ -1,0 +1,25 @@
+$ edit testdata/script/clash.txtar  # a case whose output is outcome/x
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # nested
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/clash: echo writes a file under outcome/.
+        echo: Does what the case's do/ tree says.
+        out/echo/outcome can't be held in an archive: the section is also the directory of out/echo/outcome/x.
+        Fix the code. An update writes nothing for this cell.
+    script/outputs: The run returns a.txt, and a.txt/b below it.
+        echo: Does what the case's do/ tree says.
+        out/echo/a.txt can't be held in an archive: the section is also the directory of out/echo/a.txt/b.
+        Fix the code. An update writes nothing for this cell.
+    script/stream: The run returns stdout.txt/a, and writes to stdout.
+        echo: Does what the case's do/ tree says.
+        out/echo/stdout.txt can't be held in an archive: the section is also the directory of out/echo/stdout.txt/a.
+        Fix the code. An update writes nothing for this cell.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/clash
+            --- FAIL: TestCorpus/script/clash/echo
+        --- FAIL: TestCorpus/script/outputs
+            --- FAIL: TestCorpus/script/outputs/echo
+        --- FAIL: TestCorpus/script/stream
+            --- FAIL: TestCorpus/script/stream/echo
+FAIL
+[exit 1]

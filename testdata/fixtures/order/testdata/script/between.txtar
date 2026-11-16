@@ -7,3 +7,5 @@ a
 b
 -- out/echo/b.txt --
 b
+-- out/echo/outcome --
+accepted

@@ -8,3 +8,9 @@ D1: not a number
 -- properties --
 malformed
 circular
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/resolve/outcome --
+blocked parse

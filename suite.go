@@ -56,6 +56,9 @@ type Suite[T any] struct {
 	// compared as stdout.txt and stderr.txt. It reports its own failures,
 	// such as a fixture it can't set up, through the testing.TB.
 	Run func(t testing.TB, archive string, in T, stdout, stderr io.Writer) ([]File, error)
+	// Classifier refines the outcomes of the suite's cells that ran and
+	// returned. A suite with none leaves them unrefined.
+	Classifier Classifier[T]
 }
 
 // column is a column with its type erased: a suite's, or a lift's.
@@ -68,7 +71,8 @@ type column struct {
 	consumes    reflect.Type
 	probe       func(in any) (string, bool)
 	run         func(t testing.TB, archive string, in any, stdout, stderr io.Writer) ([]File, error)
-	lift        *lift // the column's lift, for a lift's column
+	classifier  *classifier // a suite's, or nil
+	lift        *lift       // the column's lift, for a lift's column
 }
 
 // kind names what the column is, in a message.
@@ -129,6 +133,7 @@ func (s Suite[T]) column() *column {
 		outputs:     slices.Clone(s.Outputs),
 		rejects:     slices.Clone(s.Rejects),
 		consumes:    reflect.TypeFor[T](),
+		classifier:  s.Classifier.erase(),
 	}
 	if s.Probe != nil {
 		probe := s.Probe

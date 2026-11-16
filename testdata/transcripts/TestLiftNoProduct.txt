@@ -2,8 +2,8 @@ $ go test  # picked
     script/none: format is blocked: the lift pick failed on the case: it returned no product and no error.
     script/none: pick returns no product.
         pick: Picks the script's view, as its pick/ tree says.
-        pick returned no product and no error.
-        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error.
+        pick returned no product and no error, so the cell has no outcome.
+        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.
     script/none: unpick is blocked: the lift pick failed on the case: it returned no product and no error.
     script/none: walk is blocked: the lift pick failed on the case: it returned no product and no error.
     what ran, in order:
@@ -32,8 +32,8 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # picked
     script/none: format is blocked: the lift pick failed on the case: it returned no product and no error.
     script/none: pick returns no product.
         pick: Picks the script's view, as its pick/ tree says.
-        pick returned no product and no error.
-        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error.
+        pick returned no product and no error, so the cell has no outcome.
+        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.
     script/none: unpick is blocked: the lift pick failed on the case: it returned no product and no error.
     script/none: walk is blocked: the lift pick failed on the case: it returned no product and no error.
     what ran, in order:

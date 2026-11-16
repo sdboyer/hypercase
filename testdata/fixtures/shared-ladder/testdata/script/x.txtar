@@ -3,3 +3,7 @@ The root package, ., owns parse, resolve and evaluate, and ./b uses parse for ou
 evaluate 1
 -- in/outline/out/values.txt --
 outline 1
+-- out/parse/outcome --
+accepted
+-- out/resolve/outcome --
+accepted

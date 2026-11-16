@@ -3,9 +3,19 @@ resolve now rejects the script, so evaluate's committed values are orphans.
 A1 -> A1: cycle
 -- properties --
 circular
+-- out/calc/outcome --
+accepted
+-- out/evaluate/outcome --
+blocked resolve
 -- out/evaluate/values.txt --
 evaluate 1
+-- out/format/outcome --
+accepted
 -- out/format/trail.txt --
 parse
+-- out/parse/outcome --
+accepted
 -- out/resolve/error.txt --
 A1 -> A1: cycle
+-- out/resolve/outcome --
+rejected

@@ -7,10 +7,11 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo-links
 PASS
 $ cat testdata/hypercase.json
 {
-  "format": 4,
+  "format": 5,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
+  "codes": false,
   "issueLinks": [
     {
       "pattern": "recipes#(\\d+)",
@@ -69,7 +70,8 @@ $ cat testdata/hypercase.json
           "description": "The values the case's instructions give."
         }
       ],
-      "rejects": []
+      "rejects": [],
+      "classifier": null
     }
   ]
 }
@@ -81,9 +83,9 @@ $ go test  # echo-links
 PASS
 $ go test  # echo
     testdata/hypercase.json differs from what the package registers (-committed +registered):
-            "updateVar": "FIXTURE_UPDATE_GOLDEN",
             "corpusRoot": ".",
             "rootPackage": true,
+            "codes": false,
         -   "issueLinks": [
         -     {
         -       "pattern": "recipes#(\\d+)",

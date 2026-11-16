@@ -5,5 +5,15 @@ D1: not a number
 malformed
 -- out/calc/error.txt --
 D1: not a number
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+accepted
+-- out/format/outcome --
+accepted
 -- out/format/trail.txt --
 parse
+-- out/parse/outcome --
+accepted
+-- out/resolve/outcome --
+accepted

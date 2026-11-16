@@ -3,3 +3,5 @@ The probe says no to a cell a gaps line marks.
 no formulas
 -- gaps --
 echo A1 should be 6. Waits on sheets#12.
+-- out/echo/outcome --
+skipped no formulas

@@ -415,6 +415,9 @@ var fixturePackages = map[string][]fixturePkg{
 	"variants":           {{".", "variants"}},
 	"transforms":         {{".", "transforms"}},
 	"transform-failures": {{".", "poke"}},
+
+	"outcomes":         {{".", "outcomes"}},
+	"outcome-failures": {{".", "outcomes"}},
 }
 
 type fixturePkg struct{ dir, registration string }

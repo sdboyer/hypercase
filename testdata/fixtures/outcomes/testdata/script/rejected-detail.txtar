@@ -1,0 +1,6 @@
+The classifier reads the error of a cell with a code.
+-- in/cl/err --
+-- in/do/error --
+codes S1
+-- properties --
+circular

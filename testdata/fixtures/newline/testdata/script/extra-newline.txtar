@@ -1,5 +1,7 @@
 The output gains a newline its golden lacks.
 -- in/do/extranl/values.txt --
 A1 6
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 A1 6

@@ -77,6 +77,7 @@ func TestVariants(t *testing.T) {
 		"variant/cycle/out/echo/values.txt": "a1 six\n",
 		"variant/more/out/echo/b.txt":       "b1 three\n",
 		"variant/more/out/echo/values.txt":  "a1 six\n",
+		"variant/blank/out/echo/outcome":    "accepted\n",
 	}, "variant/blank/out/")
 	s.passes(s.normal("variants"))
 

@@ -3,5 +3,7 @@ A1 divides by zero, and the code prints a number.
 A1 0
 -- gaps --
 echo A division by zero evaluates to #DIV/0!. Waits on sheets#5.
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 A1 0

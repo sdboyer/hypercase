@@ -1,0 +1,156 @@
+package hypercase_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/sdboyer/hypercase/archive"
+)
+
+// Step 8: outcomes, Codes, classifiers and corpus checks.
+
+// TestOutcomes: every cell has an outcome, the code's verdict, whatever its
+// state: accepted, rejected with the codes the project's Codes gives,
+// sorted and each once, panicked, and skipped with the probe's reason. A
+// classifier adds a detail to a cell that ran and returned, from what it
+// consumed and what the run produced.
+func TestOutcomes(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "outcomes")
+	s.passes(s.update("outcomes"))
+	for _, c := range []struct{ name, outcome string }{
+		{"accepted", "accepted\n"},
+		{"codes", "rejected S1 S2\n"},
+		{"no-codes", "rejected\n"},
+		{"panicked", "panicked\n"},
+		{"skipped", "skipped the case is for no one\n"},
+		{"detail", "accepted div-zero\n"},
+		{"file-detail", "accepted big\n"},
+		{"rejected-detail", "rejected S1; saw-error\n"},
+	} {
+		s.hasSections("testdata/script/"+c.name+".txtar", map[string]string{"out/echo/outcome": c.outcome})
+	}
+	s.hasSections("testdata/script/skipped.txtar", nil, "out/echo/")
+	for _, name := range []string{"accepted", "codes", "skipped", "rejected-detail"} {
+		s.cat("testdata/script/" + name + ".txtar")
+	}
+	// The registry records the classifier, and that the project gives
+	// Codes.
+	s.cat("testdata/hypercase.json")
+	reg := string(s.read("testdata/hypercase.json"))
+	for _, want := range []string{`"codes": true`, `"classifier": {`, `"name": "steered"`} {
+		if !strings.Contains(reg, want) {
+			t.Errorf("the registry doesn't hold %s:\n%s", want, reg)
+		}
+	}
+	s.passes(s.normal("outcomes"))
+
+	// The outcome is a golden.
+	s.edit("testdata/script/codes.txtar", "record another code", set("out/echo/outcome", "rejected S1\n"))
+	s.fails(s.normal("outcomes"), "script/codes: echo errs with two codes, one of them twice.\n    echo: Does what the case's do/ tree says.\n    out/echo/outcome differs (-golden +got):\n    - rejected S1\n    + rejected S1 S2")
+	s.edit("testdata/script/skipped.txtar", "record another reason", set("out/echo/outcome", "skipped no reason\n"))
+	s.fails(s.normal("outcomes"), "out/echo/outcome differs (-golden +got):\n    - skipped no reason\n    + skipped the case is for no one")
+	s.done()
+}
+
+// TestOutcomeFailures: a cell whose code, classifier or probe gives what
+// an outcome can't hold fails, naming it, and so does a classifier or a
+// Codes that fails or panics. An update writes nothing for such a cell.
+func TestOutcomeFailures(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "outcome-failures")
+	want := []string{
+		"script/bad-code: Codes gives a code with a space in it.\n    echo: Does what the case's do/ tree says.\n    The project's Codes gave echo's error a code an outcome can't hold: the code \"a b\" can't be held in an outcome: a code is not empty, and holds no space, semicolon or newline.\n    Fix Codes. An update writes nothing for this cell.",
+		"script/codes-panic: Codes panics on echo's error.\n    echo: Does what the case's do/ tree says.\n    The project's Codes panicked on echo's error: codes boom\n    Fix Codes. An update writes nothing for this cell.",
+		"script/cl-error: The classifier fails.\n    echo: Does what the case's do/ tree says.\n    echo's classifier steered failed: no detail today\n    Fix the classifier. An update writes nothing for this cell.",
+		"script/cl-panic: The classifier panics.\n    echo: Does what the case's do/ tree says.\n    echo's classifier steered panicked: classifier boom\n    Fix the classifier. An update writes nothing for this cell.",
+		"script/cl-bad: The classifier gives a detail with a space at its start.\n    echo: Does what the case's do/ tree says.\n    echo's classifier steered gave a detail an outcome can't hold: \" padded\" can't be held in an outcome: it is one line, not empty, with no space at either end.\n    Fix the classifier. An update writes nothing for this cell.",
+		"script/reason: echo's probe says no with a reason of two lines.\n    echo: Does what the case's do/ tree says.\n    echo's probe said the case isn't for it, with a reason an outcome can't hold: \"two\\nlines\" can't be held in an outcome: it is one line, not empty, with no space at either end.\n    Fix the probe. An update writes nothing for this cell.",
+	}
+	s.fails(s.update("outcomes"), want...)
+	for _, name := range []string{"bad-code", "codes-panic", "cl-error", "cl-panic", "cl-bad", "reason"} {
+		s.hasSections("testdata/script/"+name+".txtar", nil, "out/")
+		if s.exists("testdata/script/"+name+".txtar") && strings.Contains(string(s.read("testdata/script/"+name+".txtar")), "-- out/") {
+			t.Errorf("the update wrote to %s, whose cell failed", name)
+		}
+	}
+	s.hasSections("testdata/script/fine.txtar", map[string]string{"out/echo/outcome": "accepted\n"})
+	s.fails(s.normal("outcomes"), want...)
+	s.done()
+}
+
+// TestClassifierRefusals: a classifier's name follows the naming rule, it
+// has a Classify, and a description.
+func TestClassifierRefusals(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "outcomes")
+	for _, tt := range []struct{ reg, want string }{
+		{"cl-bad-name", `panic: hypercase: the suite echo's classifier name "Steered" breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter. Rename the classifier.`},
+		{"cl-no-classify", "panic: hypercase: the suite echo's classifier steered has no Classify. Give it the function that gives a cell's detail."},
+	} {
+		r := s.normal(tt.reg)
+		s.fails(r, tt.want)
+		s.lacks(r, "--- ")
+	}
+	// The cells are written, so the run fails on the description alone.
+	s.passes(s.update("outcomes"))
+	s.fails(s.normal("cl-no-description"), "the suite echo's classifier steered has no description.\nAdd one: it says what the classifier's details mean, in prose.")
+	s.done()
+}
+
+// TestFrozenOutcome: a cell frozen before outcomes were written has none.
+// A normal run fails on it, and says to run the update, which adds the
+// outcome and changes nothing else, when the cell's other files match the
+// run. A frozen cell whose files differ gains nothing, and fails as
+// before.
+func TestFrozenOutcome(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "gaps")
+	const negative = "testdata/script/negative.txtar"
+	before := s.read(negative)
+	s.edit(negative, "drop the frozen cell's outcome, as before outcomes were written", drop("out/echo/outcome"))
+	s.fails(s.normal("rejects"), "script/negative: A1 is a negative number, which the code wrongly rejects.\n    echo: Does what the case's do/ tree says.\n    The cell is frozen by its known gap, gaps line 1: \"echo A negative number is valid, and evaluates to itself. Waits on sheets#3.\"\n    Its committed files match the run, and it has no out/echo/outcome, which every cell has.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to add it. The update adds the outcome and changes nothing else.")
+	s.passes(s.update("rejects"))
+	s.same(negative, before)
+
+	s.edit(negative, "drop the outcome, and change the recorded error", func(a *archive.Archive) {
+		drop("out/echo/outcome")(a)
+		set("out/echo/error.txt", "A1: bad number\n")(a)
+	})
+	edited := s.read(negative)
+	want := "Its committed files record today's behavior, and the run now produces different ones:\n    out/echo/error.txt differs (-committed +got):"
+	r := s.normal("rejects")
+	s.fails(r, want)
+	s.lacks(r, "which every cell has")
+	s.fails(s.update("rejects"), want)
+	s.same(negative, edited)
+	s.done()
+}
+
+// TestOutcomeClash: a column's output under outcome/ is one no archive
+// can hold beside the cell's outcome.
+func TestOutcomeClash(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "file-dir")
+	const clash = "testdata/script/clash.txtar"
+	s.write(clash, []byte("echo writes a file under outcome/.\n-- in/do/out/outcome/x --\nx\n"), "a case whose output is outcome/x")
+	s.fails(s.update("nested"), "script/clash: echo writes a file under outcome/.\n    echo: Does what the case's do/ tree says.\n    out/echo/outcome can't be held in an archive: the section is also the directory of out/echo/outcome/x.\n    Fix the code. An update writes nothing for this cell.")
+	s.hasSections(clash, nil, "out/")
+	s.done()
+}
+
+// TestVariantOutcomes: a variant's cells have outcomes too, under its
+// prefix. A transform's variant the transform declines has no cells, so
+// no outcome.
+func TestVariantOutcomes(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.passes(s.update("transforms"))
+	s.hasSections(twice, map[string]string{
+		"out/echo/outcome":                  "accepted\n",
+		"transform/looped/out/echo/outcome": "rejected\n",
+		"transform/upper/out/echo/outcome":  "accepted\n",
+	})
+	s.hasSections("testdata/script/errs.txtar", map[string]string{"transform/upper/out/echo/outcome": "rejected\n"}, "transform/looped/")
+	s.done()
+}
