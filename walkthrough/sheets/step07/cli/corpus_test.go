@@ -21,7 +21,6 @@ func init() {
 	)
 }
 
-// doc:begin calc
 var calc = hypercase.Suite[sheetcorpus.Sheet]{
 	Name:        "calc",
 	Description: "Runs the calc command on the sheet.",
@@ -35,7 +34,5 @@ var calc = hypercase.Suite[sheetcorpus.Sheet]{
 		return nil, sheet.Calc(in, stdout, stderr)
 	},
 }
-
-// doc:end calc
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }

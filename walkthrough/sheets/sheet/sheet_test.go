@@ -455,7 +455,7 @@ func TestMoveDown(t *testing.T) {
 		cells map[string]string
 		want  string // cellsOf, or describe
 	}{
-		{"empty", map[string]string{}, ""},
+		{"empty", map[string]string{}, "plain: the sheet has no cells"},
 		{"twice", map[string]string{"A1": "=B1*2\n", "B1": "3\n"}, "sheet/A2 \"=B2*2\\n\"\nsheet/B2 \"3\\n\"\n"},
 		{"spacing kept", map[string]string{"A1": "  = B1 *(C9+ XFD7) \n"}, "sheet/A2 \"  = B2 *(C10+ XFD8) \\n\"\n"},
 		{"not a reference", map[string]string{"A1": "=b1+B1x+B1"}, "sheet/A2 \"=b1+B1x+B2\"\n"},
@@ -467,6 +467,7 @@ func TestMoveDown(t *testing.T) {
 		{"cell on the last row", map[string]string{"A1048576": "1"}, "plain: A1048576 is on the last row, so it can't move down"},
 		{"reference to the last row", map[string]string{"A1": "=B1048576"}, "plain: A1: B1048576 is on the last row, so it can't move down"},
 		{"not a cell", map[string]string{"notes": "1"}, "S101 notes: not a cell name @ sheet/notes:0"},
+		{"not a cell, and a cell on the last row", map[string]string{"A1048576": "1", "notes": "1"}, "S101 notes: not a cell name @ sheet/notes:0"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -477,6 +478,42 @@ func TestMoveDown(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("got:\n%s\nwant:\n%s", got, tt.want)
+			}
+		})
+	}
+}
+
+// Movable declines exactly the sheets MoveDown can't move, with MoveDown's
+// reason, and leaves what's wrong with a sheet for MoveDown to report.
+func TestMovable(t *testing.T) {
+	tests := []struct {
+		name   string
+		fsys   fstest.MapFS
+		why    string // "" when movable
+		broken bool   // movable, and MoveDown fails on it
+	}{
+		{"twice", sheetFS(map[string]string{"A1": "=B1*2", "B1": "3"}), "", false},
+		{"empty", sheetFS(map[string]string{}), "the sheet has no cells", false},
+		{"no sheet", fstest.MapFS{}, "the sheet has no cells", false},
+		{"cell on the last row", sheetFS(map[string]string{"A1": "1", "B1048576": "2"}), "B1048576 is on the last row, so it can't move down", false},
+		{"reference to the last row", sheetFS(map[string]string{"A1": "=B1048576"}), "A1: B1048576 is on the last row, so it can't move down", false},
+		{"not a cell", sheetFS(map[string]string{"A1": "1", "notes": "1"}), "", true},
+		{"not a cell, and a cell on the last row", sheetFS(map[string]string{"A1048576": "1", "notes": "1"}), "", true},
+		{"a directory", fstest.MapFS{"sheet/A1/x": {}}, "", true},
+		{"sheet is a file", fstest.MapFS{"sheet": {}}, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			why, ok := sheet.Movable(tt.fsys)
+			if why != tt.why || ok != (tt.why == "") {
+				t.Errorf("got %q, %v; want %q, %v", why, ok, tt.why, tt.why == "")
+			}
+			_, err := sheet.MoveDown(tt.fsys)
+			switch {
+			case !ok && (err == nil || err.Error() != why):
+				t.Errorf("Movable declined with %q, and MoveDown gave %v", why, err)
+			case ok && tt.broken != (err != nil):
+				t.Errorf("MoveDown gave %v, on a sheet Movable let through", err)
 			}
 		})
 	}
@@ -543,6 +580,7 @@ func TestLoopable(t *testing.T) {
 		{"refers to itself", sheetFS(map[string]string{"A1": "= (A1)\n", "B1": "1"}), "A1 already refers to itself"},
 		{"later cell refers to itself", sheetFS(map[string]string{"A1": "1", "B1": "=B1"}), ""},
 		{"not a cell", sheetFS(map[string]string{"A1": "1", "notes": "1"}), ""},
+		{"not a cell, and the first cell refers to itself", sheetFS(map[string]string{"A1": "=A1", "notes": "1"}), ""},
 		{"a directory", fstest.MapFS{"sheet/A1/x": {}}, ""},
 		{"sheet is a file", fstest.MapFS{"sheet": {}}, ""},
 	}

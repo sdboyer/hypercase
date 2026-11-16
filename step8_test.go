@@ -236,6 +236,44 @@ func TestFrozenOutcome(t *testing.T) {
 	s.done()
 }
 
+// TestFrozenOutcomeCodes: a project that starts supplying Codes changes the
+// outcome of each rejected cell whose error Codes gives a code, a frozen
+// one included. The frozen cell fails, and the update writes nothing for
+// it, until a person deletes its outcome: the next update adds it, and
+// changes nothing else. A frozen rejected cell whose error Codes gives no
+// code keeps its outcome.
+func TestFrozenOutcomeCodes(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "gaps")
+	const negative = "testdata/script/negative.txtar"
+	original := s.read(negative)
+	s.remove("testdata/script/other-column.txtar", "remove the case whose gaps line fails every normal run")
+	s.edit(negative, "give the frozen cell an error that Codes, once supplied, gives the code S1", func(a *archive.Archive) {
+		set("in/do/error", "codes S1\n")(a)
+		set("out/echo/error.txt", "codes S1\n")(a)
+	})
+	edited := s.read(negative)
+	s.passes(s.update("rejects"))
+	s.same(negative, edited)
+	s.passes(s.normal("rejects"))
+
+	want := "Its committed files record today's behavior, and the run now produces different ones:\n    out/echo/outcome differs (-committed +got):"
+	s.fails(s.update("rejects-codes"), want)
+	s.same(negative, edited)
+	s.fails(s.normal("rejects-codes"), want)
+
+	s.edit(negative, "drop the frozen cell's outcome", drop("out/echo/outcome"))
+	s.passes(s.update("rejects-codes"))
+	a := archive.Parse(edited)
+	set("out/echo/outcome", "rejected S1\n")(a)
+	s.same(negative, a.Format())
+	s.passes(s.normal("rejects-codes"))
+
+	s.write(negative, original, "restore the frozen cell, whose error Codes gives no code")
+	s.passes(s.normal("rejects-codes"))
+	s.done()
+}
+
 // TestFrozenVariantOutcome: the upgrade adds a missing outcome to a frozen
 // cell of a hand-written variant, and of a transform's variant, as it does
 // to a base's, and changes nothing else.

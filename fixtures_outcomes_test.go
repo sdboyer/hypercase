@@ -169,6 +169,10 @@ func checks(items ...any) {
 // outcomeRegistrations are step 8's declaration sets, by name.
 var outcomeRegistrations = map[string]func(){
 	"outcomes": func() { hypercase.Register(projectCodes, rootPkg, circular, scriptType, own(classified)) },
+	// rejects, in a project that supplies Codes.
+	"rejects-codes": func() {
+		hypercase.Register(projectCodes, rootPkg, circular, dangling, malformed, scriptType, own(withRejects(echo, circular, dangling)))
+	},
 
 	// Classifiers that break a rule.
 	"cl-bad-name": func() {

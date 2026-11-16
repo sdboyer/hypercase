@@ -454,14 +454,15 @@ Its `.gitignore` names the corpus root's lock, which an update takes
 - What an update writes to a cell depends only on the inputs and the code,
   never on committed outputs. Committed outputs decide whether a run fails,
   and, from step 4, that a frozen cell is left alone.
-- `hypercase strip` (#16) removes update-written sections, which it
-  recognizes by name, under the corpus root's lock (step 5). A person runs
-  it, never an update. With no flags it strips every archive under the corpus
-  root, and the registry and findings files (steps 5 and 8). `-column <name>`
-  and `-transform <name>` limit it. It leaves frozen cells (step 4) in place
-  and lists them, and `-frozen` strips those too.
+- `hypercase strip` (#16) isn't built yet. As designed, it removes
+  update-written sections, which it recognizes by name, under the corpus
+  root's lock (step 5). A person runs it, never an update. With no flags it
+  strips every archive under the corpus root, and the registry and findings
+  files (steps 5 and 8). `-column <name>` and `-transform <name>` limit it.
+  It leaves frozen cells (step 4) in place and lists them, and `-frozen`
+  strips those too.
 - Stripping and then updating, repeated until an update changes nothing,
-  reaches a known state.
+  will reach a known state.
 
 **What an archive can't hold** (proposed).
 
@@ -1095,8 +1096,9 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
   consumes, the corpora it runs over, its declared outputs and the
   properties it rejects. It records the package's corpus root, and whether
   the package runs the root-package check.
-- It records the name of the project's update variable, so `hypercase strip`
-  and `hypercase report` can print the update command.
+- It records the name of the project's update variable, so
+  `hypercase report`, and `hypercase strip` once it is built, can print the
+  update command.
 - It carries a format version, which changes on any change to what the
   registry holds.
 - It is compared like a golden. An update writes it by temp file and rename.
@@ -1587,7 +1589,8 @@ Proposed names: `decl.Transform` with its `Name`, `Description`, `Gives`,
 `Keeps`, `Probe` and `Jenny` fields, and `decl.Type`'s `Transforms` field.
 The variant prefixes `variant/<name>/` and `transform/<name>/` are proposed.
 Trade-off: the prefix says whether a person or an update wrote the variant,
-at the cost of two reserved top-level names and longer section paths.
+at the cost of reserving two names, as top-level section names and as
+column names, and of longer section paths.
 
 A transform's `Jenny` is a
 [jenny](https://pkg.go.dev/github.com/sdboyer/jenny): a named generator
@@ -1613,12 +1616,7 @@ var Renamed = decl.Transform[Sheet]{
 	Name:        "renamed",
 	Description: "Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.",
 	Keeps:       []decl.Property{Circular, Dangling},
-	Probe: func(base Sheet) (why string, ok bool) {
-		if entries, _ := fs.ReadDir(base, "sheet"); len(entries) == 0 {
-			return "the sheet has no cells", false
-		}
-		return "", true
-	},
+	Probe:       func(base Sheet) (why string, ok bool) { return sheet.Movable(base) },
 	Jenny: jenny.For[Sheet]().New("renamed", func(base Sheet) (jenny.Files, error) {
 		return view(sheet.MoveDown(base))
 	}),
@@ -1628,6 +1626,27 @@ var SheetType = decl.Type[Sheet]{
 	Dir:         "sheet",
 	Description: "A spreadsheet: one file per cell under in/sheet/, holding a number or a formula.",
 	Transforms:  []decl.Transform[Sheet]{Looped, Renamed},
+}
+
+// view gives a sheet's every file as a transform's jenny returns them, by its
+// path in the sheet's input view.
+func view(fsys fs.FS, err error) (jenny.Files, error) {
+	if err != nil {
+		return nil, err
+	}
+	var files jenny.Files
+	err = fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := fs.ReadFile(fsys, p)
+		if err != nil {
+			return err
+		}
+		files = append(files, jenny.NewFile(p, data))
+		return nil
+	})
+	return files, err
 }
 ```
 
@@ -1860,6 +1879,13 @@ whether each has a probe, and whether the package owns it.
   by hand. `renamed` moves every cell one row down, rewriting each reference,
   and keeps `circular` and `dangling`, so it runs over bases that state
   either; a base that states `malformed` is declined.
+- Their probes decline a base only when the transform can't apply to it,
+  which is a fact about the sheet: it has no cells; for `looped`, its first
+  cell already refers to itself; for `renamed`, a cell or a reference is on
+  the last row, with no row below. A sheet a probe can't read, or one
+  holding a file that isn't a cell, is malformed, and no reason to decline:
+  the probe leaves it to the jenny, which fails on it, and so the transform
+  fails.
 - It is materialized. An update writes `transform/<name>/in/…` and
   `transform/<name>/delete`, and the owner's normal run checks them like
   goldens.
@@ -1892,8 +1918,8 @@ whether each has a probe, and whether the package owns it.
   its update removes them. What remains under `transform/<name>/out/` is
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
-  root-package check reports them, and says to delete them by hand until
-  `hypercase strip` (#16) lands.
+  root-package check reports them, and says to delete them by hand:
+  `hypercase strip` (#16), which is to remove them, isn't built yet.
 - The root-package check fails on a transform that a package with tests
   lists in a corpus type and no package owns (step 5's rule for packages
   with no tests), and on one that two own.
@@ -2108,11 +2134,10 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 
 ### How the files change
 
-Every cell of the sheets examples gains an `outcome` file, skipped and
-blocked cells included. The archives shown in steps 3 to 7 come from their
-examples, which carry an `outcome` per cell, as every update writes from
-this step on. Their projects supply no `Codes`, so their rejected cells
-carry none.
+From this step, every cell has an `outcome` file, skipped and blocked cells
+included. The archives shown in steps 3 to 7 have them too: they come from
+their examples, which today's updates write. Their projects supply no
+`Codes`, so their rejected cells carry none.
 
 `testdata/sheet/divide.txtar`, whose `A1` is `=B1/C1` with `C1` at `0`. The
 classifier makes `evaluate`'s outcome `accepted div-zero`, on the base and
@@ -2206,12 +2231,13 @@ step 5's `negative` shows. From step 6 it needs to parse as well, since
 `format` reads `parse`'s product: step 6's `negative` has `blocked parse`
 there.
 
-`Codes` changes the outcome of every rejected cell, frozen ones included.
-In archives that already carry outcomes, as step 7's do, the committed
-outcome of `negative`'s four frozen cells is `rejected`, and their run now
-gives `rejected S101`. So they fail, and no update writes them. A person
-deletes those four `outcome` files, and the next update adds them, as step
-4's upgrade does for a frozen cell whose other files match its run.
+`Codes` changes the outcome of every rejected cell whose error it gives a
+code, frozen ones included; a rejected cell whose error it gives none keeps
+`rejected`. In archives that already carry outcomes, as step 7's do, the
+committed outcome of `negative`'s four frozen cells is `rejected`, and their
+run now gives `rejected S101`. So they fail, and no update writes them. A
+person deletes those four `outcome` files, and the next update adds them, as
+step 4's upgrade does for a frozen cell whose other files match its run.
 
 `hypercase.json` records each suite's classifier, and whether the project
 supplies `Codes`: step 5's shows them unset, and the registry of step 8's

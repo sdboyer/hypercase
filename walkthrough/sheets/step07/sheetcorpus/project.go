@@ -10,7 +10,6 @@ import (
 	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
 )
 
-// doc:begin project
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
@@ -33,8 +32,6 @@ func renderError(in fs.FS, err error) []byte {
 	}
 	return out
 }
-
-// doc:end project
 
 // lineAt is line n, counted from 1, of the file at path in in, or "" when
 // there is no such line.
