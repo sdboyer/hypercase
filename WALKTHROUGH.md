@@ -1647,7 +1647,11 @@ whether each has a probe, and whether the package owns it.
 - Every package's update runs the variant's cells on what the transform
   makes, and every normal run on the committed sections. What an update
   writes depends only on the inputs and the code, so one pass of the
-  module's update settles, whichever package runs first.
+  module's update settles, whichever package runs first. A frozen cell is
+  the exception: no update writes it, so when a transform's change moves
+  its output, every run fails on it, updates included, until a person
+  deletes its files, and the next update writes them, or removes its
+  `gaps` line.
 - A package's update alone, after a transform changed, leaves its normal
   run failing on the variant's cells, which read the sections the owner has
   yet to rewrite. The failure shows how they differ from what the transform
