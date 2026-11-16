@@ -357,9 +357,8 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bo
 	}
 	marked := func(section string, gaps []archive.Gap) {
 		for _, g := range gaps {
-			_, listed := transforms[g.Transform]
 			switch {
-			case g.Transform != "" && !listed:
+			case g.Transform != "" && !transforms[g.Transform]:
 				t.Errorf("%s: %s, line %d, names transform/%s, and no corpus type of testdata/%s/ lists a transform of that name.\nList the transform, or remove the line.", rel, section, g.Line, g.Transform, corpus)
 			case !cols[g.Column]:
 				t.Errorf("%s: %s, line %d, names %s, and no registry has a column of that name over the corpus %s.\nRegister the column, or remove the line.", rel, section, g.Line, g.Column, corpus)
@@ -379,7 +378,7 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bo
 	unclaimed := map[claim][]string{}
 	for _, s := range a.Sections {
 		kind, name, rest := archive.SplitCase(s.Name)
-		if _, listed := transforms[name]; kind == archive.Transform && !listed {
+		if kind == archive.Transform && !transforms[name] {
 			c := claim{archive.Transform + "/" + name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s.\nIf a transform should make the variant, list it in its corpus type's Transforms", corpus, name)}
 			unclaimed[c] = append(unclaimed[c], s.Name)
 			continue
