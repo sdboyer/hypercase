@@ -168,9 +168,11 @@ func (v *plannedVariant) runs() bool {
 }
 
 // planVariants plans an archive's variants: its hand-written ones, in the
-// order written, then one per transform of its corpus type, by name. view
-// is the base's input view, which each transform reads.
-func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base, view fs.FS) []*plannedVariant {
+// order written, then one per transform of its corpus type, by name. Each
+// transform runs here, on the base's input view, since whether its variant
+// has cells sets the count of each suite's cells, which doesn't depend on
+// -run. The view is made once, if a transform runs, and dropped after.
+func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []*plannedVariant {
 	var vs []*plannedVariant
 	committed := map[string]archive.VariantCase{}
 	for _, v := range a.Variants() {
@@ -191,6 +193,7 @@ func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base, vi
 	trs := slices.Clone(p.root.transforms)
 	slices.SortFunc(trs, func(a, b *transform) int { return strings.Compare(a.name, b.name) })
 	stated, gaps := a.Properties(), a.Gaps()
+	var view fs.FS
 	for _, tr := range trs {
 		v := &plannedVariant{
 			kind:      archive.Transform,
@@ -210,6 +213,9 @@ func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base, vi
 		if len(neither) > 0 {
 			v.declined = fmt.Sprintf("the base states %s, which %s neither gives nor keeps", andList(neither), tr.name)
 		} else {
+			if view == nil {
+				view = base.View()
+			}
 			r.makeVariant(v, base, view)
 		}
 		vs = append(vs, v)
