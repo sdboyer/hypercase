@@ -2,7 +2,9 @@ package archive
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,10 +26,16 @@ func IsTemp(name string) bool {
 var afterTemp func(tmp string) error
 
 // WriteFile writes data to the named file through a temp file in the same
-// directory, renamed over it, so a reader sees the old file or the new one,
-// never part of one. A failed write leaves the file as it was and removes
-// the temp file.
+// directory, synced and renamed over it, so a reader sees the old file or
+// the new one, never part of one. The file keeps its mode; a new one is
+// 0644. A failed write leaves the file as it was and removes the temp file.
 func WriteFile(name string, data []byte) (err error) {
+	mode := fs.FileMode(0o644)
+	if fi, err := os.Stat(name); err == nil {
+		mode = fi.Mode().Perm()
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
 	f, err := os.CreateTemp(filepath.Dir(name), tempPrefix+filepath.Base(name)+"-*")
 	if err != nil {
 		return err
@@ -42,10 +50,15 @@ func WriteFile(name string, data []byte) (err error) {
 		f.Close()
 		return err
 	}
-	if err := f.Close(); err != nil {
+	if err := f.Chmod(mode); err != nil {
+		f.Close()
 		return err
 	}
-	if err := os.Chmod(tmp, 0o644); err != nil {
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
 		return err
 	}
 	if afterTemp != nil {
