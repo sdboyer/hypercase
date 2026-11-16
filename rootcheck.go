@@ -172,7 +172,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		t.Errorf("%s register the root-package check for %s. It runs once per corpus root.\nRegister it in one package.", andList(rootPkgs), r.rootName())
 	}
 	// Lifts share the suites' column names, so the duplicate-column check
-	// runs over both.
+	// runs over both. A lift that no package owns still takes its name
+	// from the suites, since owning it makes it a column, so its users
+	// stand in for its owners.
 	columns := map[string]bool{}
 	for name := range suitePkgs {
 		columns[name] = true
@@ -182,19 +184,17 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	}
 	for _, name := range slices.Sorted(maps.Keys(columns)) {
 		suites, lifts := suitePkgs[name], liftPkgs[name]
-		if len(suites)+len(lifts) > 1 {
-			t.Error(duplicateColumn(name, suites, lifts))
+		var users []string
+		if len(lifts) == 0 {
+			users = usedPkgs[name]
+		}
+		if len(suites)+len(lifts) > 1 || len(suites) > 0 && len(users) > 0 {
+			t.Error(duplicateColumn(name, suites, lifts, users))
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(usedPkgs)) {
 		if len(liftPkgs[name]) > 0 {
 			continue
-		}
-		// No package owns the lift, so the duplicate-column check above
-		// can't see it collide with a suite of its name.
-		suites := suitePkgs[name]
-		if len(suites) > 0 {
-			t.Errorf("the column %s is owned by %s, and used by %s as a lift. Lifts share the suites' column names, which are unique per corpus root.\nRename the suite or the lift.", name, ownedAs(suites, "suite"), andList(usedPkgs[name]))
 		}
 		msg := fmt.Sprintf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.", name, andList(usedPkgs[name]))
 		fix := "Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use."
@@ -204,9 +204,10 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			fix = restore + " own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use."
 		}
 		// Owning the lift while a suite holds its name would make the
-		// column owned twice, so the fix waits on the collision's.
-		if len(suites) > 0 {
-			fix = "Once the suite and the lift have different names, " + lowerFirst(fix)
+		// column owned twice, so the fix waits on the collision's, which
+		// the duplicate-column check reports.
+		if len(suitePkgs[name]) > 0 {
+			fix = "Once no suite shares the lift's name, " + lowerFirst(fix)
 		}
 		t.Errorf("%s\n%s", msg, fix)
 	}
@@ -306,39 +307,58 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	}
 }
 
-// duplicateColumn words the failure of a column that more than one package
-// owns: suites are the packages that own it as a suite, and lifts those
-// that own it as a lift. Only a lift's owners are offered hypercase.Use,
-// and only when more than one owns the lift, since a lift that one package
-// owns has an owner it needs.
-func duplicateColumn(name string, suites, lifts []string) string {
-	var owners, why, fix string
+// duplicateColumn words the failure of a name that more than one column
+// holds: suites are the packages that own it as a suite, and lifts those
+// that own it as a lift. When no package owns the lift, lifts is empty,
+// and users are the packages that use it: the lift is one column still,
+// the one owning it makes. Each package that owns the name holds one
+// column, and the fix leaves one of them all. Only a lift's owners are
+// offered hypercase.Use, and only when more than one owns the lift, since
+// a lift that one package owns has an owner it needs.
+func duplicateColumn(name string, suites, lifts, users []string) string {
+	n := len(suites) + len(lifts)
+	if len(users) > 0 {
+		n++
+	}
+	var holders, why, fix string
 	switch {
-	case len(lifts) == 0:
-		owners = ownedAs(suites, "suite")
+	case len(lifts) == 0 && len(users) == 0:
+		holders = "owned by " + pkgsAs(suites, "suite")
 		why = "Column names are unique per corpus root, and one package owns each column."
-		fix = "Rename one of the suites, or remove one."
+		fix = leaveOne(n, "one of the suites", "the suites")
 	case len(suites) == 0:
-		owners = ownedAs(lifts, "lift")
+		holders = "owned by " + pkgsAs(lifts, "lift")
 		why = "Column names are unique per corpus root, and one package owns each column."
-		fix = "Rename one of the lifts, or remove one. A package that only reads the lift's product gives it to hypercase.Use in place of hypercase.Own."
+		fix = leaveOne(n, "one of the lifts", "the lifts") + " A package that only reads the lift's product gives it to hypercase.Use in place of hypercase.Own."
 	default:
-		owners = ownedAs(suites, "suite") + ", and by " + ownedAs(lifts, "lift")
-		why = "Lifts share the suites' column names, which are unique per corpus root, and one package owns each column."
-		fix = "Rename the suite or the lift."
-		if len(suites) > 1 {
-			fix = "Rename one of the columns, or remove one."
+		holders = "owned by " + pkgsAs(suites, "suite")
+		if len(lifts) > 0 {
+			holders += ", and by " + pkgsAs(lifts, "lift")
+		} else {
+			holders += ", and used by " + pkgsAs(users, "lift")
 		}
+		why = "Lifts share the suites' column names, which are unique per corpus root, and one package owns each column."
+		fix = leaveOne(n, "the suite or the lift", "the columns")
 		if len(lifts) > 1 {
 			fix += fmt.Sprintf(" Of %s, which own the lift, a package that only reads its product gives it to hypercase.Use in place of hypercase.Own.", andList(lifts))
 		}
 	}
-	return fmt.Sprintf("the column %s is owned by %s. %s\n%s", name, owners, why, fix)
+	return fmt.Sprintf("the column %s is %s. %s\n%s", name, holders, why, fix)
 }
 
-// ownedAs names the packages that own a column, and what they own it as:
-// "./b as a suite", ". and ./b, each as a lift".
-func ownedAs(pkgs []string, kind string) string {
+// leaveOne words the fix that leaves one of n columns of a name: of two,
+// rename or remove one, which two names; of more, every one but one, of
+// those many names.
+func leaveOne(n int, two, many string) string {
+	if n == 2 {
+		return "Rename " + two + ", or remove one."
+	}
+	return "Rename or remove all but one of " + many + "."
+}
+
+// pkgsAs names packages, and what each holds a column's name as: "./b as
+// a suite", ". and ./b, each as a lift".
+func pkgsAs(pkgs []string, kind string) string {
 	if len(pkgs) == 1 {
 		return pkgs[0] + " as a " + kind
 	}

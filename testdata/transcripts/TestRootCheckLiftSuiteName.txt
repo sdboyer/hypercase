@@ -18,10 +18,10 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # ladder-b-suite
             --- PASS: TestCorpus/script/x/parse
 PASS
 $ go test  # ladder-a-useonly
-    the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root.
-        Rename the suite or the lift.
+    the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root, and one package owns each column.
+        Rename the suite or the lift, or remove one.
     the lift parse is used by ., and no package owns it, so its error is recorded nowhere.
-        Once the suite and the lift have different names, own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
+        Once no suite shares the lift's name, own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
     what ran, in order:
         parse ran on x
         resolve ran on x
@@ -55,7 +55,7 @@ FAIL
 [exit 1]
 $ go test  # ladder-a
     the column parse is owned by ./b as a suite, and by . as a lift. Lifts share the suites' column names, which are unique per corpus root, and one package owns each column.
-        Rename the suite or the lift.
+        Rename the suite or the lift, or remove one.
     script/x: The root package, ., owns parse, resolve and evaluate, and ./b uses parse for outline.
         parse: Parses the script, as its parse/ tree says.
         out/parse/values.txt is an output the run no longer produces.
