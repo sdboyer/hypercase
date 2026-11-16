@@ -42,4 +42,5 @@ var evaluate = hypercase.Suite[fs.FS]{
 }
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }
+
 // doc:end evaluate

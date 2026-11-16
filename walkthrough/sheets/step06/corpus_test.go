@@ -35,4 +35,5 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 }
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }
+
 // doc:end evaluate

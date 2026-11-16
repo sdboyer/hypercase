@@ -36,6 +36,7 @@ var calc = hypercase.Suite[fs.FS]{
 		return nil, sheet.Calc(in, stdout, stderr)
 	},
 }
+
 // doc:end calc
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }

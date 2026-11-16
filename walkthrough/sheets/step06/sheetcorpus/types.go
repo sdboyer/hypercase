@@ -40,4 +40,5 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 		return sheet.Resolve(p)
 	},
 }
+
 // doc:end types
