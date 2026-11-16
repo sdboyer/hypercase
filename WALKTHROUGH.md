@@ -1810,6 +1810,8 @@ whether each has a probe, and whether the package owns it.
 - Cases are named `<archive>`, `<archive>/variant/<name>` and
   `<archive>/transform/<name>` in subtests and in the report, after the
   corpus directory (step 3): `TestCorpus/sheet/twice/transform/looped/resolve`.
+- So `variant` and `transform` are reserved column names. A suite or a lift
+  given either is refused at registration.
 
 **Hand-written variants.**
 
@@ -1847,6 +1849,12 @@ whether each has a probe, and whether the package owns it.
 - A package that registers the corpus type registers each property its
   transforms give or keep. Without one, the package's run fails before any
   case runs, naming the property.
+- A transform can fail on a base: its jenny errs or panics, or makes a view
+  equal to the base's, or one that no archive or file tree can hold, or its
+  probe panics, or declines without a reason. The variant then fails in
+  every run of the package that owns the transform, naming the failure, and
+  no cell runs on it. Every other package skips the variant, saying that
+  the owner reports why.
 - `looped` makes the first cell refer to itself and gives `circular`, so
   `resolve` is expected to err on every `looped` variant with nothing written
   by hand. `renamed` moves every cell one row down, rewriting each reference,
@@ -1884,7 +1892,8 @@ whether each has a probe, and whether the package owns it.
   its update removes them. What remains under `transform/<name>/out/` is
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
-  root-package check reports them and names the strip command.
+  root-package check reports them, and says to delete them by hand until
+  `hypercase strip` (#16) lands.
 - The root-package check fails on a transform that a package with tests
   lists in a corpus type and no package owns (step 5's rule for packages
   with no tests), and on one that two own.
