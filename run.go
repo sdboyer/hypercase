@@ -724,25 +724,12 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 
 	m := &msg{}
 	files, unjudged, writable := r.outputs(m, c, col, out)
-	o, ok := r.outcome(m, col, in, out, files)
-	if ok {
+	if o, ok := r.outcome(m, col, in, out, files); ok {
 		files[outcomeFile] = o.Format()
 	} else {
+		// The cell has no outcome, so a committed one is no orphan.
 		writable = false
-	}
-	// What the run leaves unjudged: the outcome of a cell that has none,
-	// so a committed one is no orphan, and each file of a cell no update
-	// writes that has no golden, which isn't one to write: the cell's
-	// problems come first.
-	if !ok {
 		unjudged[outcomeFile] = true
-	}
-	if !writable {
-		for p := range files {
-			if _, golden := goldens[p]; !golden {
-				unjudged[p] = true
-			}
-		}
 	}
 
 	if !marked {
@@ -1086,14 +1073,17 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 }
 
 // compare compares a cell's files with its goldens, and reports orphans.
-// In a cell no update writes, a file that differs says the cell's problems
-// come first.
+// In a cell no update writes, a file with no golden isn't reported, and
+// one that differs says the cell's problems come first.
 func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[string][]byte, unjudged map[string]bool, writable bool) {
 	if !r.update {
 		for _, p := range slices.Sorted(maps.Keys(files)) {
 			g, ok := goldens[p]
 			switch {
 			case unjudged[p]:
+			case !ok && !writable:
+				// No update writes the cell, so the file isn't one to
+				// write: the cell's problems come first.
 			case !ok:
 				m.add("%s has no golden.\nRun %s to write it, and read it before committing.", c.out(col.name, p), r.updateCmd())
 			case !bytes.Equal(g, files[p]) && !writable:

@@ -132,6 +132,16 @@ func TestOutcomeFailures(t *testing.T) {
 		s.lacks(r, "out/echo/outcome is no longer produced", "The cell is frozen")
 	}
 	s.same(clError, committed)
+
+	// A frozen cell no update writes still reports what its run makes that
+	// it doesn't hold.
+	s.edit(clError, "commit only the frozen cell's outcome", drop("out/echo/values.txt"))
+	committed = s.read(clError)
+	for _, update := range []bool{false, true} {
+		r := s.run(".", "outcomes", update)
+		s.fails(r, clFails+"\n    The cell is frozen by its known gap, gaps line 1: \"echo The classifier gives a detail. Waits on sheets#10.\"\n    Its committed files record today's behavior, and the run now produces different ones:\n    out/echo/values.txt is new")
+	}
+	s.same(clError, committed)
 	s.done()
 }
 
