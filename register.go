@@ -320,9 +320,7 @@ func checkPatterns(kind, name string, outputs []decl.Output) {
 	}
 }
 
-// checksDir is the directory name that holds corpus check findings, which
-// no corpus type declares.
-const checksDir = "checks"
+const checksDir = archive.ChecksDir
 
 func (r *registrations) addType(e *erase.Type) {
 	t := &corpusType{dir: e.Dir, description: e.Description, goType: e.GoType, new: e.New}

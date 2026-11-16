@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/rogpeppe/go-internal/lockedfile"
+	"github.com/sdboyer/hypercase/internal/hooks"
 )
 
 // LockFile is the name of a corpus root's lock file, in the root's
@@ -13,14 +14,11 @@ import (
 // ignores it.
 const LockFile = ".hypercase.lock"
 
-// modifyHook, when set, is called at each step of [Modify]: "locked",
-// "read", "renamed" and "unlock", which comes just before the lock is
-// released. Tests sequence the steps through it.
-var modifyHook func(step string)
-
+// hook calls hooks.Modify, through which tests sequence the steps of
+// [Modify].
 func hook(step string) {
-	if modifyHook != nil {
-		modifyHook(step)
+	if hooks.Modify != nil {
+		hooks.Modify(step)
 	}
 }
 

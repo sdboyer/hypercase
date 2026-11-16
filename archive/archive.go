@@ -87,6 +87,11 @@ const (
 // archive carries: in/params/ is a problem of the archive's form.
 const ParamsTree = "params"
 
+// ChecksDir is the directory name reserved for corpus checks' findings,
+// testdata/checks/ in the package that owns the checks, so no corpus
+// directory has it.
+const ChecksDir = "checks"
+
 // topLevel is the closed set, each with whether this hypercase reads it yet.
 // A section under a name it doesn't read yet is a problem of form, so it
 // can't pass unread while an update rewrites the goldens beside it.

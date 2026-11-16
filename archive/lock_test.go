@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/rogpeppe/go-internal/lockedfile"
+	"github.com/sdboyer/hypercase/internal/hooks"
 )
 
 // modifyFixture writes the well-formed archive in a temp dir, and returns
@@ -44,7 +45,7 @@ func TestModifyHoldsTheLockAcrossTheRename(t *testing.T) {
 		mu.Unlock()
 	}
 	held := make(chan *lockedfile.File, 1)
-	modifyHook = func(step string) {
+	hooks.Modify = func(step string) {
 		record("A " + step)
 		if step == "read" {
 			go func() {
@@ -58,7 +59,7 @@ func TestModifyHoldsTheLockAcrossTheRename(t *testing.T) {
 		}
 	}
 	err := Modify(lock, name, scaled)
-	modifyHook = nil
+	hooks.Modify = nil
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,9 +95,9 @@ func TestModifyHoldsTheLockAcrossTheRename(t *testing.T) {
 // so the next update completes.
 func TestModifyFailedWrite(t *testing.T) {
 	name, lock := modifyFixture(t)
-	afterTemp = func(string) error { return errors.New("disk full") }
+	hooks.AfterTemp = func(string) error { return errors.New("disk full") }
 	err := Modify(lock, name, scaled)
-	afterTemp = nil
+	hooks.AfterTemp = nil
 	if err == nil {
 		t.Fatal("Modify succeeded, and its write failed")
 	}
@@ -121,11 +122,11 @@ func TestModifyFailedWrite(t *testing.T) {
 // error, or the bytes it read.
 func TestModifyWritesNothing(t *testing.T) {
 	name, lock := modifyFixture(t)
-	afterTemp = func(string) error {
+	hooks.AfterTemp = func(string) error {
 		t.Error("Modify wrote a temp file")
 		return nil
 	}
-	defer func() { afterTemp = nil }()
+	defer func() { hooks.AfterTemp = nil }()
 	if err := Modify(lock, name, func(*Archive) (*Archive, error) { return nil, nil }); err != nil {
 		t.Error(err)
 	}
