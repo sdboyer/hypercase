@@ -66,23 +66,32 @@ func TestImportInput(t *testing.T) {
 }
 
 // TestImportReadFault: import rejects a case only with the importer's own
-// error. A CSV it can't read is a fault, returned unmarked.
+// error. A CSV it can't read, or an input it can't walk, is a fault,
+// returned unmarked.
 func TestImportReadFault(t *testing.T) {
-	in := unreadable{fstest.MapFS{"csv/a.csv": {Data: []byte("4,6\n")}}}
-	_, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: in})
-	if !errors.Is(err, fs.ErrPermission) {
-		t.Fatalf("got %v, want the read's error", err)
-	}
-	if rejected(err) {
-		t.Errorf("import rejects the case with a read error: %v", err)
+	for _, name := range []string{"csv/a.csv", "csv"} {
+		t.Run(name, func(t *testing.T) {
+			in := unopenable{fstest.MapFS{"csv/a.csv": {Data: []byte("4,6\n")}}, name}
+			_, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: in})
+			if !errors.Is(err, fs.ErrPermission) {
+				t.Fatalf("got %v, want the open's error", err)
+			}
+			if rejected(err) {
+				t.Errorf("import rejects the case with a read error: %v", err)
+			}
+		})
 	}
 }
 
-// unreadable is a view that lists csv/a.csv, and can't open it.
-type unreadable struct{ files fstest.MapFS }
+// unopenable is a view holding csv/a.csv, in which one name, a file's or a
+// directory's, can't be opened.
+type unopenable struct {
+	files fstest.MapFS
+	name  string
+}
 
-func (u unreadable) Open(name string) (fs.File, error) {
-	if name == "csv/a.csv" {
+func (u unopenable) Open(name string) (fs.File, error) {
+	if name == u.name {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrPermission}
 	}
 	return u.files.Open(name)
