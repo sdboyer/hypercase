@@ -497,7 +497,8 @@ func TestTransformJennyChanges(t *testing.T) {
 // TestTransformStaleInputs: another package's normal run on a variant
 // whose committed inputs differ from what its transform makes notes it
 // once for the variant, however a cell fails: here a run that fails its
-// test through its testing.TB, and a probe that says no with no reason.
+// test through its testing.TB, a probe that says no with no reason, and a
+// frozen cell, which the note says no update rewrites.
 func TestTransformStaleInputs(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -514,6 +515,15 @@ func TestTransformStaleInputs(t *testing.T) {
 	s.edit(twice, "add an empty probe instruction to upper's input by hand", insert("transform/upper/in/do/probe", "", "transform/upper/out/"))
 	s.fails(s.run("b", "tr-b-probe", false), "copy's probe said the case isn't for it, and gave no reason.",
 		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/probe is no longer made\nA normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells.")
+
+	// The note claims no update rewrites a frozen cell.
+	s.write(twice, settled, "restore the settled archive")
+	s.edit(twice, "mark upper's cell of copy, and edit upper's input by hand", func(a *archive.Archive) {
+		insert("gaps", "transform/upper copy Waits on sheets#9.\n", "out/")(a)
+		set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n")(a)
+	})
+	s.fails(s.run("b", "tr-b", false), "The cell is frozen by its known gap, gaps line 1: \"transform/upper copy Waits on sheets#9.\"",
+		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n- A1 SEVEN\n+ A1 SIX\nA normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, here copy's: no update writes a cell its known gap freezes, and a normal run checks what it produces on the rewritten inputs against its committed files.")
 	s.done()
 }
 

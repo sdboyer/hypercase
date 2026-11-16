@@ -348,9 +348,22 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		return
 	}
 	// However its cells failed, the failures may be the inputs'.
-	if m := v.inputDiffs(pc.a); !m.empty() {
-		t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and the variant's cells.", c.header(), v.name, v.name, m, v.name, r.updateCmd(), v.name)
+	m := v.inputDiffs(pc.a)
+	if m.empty() {
+		return
 	}
+	// An update writes no frozen cell, so it rewrites none of those.
+	cells := "the variant's cells."
+	var frozen []string
+	for _, col := range p.cols {
+		if _, marked := c.gap(col.name); marked && len(c.goldens(col.name)) > 0 {
+			frozen = append(frozen, col.name+"'s")
+		}
+	}
+	if len(frozen) > 0 {
+		cells = fmt.Sprintf("the variant's cells but the frozen ones, here %s: no update writes a cell its known gap freezes, and a normal run checks what it produces on the rewritten inputs against its committed files.", andList(frozen))
+	}
+	t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and %s", c.header(), v.name, v.name, m, v.name, r.updateCmd(), v.name, cells)
 }
 
 // inputDiffs says how the committed inputs of a transform's variant differ
