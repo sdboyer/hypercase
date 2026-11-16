@@ -15,24 +15,41 @@ const (
 	context = 3
 	// maxLines caps how many diff lines a message prints.
 	maxLines = 200
-	// maxCells caps the edit graph Myers' algorithm explores in one stretch
-	// of the files. Past it, the stretch is aligned on its unique lines
-	// instead, and a stretch with none is left unaligned.
+	// maxUnaligned caps how many lines of each side of a stretch the diff
+	// can't align a message prints, so that both sides show under
+	// maxLines.
+	maxUnaligned = maxLines / 4
+	// maxCells caps the work of one attempt of Myers' algorithm on a
+	// stretch of the files: the cells of the edit graph it records, and
+	// the lines it compares. Past it, the stretch is aligned on its unique
+	// lines instead.
 	maxCells = 4 << 20
+	// maxSteps bounds the edits an attempt within maxCells can find: step
+	// d records 2d+1 cells, so the steps before maxSteps record
+	// maxSteps^2, which is maxCells.
+	maxSteps = 2048
+	// maxWork caps the work of a whole diff, past reading its files once:
+	// every attempt of Myers' algorithm, every pass for unique lines, and
+	// every comparison. What is still to align once it is spent is left
+	// unaligned, so a diff's cost grows with its files' lengths plus this,
+	// never with their product.
+	maxWork = 4 * maxCells
 )
 
 // Lines returns a line diff from a to b. Each line is prefixed "  " (in
 // both), "- " (only in a) or "+ " (only in b), with up to three lines of
 // context around each change and "  ..." between hunks. A stretch the diff
-// can't align is shown as removed whole, then added whole. A line holding
-// a carriage return or another control character is quoted, and a last
-// line with no final newline is followed by `\ no final newline`. Lines
-// returns "" when a and b are equal.
+// can't align is shown as removed, then added, each side's first lines
+// and how many more it leaves out. A line holding a carriage return or
+// another control character is quoted, and a last line with no final
+// newline is followed by `\ no final newline`. Lines returns "" when a and
+// b are equal.
 func Lines(a, b []byte) string {
 	lines, _ := diff(a, b, false)
 	var sb strings.Builder
 	printed := 0
-	for i, l := range lines {
+	for i := 0; i < len(lines); i++ {
+		l := lines[i]
 		if printed >= maxLines {
 			rest := 0
 			for _, l := range lines[i:] {
@@ -46,6 +63,27 @@ func Lines(a, b []byte) string {
 		if l.Kind == Skip {
 			sb.WriteString("  ...\n")
 			continue
+		}
+		if l.unaligned {
+			// The side's lines so far, l among them.
+			run := 1
+			for i-run >= 0 && lines[i-run].unaligned && lines[i-run].Kind == l.Kind {
+				run++
+			}
+			if run > maxUnaligned {
+				end := i
+				for end < len(lines) && lines[end].unaligned && lines[end].Kind == l.Kind {
+					end++
+				}
+				how := "removed"
+				if l.Kind == '+' {
+					how = "added"
+				}
+				fmt.Fprintf(&sb, "  ... (%d more lines %s, which the diff can't align)\n", end-i, how)
+				printed++
+				i = end - 1
+				continue
+			}
 		}
 		sb.WriteByte(l.Kind)
 		sb.WriteByte(' ')
@@ -85,28 +123,34 @@ type Line struct {
 	// Old and New count the lines of a and of b an Unaligned line stands
 	// for.
 	Old, New int
+	// unaligned marks a '-' or '+' line of a stretch the diff can't align,
+	// in the lines Lines shows, which hold no Unaligned line.
+	unaligned bool
 }
 
 // Diff returns the line diff from a to b, with no cap on how many lines,
-// and how many pairs of lines it compared to find them. Each stretch it
-// can't align is one Unaligned line, so the diff holds only lines it
-// aligned, and its '+' and '-' lines count them exactly. The pairs grow
-// with the files' lengths times the changes between the lines each holds
-// once, never with the product of the lengths. Diff returns no lines when
-// a and b are equal.
-func Diff(a, b []byte) (lines []Line, pairs int) {
+// and the work it did to find them: each pair of lines it compared, each
+// line it looked up, and each cell of the edit graph Myers' algorithm
+// recorded. Each stretch it can't align is one Unaligned line, so the diff
+// holds only lines it aligned, and its '+' and '-' lines count them
+// exactly. The work is at most the files' lengths in lines plus a fixed
+// budget, so it never grows with the product of the lengths. Diff returns
+// no lines when a and b are equal.
+func Diff(a, b []byte) (lines []Line, work int) {
 	return diff(a, b, true)
 }
 
 // diff returns the lines of a diff from a to b. With collapse, each
 // unaligned stretch is one Unaligned line; without, it is its lines of a
 // removed, then its lines of b added.
-func diff(a, b []byte, collapse bool) (lines []Line, pairs int) {
+func diff(a, b []byte, collapse bool) (lines []Line, work int) {
 	if bytes.Equal(a, b) {
 		return nil, 0
 	}
 	x, y := split(a), split(b)
-	ops := edits(x, y, &pairs)
+	w := &budget{limit: len(x) + len(y) + maxWork}
+	var ops []op
+	edits(x, y, w, &ops)
 
 	// Mark which ops to show: every change, and context around it.
 	show := make([]bool, len(ops))
@@ -139,9 +183,9 @@ func diff(a, b []byte, collapse bool) (lines []Line, pairs int) {
 			}
 			continue
 		}
-		lines = append(lines, Line{Kind: op.kind, Text: display(op.line), NoNewline: !strings.HasSuffix(op.line, "\n")})
+		lines = append(lines, Line{Kind: op.kind, Text: display(op.line), NoNewline: !strings.HasSuffix(op.line, "\n"), unaligned: op.unaligned})
 	}
-	return lines, pairs
+	return lines, w.spent
 }
 
 func split(b []byte) []string {
@@ -175,68 +219,91 @@ type op struct {
 	unaligned bool
 }
 
-// edits returns an edit script from x to y, and adds each pair of lines it
-// compares to *pairs. It trims the common prefix and suffix, which most
-// diffs are, and aligns what is between them.
-func edits(x, y []string, pairs *int) []op {
+// A budget counts the work of a diff, and refuses work past its limit.
+type budget struct {
+	spent, limit int
+}
+
+// spend records n units of work, and reports whether the budget holds
+// them. When it doesn't, it records none.
+func (b *budget) spend(n int) bool {
+	if b.spent+n > b.limit {
+		return false
+	}
+	b.spent += n
+	return true
+}
+
+// edits appends an edit script from x to y to *out, spending from w. It
+// trims the common prefix and suffix, which most diffs are, and aligns
+// what is between them.
+func edits(x, y []string, w *budget, out *[]op) {
 	pre := 0
-	for pre < len(x) && pre < len(y) && same(x[pre], y[pre], pairs) {
+	for pre < len(x) && pre < len(y) && w.spend(1) && x[pre] == y[pre] {
 		pre++
 	}
 	suf := 0
-	for suf < len(x)-pre && suf < len(y)-pre && same(x[len(x)-1-suf], y[len(y)-1-suf], pairs) {
+	for suf < len(x)-pre && suf < len(y)-pre && w.spend(1) && x[len(x)-1-suf] == y[len(y)-1-suf] {
 		suf++
 	}
-	var ops []op
 	for _, l := range x[:pre] {
-		ops = append(ops, op{kind: ' ', line: l})
+		*out = append(*out, op{kind: ' ', line: l})
 	}
-	ops = append(ops, align(x[pre:len(x)-suf], y[pre:len(y)-suf], pairs)...)
+	align(x[pre:len(x)-suf], y[pre:len(y)-suf], w, out)
 	for _, l := range x[len(x)-suf:] {
-		ops = append(ops, op{kind: ' ', line: l})
+		*out = append(*out, op{kind: ' ', line: l})
 	}
-	return ops
 }
 
-// align returns an edit script from x to y: a shortest one, when Myers'
-// algorithm finds it within its budget. Otherwise it anchors the script on
-// the longest run, in order in both, of lines that x and y each hold once,
-// and aligns each stretch between two anchors as edits does. A stretch with
-// no such line is left unaligned: its lines of x removed, then its lines
-// of y added, each marked.
-func align(x, y []string, pairs *int) []op {
-	if ops, ok := myers(x, y, pairs); ok {
-		return ops
-	}
-	anchors := uniqueAnchors(x, y, pairs)
-	if len(anchors) == 0 {
-		var ops []op
+// align appends an edit script from x to y to *out, spending from w: a
+// shortest one, when Myers' algorithm finds it within maxCells. Otherwise
+// it anchors the script on the longest run, in order in both, of lines
+// that x and y each hold once, and aligns each stretch between two anchors
+// as edits does. A stretch with no such line, or that w can't pay to look
+// for one, is left unaligned: its lines of x removed, then its lines of y
+// added, each marked.
+func align(x, y []string, w *budget, out *[]op) {
+	if len(x) == 0 || len(y) == 0 {
 		for _, l := range x {
-			ops = append(ops, op{kind: '-', line: l, unaligned: true})
+			*out = append(*out, op{kind: '-', line: l})
 		}
 		for _, l := range y {
-			ops = append(ops, op{kind: '+', line: l, unaligned: true})
+			*out = append(*out, op{kind: '+', line: l})
 		}
-		return ops
+		return
 	}
-	var ops []op
+	if myers(x, y, w, out) {
+		return
+	}
+	var anchors [][2]int
+	if w.spend(len(x) + len(y)) {
+		anchors = uniqueAnchors(x, y)
+	}
+	if len(anchors) == 0 {
+		for _, l := range x {
+			*out = append(*out, op{kind: '-', line: l, unaligned: true})
+		}
+		for _, l := range y {
+			*out = append(*out, op{kind: '+', line: l, unaligned: true})
+		}
+		return
+	}
 	i, j := 0, 0
 	for _, a := range anchors {
-		ops = append(ops, edits(x[i:a[0]], y[j:a[1]], pairs)...)
-		ops = append(ops, op{kind: ' ', line: x[a[0]]})
+		edits(x[i:a[0]], y[j:a[1]], w, out)
+		*out = append(*out, op{kind: ' ', line: x[a[0]]})
 		i, j = a[0]+1, a[1]+1
 	}
-	return append(ops, edits(x[i:], y[j:], pairs)...)
+	edits(x[i:], y[j:], w, out)
 }
 
 // uniqueAnchors returns the longest run of pairs (i, j), increasing in
 // both, where x[i] and y[j] are one line that x and y each hold once. It
-// adds each line it looks up by its text to *pairs.
-func uniqueAnchors(x, y []string, pairs *int) [][2]int {
+// looks up each line of x and y once.
+func uniqueAnchors(x, y []string) [][2]int {
 	type seen struct{ nx, ny, i, j int }
 	lines := map[string]*seen{}
 	for i, l := range x {
-		*pairs++
 		s := lines[l]
 		if s == nil {
 			s = &seen{}
@@ -246,7 +313,6 @@ func uniqueAnchors(x, y []string, pairs *int) [][2]int {
 		s.i = i
 	}
 	for j, l := range y {
-		*pairs++
 		if s := lines[l]; s != nil {
 			s.ny++
 			s.j = j
@@ -285,36 +351,27 @@ func uniqueAnchors(x, y []string, pairs *int) [][2]int {
 	return run
 }
 
-// same compares two lines, and counts the pair in *pairs.
-func same(a, b string, pairs *int) bool {
-	*pairs++
-	return a == b
-}
-
-// myers returns a shortest edit script from x to y, by Myers' O(ND)
-// algorithm, preferring deletions before insertions, and whether it found
-// one within maxCells. It adds each pair of lines it compares to *pairs.
-func myers(x, y []string, pairs *int) ([]op, bool) {
+// myers appends a shortest edit script from x to y to *out, by Myers'
+// O(ND) algorithm, preferring deletions before insertions, and reports
+// whether it found one within maxCells of work, which it spends from w
+// whether or not it does. Step d records the furthest point reached on
+// each diagonal from -d to d, the 2d+1 cells that backtracking reads.
+func myers(x, y []string, w *budget, out *[]op) bool {
+	attempt := budget{limit: min(maxCells, w.limit-w.spent)}
+	defer func() { w.spent += attempt.spent }()
 	n, m := len(x), len(y)
-	if n == 0 || m == 0 {
-		var ops []op
-		for _, l := range x {
-			ops = append(ops, op{kind: '-', line: l})
-		}
-		for _, l := range y {
-			ops = append(ops, op{kind: '+', line: l})
-		}
-		return ops, true
-	}
-	maxD := n + m
+	maxD := min(n+m, maxSteps)
 	off := maxD
+	if !attempt.spend(2*maxD + 2) {
+		return false
+	}
 	v := make([]int, 2*maxD+2)
 	var trace [][]int
 	for d := 0; d <= maxD; d++ {
-		if d*len(v) > maxCells {
-			return nil, false
+		if !attempt.spend(2*d + 1) {
+			return false
 		}
-		trace = append(trace, append([]int(nil), v...))
+		trace = append(trace, slices.Clone(v[off-d:off+d+1]))
 		for k := -d; k <= d; k += 2 {
 			var i int
 			if k == -d || k != d && v[off+k-1] < v[off+k+1] {
@@ -323,31 +380,38 @@ func myers(x, y []string, pairs *int) ([]op, bool) {
 				i = v[off+k-1] + 1 // right: a deletion
 			}
 			j := i - k
-			for i < n && j < m && same(x[i], y[j], pairs) {
+			for i < n && j < m && x[i] == y[j] {
+				if !attempt.spend(1) {
+					return false
+				}
 				i, j = i+1, j+1
 			}
 			v[off+k] = i
 			if i >= n && j >= m {
-				return backtrack(x, y, trace, d, off), true
+				*out = append(*out, backtrack(x, y, trace, d)...)
+				return true
 			}
 		}
 	}
-	return nil, false
+	return false
 }
 
-func backtrack(x, y []string, trace [][]int, d, off int) []op {
+// backtrack returns the edit script that ends at step d, from trace, where
+// trace[d] holds the furthest point on diagonal k at trace[d][k+d], as the
+// steps before d left it.
+func backtrack(x, y []string, trace [][]int, d int) []op {
 	var rev []op
 	i, j := len(x), len(y)
 	for ; d > 0; d-- {
 		v := trace[d]
 		k := i - j
 		var pk int
-		if k == -d || k != d && v[off+k-1] < v[off+k+1] {
+		if k == -d || k != d && v[k-1+d] < v[k+1+d] {
 			pk = k + 1
 		} else {
 			pk = k - 1
 		}
-		pi := v[off+pk]
+		pi := v[pk+d]
 		pj := pi - pk
 		for i > pi && j > pj {
 			i, j = i-1, j-1

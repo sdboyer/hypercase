@@ -2,6 +2,7 @@ package diff
 
 import (
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -42,8 +43,8 @@ func TestLinesMinimal(t *testing.T) {
 	for _, a := range inputs {
 		for _, b := range inputs {
 			x, y := chars(a), chars(b)
-			var pairs int
-			ops := edits(x, y, &pairs)
+			var ops []op
+			edits(x, y, &budget{limit: maxWork}, &ops)
 			changes := 0
 			var gotA, gotB []string
 			for _, o := range ops {
@@ -127,16 +128,16 @@ func TestDiff(t *testing.T) {
 	if got, _ := Diff([]byte(a.String()), []byte(b.String())); len(got) != 600 {
 		t.Errorf("a diff of 600 changed lines has %d lines, want every one", len(got))
 	}
-	if got, pairs := Diff([]byte("a\n"), []byte("a\n")); got != nil || pairs != 0 {
-		t.Errorf("equal files: got %v, %d pairs", got, pairs)
+	if got, work := Diff([]byte("a\n"), []byte("a\n")); got != nil || work != 0 {
+		t.Errorf("equal files: got %v, %d work", got, work)
 	}
 }
 
-// TestDiffPairs: a diff of two 100,000-line files compares a number of
-// line pairs that grows with their length and the size of the change, far
-// under the 10^10 of a table of every pair: with one line changed in the
-// middle, and with the first and last lines changed, which leave no common
-// prefix or suffix to trim.
+// TestDiffPairs: a diff of two 100,000-line files does work, its cells of
+// Myers' trace included, that grows with their length and the size of the
+// change, far under the 10^10 of a table of every pair: with one line
+// changed in the middle, and with the first and last lines changed, which
+// leave no common prefix or suffix to trim.
 func TestDiffPairs(t *testing.T) {
 	const n = 100_000
 	lines := func(change ...int) []byte {
@@ -151,9 +152,9 @@ func TestDiffPairs(t *testing.T) {
 		return []byte(b.String())
 	}
 	for _, change := range [][]int{{n / 2}, {0, n - 1}} {
-		got, pairs := Diff(lines(), lines(change...))
-		if pairs >= 1_000_000 {
-			t.Errorf("changing lines %v compared %d pairs of lines, want fewer than 1,000,000", change, pairs)
+		got, work := Diff(lines(), lines(change...))
+		if work >= 1_000_000 {
+			t.Errorf("changing lines %v did %d work, want less than 1,000,000", change, work)
 		}
 		var changed, want []string
 		for _, l := range got {
@@ -192,30 +193,34 @@ func counts(lines []Line) map[byte]int {
 	return n
 }
 
-// TestDiffAnchors: edits scattered over a long file, more than Myers'
-// budget covers there, are aligned on the lines each file holds once, so
-// the diff holds exactly the changed lines and their context, comparing a
-// number of pairs that grows with the files' lengths.
+// TestDiffAnchors: edits scattered over a long file come out exactly, so
+// the diff holds the changed lines and their context. Six edits in 100,000
+// lines are within one attempt of Myers' algorithm, whose work grows with
+// the files' lengths. More edits than an attempt covers are aligned on the
+// lines each file holds once, for one failed attempt's work more.
 func TestDiffAnchors(t *testing.T) {
+	every := func(n, step int) (c []int) {
+		for i := 1; i < n; i += step {
+			c = append(c, i)
+		}
+		return c
+	}
 	for _, tt := range []struct {
 		n      int
 		change []int
+		work   int
 	}{
-		{100_000, []int{3, 17_000, 33_333, 50_001, 81_234, 99_990}},
-		{3000, func() (c []int) {
-			for i := 1; i < 3000; i += 2 {
-				c = append(c, i)
-			}
-			return c
-		}()},
+		{100_000, []int{3, 17_000, 33_333, 50_001, 81_234, 99_990}, 2 * 100_000},
+		{3000, every(3000, 2), maxCells + 100*3000},
+		{100_000, every(100_000, 40), maxCells + 100*100_000},
 	} {
-		got, pairs := Diff(scattered(tt.n), scattered(tt.n, tt.change...))
+		got, work := Diff(scattered(tt.n), scattered(tt.n, tt.change...))
 		n := counts(got)
 		if n['-'] != len(tt.change) || n['+'] != len(tt.change) || n[Unaligned] != 0 {
 			t.Errorf("%d lines, %d changed: the diff holds %d removed, %d added and %d unaligned, want %d, %d and 0", tt.n, len(tt.change), n['-'], n['+'], n[Unaligned], len(tt.change), len(tt.change))
 		}
-		if pairs > 100*tt.n {
-			t.Errorf("%d lines, %d changed: the diff compared %d pairs, want at most %d", tt.n, len(tt.change), pairs, 100*tt.n)
+		if work > tt.work {
+			t.Errorf("%d lines, %d changed: the diff did %d work, want at most %d", tt.n, len(tt.change), work, tt.work)
 		}
 	}
 	// Each changed line is removed, then added, in place.
@@ -228,8 +233,8 @@ func TestDiffAnchors(t *testing.T) {
 
 // TestDiffUnaligned: a stretch past Myers' budget with no line that both
 // files hold once is one Unaligned line, which counts its lines of each
-// file and holds none of them. Lines shows it removed whole, then added
-// whole.
+// file and holds none of them. Lines shows it removed, then added, each
+// side's first lines and how many more it leaves out.
 func TestDiffUnaligned(t *testing.T) {
 	const n = 10_000
 	file := func(first string, mul, mod, below int) []byte {
@@ -250,8 +255,68 @@ func TestDiffUnaligned(t *testing.T) {
 	if want := []Line{{Kind: Unaligned, Old: n, New: n}}; !slices.Equal(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
-	lines := strings.Split(Lines(a, b), "\n")
-	if lines[0] != "- first of a" || lines[maxLines-1] != "- b" && lines[maxLines-1] != "- a" || lines[maxLines] != fmt.Sprintf("  ... (%d more lines of diff)", 2*n-maxLines) {
-		t.Errorf("Lines begins %q, and ends %q", lines[:3], lines[maxLines-1:])
+	lines := strings.Split(strings.TrimSuffix(Lines(a, b), "\n"), "\n")
+	if len(lines) != 2*maxUnaligned+2 || lines[0] != "- first of a" || lines[maxUnaligned+1] != "+ first of b" ||
+		lines[maxUnaligned] != fmt.Sprintf("  ... (%d more lines removed, which the diff can't align)", n-maxUnaligned) ||
+		lines[2*maxUnaligned+1] != fmt.Sprintf("  ... (%d more lines added, which the diff can't align)", n-maxUnaligned) {
+		t.Errorf("Lines gives:\n%s", strings.Join(lines, "\n"))
+	}
+}
+
+// chain returns a file of k marker lines, each after a filler line, where
+// each marker but the last appears again after the next: so the only line
+// two such files each hold once is the last marker, and only with it taken
+// as an anchor does the marker before it stand alone in the stretch before
+// it, and so on down the file, one marker per pass.
+func chain(k int, filler, first, last string) []byte {
+	var b strings.Builder
+	b.WriteString(first + "\n")
+	for i := 1; i <= k; i++ {
+		fmt.Fprintf(&b, "%s\nm%d\n", filler, i)
+		if i >= 2 {
+			fmt.Fprintf(&b, "m%d\n", i-1)
+		}
+	}
+	b.WriteString(filler + "\n" + last + "\n")
+	return []byte(b.String())
+}
+
+// TestDiffChain: two files that each pass for unique lines aligns one line
+// of, at its stretch's end, and that no attempt of Myers' algorithm covers,
+// so each pass leaves the next one nearly all of what it had. The whole
+// diff's work, each cell of Myers' trace included, stays within the files'
+// lengths plus maxWork, and so does what it allocates, at 16 bytes a unit
+// of work: a cell of the trace is 8. What is still to align once the work
+// is spent is left unaligned, and Lines shows the start of each side of
+// it under its cap.
+func TestDiffChain(t *testing.T) {
+	const k = 1500
+	a, b := chain(k, "a", "first of a", "end of a"), chain(k, "b", "first of b", "end of b")
+	na, nb := strings.Count(string(a), "\n"), strings.Count(string(b), "\n")
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	got, work := Diff(a, b)
+	runtime.ReadMemStats(&after)
+	if work > na+nb+maxWork {
+		t.Errorf("the diff did %d work, want at most %d", work, na+nb+maxWork)
+	}
+	if alloc, most := after.TotalAlloc-before.TotalAlloc, uint64(16*(na+nb+maxWork)); alloc > most {
+		t.Errorf("the diff allocated %d bytes, want at most %d", alloc, most)
+	}
+	n := counts(got)
+	old, new := 0, 0
+	for _, l := range got {
+		if l.Kind == Unaligned {
+			old, new = old+l.Old, new+l.New
+		}
+	}
+	if n[Unaligned] != 1 || n[' ']+n['-']+old != na || n[' ']+n['+']+new != nb {
+		t.Errorf("the diff holds %v, and leaves %d lines of a and %d of b unaligned, want one unaligned stretch and every line of a's %d and b's %d", n, old, new, na, nb)
+	}
+	msg := Lines(a, b)
+	if lines := strings.Count(msg, "\n"); !strings.HasPrefix(msg, "- first of a\n") || lines > maxLines+1 ||
+		!strings.Contains(msg, fmt.Sprintf("\n  ... (%d more lines removed, which the diff can't align)\n+ first of b\n", old-maxUnaligned)) ||
+		!strings.Contains(msg, fmt.Sprintf("\n  ... (%d more lines added, which the diff can't align)\n", new-maxUnaligned)) {
+		t.Errorf("Lines gives %d lines:\n%s", lines, msg)
 	}
 }
