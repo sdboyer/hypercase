@@ -96,6 +96,48 @@ func TestRootCheckLiftOwnerUntested(t *testing.T) {
 	s.done()
 }
 
+// TestRootCheckLiftUsedUntested: a lift that only packages with no
+// _test.go file use needs no owner, as a transform that only they list
+// doesn't: nothing beyond their registries' failures is reported.
+func TestRootCheckLiftUsedUntested(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared-ladder")
+	s.edit("testdata/script/x.txtar", "remove the outcomes of the root package's lifts, which it owns no longer", drop("out/"))
+	// The root package registers no corpus type, and b uses parse, which
+	// no package owns.
+	s.passes(s.update("root-only"))
+	s.passes(s.run("b", "ladder-b", true))
+	s.fails(s.normal("root-only"), "the lift parse is used by ./b, and no package owns it, so its error is recorded nowhere.")
+
+	s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
+	r := s.normal("root-only")
+	s.fails(r, "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.")
+	s.lacks(r, "the lift parse", "no registry claims")
+	s.done()
+}
+
+// TestRootCheckLiftSuiteName: lifts share the suites' column names, so a
+// suite named like a lift that another package uses collides with it, and
+// is no owner of the lift, which no package then owns. A suite named like
+// a lift another package owns is that column owned twice.
+func TestRootCheckLiftSuiteName(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared-ladder")
+	s.passes(s.update("ladder-a-useonly"))
+	s.passes(s.run("b", "ladder-b-suite", true))
+	s.fails(s.normal("ladder-a-useonly"),
+		"the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root.\nRename the suite or the lift.",
+		"the lift parse is used by ., and no package owns it, so its error is recorded nowhere.\nOwn the lift in one of them: give it to hypercase.Own in place of hypercase.Use.")
+
+	// The root package owns parse, and its update fails on what b's suite
+	// wrote under the same name.
+	s.fails(s.update("ladder-a"), "out/parse/values.txt is an output the run no longer produces.")
+	r := s.normal("ladder-a")
+	s.fails(r, "the column parse is owned by . and ./b. Column names are unique per corpus root, and one package owns each column.")
+	s.lacks(r, "as a suite", "the lift parse is used by")
+	s.done()
+}
+
 // TestRootCheckCorpusTypes: two corpus types of one directory under one
 // corpus root fail the root-package check. Under two roots, neither
 // refuses.
