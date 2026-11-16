@@ -26,10 +26,11 @@ type VariantCase struct {
 	Name string
 	// Overlay holds the variant's in/ files, by their paths in the input
 	// view, and Delete the base's paths it removes, in the order written.
-	// EmptyDelete records a delete section that lists no path.
-	Overlay     map[string][]byte
-	Delete      []string
-	EmptyDelete bool
+	Overlay map[string][]byte
+	Delete  []string
+	// emptyDelete records that [Archive.Variants] read a delete section
+	// that lists no path. A VariantCase made otherwise has none.
+	emptyDelete bool
 	// Inputs records that the archive holds the variant's in/ or delete. A
 	// transform's variant without them is one its transform no longer
 	// makes, whose outputs are left.
@@ -109,7 +110,7 @@ func (a *Archive) Variants() []VariantCase {
 			v.Inputs = true
 		case rest == Delete:
 			v.Delete = lines(s.Data)
-			v.EmptyDelete = len(v.Delete) == 0
+			v.emptyDelete = len(v.Delete) == 0
 			v.Inputs = true
 		case rest == About:
 			v.About = s.Data
@@ -319,7 +320,7 @@ func checkDelete(v VariantCase, base map[string][]byte) []Problem {
 	var ps []Problem
 	section := v.Prefix() + Delete
 	seen := map[string]int{}
-	if v.EmptyDelete {
+	if v.emptyDelete {
 		ps = append(ps, Problem{Section: section, Msg: "the section is empty; a variant that removes nothing has no delete section"})
 	}
 	for i, p := range v.Delete {
