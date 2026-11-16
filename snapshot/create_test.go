@@ -9,8 +9,10 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
@@ -340,6 +342,9 @@ func TestCreateOpenFails(t *testing.T) {
 // TestCreateFailsBesideAnother: a Create, A, that fails after another, B,
 // has run to the end in the directories A made leaves B's case as B
 // wrote it. A's hook runs B once A's temp file is written, then fails A.
+// The directories hold B's case by then, so this holds even of a Create
+// that removes its directories when they are empty; TestCreateBesideARemoval
+// is the race that removal loses.
 func TestCreateFailsBesideAnother(t *testing.T) {
 	corp := newCorpus(t)
 	ss := serialize(t, cells)
@@ -361,6 +366,59 @@ func TestCreateFailsBesideAnother(t *testing.T) {
 	dir := filepath.Join(corp.Dir(), "testdata", "sheet")
 	fails(t, err, "creating "+filepath.Join(dir, "first.txtar")+": the disk is full.")
 	same(t, bPath, format(ss))
+	absent(t, filepath.Join(dir, "first.txtar"))
+	noTemps(t, dir)
+}
+
+// TestCreateBesideARemoval: a Create, B, that has found the directory
+// another, A, made, and has yet to open its temp file there, completes
+// though A fails meanwhile, since A keeps the directories it made. B's
+// hook, between its MkdirAll and its temp file, waits until A has failed.
+// A Create that removed the empty directories it made would remove
+// testdata/sheet/ then, and B couldn't open its temp file.
+func TestCreateBesideARemoval(t *testing.T) {
+	corp := newCorpus(t)
+	ss := serialize(t, cells)
+	var calls atomic.Int32
+	bFound := make(chan struct{})
+	aFailed := make(chan struct{})
+	hooks.AfterMkdir = func(string) {
+		if calls.Add(1) == 2 { // B's, since A makes the directory first
+			close(bFound)
+			<-aFailed
+		}
+	}
+	type result struct {
+		path string
+		err  error
+	}
+	bDone := make(chan result, 1)
+	hooks.AfterTemp = func(tmp string) error {
+		if !strings.HasPrefix(filepath.Base(tmp), ".hypercase-tmp-first.txtar-") {
+			return nil
+		}
+		go func() {
+			p, err := Create(corp, project, sheetType, "second", ss)
+			bDone <- result{p, err}
+		}()
+		<-bFound
+		return errors.New("the disk is full")
+	}
+	_, err := Create(corp, project, sheetType, "first", ss)
+	close(aFailed)
+	var b result
+	select {
+	case b = <-bDone:
+	case <-time.After(30 * time.Second):
+		t.Fatal("B never returned")
+	}
+	hooks.AfterMkdir, hooks.AfterTemp = nil, nil
+	dir := filepath.Join(corp.Dir(), "testdata", "sheet")
+	fails(t, err, "creating "+filepath.Join(dir, "first.txtar")+": the disk is full.")
+	if b.err != nil {
+		t.Fatalf("B failed beside A's failure: %v", b.err)
+	}
+	same(t, b.path, format(ss))
 	absent(t, filepath.Join(dir, "first.txtar"))
 	noTemps(t, dir)
 }

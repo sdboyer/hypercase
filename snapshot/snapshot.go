@@ -193,6 +193,9 @@ func Create[T ~struct{ fs.FS }](c root.Corpus, project decl.Project, typ decl.Ty
 	if err := os.MkdirAll(corpusDir, 0o755); err != nil {
 		return "", fmt.Errorf("creating %s: %v.\nFix what stopped it, and create the case again.", corpusDir, err)
 	}
+	if hooks.AfterMkdir != nil {
+		hooks.AfterMkdir(corpusDir)
+	}
 	path := filepath.Join(corpusDir, name+".txtar")
 	if err := archive.CreateFile(path, data); err != nil {
 		if errors.Is(err, fs.ErrExist) {

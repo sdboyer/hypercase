@@ -15,6 +15,10 @@ var Modify func(step string)
 // the write at that point.
 var AfterTemp func(tmp string) error
 
+// AfterMkdir, when set, runs in snapshot.Create once it has made or found
+// the case's directory, and before it opens the case's temp file there.
+var AfterMkdir func(dir string)
+
 // ExtractFile, when set, runs in snapshot.Extract once each file is
 // written. An error it returns fails the extract at that point.
 var ExtractFile func(path string) error
