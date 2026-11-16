@@ -25,6 +25,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	type pkgReg struct {
 		pkg string
 		reg *registry.Registry
+		// tested records that the package holds a _test.go file, so some
+		// test runs what its registry records.
+		tested bool
 	}
 	var regs []pkgReg
 	otherRoots := map[string]bool{}
@@ -46,8 +49,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			t.Errorf("%s can't be read: %v.\nRun %s to write it.", rel, err, r.updateCmd())
 			continue
 		}
-		regs = append(regs, pkgReg{pkg: r.pkgName(f.Pkg), reg: g})
-		if !hasTestFile(f.Pkg) {
+		tested := hasTestFile(f.Pkg)
+		regs = append(regs, pkgReg{pkg: r.pkgName(f.Pkg), reg: g, tested: tested})
+		if !tested {
 			t.Errorf("%s is a registry, and %s holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests.", rel, r.rel(f.Pkg))
 		}
 	}
@@ -111,7 +115,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 			for _, tr := range ct.Transforms {
 				pkgs := transforms[ct.Dir][tr.Name]
-				if tr.Owned {
+				// A package no test runs writes no inputs, so it owns
+				// none, whatever its registry records.
+				if tr.Owned && g.tested {
 					pkgs = append(pkgs, g.pkg)
 				}
 				transforms[ct.Dir][tr.Name] = pkgs

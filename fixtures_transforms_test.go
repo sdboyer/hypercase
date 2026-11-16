@@ -174,6 +174,8 @@ var transformRegistrations = map[string]func(){
 	"transforms": func() { transforms(transformType, own(echoRejects, looped, upper)) },
 	"tr-ladder":  func() { transforms(transformType, own(parse, resolve, looped, upper)) },
 	"tr-unowned": func() { transforms(transformType, own(echoRejects)) },
+	// tr-owns-looped leaves upper to another package.
+	"tr-owns-looped": func() { transforms(transformType, own(echoRejects, looped)) },
 	"tr-b": func() {
 		hypercase.Register(append([]any{project, transformType, own(withName(echoRejects, "copy"))}, sheetsProps...)...)
 	},

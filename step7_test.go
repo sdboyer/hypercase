@@ -641,6 +641,28 @@ func TestTransformUnowned(t *testing.T) {
 	s.done()
 }
 
+// TestTransformOwnerUntested: a registry in a package with no _test.go
+// records what no test runs, so its package owns no transform: the
+// root-package check reports the transform as owned by no package, beside
+// the registry no test compares.
+func TestTransformOwnerUntested(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "a package b over the corpus")
+	s.passes(s.update("tr-owns-looped"))
+	s.passes(s.run("b", "tr-b-owns", true))
+	s.passes(s.normal("tr-owns-looped"))
+	s.passes(s.run("b", "tr-b-owns", false))
+
+	s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
+	r := s.normal("tr-owns-looped")
+	s.fails(r,
+		"b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.",
+		"the transform upper, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.")
+	s.lacks(r, "the transform looped, of testdata/script/, is owned by no package")
+	s.done()
+}
+
 // TestTransformOwners: the root-package check fails a transform no package
 // owns, or two own, and a corpus type two packages list differently.
 func TestTransformOwners(t *testing.T) {
