@@ -620,7 +620,14 @@ func TestTransformStaleInputs(t *testing.T) {
 
 // TestTransformUnowned: a package that doesn't own a transform can't know
 // whether another does, so a message that names the update in the package
-// that owns it says what happens when none does, and is true either way.
+// that owns it adds what happens when none does: the root-package check
+// says so, and no update rewrites the inputs. Here the root package gives
+// its transforms up, and its check reports them. The sentence also holds
+// when the only owner's package has no tests (TestTransformOwnerUntested),
+// and, once its update runs, when the owner dropped the transform from Own
+// (TestTransformOwnerDropped); until then that package's normal run fails
+// on its registry. With no root-package check registered, every normal
+// run fails for the missing check (TestRootCheckRequired).
 func TestTransformUnowned(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -629,6 +636,7 @@ func TestTransformUnowned(t *testing.T) {
 	s.passes(s.run("b", "tr-b", true))
 	// The root package gives up its transforms, and its update records it.
 	s.passes(s.update("tr-unowned"))
+	s.fails(s.normal("tr-unowned"), "the transform upper, of testdata/script/, is owned by no package")
 	settled := s.read(twice)
 
 	s.edit(twice, "edit upper's input by hand", set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n"))
