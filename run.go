@@ -740,7 +740,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		// today's behavior, and no update writes to it, but to add the
 		// outcome of a cell frozen before outcomes were written, when
 		// nothing else keeps an update from writing the cell. couldWrite
-		// is whether anything else does.
+		// is true when nothing else does.
 		couldWrite := writable
 		writable = false
 		_, hasOutcome := goldens[outcomeFile]
