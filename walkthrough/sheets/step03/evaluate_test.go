@@ -7,18 +7,23 @@ import (
 	"testing"
 
 	"github.com/sdboyer/hypercase"
+	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step03/sheetcorpus"
 )
 
 // doc:begin suite
 func init() {
-	hypercase.Register(sheetcorpus.Project, evaluate)
+	hypercase.Register(sheetcorpus.Project, hypercase.Root("step03"), hypercase.RootPackage(), evaluate)
 }
 
 var evaluate = hypercase.Suite[fs.FS]{
 	Name:        "evaluate",
 	Description: "Evaluates every cell of the sheet.",
+	Corpus:      "sheet",
+	Outputs: []decl.Output{
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+	},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		values, err := sheet.Eval(in) // the cells under sheet/
 		if err != nil {

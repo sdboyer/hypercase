@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "updateVar": "SHEETS_UPDATE_GOLDEN",
+  "corpusRoot": "step03",
+  "rootPackage": true,
+  "properties": [],
+  "suites": [
+    {
+      "name": "evaluate",
+      "description": "Evaluates every cell of the sheet.",
+      "corpus": "sheet",
+      "outputs": [
+        {
+          "pattern": "values.txt",
+          "description": "Each cell's value, one per line, in cell order."
+        }
+      ],
+      "rejects": []
+    }
+  ]
+}

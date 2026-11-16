@@ -1,0 +1,11 @@
+A total row whose label sits in a cell of its own.
+-- in/sheet/A1 --
+4
+-- in/sheet/D1 --
+total
+-- properties --
+malformed
+-- out/calc/error.txt --
+D1: not a number or a formula: "total"
+-- out/evaluate/error.txt --
+D1: not a number or a formula: "total"
