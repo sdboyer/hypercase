@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -263,6 +264,59 @@ func TestPageDiffs(t *testing.T) {
 			`<pre class="diff"><span class="del">- 1,0,#DIV/0!</span></pre>`)
 }
 
+// TestPageLargeDiff: a 100,000-line output with six lines changed far
+// apart shows exactly those lines and their context, counted, so the page
+// grows with the change, not with the file. A stretch the diff can't align
+// is left out, marked, and its file shows no counts, which wouldn't count
+// its change.
+func TestPageLargeDiff(t *testing.T) {
+	t.Parallel()
+	big := func(change ...int) string {
+		var b strings.Builder
+		for i := range 100_000 {
+			if slices.Contains(change, i) {
+				fmt.Fprintf(&b, "line %d, changed\n", i)
+				continue
+			}
+			fmt.Fprintf(&b, "line %d\n", i)
+		}
+		return b.String()
+	}
+	// Ten thousand lines of a and b, in an order no edit script within the
+	// diff's budget aligns, and no line either holds once.
+	unaligned := func(first string, mul, mod, below int) string {
+		var b strings.Builder
+		b.WriteString(first + "\n")
+		for i := range 9998 {
+			if i*mul%mod < below {
+				b.WriteString("a\n")
+			} else {
+				b.WriteString("b\n")
+			}
+		}
+		b.WriteString(first + " again\n")
+		return b.String()
+	}
+	const head = "A case.\n-- out/calc/outcome --\naccepted\n-- out/calc/stdout.txt --\n"
+	g := gittest.New(t)
+	c := revisions(t, g,
+		module(map[string]string{"x": head + big(), "y": head + unaligned("first of a", 7919, 13, 6)}),
+		module(map[string]string{"x": head + big(3, 17_000, 33_333, 50_001, 81_234, 99_990), "y": head + unaligned("first of b", 104_729, 17, 8)}))
+	page := ok(t, g, "", "report", c[0], c[1])
+	x := change(t, page, "sheet/x", "calc")
+	holds(t, "x calc's change", x, `<code>stdout.txt</code> changed <span class="stat"><span class="add">+6</span> <span class="del">-6</span></span>`,
+		`<span class="ctx">  line 2</span><span class="del">- line 3</span><span class="add">&#43; line 3, changed</span><span class="ctx">  line 4</span>`)
+	if n := strings.Count(x, `<span class="skip">`); n != 5 {
+		t.Errorf("x calc's diff has %d skips between its hunks, want 5", n)
+	}
+	y := change(t, page, "sheet/y", "calc")
+	holds(t, "y calc's change", y, `<code>stdout.txt</code> changed <span class="stat">partly unaligned</span>`,
+		`<pre class="diff"><span class="unaligned">  ... left out: 10000 lines before and 10000 lines after, which the diff can&#39;t align</span></pre>`)
+	if len(x) > 4<<10 || len(y) > 1<<10 || len(page) > 24<<10 {
+		t.Errorf("the page is %d bytes, x calc's change %d and y calc's %d, want at most 24 KiB, 4 KiB and 1 KiB", len(page), len(x), len(y))
+	}
+}
+
 // TestPageGolden: the page of the sheets fixture is the same on every run,
 // and the golden records it.
 func TestPageGolden(t *testing.T) {
@@ -311,6 +365,13 @@ func TestPageDescriptions(t *testing.T) {
 		return r
 	}
 	ra, rb := reg("at a"), reg("at b")
+	// b drops calc's stdout.txt and evaluate's classifier; a's describe
+	// them. calc's classifier is at both, and b's describes it.
+	ra.Suites[0].Outputs = append(ra.Suites[0].Outputs, registry.Output{Pattern: "stderr.txt", Description: "What calc warns, at a."})
+	rb.Suites[0].Outputs = []registry.Output{{Pattern: "stderr.txt", Description: "What calc warns, at b."}}
+	ra.Suites[0].Classifier = &registry.Classifier{Name: "slow", Description: "Adds slow, at a."}
+	rb.Suites[0].Classifier = &registry.Classifier{Name: "slow", Description: "Adds slow, at b."}
+	rb.Suites[1].Classifier = nil
 	ra.Suites = append(ra.Suites, registry.Suite{Name: "old", Description: "A column only a has.", Consumes: registry.RawInput, Corpora: []string{"sheet"},
 		Outputs: []registry.Output{{Pattern: "old.txt", Description: "What old wrote."}}})
 	ra.Types[0].Transforms = append(ra.Types[0].Transforms, registry.Transform{Name: "doubled", Description: "A transform only a has.", Keeps: []string{"dangling"}, Owned: true})
@@ -335,14 +396,15 @@ func TestPageDescriptions(t *testing.T) {
 	d := section(t, page, `<section class="corpus" id="describe-sheet">`, "</section>")
 	holds(t, "the sheet corpus's descriptions", d,
 		"<h3>sheet</h3>\n<p>A sheet, at b.</p>",
-		"<dt>calc</dt><dd>Runs calc, at b.<ul class=\"outputs\"><li><code>stdout.txt</code>: What calc prints, at b.</li></ul></dd>",
-		"<dt>evaluate</dt><dd>Evaluates.<p class=\"classifier\">Its classifier, <code>div-zero</code>: Adds div-zero, at b.</p></dd>",
+		"<dt>calc</dt><dd>Runs calc, at b.<ul class=\"outputs\"><li><code>stderr.txt</code>: What calc warns, at b.</li><li><code>stdout.txt</code>"+only+": What calc prints, at a.</li></ul>"+
+			"<p class=\"classifier\">Its classifier, <code>slow</code>: Adds slow, at b.</p></dd>",
+		"<dt>evaluate</dt><dd>Evaluates.<p class=\"classifier\">Its classifier, <code>div-zero</code>"+only+": Adds div-zero, at a.</p></dd>",
 		"<dt>old"+only+"</dt><dd>A column only a has.<ul class=\"outputs\"><li><code>old.txt</code>: What old wrote.</li></ul></dd>",
 		"<dt>doubled"+only+"</dt><dd>A transform only a has.<p>Keeps <span class=\"prop\">dangling</span>.</p></dd>",
 		"<dt>looped</dt><dd>Loops, at b.<p>Gives <span class=\"prop\">circular</span>.</p></dd>",
 		`<dt><span class="case">sheet/gone</span></dt><dd>A case only a has.</dd>`,
 		`<dt><span class="case">sheet/gone/variant/w</span></dt><dd>A variant only a has.</dd>`)
-	lacks(t, "the sheet corpus's descriptions", d, "at a.", "sheet/kept")
+	lacks(t, "the sheet corpus's descriptions", d, "A sheet, at a.", "Runs calc, at a.", "What calc warns, at a.", "Adds slow, at a.", "Loops, at a.", "sheet/kept")
 	holds(t, "the csv corpus's description", section(t, page, `<section class="corpus" id="describe-csv">`, "</section>"), "<h3>csv</h3>\n<p>A CSV, only at b.</p>")
 	holds(t, "the tsv corpus's description", section(t, page, `<section class="corpus" id="describe-tsv">`, "</section>"), "<h3>tsv"+only+"</h3>\n<p>A TSV, only at a.</p>")
 	holds(t, "the properties' descriptions", section(t, page, `<section class="properties" id="describe-properties">`, "</section>"),

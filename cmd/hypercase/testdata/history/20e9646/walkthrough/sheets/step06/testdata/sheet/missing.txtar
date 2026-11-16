@@ -1,0 +1,13 @@
+A1 refers to B1, which the sheet lacks.
+-- in/sheet/A1 --
+=B1+1
+-- properties --
+dangling
+-- out/calc/error.txt --
+A1: B1 doesn't exist
+  sheet/A1:1: =B1+1
+-- out/format/formulas.txt --
+A1 =B1 + 1
+-- out/resolve/error.txt --
+A1: B1 doesn't exist
+  sheet/A1:1: =B1+1

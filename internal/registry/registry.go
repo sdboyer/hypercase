@@ -256,6 +256,11 @@ func decode(data []byte) (*Registry, error) {
 // the branch that brought the registry to main, whose merge read neither.
 const Oldest = 3
 
+// OutcomeFormat is the first format version whose revisions commit an
+// outcome file for every cell. Before it, a cell commits only the files
+// its column writes, and none at all when it writes none.
+const OutcomeFormat = 5
+
 // added is what each format version added to the one before it, by the
 // key that holds it, which a registry of an older format doesn't hold.
 // Format 4 added each corpus type's transforms, and format 5 whether the

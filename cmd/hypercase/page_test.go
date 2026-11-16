@@ -326,3 +326,32 @@ func TestPageTwoTrackers(t *testing.T) {
 		}
 	}
 }
+
+// TestPageBadLink: a link pattern at b that isn't a regular expression is
+// one problem at b, naming every registry that gives it, and links nothing,
+// while the report still links through the patterns that are.
+func TestPageBadLink(t *testing.T) {
+	t.Parallel()
+	reg := moduleRegistry()
+	reg.IssueLinks = []registry.IssueLink{
+		{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/issues/$1"},
+		{Pattern: `calc-lib#(\d+`, URL: "https://example.com/calc-lib/pull/$1"},
+	}
+	other := registry.Registry{UpdateVar: "M_UPDATE_GOLDEN", CorpusRoot: ".", IssueLinks: reg.IssueLinks[1:]}
+	files := module(map[string]string{
+		"x": "Waits on sheets#1 and calc-lib#(2.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n",
+	})
+	files["testdata/hypercase.json"] = string(reg.Marshal())
+	files["pkg/testdata/hypercase.json"] = string(other.Marshal())
+	g := gittest.New(t)
+	c := revisions(t, g, module(nil), files)
+	page := ok(t, g, "", "report", c[0], c[1])
+	ps := section(t, page, `<section id="problems">`, "</section>")
+	holds(t, "the problems", ps, `<h2>Problems <span class="count">1</span></h2>`, `<h3>At <span class="rev">`+c[1]+`</span></h3>`,
+		"<li>testdata/hypercase.json and pkg/testdata/hypercase.json give the issue link pattern &#34;calc-lib#(\\\\d&#43;&#34;, which is not a regular expression (error parsing regexp: missing closing ): `calc-lib#(\\d&#43;`), so the report links no text through it.</li>")
+	head, _ := matrixRow(t, page, "sheet", "sheet/x")
+	holds(t, "x's description", head, `Waits on <a href="https://example.com/sheets/issues/1">sheets#1</a> and calc-lib#(2.`)
+	if back := ok(t, g, "", "report", c[1], c[0]); strings.Contains(back, `<section id="problems">`) {
+		t.Errorf("the report from b to a lists a problem, and a's registries give no pattern:\n%s", section(t, back, `<section id="problems">`, "</section>"))
+	}
+}

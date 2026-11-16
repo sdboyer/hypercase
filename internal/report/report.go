@@ -97,7 +97,8 @@ type Change struct {
 	Case   string
 	Column string
 	// Before and After are the outcome at A and at B, as the outcome file
-	// holds it less its newline, or "" where the cell isn't.
+	// holds it less its newline, Unknown where the cell's state is, or ""
+	// where the cell isn't.
 	Before, After string
 	// Files are the cell's other files that were added, changed or removed,
 	// by path.
@@ -116,9 +117,11 @@ type FileChange struct {
 	Path string
 	How  string // added, changed or removed
 	// Diff is the line diff, and Added and Removed count its lines only at
-	// B and only at A.
+	// B and only at A. Unaligned records that the diff left out a stretch
+	// it can't align, so Added and Removed don't count the file's change.
 	Diff           []diff.Line
 	Added, Removed int
+	Unaligned      bool
 }
 
 // A Property is a property a case states, with its description at B, or
@@ -178,9 +181,14 @@ func Build(opts Options) (*Report, error) {
 		}
 	}
 	a, b := snaps[0], snaps[1]
-	links, err := newLinker(b.links)
-	if err != nil {
-		return nil, fmt.Errorf("the registries at %s: %w", b.rev.Name, err)
+	links, bad := newLinker(b.links)
+	for _, bl := range bad {
+		regs := b.linkRegs[bl.pattern]
+		verb := "gives"
+		if len(regs) > 1 {
+			verb = "give"
+		}
+		b.problem("", fmt.Sprintf("%s %s the issue link pattern %q, which is not a regular expression (%v), so the report links no text through it.", andList(regs), verb, bl.pattern, bl.err))
 	}
 	r := &Report{A: a.rev, B: b.rev, Root: root}
 	r.Problems = append(slices.Clone(b.problems), a.problems...)
@@ -247,7 +255,9 @@ func findModule(tree fs.FS, dir string) (string, bool) {
 }
 
 // changes compares every cell of the two snapshots, and ranks those that
-// changed. props holds each property's description.
+// changed. A cell whose state is unknown at either revision has no outcome
+// to compare, so it ranks on its files alone when it is at both. props
+// holds each property's description.
 func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 	keys := map[cellKey]bool{}
 	for k := range a.cells {
@@ -269,7 +279,7 @@ func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 		case cb == nil:
 			ch.Rank, ch.Before = Disappeared, ca.line
 			at = a
-		case ca.line != cb.line:
+		case ca.known && cb.known && ca.line != cb.line:
 			ch.Rank, ch.Before, ch.After = OutcomeChanged, ca.line, cb.line
 		default:
 			ch.Rank, ch.Before, ch.After = BytesChanged, ca.line, cb.line
@@ -328,6 +338,8 @@ func fileChanges(a, b *cellAt) []FileChange {
 				fc.Added++
 			case '-':
 				fc.Removed++
+			case diff.Unaligned:
+				fc.Unaligned = true
 			}
 		}
 		out = append(out, fc)

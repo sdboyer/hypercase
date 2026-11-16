@@ -63,17 +63,34 @@ func describe(a, b *snapshot, links *linker) ([]Corpus, []Described) {
 		c := Corpus{Described: Described{Name: dir, Description: links.text(desc), OnlyAtA: !inB[dir]}}
 
 		for _, name := range union(a.columnsOver(dir), b.columnsOver(dir)) {
-			_, atB := b.column(dir, name)
-			s, onlyA := pick(atB)
-			col, _ := s.column(dir, name)
+			colB, atB := b.column(dir, name)
+			colA, atA := a.column(dir, name)
+			col, onlyA := colB, false
+			if !atB {
+				col, onlyA = colA, true
+			}
 			cd := ColumnDescribed{Described: Described{Name: name, Description: links.text(col.description), OnlyAtA: onlyA}}
-			outputs := slices.SortedFunc(slices.Values(col.outputs), func(x, y registry.Output) int { return cmp.Compare(x.Pattern, y.Pattern) })
-			for _, o := range outputs {
+			for _, o := range col.outputs {
 				cd.Outputs = append(cd.Outputs, Described{Name: o.Pattern, Description: links.text(o.Description), OnlyAtA: onlyA})
 			}
 			if cl := col.classifier; cl != nil {
 				cd.Classifier = &Described{Name: cl.Name, Description: links.text(cl.Description), OnlyAtA: onlyA}
 			}
+			// What the column declares at A and not at B, B lacks: an
+			// output declaration of another pattern, or a classifier. A
+			// column in conflict at either revision has no declarations to
+			// take from.
+			if atA && atB && !colA.conflict && !colB.conflict {
+				for _, o := range colA.outputs {
+					if !slices.ContainsFunc(colB.outputs, func(p registry.Output) bool { return p.Pattern == o.Pattern }) {
+						cd.Outputs = append(cd.Outputs, Described{Name: o.Pattern, Description: links.text(o.Description), OnlyAtA: true})
+					}
+				}
+				if cl := colA.classifier; cl != nil && colB.classifier == nil {
+					cd.Classifier = &Described{Name: cl.Name, Description: links.text(cl.Description), OnlyAtA: true}
+				}
+			}
+			slices.SortFunc(cd.Outputs, func(x, y Described) int { return cmp.Compare(x.Name, y.Name) })
 			c.Columns = append(c.Columns, cd)
 		}
 

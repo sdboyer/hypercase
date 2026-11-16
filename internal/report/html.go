@@ -1,6 +1,7 @@
 package report
 
 import (
+	"fmt"
 	"html/template"
 	"io"
 	"strings"
@@ -80,6 +81,8 @@ func diffLine(l diff.Line) (class, text string) {
 	switch l.Kind {
 	case diff.Skip:
 		return "skip", "  ..."
+	case diff.Unaligned:
+		return "unaligned", fmt.Sprintf("  ... left out: %s before and %s after, which the diff can't align", lines(l.Old), lines(l.New))
 	case '+':
 		class = "add"
 	case '-':
@@ -92,6 +95,14 @@ func diffLine(l diff.Line) (class, text string) {
 		text += "\n" + string(l.Kind) + ` \ no final newline`
 	}
 	return class, text
+}
+
+// lines says how many lines there are.
+func lines(n int) string {
+	if n == 1 {
+		return "1 line"
+	}
+	return fmt.Sprintf("%d lines", n)
 }
 
 var page = template.Must(template.New("page").Funcs(template.FuncMap{
@@ -148,7 +159,7 @@ const pageTemplate = `<!doctype html>
 {{- if .Files}}
 <ul class="files">
 {{- range .Files}}
-<li class="{{.How}}"><details><summary><code>{{.Path}}</code> {{.How}} <span class="stat"><span class="add">+{{.Added}}</span> <span class="del">-{{.Removed}}</span></span></summary>
+<li class="{{.How}}"><details><summary><code>{{.Path}}</code> {{.How}} <span class="stat">{{if .Unaligned}}partly unaligned{{else}}<span class="add">+{{.Added}}</span> <span class="del">-{{.Removed}}</span>{{end}}</span></summary>
 <pre class="diff">{{range .Diff}}<span class="{{diffClass .}}">{{diffText .}}</span>{{end}}</pre></details></li>
 {{- end}}
 </ul>
@@ -203,10 +214,10 @@ const pageTemplate = `<!doctype html>
 {{- if .Columns}}
 <h4>Columns</h4>
 <dl class="columns">
-{{- range .Columns}}
+{{- range .Columns}}{{$only := .OnlyAtA}}
 <dt>{{.Name}}{{if .OnlyAtA}} <span class="badge">only at {{$.A.Name}}</span>{{end}}</dt><dd>{{template "text" .Description}}
-{{- if .Outputs}}<ul class="outputs">{{range .Outputs}}<li><code>{{.Name}}</code>: {{template "text" .Description}}</li>{{end}}</ul>{{end}}
-{{- with .Classifier}}<p class="classifier">Its classifier, <code>{{.Name}}</code>: {{template "text" .Description}}</p>{{end -}}
+{{- if .Outputs}}<ul class="outputs">{{range .Outputs}}<li><code>{{.Name}}</code>{{if and .OnlyAtA (not $only)}} <span class="badge">only at {{$.A.Name}}</span>{{end}}: {{template "text" .Description}}</li>{{end}}</ul>{{end}}
+{{- with .Classifier}}<p class="classifier">Its classifier, <code>{{.Name}}</code>{{if and .OnlyAtA (not $only)}} <span class="badge">only at {{$.A.Name}}</span>{{end}}: {{template "text" .Description}}</p>{{end -}}
 </dd>
 {{- end}}
 </dl>
@@ -293,6 +304,7 @@ li.change { padding: 6px 0; border-bottom: 1px solid var(--line); }
 .s-panicked .outcome, .outcome.s-panicked { background: var(--panicked); }
 .s-blocked .outcome, .outcome.s-blocked { background: var(--blocked); }
 .s-skipped .outcome, .outcome.s-skipped { background: var(--skipped); }
+.outcome.s-unknown { font-style: italic; color: var(--muted); }
 .arrow { color: var(--muted); }
 ul.files { list-style: none; margin: 4px 0 0 20px; padding: 0; color: var(--muted); }
 summary { cursor: pointer; }
@@ -302,7 +314,7 @@ pre.diff { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg)
 pre.diff span { display: block; padding: 0 8px; white-space: pre; }
 pre.diff .add { background: var(--add); }
 pre.diff .del { background: var(--del); }
-pre.diff .skip { color: var(--muted); }
+pre.diff .skip, pre.diff .unaligned { color: var(--muted); }
 .props { margin-left: 6px; }
 .prop { display: inline-block; margin: 0 4px 0 0; padding: 0 6px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); }
 .prop.kept { border-style: dashed; }
@@ -321,6 +333,7 @@ td.s-rejected { background: var(--rejected); }
 td.s-panicked { background: var(--panicked); }
 td.s-blocked { background: var(--blocked); }
 td.s-skipped { background: var(--skipped); }
+td.s-unknown .outcome { font-style: italic; color: var(--muted); }
 td.cell .outcome { background: transparent; padding: 0; }
 td.outcome-changed { box-shadow: inset 0 0 0 2px var(--changed); }
 td.appeared { box-shadow: inset 0 0 0 2px var(--appeared); }

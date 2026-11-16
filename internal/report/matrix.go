@@ -32,10 +32,12 @@ type Row struct {
 // A Cell is one cell of the matrix.
 type Cell struct {
 	Column string
-	// Present says the cell exists: its outcome file does.
+	// Present says the cell exists: its outcome file does, or, before
+	// outcome files, its case runs under its column.
 	Present bool
 	// Outcome is its outcome, as the outcome file holds it less its
-	// newline, and State its first word, or "" for a cell that isn't.
+	// newline, and State its first word: each Unknown for a cell whose
+	// state is, and "" for a cell that isn't.
 	Outcome, State string
 	// Gap is the text of the gaps line that marks the cell, or nil. A cell
 	// that a line marks and that exists is frozen.
@@ -94,6 +96,9 @@ func matrices(b *snapshot, changes []Change, props map[string]string, links *lin
 				cell := Cell{Column: col.Name}
 				if c := b.cells[ck]; c != nil {
 					cell.Present, cell.Outcome, cell.State = true, c.line, c.outcome.State
+					if !c.known {
+						cell.State = Unknown
+					}
 				}
 				if text, ok := b.gaps[ck]; ok {
 					cell.Gap = links.text(text)

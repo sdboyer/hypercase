@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -140,12 +141,18 @@ func TestFormats(t *testing.T) {
 	} {
 		g = gittest.New(t)
 		c = revisions(t, g, module(broken), withRegistry(module(arch), other.data))
-		want := []string{
-			fmt.Sprintf("hypercase report: testdata/hypercase.json at %s holds registry format %d, and this hypercase reads formats %d to %d.\n", c[1], other.format, registry.Oldest, registry.Format) +
-				"Run the report from " + c[1] + "'s hypercase, which reads it: in a checkout of " + c[1] + ", run the same command as go run github.com/sdboyer/hypercase/cmd/hypercase.\n",
+		// A newer format is read by the revision's own hypercase; an older
+		// one than any report reads, by none.
+		want := fmt.Sprintf("hypercase report: testdata/hypercase.json at %s holds registry format %d, and this hypercase reads formats %d to %d.\n", c[1], other.format, registry.Oldest, registry.Format) +
+			"Run the report from " + c[1] + "'s hypercase, which reads it: in a checkout of " + c[1] + ", run the same command as go run github.com/sdboyer/hypercase/cmd/hypercase.\n"
+		if other.format < registry.Oldest {
+			want = fmt.Sprintf("hypercase report: testdata/hypercase.json at %s holds registry format %d, which no hypercase's report reads: the oldest format a report reads is %d.\n", c[1], other.format, registry.Oldest)
 		}
-		fails(t, g, "", 1, []string{"report", c[0], c[1]}, want...)
-		fails(t, g, "", 1, []string{"report", "-text", c[1], c[0]}, want...)
+		for _, args := range [][]string{{"report", c[0], c[1]}, {"report", "-text", c[1], c[0]}} {
+			if r := hypercase(t, g, "", args...); r.code != 1 || r.stdout != "" || r.stderr != want {
+				t.Errorf("hypercase %s: exit %d, stdout %q, stderr:\n%s\nwant exit 1, no stdout, and:\n%s", strings.Join(args, " "), r.code, r.stdout, r.stderr, want)
+			}
+		}
 	}
 	// A registry that is no registry fails by name.
 	g = gittest.New(t)
@@ -153,71 +160,126 @@ func TestFormats(t *testing.T) {
 	fails(t, g, "", 1, []string{"report", c[0], c[1]}, "testdata/hypercase.json at "+c[1]+" can't be read: it is not a registry")
 }
 
-// format4 is a registry of format 4, the format before this hypercase's,
-// as hypercase's main branch wrote it: no codes and no classifiers.
-const format4 = `{
-  "format": 4,
-  "updateVar": "M_UPDATE_GOLDEN",
-  "corpusRoot": ".",
-  "rootPackage": true,
-  "issueLinks": [{"pattern": "sheets#(\\d+)", "url": "https://example.com/sheets/issues/$1"}],
-  "properties": [
-    {"name": "circular", "description": "A loop, as format 4 says."},
-    {"name": "retired", "description": "A property only format 4 lists."}
-  ],
-  "types": [{"dir": "sheet", "description": "A sheet, as format 4 says.", "goType": "example.com/m.Sheet", "transforms": [
-    {"name": "looped", "description": "Loops, as format 4 says.", "gives": ["circular"], "keeps": ["retired"], "probe": false, "owned": true}
-  ]}],
-  "lifts": [],
-  "suites": [
-    {"name": "calc", "description": "Runs calc, as format 4 says.", "consumes": "io/fs.FS", "corpora": ["sheet"],
-      "outputs": [{"pattern": "stdout.txt", "description": "What calc printed, as format 4 says."}], "rejects": []},
-    {"name": "old", "description": "A column only format 4 has.", "consumes": "io/fs.FS", "corpora": ["sheet"], "outputs": [], "rejects": []}
-  ]
+// history reads the files of one of hypercase's own commits that
+// testdata/history holds: the sheets toy's registries and archives, and
+// its go.mod, as the commit has them. 20e9646 is main before the format
+// that added outcome files, at format 4, and b7e82fe the merge that added
+// them, at format 5.
+func history(t *testing.T, commit string) map[string]string {
+	t.Helper()
+	fsys := os.DirFS(filepath.Join("testdata", "history", commit))
+	files := map[string]string{}
+	err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := fs.ReadFile(fsys, p)
+		files[p] = string(data)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return files
 }
-`
 
-// TestPreviousFormat: a registry of the format before the report's own at
-// a, and one of its own at b. The page shows both revisions' cells,
-// properties and descriptions, each from b, or from a for what b lacks.
+// toyRoots are the corpus roots of the sheets toy at both commits.
+var toyRoots = []string{"walkthrough/sheets/step03", "walkthrough/sheets/step04", "walkthrough/sheets/step05", "walkthrough/sheets/step06"}
+
+// TestPreviousFormat: the sheets toy across the format that added outcome
+// files, as hypercase's own history holds it: format 4 at 20e9646, and 5
+// at b7e82fe, whose archives differ only by an outcome file in every
+// cell. Before outcome files, every cell of a case under each column the
+// registries claim exists, its state unknown, so the report finds both
+// revisions' cells, ranks none, since none has another file that
+// changed, and finds no problem, in either direction. The matrix at
+// format 4 shows each cell, its state unknown.
 func TestPreviousFormat(t *testing.T) {
 	t.Parallel()
-	const gone = "A case only a has.\n-- in/sheet/A1 --\n=A1\n-- properties --\nretired\n" +
-		"-- out/calc/outcome --\nrejected\n-- out/calc/stdout.txt --\nloop\n-- out/old/outcome --\naccepted\n" +
-		"-- transform/looped/in/sheet/A1 --\n=A1\n-- transform/looped/out/calc/outcome --\nrejected\n"
-	a := module(map[string]string{"gone": gone, "kept": "A case both have.\n-- out/calc/outcome --\naccepted\n"})
-	a["testdata/hypercase.json"] = format4
-	b := module(map[string]string{"kept": "A case both have.\n-- out/calc/outcome --\nrejected\n", "new": "A case only b has.\n-- out/evaluate/outcome --\naccepted\n"})
+	g := gittest.New(t)
+	c := revisions(t, g, history(t, "20e9646"), history(t, "b7e82fe"))
+	for _, root := range toyRoots {
+		for _, revs := range [][2]string{{c[0], c[1]}, {c[1], c[0]}} {
+			if got := ok(t, g, root, "report", "-text", revs[0], revs[1]); got != "" {
+				t.Errorf("%s, from %s to %s: the report is:\n%s\nwant no change", root, revs[0], revs[1], got)
+			}
+			page := ok(t, g, root, "report", revs[0], revs[1])
+			holds(t, root+"'s page", page, `<p class="none">No cell changed.</p>`)
+			lacks(t, root+"'s page", page, `<section id="problems">`)
+		}
+	}
+	page := ok(t, g, "walkthrough/sheets/step06", "report", c[1], c[0])
+	_, cells := matrixRow(t, page, "sheet", "sheet/blank")
+	if len(cells) != 5 {
+		t.Fatalf("blank's row has %d cells, want 5", len(cells))
+	}
+	for i, cell := range cells {
+		holds(t, fmt.Sprintf("blank's cell %d at format 4", i), cell, `class="cell s-unknown"><span class="outcome">unknown</span>`)
+	}
+	m := section(t, page, `<section class="matrix" id="corpus-sheet">`, "</section>")
+	if n, rows := strings.Count(m, `<td class="cell s-unknown`), strings.Count(m, `<th scope="row">`); n != 5*rows || rows != 9 {
+		t.Errorf("the matrix at format 4 has %d rows and %d cells of unknown state, want 9 and 45", rows, n)
+	}
+	holds(t, "blank's row at format 4", page, `<span class="case">sheet/blank</span> <span class="props"><span class="prop" title=`)
+}
+
+// TestOutcomeBoundary: across the format that added outcome files, a cell
+// at both revisions ranks on its other files alone, showing the state it
+// has at one revision as unknown at the other, and a cell only at one
+// revision appears or disappears with its state, unknown before outcome
+// files. An outcome file at a revision before them is a problem, and left
+// out.
+func TestOutcomeBoundary(t *testing.T) {
+	t.Parallel()
+	const blank = "walkthrough/sheets/step06/testdata/sheet/blank.txtar"
+	a, b := history(t, "20e9646"), history(t, "b7e82fe")
+	a[blank] = strings.Replace(a[blank], "-- out/calc/error.txt --\nA1: not a number", "-- out/calc/error.txt --\nA1 is not a number", 1)
+	a[blank] = strings.Replace(a[blank], "-- out/parse/error.txt --", "-- out/format/outcome --\nblocked parse\n-- out/parse/error.txt --", 1)
+	delete(a, "walkthrough/sheets/step06/testdata/sheet/notes.txtar")
+	delete(b, "walkthrough/sheets/step06/testdata/sheet/stray.txtar")
 	g := gittest.New(t)
 	c := revisions(t, g, a, b)
-
-	want := "outcome changed\n  sheet/kept calc: accepted -> rejected\n" +
-		"appeared\n  sheet/new evaluate: accepted\n" +
-		"disappeared\n  sheet/gone calc: rejected\n    stdout.txt removed\n  sheet/gone old: accepted\n  sheet/gone/transform/looped calc: rejected\n"
-	if got := ok(t, g, "", "report", "-text", c[0], c[1]); got != want {
-		t.Errorf("from format 4 to %d, the report is:\n%s\nwant:\n%s", registry.Format, got, want)
+	const root = "walkthrough/sheets/step06"
+	forward := ok(t, g, root, "report", "-text", c[0], c[1])
+	want := "appeared\n" +
+		"  sheet/notes calc: rejected\n    error.txt added\n" +
+		"  sheet/notes evaluate: blocked parse\n" +
+		"  sheet/notes format: blocked parse\n" +
+		"  sheet/notes parse: rejected\n    error.txt added\n" +
+		"  sheet/notes resolve: blocked parse\n" +
+		"disappeared\n" +
+		"  sheet/stray calc: unknown\n    error.txt removed\n" +
+		"  sheet/stray evaluate: unknown\n" +
+		"  sheet/stray format: unknown\n" +
+		"  sheet/stray parse: unknown\n    error.txt removed\n" +
+		"  sheet/stray resolve: unknown\n" +
+		"bytes changed\n  sheet/blank calc: unknown -> rejected\n    error.txt changed\n"
+	if forward != want {
+		t.Errorf("from format 4 to 5, the report is:\n%s\nwant:\n%s", forward, want)
 	}
-	page := ok(t, g, "", "report", c[0], c[1])
-	holds(t, "gone calc's change", change(t, page, "sheet/gone", "calc"), `<span class="prop" title="A property only format 4 lists.">retired</span>`)
-	holds(t, "gone/transform/looped calc's change", change(t, page, "sheet/gone/transform/looped", "calc"),
-		`<span class="prop given" title="A loop.">circular <span class="how">given</span></span>`,
-		`<span class="prop kept" title="A property only format 4 lists.">retired <span class="how">kept</span></span>`)
-	d := section(t, page, `<section class="corpus" id="describe-sheet">`, "</section>")
-	only := `<span class="badge">only at ` + c[0] + `</span>`
-	holds(t, "the descriptions of sheet", d,
-		"<dt>calc</dt><dd>Runs calc.</dd>",
-		"<dt>old "+only+"</dt><dd>A column only format 4 has.</dd>",
-		"<dt>looped "+only+"</dt><dd>Loops, as format 4 says.<p>Gives <span class=\"prop\">circular</span>.</p><p>Keeps <span class=\"prop\">retired</span>.</p></dd>",
-		`<dt><span class="case">sheet/gone</span></dt><dd>A case only a has.</dd>`)
-	lacks(t, "the descriptions of sheet", d, "sheet/kept", "sheet/new", "transform/looped</span>")
-	props := section(t, page, `<section class="properties" id="describe-properties">`, "</section>")
-	holds(t, "the properties' descriptions", props, "<dt>circular</dt><dd>A loop.</dd>", "<dt>retired "+only+"</dt><dd>A property only format 4 lists.</dd>")
-
-	// From b to a, the matrix is a's, at format 4.
-	back := ok(t, g, "", "report", c[1], c[0])
-	_, cells := matrixRow(t, back, "sheet", "sheet/gone")
-	holds(t, "gone's calc at format 4", cells[0], `class="cell s-rejected appeared"`)
-	holds(t, "gone's old at format 4", cells[1], `class="cell s-accepted appeared"`)
-	head, _ := matrixRow(t, back, "sheet", "sheet/gone/transform/looped")
-	holds(t, "gone/transform/looped's row at format 4", head, `<span class="prop given" title="A loop, as format 4 says.">circular <span class="how">given</span></span>`)
+	backward := ok(t, g, root, "report", "-text", c[1], c[0])
+	want = "appeared\n" +
+		"  sheet/stray calc: unknown\n    error.txt added\n" +
+		"  sheet/stray evaluate: unknown\n" +
+		"  sheet/stray format: unknown\n" +
+		"  sheet/stray parse: unknown\n    error.txt added\n" +
+		"  sheet/stray resolve: unknown\n" +
+		"disappeared\n" +
+		"  sheet/notes calc: rejected\n    error.txt removed\n" +
+		"  sheet/notes evaluate: blocked parse\n" +
+		"  sheet/notes format: blocked parse\n" +
+		"  sheet/notes parse: rejected\n    error.txt removed\n" +
+		"  sheet/notes resolve: blocked parse\n" +
+		"bytes changed\n  sheet/blank calc: rejected -> unknown\n    error.txt changed\n"
+	if backward != want {
+		t.Errorf("from format 5 to 4, the report is:\n%s\nwant:\n%s", backward, want)
+	}
+	page := ok(t, g, root, "report", c[1], c[0])
+	holds(t, "the problems at format 4", section(t, page, `<section id="problems">`, "</section>"),
+		`<h3>At <span class="rev">`+c[0]+`</span></h3>`,
+		"<li><code>"+blank+", out/format/outcome</code>: the section is an outcome file, and registry format 4 predates outcome files, so the report leaves it out.</li>")
+	holds(t, "blank's calc change", change(t, page, "sheet/blank", "calc"),
+		`<span class="outcome s-rejected">rejected</span> <span class="arrow">to</span> <span class="outcome s-unknown">unknown</span>`)
+	_, cells := matrixRow(t, page, "sheet", "sheet/blank")
+	holds(t, "blank's format at format 4", cells[2], `class="cell s-unknown"><span class="outcome">unknown</span>`)
 }

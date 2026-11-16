@@ -20,6 +20,13 @@ type snapshot struct {
 	rev   Rev
 	root  string // the corpus root, as a slash path from the top of the repository
 	links []registry.IssueLink
+	// linkRegs holds the registries that give each link pattern, by path.
+	linkRegs map[string][]string
+	// format is the newest format version of the registries, and outcomes
+	// whether the cells commit outcome files, as they do from
+	// registry.OutcomeFormat on. Before it, a cell's state is unknown.
+	format   int
+	outcomes bool
 	// types holds the description of each corpus type, by its directory.
 	types map[string]string
 	// columns holds each column the registries claim, by name, which is
@@ -32,7 +39,6 @@ type snapshot struct {
 	cells      map[cellKey]*cellAt
 	gaps       map[cellKey]string // the text of the gaps line that marks a cell
 	problems   []Problem
-	regs       int // the registries over the corpus root
 }
 
 // A column is one that the registries claim: a suite, or a lift its
@@ -43,8 +49,10 @@ type column struct {
 	classifier  *registry.Classifier
 	corpora     map[string]bool
 	// registries are the registries that claim the column, by path. When
-	// two do, the report shows neither one's description.
+	// two do, the column is in conflict, and the report shows neither one's
+	// description, outputs or classifier.
 	registries []string
+	conflict   bool
 }
 
 // column returns the column of the name that the registries claim over
@@ -129,13 +137,21 @@ const (
 )
 
 // A cellAt is a cell's committed files: its outcome, and the rest. A cell
-// exists at a revision when its outcome file does.
+// exists at a revision when its outcome file does. Before
+// registry.OutcomeFormat, every cell of a case that runs under a column the
+// registries claim exists, and so does one with files under a column no
+// registry claims; and its state is unknown.
 type cellAt struct {
-	hasOutcome bool
-	outcome    archive.Outcome
-	line       string // the outcome file, less its newline
-	files      map[string][]byte
+	known   bool // whether its state is: whether it has an outcome
+	outcome archive.Outcome
+	line    string // the outcome file, less its newline, or Unknown
+	files   map[string][]byte
 }
+
+// Unknown is the outcome of a cell whose state is unknown: at a revision
+// whose registries predate registry.OutcomeFormat. It is no outcome a file
+// can hold, whose first word is a state.
+const Unknown = "unknown"
 
 // A found registry is one of the corpus root's, as a revision commits it.
 type found struct {
@@ -178,11 +194,16 @@ func readRegistries(rev Rev, tree fs.FS, mod, root string) ([]found, error) {
 	return out, nil
 }
 
-// unreadable is the error of a registry that can't be read: one of a
-// format this hypercase doesn't read says which hypercase reads it.
+// unreadable is the error of a registry that can't be read. One of a newer
+// format says which hypercase reads it, and one older than any report
+// reads says so.
 func unreadable(p string, rev Rev, err error) error {
 	var fe *registry.FormatError
-	if errors.As(err, &fe) {
+	switch {
+	case errors.As(err, &fe) && fe.Format < registry.Oldest:
+		return fmt.Errorf("%s at %s holds registry format %d, which no hypercase's report reads: the oldest format a report reads is %d.",
+			p, rev.Name, fe.Format, registry.Oldest)
+	case errors.As(err, &fe):
 		return fmt.Errorf("%s at %s holds registry format %d, and this hypercase reads formats %d to %d.\n"+
 			"Run the report from %s's hypercase, which reads it: in a checkout of %s, run the same command as go run github.com/sdboyer/hypercase/cmd/hypercase.",
 			p, rev.Name, fe.Format, registry.Oldest, registry.Format, rev.Name, rev.Name)
@@ -197,6 +218,7 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 	s := &snapshot{
 		rev:        rev,
 		root:       root,
+		linkRegs:   map[string][]string{},
 		types:      map[string]string{},
 		columns:    map[string]*column{},
 		props:      map[string]string{},
@@ -204,12 +226,20 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 		cases:      map[caseKey]*caseAt{},
 		cells:      map[cellKey]*cellAt{},
 		gaps:       map[cellKey]string{},
-		regs:       len(regs),
 	}
+	for _, f := range regs {
+		s.format = max(s.format, f.reg.Format)
+	}
+	s.outcomes = s.format >= registry.OutcomeFormat
 	declared := map[string]bool{} // the corpora's directories
 	for _, f := range regs {
 		g := f.reg
 		s.links = append(s.links, g.IssueLinks...)
+		for _, l := range g.IssueLinks {
+			if !slices.Contains(s.linkRegs[l.Pattern], f.path) {
+				s.linkRegs[l.Pattern] = append(s.linkRegs[l.Pattern], f.path)
+			}
+		}
 		for _, p := range g.Properties {
 			if _, ok := s.props[p.Name]; !ok {
 				s.props[p.Name] = p.Description
@@ -255,7 +285,7 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 	for _, name := range slices.Sorted(maps.Keys(s.columns)) {
 		if c := s.columns[name]; len(c.registries) > 1 {
 			s.problem("", fmt.Sprintf("%s each claim the column %s, and a column's name is unique per corpus root, so the report shows neither one's description of it.", andList(c.registries), name))
-			c.description, c.outputs, c.classifier = "", nil, nil
+			c.description, c.outputs, c.classifier, c.conflict = "", nil, nil, true
 		}
 	}
 	for _, corpus := range slices.Sorted(maps.Keys(declared)) {
@@ -293,9 +323,11 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 // section by its name: a case's inputs and its other hand-written
 // sections, and a transform's in/ and delete, belong to the case, and its
 // out/<column>/ sections to its cells. A section it can't place is a
-// problem, and so is a cell with no outcome file, which doesn't exist. It
-// reads what a case states and what a cell's outcome is with the archive
-// package's parsers, and fails on a section of those it can't read.
+// problem. From registry.OutcomeFormat on, so is a cell with no outcome
+// file, which doesn't exist; before it, an outcome file is, and the case's
+// cells are those of [cellAt]. It reads what a case states and what a
+// cell's outcome is with the archive package's parsers, and fails on a
+// section of those it can't read.
 func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 	a := archive.Parse(data)
 	baseKey := caseKey{corpus: corpus, archive: name, kind: base}
@@ -345,11 +377,15 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 				cantPlace(sec.Name)
 				continue
 			}
+			if file == archive.OutcomeFile && !s.outcomes {
+				s.problem(p+", "+sec.Name, fmt.Sprintf("the section is an outcome file, and registry format %d predates outcome files, so the report leaves it out.", s.format))
+				continue
+			}
 			place(k)
 			ck := cellKey{c: k, column: col}
 			c := s.cells[ck]
 			if c == nil {
-				c = &cellAt{files: map[string][]byte{}}
+				c = &cellAt{line: Unknown, files: map[string][]byte{}}
 				s.cells[ck] = c
 				cells = append(cells, ck)
 			}
@@ -361,7 +397,7 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 			if err != nil {
 				return problem(sec.Name, 0, err.Error())
 			}
-			c.hasOutcome, c.outcome, c.line = true, o, strings.TrimSuffix(string(sec.Data), "\n")
+			c.known, c.outcome, c.line = true, o, strings.TrimSuffix(string(sec.Data), "\n")
 		case top == archive.In && below != "", kind != "" && rest == archive.Delete:
 			// An input, or a variant's deleted inputs, which the report
 			// doesn't read.
@@ -408,10 +444,32 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 			cantPlace(sec.Name)
 		}
 	}
-	for _, ck := range cells {
-		if !s.cells[ck].hasOutcome {
-			s.problem(p+", "+ck.c.prefix()+archive.Out+"/"+ck.column+"/", "the cell has files and no outcome file. A cell exists where its outcome file does, so the report shows no cell here.")
-			delete(s.cells, ck)
+	if s.outcomes {
+		for _, ck := range cells {
+			if !s.cells[ck].known {
+				s.problem(p+", "+ck.c.prefix()+archive.Out+"/"+ck.column+"/", "the cell has files and no outcome file. A cell exists where its outcome file does, so the report shows no cell here.")
+				delete(s.cells, ck)
+			}
+		}
+	} else {
+		// Before outcome files, a case runs under every column the
+		// registries claim over its corpus, and a cell that wrote nothing
+		// committed nothing: so each of its cells exists, its state
+		// unknown. A case runs when the archive holds a section of it: the
+		// base always, and a transform's variant only when its corpus type
+		// lists the transform, which may decline a base.
+		runs := map[caseKey]bool{baseKey: true}
+		for k := range withSections {
+			if _, listed := s.transforms[corpus][k.name]; k.kind != transform || listed {
+				runs[k] = true
+			}
+		}
+		for k := range runs {
+			for col := range s.columnsOver(corpus) {
+				if ck := (cellKey{c: k, column: col}); s.cells[ck] == nil {
+					s.cells[ck] = &cellAt{line: Unknown, files: map[string][]byte{}}
+				}
+			}
 		}
 	}
 	var baseStates []string
