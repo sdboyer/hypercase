@@ -56,8 +56,10 @@ func TestOutcomes(t *testing.T) {
 
 // TestOutcomeFailures: a cell whose code, classifier or probe gives what
 // an outcome can't hold fails, naming it, and so does a classifier or a
-// Codes that fails or panics. An update writes nothing for such a cell,
-// and its committed outcome, if any, is left, not reported as an orphan.
+// Codes that fails or panics, whether or not a gaps line marks the cell.
+// An update writes nothing for such a cell, nor asks for a golden it
+// wouldn't write, and the cell's committed outcome, if any, is left, not
+// reported as an orphan.
 func TestOutcomeFailures(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "outcome-failures")
@@ -82,10 +84,30 @@ func TestOutcomeFailures(t *testing.T) {
 	// No update writes these cells, so no file of theirs is one to write,
 	// and a file that differs from its golden says so.
 	s.lacks(r, "has no golden")
+	clPanic := s.read("testdata/script/cl-panic.txtar")
 	s.edit("testdata/script/cl-panic.txtar", "commit a values.txt the run no longer gives", set("out/echo/values.txt", "A1 7\n"))
 	r = s.normal("outcomes")
 	s.fails(r, "script/cl-panic: The classifier panics.\n    echo: Does what the case's do/ tree says.\n    echo's classifier steered panicked: classifier boom\n    Fix the classifier. An update writes nothing for this cell.\n    out/echo/values.txt differs (-golden +got):\n    - A1 7\n    + A1 6\n    An update writes nothing for this cell until the problems above are fixed.")
 	s.lacks(r, "has no golden", "If the change is intended")
+	s.write("testdata/script/cl-panic.txtar", clPanic, "restore the cell")
+
+	// A gaps line excuses none of these: each cell fails the same when a
+	// line marks it, and an update writes nothing for it.
+	failing := []string{"bad-code", "codes-panic", "cl-error", "cl-panic", "cl-bad", "reason"}
+	unmarked := map[string][]byte{}
+	for _, name := range failing {
+		p := "testdata/script/" + name + ".txtar"
+		unmarked[name] = s.read(p)
+		s.edit(p, "mark the cell", insert("gaps", "echo The cell has an outcome. Waits on sheets#10.\n", "out/"))
+	}
+	for _, update := range []bool{false, true} {
+		s.fails(s.run(".", "outcomes", update), want...)
+	}
+	for _, name := range failing {
+		p := "testdata/script/" + name + ".txtar"
+		s.hasSections(p, nil, "out/")
+		s.write(p, unmarked[name], "remove the line")
+	}
 
 	// Such a cell has no outcome to judge, so a committed one is no orphan,
 	// frozen or not, and the update leaves it.

@@ -133,6 +133,106 @@ $ go test  # outcomes
             --- FAIL: TestCorpus/script/reason/echo
 FAIL
 [exit 1]
+$ edit testdata/script/cl-panic.txtar  # restore the cell
+$ edit testdata/script/bad-code.txtar  # mark the cell
+$ edit testdata/script/codes-panic.txtar  # mark the cell
+$ edit testdata/script/cl-error.txtar  # mark the cell
+$ edit testdata/script/cl-panic.txtar  # mark the cell
+$ edit testdata/script/cl-bad.txtar  # mark the cell
+$ edit testdata/script/reason.txtar  # mark the cell
+$ go test  # outcomes
+    script/bad-code: Codes gives a code with a space in it.
+        echo: Does what the case's do/ tree says.
+        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon, carriage return or newline.
+        Fix Codes. An update writes nothing for this cell.
+    script/cl-bad: The classifier gives a detail with a space at its start.
+        echo: Does what the case's do/ tree says.
+        echo's classifier steered gave a detail an outcome can't hold: " padded" can't be held in an outcome: it is one line, not empty, with no space at either end.
+        Fix the classifier. An update writes nothing for this cell.
+    script/cl-error: The classifier fails.
+        echo: Does what the case's do/ tree says.
+        echo's classifier steered failed: no detail today
+        Fix the classifier. An update writes nothing for this cell.
+    script/cl-panic: The classifier panics.
+        echo: Does what the case's do/ tree says.
+        echo's classifier steered panicked: classifier boom
+        Fix the classifier. An update writes nothing for this cell.
+    script/codes-panic: Codes panics on echo's error.
+        echo: Does what the case's do/ tree says.
+        The project's Codes panicked on echo's error: codes boom
+        Fix Codes. An update writes nothing for this cell.
+    script/reason: echo's probe says no with a reason of two lines.
+        echo: Does what the case's do/ tree says.
+        echo's probe said the case isn't for it, with a reason an outcome can't hold: "two\nlines" can't be held in an outcome: it is one line, not empty, with no space at either end.
+        Fix the probe. An update writes nothing for this cell.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/bad-code
+            --- FAIL: TestCorpus/script/bad-code/echo
+        --- FAIL: TestCorpus/script/cl-bad
+            --- FAIL: TestCorpus/script/cl-bad/echo
+        --- FAIL: TestCorpus/script/cl-error
+            --- FAIL: TestCorpus/script/cl-error/echo
+        --- FAIL: TestCorpus/script/cl-panic
+            --- FAIL: TestCorpus/script/cl-panic/echo
+        --- FAIL: TestCorpus/script/codes-panic
+            --- FAIL: TestCorpus/script/codes-panic/echo
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/echo
+        --- FAIL: TestCorpus/script/reason
+            --- FAIL: TestCorpus/script/reason/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # outcomes
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/bad-code: Codes gives a code with a space in it.
+        echo: Does what the case's do/ tree says.
+        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon, carriage return or newline.
+        Fix Codes. An update writes nothing for this cell.
+    script/cl-bad: The classifier gives a detail with a space at its start.
+        echo: Does what the case's do/ tree says.
+        echo's classifier steered gave a detail an outcome can't hold: " padded" can't be held in an outcome: it is one line, not empty, with no space at either end.
+        Fix the classifier. An update writes nothing for this cell.
+    script/cl-error: The classifier fails.
+        echo: Does what the case's do/ tree says.
+        echo's classifier steered failed: no detail today
+        Fix the classifier. An update writes nothing for this cell.
+    script/cl-panic: The classifier panics.
+        echo: Does what the case's do/ tree says.
+        echo's classifier steered panicked: classifier boom
+        Fix the classifier. An update writes nothing for this cell.
+    script/codes-panic: Codes panics on echo's error.
+        echo: Does what the case's do/ tree says.
+        The project's Codes panicked on echo's error: codes boom
+        Fix Codes. An update writes nothing for this cell.
+    script/reason: echo's probe says no with a reason of two lines.
+        echo: Does what the case's do/ tree says.
+        echo's probe said the case isn't for it, with a reason an outcome can't hold: "two\nlines" can't be held in an outcome: it is one line, not empty, with no space at either end.
+        Fix the probe. An update writes nothing for this cell.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/bad-code
+            --- FAIL: TestCorpus/script/bad-code/echo
+        --- FAIL: TestCorpus/script/cl-bad
+            --- FAIL: TestCorpus/script/cl-bad/echo
+        --- FAIL: TestCorpus/script/cl-error
+            --- FAIL: TestCorpus/script/cl-error/echo
+        --- FAIL: TestCorpus/script/cl-panic
+            --- FAIL: TestCorpus/script/cl-panic/echo
+        --- FAIL: TestCorpus/script/codes-panic
+            --- FAIL: TestCorpus/script/codes-panic/echo
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/echo
+        --- FAIL: TestCorpus/script/reason
+            --- FAIL: TestCorpus/script/reason/echo
+FAIL
+[exit 1]
+$ edit testdata/script/bad-code.txtar  # remove the line
+$ edit testdata/script/codes-panic.txtar  # remove the line
+$ edit testdata/script/cl-error.txtar  # remove the line
+$ edit testdata/script/cl-panic.txtar  # remove the line
+$ edit testdata/script/cl-bad.txtar  # remove the line
+$ edit testdata/script/reason.txtar  # remove the line
 $ edit testdata/script/cl-error.txtar  # commit the cell's files, as before the classifier failed
 $ go test  # outcomes
     script/bad-code: Codes gives a code with a space in it.
@@ -151,10 +251,6 @@ $ go test  # outcomes
         echo: Does what the case's do/ tree says.
         echo's classifier steered panicked: classifier boom
         Fix the classifier. An update writes nothing for this cell.
-        out/echo/values.txt differs (-golden +got):
-        - A1 7
-        + A1 6
-        An update writes nothing for this cell until the problems above are fixed.
     script/codes-panic: Codes panics on echo's error.
         echo: Does what the case's do/ tree says.
         The project's Codes panicked on echo's error: codes boom
@@ -243,10 +339,6 @@ $ go test  # outcomes
         echo: Does what the case's do/ tree says.
         echo's classifier steered panicked: classifier boom
         Fix the classifier. An update writes nothing for this cell.
-        out/echo/values.txt differs (-golden +got):
-        - A1 7
-        + A1 6
-        An update writes nothing for this cell until the problems above are fixed.
     script/codes-panic: Codes panics on echo's error.
         echo: Does what the case's do/ tree says.
         The project's Codes panicked on echo's error: codes boom
