@@ -1648,10 +1648,13 @@ whether each has a probe, and whether the package owns it.
   makes, and every normal run on the committed sections. What an update
   writes depends only on the inputs and the code, so one pass of the
   module's update settles, whichever package runs first. A frozen cell is
-  the exception: no update writes it, so when a transform's change moves
-  its output, every run fails on it, updates included, until a person
-  deletes its files, and the next update writes them, or removes its
-  `gaps` line.
+  the exception: no update writes it. When a transform's change moves its
+  output, every update of the package that owns its column fails on it,
+  and so does each of that package's normal runs once the transform's
+  owner has rewritten the inputs; before then, a normal run reads the old
+  inputs, and the cell passes. It fails until a person deletes its files,
+  which the next update writes, or removes its `gaps` line, after which
+  the next update writes the cell.
 - A package's update alone, after a transform changed, writes the
   variant's cells on what the transform makes, while its normal run reads
   the sections the owner has yet to rewrite. A cell whose output on those

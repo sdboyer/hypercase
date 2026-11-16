@@ -514,32 +514,57 @@ func TestTransformJennyChanges(t *testing.T) {
 
 // TestTransformJennyFrozen: a frozen cell is the exception to one pass of
 // the module's update settling a jenny's change. No update writes it, so
-// when the change moves its output, every run fails on it, updates
-// included, until a person deletes its files, and the next update writes
-// them.
+// when the change moves its output, every update of the package that owns
+// its column fails on it, and so does each of that package's normal runs
+// once the transform's owner has rewritten the inputs. Before that, another
+// package's normal run reads the old inputs, and the cell passes. It fails
+// until a person deletes its files, which the next update writes, or
+// removes its gaps line, after which the next update writes the cell.
 func TestTransformJennyFrozen(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
+	s.remove("testdata/script/errs.txtar", "leave twice, whose frozen cells this follows")
+	s.remove("testdata/script/garbled.txtar", "leave twice, whose frozen cells this follows")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "a package b over the corpus")
 	s.passes(s.update("transforms"))
-	s.edit(twice, "mark upper's cell of echo", insert("gaps", "transform/upper echo Waits on sheets#9.\n", "out/"))
+	s.passes(s.run("b", "tr-b", true))
+	s.edit(twice, "mark upper's cells of echo and copy", insert("gaps", "transform/upper echo Waits on sheets#9.\ntransform/upper copy Waits on sheets#10.\n", "out/"))
 	s.passes(s.normal("transforms"))
+	s.passes(s.run("b", "tr-b", false))
 
-	// upper's jenny now doubles what it uppercases. The update rewrites
-	// the inputs, and leaves the frozen cell.
-	frozen := "script/twice/transform/upper: Uppercases every file under do/out/.\n    echo: Does what the case's do/ tree says.\n    The cell is frozen by its known gap, gaps line 1: \"transform/upper echo Waits on sheets#9.\""
-	s.fails(s.update("tr-jenny"), frozen)
+	// upper's jenny now doubles what it uppercases. b's update fails on
+	// its frozen cell, and b's normal run, on the old inputs, passes.
+	frozen := func(col, line string) string {
+		return "script/twice/transform/upper: Uppercases every file under do/out/.\n    " + col + ": Does what the case's do/ tree says.\n    The cell is frozen by its known gap, gaps line " + line + ": \"transform/upper " + col + " Waits on sheets#"
+	}
+	s.fails(s.run("b", "tr-b-jenny", true), frozen("copy", "2"))
+	s.passes(s.run("b", "tr-b-jenny", false))
+
+	// The owner's update rewrites the inputs, and leaves its frozen cell.
+	s.fails(s.update("tr-jenny"), frozen("echo", "1"))
 	s.hasSections(twice, map[string]string{
 		"transform/upper/in/do/out/values.txt": "A1 SIX\nA1 SIX\n",
 		"transform/upper/out/echo/values.txt":  "A1 SIX\n",
+		"transform/upper/out/copy/values.txt":  "A1 SIX\n",
 	})
-	s.fails(s.update("tr-jenny"), frozen)
-	s.fails(s.normal("tr-jenny"), frozen)
+	s.fails(s.update("tr-jenny"), frozen("echo", "1"))
+	s.fails(s.normal("tr-jenny"), frozen("echo", "1"))
+	s.fails(s.run("b", "tr-b-jenny", false), frozen("copy", "2"))
 
-	// A person deletes the cell's files, and the next update writes them.
-	s.edit(twice, "delete upper's frozen cell of echo", drop("transform/upper/out/echo/"))
+	// A person deletes echo's frozen files, and removes copy's gaps line,
+	// and the next updates write both cells.
+	s.edit(twice, "delete upper's frozen cell of echo, and close copy's gap", func(a *archive.Archive) {
+		drop("transform/upper/out/echo/")(a)
+		set("gaps", "transform/upper echo Waits on sheets#9.\n")(a)
+	})
 	s.passes(s.update("tr-jenny"))
-	s.hasSections(twice, map[string]string{"transform/upper/out/echo/values.txt": "A1 SIX\nA1 SIX\n"})
+	s.passes(s.run("b", "tr-b-jenny", true))
+	s.hasSections(twice, map[string]string{
+		"transform/upper/out/echo/values.txt": "A1 SIX\nA1 SIX\n",
+		"transform/upper/out/copy/values.txt": "A1 SIX\nA1 SIX\n",
+	})
 	s.passes(s.normal("tr-jenny"))
+	s.passes(s.run("b", "tr-b-jenny", false))
 	s.done()
 }
 
