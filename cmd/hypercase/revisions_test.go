@@ -101,10 +101,11 @@ func TestNestedModule(t *testing.T) {
 }
 
 // TestFormats: the report reads every registry format from the oldest that
-// hypercase's main branch wrote to its own, and refuses another, older or
-// newer, saying to run the report from that revision's hypercase. It reads
-// both revisions' registries before anything else, so an archive it can't
-// read never hides the refusal. A registry of another corpus root is left
+// hypercase's main branch wrote to its own, and refuses another: a newer
+// one saying to run the report from that revision's hypercase, and an
+// older one saying no hypercase's report reads it. It reads both
+// revisions' registries before anything else, so an archive it can't read
+// never hides the refusal. A registry of another corpus root is left
 // unread, whatever its format.
 func TestFormats(t *testing.T) {
 	t.Parallel()
@@ -229,13 +230,16 @@ func TestPreviousFormat(t *testing.T) {
 // has at one revision as unknown at the other, and a cell only at one
 // revision appears or disappears with its state, unknown before outcome
 // files. An outcome file at a revision before them is a problem, and left
-// out.
+// out, even one that would fail the report at a later format, since the
+// report doesn't parse it.
 func TestOutcomeBoundary(t *testing.T) {
 	t.Parallel()
 	const blank = "walkthrough/sheets/step06/testdata/sheet/blank.txtar"
+	const divide = "walkthrough/sheets/step06/testdata/sheet/divide.txtar"
 	a, b := history(t, "20e9646"), history(t, "b7e82fe")
 	a[blank] = strings.Replace(a[blank], "-- out/calc/error.txt --\nA1: not a number", "-- out/calc/error.txt --\nA1 is not a number", 1)
 	a[blank] = strings.Replace(a[blank], "-- out/parse/error.txt --", "-- out/format/outcome --\nblocked parse\n-- out/parse/error.txt --", 1)
+	a[divide] += "-- out/format/outcome --\nfine\n"
 	delete(a, "walkthrough/sheets/step06/testdata/sheet/notes.txtar")
 	delete(b, "walkthrough/sheets/step06/testdata/sheet/stray.txtar")
 	g := gittest.New(t)
@@ -278,7 +282,8 @@ func TestOutcomeBoundary(t *testing.T) {
 	page := ok(t, g, root, "report", c[1], c[0])
 	holds(t, "the problems at format 4", section(t, page, `<section id="problems">`, "</section>"),
 		`<h3>At <span class="rev">`+c[0]+`</span></h3>`,
-		"<li><code>"+blank+", out/format/outcome</code>: the section is an outcome file, and registry format 4 predates outcome files, so the report leaves it out.</li>")
+		"<li><code>"+blank+", out/format/outcome</code>: the section is an outcome file, and registry format 4 predates outcome files, so the report leaves it out.</li>",
+		"<li><code>"+divide+", out/format/outcome</code>: the section is an outcome file, and registry format 4 predates outcome files, so the report leaves it out.</li>")
 	holds(t, "blank's calc change", change(t, page, "sheet/blank", "calc"),
 		`<span class="outcome s-rejected">rejected</span> <span class="arrow">to</span> <span class="outcome s-unknown">unknown</span>`)
 	_, cells := matrixRow(t, page, "sheet", "sheet/blank")
@@ -288,28 +293,30 @@ func TestOutcomeBoundary(t *testing.T) {
 // TestPreOutcomeTransforms: before outcome files, a transform's variant
 // runs where the archive holds a section of it and a corpus type lists its
 // transform, and so has a cell under every column, its state unknown. A
-// variant its transform declined holds no section, and has no cells, and
-// one whose transform no corpus type lists has none either.
+// variant its transform declined holds no section, and has no cells. One
+// whose transform no corpus type lists doesn't run, and has a cell only
+// under each column it has files of.
 func TestPreOutcomeTransforms(t *testing.T) {
 	t.Parallel()
 	const root = "walkthrough/sheets/step06"
 	a := history(t, "20e9646")
 	a[root+"/testdata/hypercase.json"] = strings.Replace(a[root+"/testdata/hypercase.json"], `"transforms": []`,
 		`"transforms": [{"name": "doubled", "description": "Doubles each number.", "gives": [], "keeps": [], "probe": false, "owned": true}]`, 1)
-	a[root+"/testdata/sheet/blank.txtar"] += "-- transform/doubled/in/sheet/A1 --\n2\n-- transform/gone/in/sheet/A1 --\n2\n"
+	a[root+"/testdata/sheet/blank.txtar"] += "-- transform/doubled/in/sheet/A1 --\n2\n-- transform/gone/in/sheet/A1 --\n2\n-- transform/gone/out/calc/error.txt --\nA1 is gone\n"
 	g := gittest.New(t)
 	c := revisions(t, g, history(t, "b7e82fe"), a)
 	want := "appeared\n"
 	for _, col := range []string{"calc", "evaluate", "format", "parse", "resolve"} {
 		want += "  sheet/blank/transform/doubled " + col + ": unknown\n"
 	}
+	want += "  sheet/blank/transform/gone calc: unknown\n    error.txt added\n"
 	if got := ok(t, g, root, "report", "-text", c[0], c[1]); got != want {
 		t.Errorf("to format 4, the report is:\n%s\nwant:\n%s", got, want)
 	}
 	page := ok(t, g, root, "report", c[0], c[1])
 	rows := rowNames(t, page, "sheet")
-	if !slices.Contains(rows, "sheet/blank/transform/doubled") || slices.Contains(rows, "sheet/divide/transform/doubled") {
-		t.Errorf("the matrix at format 4 has the rows %q, want blank's doubled variant and not divide's", rows)
+	if !slices.Contains(rows, "sheet/blank/transform/doubled") || !slices.Contains(rows, "sheet/blank/transform/gone") || slices.Contains(rows, "sheet/divide/transform/doubled") {
+		t.Errorf("the matrix at format 4 has the rows %q, want blank's doubled and gone variants and not divide's", rows)
 	}
 	_, cells := matrixRow(t, page, "sheet", "sheet/blank/transform/doubled")
 	for i, cell := range cells {
@@ -318,11 +325,13 @@ func TestPreOutcomeTransforms(t *testing.T) {
 	if len(cells) != 5 {
 		t.Errorf("blank's doubled variant has %d cells, want 5", len(cells))
 	}
-	if slices.Contains(rows, "sheet/blank/transform/gone") {
-		_, cells := matrixRow(t, page, "sheet", "sheet/blank/transform/gone")
-		for i, cell := range cells {
-			lacks(t, fmt.Sprintf("blank's gone variant's cell %d", i), cell, "s-unknown")
+	_, cells = matrixRow(t, page, "sheet", "sheet/blank/transform/gone")
+	for i, cell := range cells {
+		if i == 0 {
+			holds(t, "blank's gone variant's calc", cell, `class="cell s-unknown appeared"><span class="outcome">unknown</span>`)
+			continue
 		}
+		lacks(t, fmt.Sprintf("blank's gone variant's cell %d", i), cell, "s-unknown")
 	}
 	holds(t, "the problems at format 4", section(t, page, `<section id="problems">`, "</section>"),
 		"<li><code>"+root+"/testdata/sheet/blank.txtar, transform/gone/</code>: no corpus type of testdata/sheet/ lists the transform gone, so the report can&#39;t say what its variant states.</li>")

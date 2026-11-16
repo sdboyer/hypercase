@@ -2238,12 +2238,12 @@ rejected S201
 - Registry formats 3 and 4 predate `outcome` files, and a cell that wrote no
   file committed none. At a revision whose newest registry is of such a
   format, every case that runs has a cell under every column the registries
-  claim over its corpus, and under every column it has files of, and the
-  cell's state is unknown. A case runs there when the archive holds a
-  section of it: the base always, and a transform's variant only when a
-  corpus type lists its transform. A cell of unknown state at either
-  revision ranks on its files alone: bytes changed when one is added,
-  changed or removed, and never outcome changed.
+  claim over its corpus, and every case, whether it runs or not, has one
+  under each column it has files of; the cell's state is unknown. A case
+  runs there when the archive holds a section of it: the base always, and a
+  transform's variant only when a corpus type lists its transform. A cell of
+  unknown state at either revision ranks on its files alone: bytes changed
+  when one is added, changed or removed, and never outcome changed.
 - Cases go by corpus type, then archive, then the base, the hand-written
   variants by name, and the transforms' variants by transform name; a case's
   cells by column; names byte by byte. Within a rank, changes go in that
@@ -2260,11 +2260,12 @@ rejected S201
   transform, no registry has; a section it can't place in a case or a cell,
   such as `via/…` before step 10; a cell with files and no `outcome`, whose
   files it leaves out; an `outcome` at a revision whose registries predate
-  `outcome` files, which it leaves out; a transform's variant whose
+  `outcome` files, which it leaves out unread; a transform's variant whose
   transform no corpus type lists; and a link pattern at `<b>` that is not a
-  regular expression, which links nothing. An `outcome`, `properties` or
-  `gaps` section it can't parse, or a section an archive holds twice, fails
-  the report.
+  regular expression, which links nothing. A `properties` or `gaps` section
+  it can't parse, an `outcome` section it can't parse at a revision of
+  format 5 or later, and a section an archive holds twice, each fail the
+  report.
 - hypercase's own CI runs the report over the toy on each pull request, from
   its merge base to its head, once per corpus root, and keeps the pages.
 - Step 11 adds input lines and corpus-check findings.
@@ -2299,12 +2300,14 @@ An unchanged cell carries only its state, so the page grows with the change.
 The line diff sets aside the lines both files start and end with, then
 finds the shortest edit script by Myers' algorithm, whose cost grows with
 the length of what is left times the size of its change, up to a fixed
-budget. Past the budget, it aligns the two on the lines each holds exactly
-once, in an order both share, and diffs each stretch between them the same
-way. A stretch with no such line, past the budget, is left unaligned: its
-diff is one line saying how many lines it leaves out of each file, and its
-file says it is partly unaligned in place of counts that would be wrong.
-The same revisions give the same bytes.
+budget for each attempt. Past that, it aligns the two on the lines each
+holds exactly once, in an order both share, and diffs each stretch between
+them the same way. The whole diff's work is capped at the files' lengths
+plus a fixed budget, so its cost never grows with the product of their
+lengths. A stretch with no such line, or that the diff's budget no longer
+covers, is left unaligned: its diff is one line saying how many lines it
+leaves out of each file, and its file says it is partly unaligned in place
+of counts that would be wrong. The same revisions give the same bytes.
 
 **The plain-text format.** One heading per rank that has
 changes, in rank order. Under it, one line per cell: its case, its column,

@@ -139,8 +139,9 @@ const (
 // A cellAt is a cell's committed files: its outcome, and the rest. A cell
 // exists at a revision when its outcome file does. Before
 // registry.OutcomeFormat, every cell of a case that runs under a column the
-// registries claim exists, and so does one with files under a column no
-// registry claims; and its state is unknown.
+// registries claim exists, and so does every cell with files, whether or
+// not its case runs or a registry claims its column; and its state is
+// unknown.
 type cellAt struct {
 	known   bool // whether its state is: whether it has an outcome
 	outcome archive.Outcome
