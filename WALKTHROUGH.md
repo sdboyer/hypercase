@@ -380,6 +380,10 @@ Its `.gitignore` names the corpus root's lock, which an update takes
   since none of its cases errs: an error there also fails as an undeclared
   output, and an update writes nothing for its cell. When the run errs, the
   outputs it did produce are still compared.
+- A cell an update writes nothing for fails on its problems first. A normal
+  run doesn't ask for the golden a file of it lacks, which no update would
+  write, and a file that differs from its golden says the update writes
+  nothing until those problems are fixed.
 - `error.txt`, `stdout.txt` and `stderr.txt` directly under a column's
   directory are the framework's, and so are the names later steps add there:
   `outcome` (step 8) and `inputs` (step 11). A run that returns an output at

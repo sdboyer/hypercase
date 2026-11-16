@@ -77,7 +77,15 @@ func TestOutcomeFailures(t *testing.T) {
 		}
 	}
 	s.hasSections("testdata/script/fine.txtar", map[string]string{"out/echo/outcome": "accepted\n"})
-	s.fails(s.normal("outcomes"), want...)
+	r := s.normal("outcomes")
+	s.fails(r, want...)
+	// No update writes these cells, so no file of theirs is one to write,
+	// and a file that differs from its golden says so.
+	s.lacks(r, "has no golden")
+	s.edit("testdata/script/cl-panic.txtar", "commit a values.txt the run no longer gives", set("out/echo/values.txt", "A1 7\n"))
+	r = s.normal("outcomes")
+	s.fails(r, "script/cl-panic: The classifier panics.\n    echo: Does what the case's do/ tree says.\n    echo's classifier steered panicked: classifier boom\n    Fix the classifier. An update writes nothing for this cell.\n    out/echo/values.txt differs (-golden +got):\n    - A1 7\n    + A1 6\n    An update writes nothing for this cell until the problems above are fixed.")
+	s.lacks(r, "has no golden", "If the change is intended")
 
 	// Such a cell has no outcome to judge, so a committed one is no orphan,
 	// frozen or not, and the update leaves it.
@@ -91,7 +99,7 @@ func TestOutcomeFailures(t *testing.T) {
 	for _, update := range []bool{false, true} {
 		r := s.run(".", "outcomes", update)
 		s.fails(r, clFails)
-		s.lacks(r, "out/echo/outcome is an output the run no longer produces")
+		s.lacks(r, "out/echo/outcome is an output the run no longer produces", "has no golden")
 	}
 	s.same(clError, committed)
 	s.edit(clError, "freeze the cell", insert("gaps", "echo The classifier gives a detail. Waits on sheets#10.\n", "out/"))

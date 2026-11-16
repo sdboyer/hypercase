@@ -104,6 +104,8 @@ func TestFrameworkNamesFail(t *testing.T) {
 	for _, name := range []string{"error.txt", "inputs", "outcome", "stderr.txt", "stdout.txt"} {
 		s.contains(r, "The run returned an output at "+name+", a name the framework owns under out/echo/.")
 	}
+	// No update writes the cell, so no file of it is one to write.
+	s.lacks(r, "has no golden")
 	s.fails(s.update("echo"))
 	s.same("testdata/script/names.txtar", before)
 	s.done()
@@ -264,7 +266,9 @@ func TestOutputsAnArchiveCantHold(t *testing.T) {
 		"out/echo/values.txt can't be held in an archive: it has no final newline, which an archive adds.",
 		"out/echo/values.txt can't be held in an archive: its line 2 is shaped like a section marker",
 	}
-	s.fails(s.normal("echo"), want...)
+	r := s.normal("echo")
+	s.fails(r, want...)
+	s.lacks(r, "has no golden")
 	s.fails(s.update("echo"), want...)
 	s.same("testdata/script/no-newline.txtar", before["no-newline"])
 	s.same("testdata/script/marker.txtar", before["marker"])
@@ -282,7 +286,9 @@ func TestOutputsFileAndDirectory(t *testing.T) {
 		"out/echo/stdout.txt can't be held in an archive: the section is also the directory of out/echo/stdout.txt/a.\nFix the code. An update writes nothing for this cell.",
 		"out/echo/a.txt can't be held in an archive: the section is also the directory of out/echo/a.txt/b.\nFix the code. An update writes nothing for this cell.",
 	}
-	s.fails(s.normal("nested"), want...)
+	r := s.normal("nested")
+	s.fails(r, want...)
+	s.lacks(r, "has no golden")
 	s.fails(s.update("nested"), want...)
 	s.same("testdata/script/stream.txtar", before["stream"])
 	s.same("testdata/script/outputs.txtar", before["outputs"])
