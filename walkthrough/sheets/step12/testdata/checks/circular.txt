@@ -1,0 +1,3 @@
+sheet/negative resolve: predicted accepted, committed blocked parse (known gap: sheet/negative parse)
+sheet/negative/transform/looped format: predicted the base's outcome, blocked parse; committed accepted (known gap: sheet/negative parse)
+sheet/negative/transform/renamed resolve: predicted accepted, committed blocked parse (known gap: sheet/negative/transform/renamed parse)

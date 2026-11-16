@@ -1,0 +1,60 @@
+parse reads a reference that starts a product as the number 1, so =B1*2 is 1 * 2: it stops seeing a class of formula. Question 2's scenario.
+
+== break
+--- sheet/formula.go
+ 		op, ok := p.op("*/")
+ 		if !ok {
+ 			return l, nil
+ 		}
++		if _, isRef := l.(ref); isRef {
++			l = number(1) // the break
++		}
+
+== findings
+diff --git a/step12/testdata/checks/circular-relabelled.txt b/step12/testdata/checks/circular-relabelled.txt
+index 4f97a4c..c6c9bc3 100644
+--- a/step12/testdata/checks/circular-relabelled.txt
++++ b/step12/testdata/checks/circular-relabelled.txt
+@@ -1,3 +1,5 @@
+ sheet/negative resolve: predicted accepted, committed blocked parse (known gap: sheet/negative parse)
+ sheet/negative/transform/looped format: predicted the base's outcome, blocked parse; committed accepted (known gap: sheet/negative parse)
+ sheet/negative/transform/renamed resolve: predicted accepted, committed blocked parse (known gap: sheet/negative/transform/renamed parse)
++sheet/twice/variant/cycle evaluate: predicted blocked resolve, committed accepted
++sheet/twice/variant/cycle resolve: predicted rejected, committed accepted
+diff --git a/step12/testdata/checks/circular-sources.txt b/step12/testdata/checks/circular-sources.txt
+index 9555d6c..8c8b0eb 100644
+--- a/step12/testdata/checks/circular-sources.txt
++++ b/step12/testdata/checks/circular-sources.txt
+@@ -19,6 +19,6 @@ sheet/prices: stated anti-P, parsed anti-P
+ sheet/stray: stated neither, parsed unclassified, neither of which predicts anything
+ sheet/twice/transform/looped: stated P, parsed P
+ sheet/twice/transform/renamed: stated anti-P, parsed anti-P
+-sheet/twice/variant/cycle: stated P, parsed P
+-sheet/twice/variant/missing: stated neither, parsed neither
++sheet/twice/variant/cycle: stated P, parsed anti-P, which disagree
++sheet/twice/variant/missing: stated neither, parsed anti-P, which disagree
+ sheet/twice: stated anti-P, parsed anti-P
+diff --git a/step12/testdata/checks/circular.txt b/step12/testdata/checks/circular.txt
+index 4f97a4c..c6c9bc3 100644
+--- a/step12/testdata/checks/circular.txt
++++ b/step12/testdata/checks/circular.txt
+@@ -1,3 +1,5 @@
+ sheet/negative resolve: predicted accepted, committed blocked parse (known gap: sheet/negative parse)
+ sheet/negative/transform/looped format: predicted the base's outcome, blocked parse; committed accepted (known gap: sheet/negative parse)
+ sheet/negative/transform/renamed resolve: predicted accepted, committed blocked parse (known gap: sheet/negative/transform/renamed parse)
++sheet/twice/variant/cycle evaluate: predicted blocked resolve, committed accepted
++sheet/twice/variant/cycle resolve: predicted rejected, committed accepted
+
+== outcomes
+sheet/twice/variant/cycle calc: rejected S201 -> accepted
+sheet/twice/variant/cycle evaluate: blocked resolve -> accepted
+sheet/twice/variant/cycle resolve: rejected S201 -> accepted
+sheet/twice/variant/missing calc: rejected S202 -> accepted
+sheet/twice/variant/missing evaluate: blocked resolve -> accepted
+sheet/twice/variant/missing resolve: rejected S202 -> accepted
+
+== failing
+step12 TestCorpus/sheet/twice/variant/cycle/resolve: expected error missing, orphan
+step12 TestCorpus/sheet/twice/variant/missing/resolve: expected error missing, orphan
+step12/cli TestCorpus/sheet/twice/variant/cycle/calc: expected error missing, orphan
+step12/cli TestCorpus/sheet/twice/variant/missing/calc: expected error missing, orphan

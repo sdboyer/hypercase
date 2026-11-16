@@ -1,0 +1,44 @@
+The same base, low, states nothing, though its first row is empty.
+
+== break
++++ step12/testdata/sheet/low.txtar
++A2 is twice B2, and the first row is empty.
++-- in/sheet/A2 --
++=B2*2
++-- in/sheet/B2 --
++3
+
+== findings
+diff --git a/step12/testdata/checks/circular-sources.txt b/step12/testdata/checks/circular-sources.txt
+index 9555d6c..87366b9 100644
+--- a/step12/testdata/checks/circular-sources.txt
++++ b/step12/testdata/checks/circular-sources.txt
+@@ -7,6 +7,9 @@ sheet/last-row: stated P, parsed P
+ sheet/loop/transform/looped: stated P, parsed P
+ sheet/loop/transform/renamed: stated P, parsed P
+ sheet/loop: stated P, parsed P
++sheet/low/transform/looped: stated P, parsed P
++sheet/low/transform/renamed: stated anti-P, parsed anti-P
++sheet/low: stated anti-P, parsed anti-P
+ sheet/missing/transform/renamed: stated neither, parsed neither
+ sheet/missing: stated neither, parsed neither
+ sheet/negative/transform/looped: stated P, parsed P
+
+== outcomes
+sheet/low calc: none -> accepted
+sheet/low evaluate: none -> accepted
+sheet/low format: none -> accepted
+sheet/low parse: none -> accepted
+sheet/low resolve: none -> accepted
+sheet/low/transform/looped calc: none -> rejected S201
+sheet/low/transform/looped evaluate: none -> blocked resolve
+sheet/low/transform/looped format: none -> accepted
+sheet/low/transform/looped parse: none -> accepted
+sheet/low/transform/looped resolve: none -> rejected S201
+sheet/low/transform/renamed calc: none -> accepted
+sheet/low/transform/renamed evaluate: none -> accepted
+sheet/low/transform/renamed format: none -> accepted
+sheet/low/transform/renamed parse: none -> accepted
+sheet/low/transform/renamed resolve: none -> accepted
+
+== failing

@@ -1,0 +1,24 @@
+sheet/blank: stated neither, parsed unclassified, neither of which predicts anything
+sheet/divide/transform/looped: stated P, parsed P
+sheet/divide/transform/renamed: stated anti-P, parsed anti-P
+sheet/divide: stated anti-P, parsed anti-P
+sheet/last-row-ref: stated neither, parsed neither
+sheet/last-row: stated P, parsed P
+sheet/loop/transform/looped: stated P, parsed P
+sheet/loop/transform/renamed: stated P, parsed P
+sheet/loop: stated P, parsed P
+sheet/missing/transform/renamed: stated neither, parsed neither
+sheet/missing: stated neither, parsed neither
+sheet/negative/transform/looped: stated P, parsed P
+sheet/negative/transform/renamed: stated anti-P, parsed unclassified, which disagree
+sheet/negative: stated anti-P, parsed unclassified, which disagree
+sheet/notes: stated neither, parsed unclassified, neither of which predicts anything
+sheet/prices/transform/looped: stated P, parsed P
+sheet/prices/transform/renamed: stated anti-P, parsed anti-P
+sheet/prices: stated anti-P, parsed anti-P
+sheet/stray: stated neither, parsed unclassified, neither of which predicts anything
+sheet/twice/transform/looped: stated P, parsed P
+sheet/twice/transform/renamed: stated anti-P, parsed anti-P
+sheet/twice/variant/cycle: stated P, parsed P
+sheet/twice/variant/missing: stated neither, parsed neither
+sheet/twice: stated anti-P, parsed anti-P

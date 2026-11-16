@@ -1,0 +1,133 @@
+resolve accepts a sheet with a cycle: a cell it meets again while visiting the cells it refers to is no error.
+
+== break
+--- sheet/resolve.go
+-			return cycleError(stack[slices.Index(stack, c):])
++			return nil // the break
+
+== findings
+diff --git a/step12/testdata/checks/circular-parsed.txt b/step12/testdata/checks/circular-parsed.txt
+index e69de29..acbb584 100644
+--- a/step12/testdata/checks/circular-parsed.txt
++++ b/step12/testdata/checks/circular-parsed.txt
+@@ -0,0 +1,18 @@
++sheet/divide/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/divide/transform/looped resolve: predicted rejected, committed accepted
++sheet/last-row evaluate: predicted blocked resolve, committed accepted
++sheet/last-row resolve: predicted rejected, committed accepted
++sheet/loop evaluate: predicted blocked resolve, committed accepted
++sheet/loop resolve: predicted rejected, committed accepted
++sheet/loop/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/loop/transform/looped resolve: predicted rejected, committed accepted
++sheet/loop/transform/renamed evaluate: predicted blocked resolve, committed accepted
++sheet/loop/transform/renamed resolve: predicted rejected, committed accepted
++sheet/negative/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/negative/transform/looped resolve: predicted rejected, committed accepted
++sheet/prices/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/prices/transform/looped resolve: predicted rejected, committed accepted
++sheet/twice/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/twice/transform/looped resolve: predicted rejected, committed accepted
++sheet/twice/variant/cycle evaluate: predicted blocked resolve, committed accepted
++sheet/twice/variant/cycle resolve: predicted rejected, committed accepted
+diff --git a/step12/testdata/checks/circular-relabelled.txt b/step12/testdata/checks/circular-relabelled.txt
+index 4f97a4c..4f9bba4 100644
+--- a/step12/testdata/checks/circular-relabelled.txt
++++ b/step12/testdata/checks/circular-relabelled.txt
+@@ -1,3 +1,21 @@
++sheet/divide/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/divide/transform/looped resolve: predicted rejected, committed accepted
++sheet/last-row evaluate: predicted blocked resolve, committed accepted
++sheet/last-row resolve: predicted rejected, committed accepted
++sheet/loop evaluate: predicted blocked resolve, committed accepted
++sheet/loop resolve: predicted rejected, committed accepted
++sheet/loop/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/loop/transform/looped resolve: predicted rejected, committed accepted
++sheet/loop/transform/renamed evaluate: predicted blocked resolve, committed accepted
++sheet/loop/transform/renamed resolve: predicted rejected, committed accepted
+ sheet/negative resolve: predicted accepted, committed blocked parse (known gap: sheet/negative parse)
++sheet/negative/transform/looped evaluate: predicted blocked resolve, committed accepted
+ sheet/negative/transform/looped format: predicted the base's outcome, blocked parse; committed accepted (known gap: sheet/negative parse)
++sheet/negative/transform/looped resolve: predicted rejected, committed accepted
+ sheet/negative/transform/renamed resolve: predicted accepted, committed blocked parse (known gap: sheet/negative/transform/renamed parse)
++sheet/prices/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/prices/transform/looped resolve: predicted rejected, committed accepted
++sheet/twice/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/twice/transform/looped resolve: predicted rejected, committed accepted
++sheet/twice/variant/cycle evaluate: predicted blocked resolve, committed accepted
++sheet/twice/variant/cycle resolve: predicted rejected, committed accepted
+diff --git a/step12/testdata/checks/circular.txt b/step12/testdata/checks/circular.txt
+index 4f97a4c..4f9bba4 100644
+--- a/step12/testdata/checks/circular.txt
++++ b/step12/testdata/checks/circular.txt
+@@ -1,3 +1,21 @@
++sheet/divide/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/divide/transform/looped resolve: predicted rejected, committed accepted
++sheet/last-row evaluate: predicted blocked resolve, committed accepted
++sheet/last-row resolve: predicted rejected, committed accepted
++sheet/loop evaluate: predicted blocked resolve, committed accepted
++sheet/loop resolve: predicted rejected, committed accepted
++sheet/loop/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/loop/transform/looped resolve: predicted rejected, committed accepted
++sheet/loop/transform/renamed evaluate: predicted blocked resolve, committed accepted
++sheet/loop/transform/renamed resolve: predicted rejected, committed accepted
+ sheet/negative resolve: predicted accepted, committed blocked parse (known gap: sheet/negative parse)
++sheet/negative/transform/looped evaluate: predicted blocked resolve, committed accepted
+ sheet/negative/transform/looped format: predicted the base's outcome, blocked parse; committed accepted (known gap: sheet/negative parse)
++sheet/negative/transform/looped resolve: predicted rejected, committed accepted
+ sheet/negative/transform/renamed resolve: predicted accepted, committed blocked parse (known gap: sheet/negative/transform/renamed parse)
++sheet/prices/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/prices/transform/looped resolve: predicted rejected, committed accepted
++sheet/twice/transform/looped evaluate: predicted blocked resolve, committed accepted
++sheet/twice/transform/looped resolve: predicted rejected, committed accepted
++sheet/twice/variant/cycle evaluate: predicted blocked resolve, committed accepted
++sheet/twice/variant/cycle resolve: predicted rejected, committed accepted
+
+== outcomes
+sheet/divide/transform/looped calc: rejected S201 -> accepted
+sheet/divide/transform/looped evaluate: blocked resolve -> accepted
+sheet/divide/transform/looped resolve: rejected S201 -> accepted
+sheet/last-row calc: rejected S201 -> accepted
+sheet/last-row evaluate: blocked resolve -> accepted
+sheet/last-row resolve: rejected S201 -> accepted
+sheet/loop calc: rejected S201 -> accepted
+sheet/loop evaluate: blocked resolve -> accepted
+sheet/loop resolve: rejected S201 -> accepted
+sheet/loop/transform/looped calc: rejected S201 -> accepted
+sheet/loop/transform/looped evaluate: blocked resolve -> accepted
+sheet/loop/transform/looped resolve: rejected S201 -> accepted
+sheet/loop/transform/renamed calc: rejected S201 -> accepted
+sheet/loop/transform/renamed evaluate: blocked resolve -> accepted
+sheet/loop/transform/renamed resolve: rejected S201 -> accepted
+sheet/negative/transform/looped calc: rejected S201 -> accepted
+sheet/negative/transform/looped evaluate: blocked resolve -> accepted
+sheet/negative/transform/looped resolve: rejected S201 -> accepted
+sheet/prices/transform/looped calc: rejected S201 -> accepted
+sheet/prices/transform/looped evaluate: blocked resolve -> accepted
+sheet/prices/transform/looped resolve: rejected S201 -> accepted
+sheet/twice/transform/looped calc: rejected S201 -> accepted
+sheet/twice/transform/looped evaluate: blocked resolve -> accepted
+sheet/twice/transform/looped resolve: rejected S201 -> accepted
+sheet/twice/variant/cycle calc: rejected S201 -> accepted
+sheet/twice/variant/cycle evaluate: blocked resolve -> accepted
+sheet/twice/variant/cycle resolve: rejected S201 -> accepted
+
+== failing
+step12 TestCorpus/checks/codes: corpus check
+step12 TestCorpus/sheet/divide/transform/looped/resolve: expected error missing, orphan
+step12 TestCorpus/sheet/last-row/resolve: expected error missing, orphan
+step12 TestCorpus/sheet/loop/resolve: expected error missing, orphan
+step12 TestCorpus/sheet/loop/transform/looped/resolve: expected error missing, orphan
+step12 TestCorpus/sheet/loop/transform/renamed/resolve: expected error missing, orphan
+step12 TestCorpus/sheet/negative/transform/looped/resolve: expected error missing, orphan
+step12 TestCorpus/sheet/prices/transform/looped/resolve: expected error missing, orphan
+step12 TestCorpus/sheet/twice/transform/looped/resolve: expected error missing, orphan
+step12 TestCorpus/sheet/twice/variant/cycle/resolve: expected error missing, orphan
+step12/cli TestCorpus/sheet/divide/transform/looped/calc: expected error missing, orphan
+step12/cli TestCorpus/sheet/last-row/calc: expected error missing, orphan
+step12/cli TestCorpus/sheet/loop/calc: expected error missing, orphan
+step12/cli TestCorpus/sheet/loop/transform/looped/calc: expected error missing, orphan
+step12/cli TestCorpus/sheet/loop/transform/renamed/calc: expected error missing, orphan
+step12/cli TestCorpus/sheet/negative/transform/looped/calc: expected error missing, orphan
+step12/cli TestCorpus/sheet/prices/transform/looped/calc: expected error missing, orphan
+step12/cli TestCorpus/sheet/twice/transform/looped/calc: expected error missing, orphan
+step12/cli TestCorpus/sheet/twice/variant/cycle/calc: expected error missing, orphan

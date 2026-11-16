@@ -1,0 +1,13 @@
+format's package doesn't register first-row-empty, which it neither rejects nor reads, and which renamed gives.
+
+== break
+--- step12/format/corpus_test.go
+-sheetcorpus.Circular, sheetcorpus.Dangling, sheetcorpus.FirstRowEmpty,
++sheetcorpus.Circular, sheetcorpus.Dangling,
+
+== findings
+
+== outcomes
+
+== failing
+step12/format TestCorpus: unregistered property
