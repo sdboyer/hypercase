@@ -642,7 +642,7 @@ func TestTransformStaleInputs(t *testing.T) {
 		set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n")(a)
 	})
 	s.fails(s.run("b", "tr-b", false), "The cell is frozen by its known gap, gaps line 1: \"transform/upper copy Waits on sheets#9.\"",
-		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n- A1 SEVEN\n+ A1 SIX\nA normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, to which an update only adds an outcome they lack. A normal run checks each frozen cell whose files differ, here copy's, again on the rewritten inputs, against its committed files.")
+		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n- A1 SEVEN\n+ A1 SIX\nA normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, to which an update only adds an outcome they lack, when their other files match the run and nothing keeps the update from writing them. A normal run checks each frozen cell whose files differ, here copy's, again on the rewritten inputs, against its committed files.")
 
 	// The note names only the frozen cells that failed: not one that
 	// passes, nor one its probe skips.
@@ -654,7 +654,7 @@ func TestTransformStaleInputs(t *testing.T) {
 	})
 	r := s.run("b", "tr-b-keep", false)
 	s.fails(r, "gaps, line 1, marks the cell, and copy's probe says the case isn't for it: not for copy",
-		"A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, to which an update only adds an outcome they lack. If no package owns upper, the root-package check says so, and no update rewrites the inputs.\n")
+		"A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, to which an update only adds an outcome they lack, when their other files match the run and nothing keeps the update from writing them. If no package owns upper, the root-package check says so, and no update rewrites the inputs.\n")
 	s.lacks(r, "A normal run checks each frozen cell whose files differ", "keep's", "--- FAIL: TestCorpus/script/twice/transform/upper/keep")
 	s.done()
 }
