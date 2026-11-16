@@ -167,6 +167,42 @@ $ go test ./b  # tr-b-jenny
                 --- FAIL: TestCorpus/script/twice/transform/upper/copy
 FAIL
 [exit 1]
+$ edit testdata/script/twice.txtar  # delete upper's frozen cell of echo
+$ go test  # tr-jenny
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        echo: Does what the case's do/ tree says.
+        transform/upper/out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- FAIL: TestCorpus/script/twice/transform/upper
+                --- FAIL: TestCorpus/script/twice/transform/upper/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # tr-b-jenny
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        copy: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 2: "transform/upper copy Waits on sheets#10."
+        Its committed files record today's behavior, and the run now produces different ones:
+        transform/upper/out/copy/values.txt differs (-committed +got):
+          A1 SIX
+        + A1 SIX
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/copy
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/copy
+            --- FAIL: TestCorpus/script/twice/transform/upper
+                --- FAIL: TestCorpus/script/twice/transform/upper/copy
+FAIL
+[exit 1]
+$ edit testdata/script/twice.txtar  # restore echo's frozen cell
 $ edit testdata/script/twice.txtar  # delete upper's frozen cell of echo, and close copy's gap
 $ go test  # tr-jenny
     script/twice/transform/upper: Uppercases every file under do/out/.
