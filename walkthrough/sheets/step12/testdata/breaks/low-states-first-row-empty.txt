@@ -1,0 +1,40 @@
+A new base, low, starts on the second row, and states first-row-empty, which is true of it.
+
+== break
++++ step12/testdata/sheet/low.txtar
++A2 is twice B2, and the first row is empty.
++-- in/sheet/A2 --
++=B2*2
++-- in/sheet/B2 --
++3
++-- properties --
++first-row-empty
+
+== findings
+diff --git a/step12/testdata/checks/circular-sources.txt b/step12/testdata/checks/circular-sources.txt
+index 1566e94..889f3ed 100644
+--- a/step12/testdata/checks/circular-sources.txt
++++ b/step12/testdata/checks/circular-sources.txt
+@@ -5,6 +5,8 @@ sheet/divide: stated anti-P, parsed anti-P
+ sheet/loop/transform/looped: stated P, parsed P
+ sheet/loop/transform/renamed: stated P, parsed P
+ sheet/loop: stated P, parsed P
++sheet/low/transform/renamed: stated anti-P, parsed anti-P
++sheet/low: stated anti-P, parsed anti-P
+ sheet/missing/transform/renamed: stated neither, parsed neither
+ sheet/missing: stated neither, parsed neither
+ sheet/negative/transform/looped: stated P, parsed P
+
+== outcomes
+sheet/low calc: none -> accepted
+sheet/low evaluate: none -> accepted
+sheet/low format: none -> accepted
+sheet/low parse: none -> accepted
+sheet/low resolve: none -> accepted
+sheet/low/transform/renamed calc: none -> accepted
+sheet/low/transform/renamed evaluate: none -> accepted
+sheet/low/transform/renamed format: none -> accepted
+sheet/low/transform/renamed parse: none -> accepted
+sheet/low/transform/renamed resolve: none -> accepted
+
+== failing

@@ -1,0 +1,24 @@
+evaluate's values.txt holds only the cells on the first row.
+
+== break
+--- sheet/eval.go
+ 	for _, name := range slices.SortedFunc(maps.Keys(v), compareNames) {
++		if name[len(name)-1] != '1' || name[len(name)-2] > 'Z' || name[len(name)-2] < 'A' {
++			continue // the break
++		}
+
+== findings
+diff --git a/step12/testdata/checks/first-row-empty.txt b/step12/testdata/checks/first-row-empty.txt
+index e69de29..b5ab3cc 100644
+--- a/step12/testdata/checks/first-row-empty.txt
++++ b/step12/testdata/checks/first-row-empty.txt
+@@ -0,0 +1,4 @@
++sheet/divide/transform/renamed evaluate: predicted the base's outcome, accepted div-zero; committed accepted
++sheet/divide/transform/renamed evaluate: predicted the base's values.txt one row down, "A2 #DIV/0!\nB2 1\nC2 0\n"; committed ""
++sheet/prices/transform/renamed evaluate: predicted the base's values.txt one row down, "A2 4\nB2 6\nC2 10\n"; committed ""
++sheet/twice/transform/renamed evaluate: predicted the base's values.txt one row down, "A2 6\nB2 3\n"; committed ""
+
+== outcomes
+sheet/divide/transform/renamed evaluate: accepted div-zero -> accepted
+
+== failing

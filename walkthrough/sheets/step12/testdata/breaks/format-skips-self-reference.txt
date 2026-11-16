@@ -1,0 +1,62 @@
+format's probe says no to a sheet whose first formula cell refers only to itself, as each looped variant's does.
+
+== break
+--- step12/format/corpus_test.go
+ 		if len(p.Formulas()) == 0 {
+ 			return "no formulas", false
+ 		}
++		if f := p.Formulas()[0]; strings.HasPrefix(string(sheet.Format(p)), f+" ="+f+"\n") { // the break
++			return "a cell refers to itself", false
++		}
+--- step12/format/corpus_test.go
+ import (
+ 	"io"
++	"strings"
+
+== findings
+diff --git a/step12/testdata/checks/circular-parsed.txt b/step12/testdata/checks/circular-parsed.txt
+index e69de29..cb2b191 100644
+--- a/step12/testdata/checks/circular-parsed.txt
++++ b/step12/testdata/checks/circular-parsed.txt
+@@ -0,0 +1,3 @@
++sheet/divide/transform/looped format: predicted the base's outcome, accepted; committed skipped a cell refers to itself
++sheet/prices/transform/looped format: predicted the base's outcome, accepted; committed skipped a cell refers to itself
++sheet/twice/transform/looped format: predicted the base's outcome, accepted; committed skipped a cell refers to itself
+diff --git a/step12/testdata/checks/circular-relabelled.txt b/step12/testdata/checks/circular-relabelled.txt
+index 4f97a4c..5f31d9f 100644
+--- a/step12/testdata/checks/circular-relabelled.txt
++++ b/step12/testdata/checks/circular-relabelled.txt
+@@ -1,3 +1,6 @@
++sheet/divide/transform/looped format: predicted the base's outcome, accepted; committed skipped a cell refers to itself
+ sheet/negative resolve: predicted accepted, committed blocked parse (known gap: sheet/negative parse)
+-sheet/negative/transform/looped format: predicted the base's outcome, blocked parse; committed accepted (known gap: sheet/negative parse)
++sheet/negative/transform/looped format: predicted the base's outcome, blocked parse; committed skipped a cell refers to itself (known gap: sheet/negative parse)
+ sheet/negative/transform/renamed resolve: predicted accepted, committed blocked parse (known gap: sheet/negative/transform/renamed parse)
++sheet/prices/transform/looped format: predicted the base's outcome, accepted; committed skipped a cell refers to itself
++sheet/twice/transform/looped format: predicted the base's outcome, accepted; committed skipped a cell refers to itself
+diff --git a/step12/testdata/checks/circular.txt b/step12/testdata/checks/circular.txt
+index 4f97a4c..5f31d9f 100644
+--- a/step12/testdata/checks/circular.txt
++++ b/step12/testdata/checks/circular.txt
+@@ -1,3 +1,6 @@
++sheet/divide/transform/looped format: predicted the base's outcome, accepted; committed skipped a cell refers to itself
+ sheet/negative resolve: predicted accepted, committed blocked parse (known gap: sheet/negative parse)
+-sheet/negative/transform/looped format: predicted the base's outcome, blocked parse; committed accepted (known gap: sheet/negative parse)
++sheet/negative/transform/looped format: predicted the base's outcome, blocked parse; committed skipped a cell refers to itself (known gap: sheet/negative parse)
+ sheet/negative/transform/renamed resolve: predicted accepted, committed blocked parse (known gap: sheet/negative/transform/renamed parse)
++sheet/prices/transform/looped format: predicted the base's outcome, accepted; committed skipped a cell refers to itself
++sheet/twice/transform/looped format: predicted the base's outcome, accepted; committed skipped a cell refers to itself
+
+== outcomes
+sheet/divide/transform/looped format: accepted -> skipped a cell refers to itself
+sheet/loop/transform/looped format: accepted -> skipped a cell refers to itself
+sheet/negative/transform/looped format: accepted -> skipped a cell refers to itself
+sheet/prices/transform/looped format: accepted -> skipped a cell refers to itself
+sheet/twice/transform/looped format: accepted -> skipped a cell refers to itself
+
+== failing
+step12/format TestCorpus/sheet/divide/transform/looped/format: orphan
+step12/format TestCorpus/sheet/loop/transform/looped/format: orphan
+step12/format TestCorpus/sheet/negative/transform/looped/format: orphan
+step12/format TestCorpus/sheet/prices/transform/looped/format: orphan
+step12/format TestCorpus/sheet/twice/transform/looped/format: orphan
