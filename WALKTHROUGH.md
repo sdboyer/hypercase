@@ -454,14 +454,15 @@ Its `.gitignore` names the corpus root's lock, which an update takes
 - What an update writes to a cell depends only on the inputs and the code,
   never on committed outputs. Committed outputs decide whether a run fails,
   and, from step 4, that a frozen cell is left alone.
-- `hypercase strip` (#16) removes update-written sections, which it
-  recognizes by name, under the corpus root's lock (step 5). A person runs
-  it, never an update. With no flags it strips every archive under the corpus
-  root, and the registry and findings files (steps 5 and 8). `-column <name>`
-  and `-transform <name>` limit it. It leaves frozen cells (step 4) in place
-  and lists them, and `-frozen` strips those too.
+- `hypercase strip` (#16) isn't built yet. As designed, it removes
+  update-written sections, which it recognizes by name, under the corpus
+  root's lock (step 5). A person runs it, never an update. With no flags it
+  strips every archive under the corpus root, and the registry and findings
+  files (steps 5 and 8). `-column <name>` and `-transform <name>` limit it.
+  It leaves frozen cells (step 4) in place and lists them, and `-frozen`
+  strips those too.
 - Stripping and then updating, repeated until an update changes nothing,
-  reaches a known state.
+  will reach a known state.
 
 **What an archive can't hold** (proposed).
 
@@ -1095,8 +1096,9 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
   consumes, the corpora it runs over, its declared outputs and the
   properties it rejects. It records the package's corpus root, and whether
   the package runs the root-package check.
-- It records the name of the project's update variable, so `hypercase strip`
-  and `hypercase report` can print the update command.
+- It records the name of the project's update variable, so
+  `hypercase report`, and `hypercase strip` once it is built, can print the
+  update command.
 - It carries a format version, which changes on any change to what the
   registry holds.
 - It is compared like a golden. An update writes it by temp file and rename.
@@ -1894,8 +1896,8 @@ whether each has a probe, and whether the package owns it.
   its update removes them. What remains under `transform/<name>/out/` is
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
-  root-package check reports them, and says to delete them by hand until
-  `hypercase strip` (#16) lands.
+  root-package check reports them, and says to delete them by hand:
+  `hypercase strip` (#16), which is to remove them, isn't built yet.
 - The root-package check fails on a transform that a package with tests
   lists in a corpus type and no package owns (step 5's rule for packages
   with no tests), and on one that two own.
