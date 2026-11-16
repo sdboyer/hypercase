@@ -1,0 +1,34 @@
+A1 is a negative number.
+-- in/sheet/A1 --
+-3
+-- gaps --
+parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
+calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+transform/renamed parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
+transform/renamed calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+-- out/calc/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
+-- out/parse/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
+-- transform/looped/in/sheet/A1 --
+=A1
+-- transform/looped/out/calc/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/format/formulas.txt --
+A1 =A1
+-- transform/looped/out/resolve/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/renamed/in/sheet/A2 --
+-3
+-- transform/renamed/delete --
+sheet/A1
+-- transform/renamed/out/calc/error.txt --
+A2: unexpected "-"
+  sheet/A2:1: -3
+-- transform/renamed/out/parse/error.txt --
+A2: unexpected "-"
+  sheet/A2:1: -3

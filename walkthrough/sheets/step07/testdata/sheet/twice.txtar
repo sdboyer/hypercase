@@ -1,0 +1,68 @@
+A1 is twice B1.
+-- in/sheet/A1 --
+=B1*2
+-- in/sheet/B1 --
+3
+-- out/calc/stdout.txt --
+6,3
+-- out/evaluate/values.txt --
+A1 6
+B1 3
+-- out/format/formulas.txt --
+A1 =B1 * 2
+-- variant/cycle/about --
+B1 refers back to A1, so the sheet has a cycle.
+-- variant/cycle/properties --
+circular
+-- variant/cycle/in/sheet/B1 --
+=A1
+-- variant/cycle/out/calc/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1*2
+  sheet/B1:1: =A1
+-- variant/cycle/out/format/formulas.txt --
+A1 =B1 * 2
+B1 =A1
+-- variant/cycle/out/resolve/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1*2
+  sheet/B1:1: =A1
+-- variant/missing/about --
+B1 is gone, so A1 refers to a cell that doesn't exist.
+-- variant/missing/properties --
+dangling
+-- variant/missing/delete --
+sheet/B1
+-- variant/missing/out/calc/error.txt --
+A1: B1 doesn't exist
+  sheet/A1:1: =B1*2
+-- variant/missing/out/format/formulas.txt --
+A1 =B1 * 2
+-- variant/missing/out/resolve/error.txt --
+A1: B1 doesn't exist
+  sheet/A1:1: =B1*2
+-- transform/looped/in/sheet/A1 --
+=A1
+-- transform/looped/out/calc/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/format/formulas.txt --
+A1 =A1
+-- transform/looped/out/resolve/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/renamed/in/sheet/A2 --
+=B2*2
+-- transform/renamed/in/sheet/B2 --
+3
+-- transform/renamed/delete --
+sheet/A1
+sheet/B1
+-- transform/renamed/out/calc/stdout.txt --
+,
+6,3
+-- transform/renamed/out/evaluate/values.txt --
+A2 6
+B2 3
+-- transform/renamed/out/format/formulas.txt --
+A2 =B2 * 2

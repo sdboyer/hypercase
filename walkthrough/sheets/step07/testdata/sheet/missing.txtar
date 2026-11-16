@@ -1,0 +1,25 @@
+A1 refers to B1, which the sheet lacks.
+-- in/sheet/A1 --
+=B1+1
+-- properties --
+dangling
+-- out/calc/error.txt --
+A1: B1 doesn't exist
+  sheet/A1:1: =B1+1
+-- out/format/formulas.txt --
+A1 =B1 + 1
+-- out/resolve/error.txt --
+A1: B1 doesn't exist
+  sheet/A1:1: =B1+1
+-- transform/renamed/in/sheet/A2 --
+=B2+1
+-- transform/renamed/delete --
+sheet/A1
+-- transform/renamed/out/calc/error.txt --
+A2: B2 doesn't exist
+  sheet/A2:1: =B2+1
+-- transform/renamed/out/format/formulas.txt --
+A2 =B2 + 1
+-- transform/renamed/out/resolve/error.txt --
+A2: B2 doesn't exist
+  sheet/A2:1: =B2+1

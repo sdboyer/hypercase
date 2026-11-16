@@ -1,0 +1,47 @@
+A1 and B1 refer to each other.
+-- in/sheet/A1 --
+=B1
+-- in/sheet/B1 --
+=A1
+-- properties --
+circular
+-- out/calc/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1
+  sheet/B1:1: =A1
+-- out/format/formulas.txt --
+A1 =B1
+B1 =A1
+-- out/resolve/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1
+  sheet/B1:1: =A1
+-- transform/looped/in/sheet/A1 --
+=A1
+-- transform/looped/out/calc/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/format/formulas.txt --
+A1 =A1
+B1 =A1
+-- transform/looped/out/resolve/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/renamed/in/sheet/A2 --
+=B2
+-- transform/renamed/in/sheet/B2 --
+=A2
+-- transform/renamed/delete --
+sheet/A1
+sheet/B1
+-- transform/renamed/out/calc/error.txt --
+A2 -> B2 -> A2: cycle
+  sheet/A2:1: =B2
+  sheet/B2:1: =A2
+-- transform/renamed/out/format/formulas.txt --
+A2 =B2
+B2 =A2
+-- transform/renamed/out/resolve/error.txt --
+A2 -> B2 -> A2: cycle
+  sheet/A2:1: =B2
+  sheet/B2:1: =A2
