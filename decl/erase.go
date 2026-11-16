@@ -1,6 +1,7 @@
 package decl
 
 import (
+	"errors"
 	"io"
 	"io/fs"
 	"reflect"
@@ -9,7 +10,13 @@ import (
 	"github.com/sdboyer/jenny"
 )
 
-func init() { erase.Of = of }
+func init() {
+	erase.Of = of
+	erase.IsRejection = func(err error) bool {
+		var r *rejection
+		return errors.As(err, &r)
+	}
+}
 
 // erasable is implemented by the generic declarations, and only by them.
 type erasable interface{ erase() any }

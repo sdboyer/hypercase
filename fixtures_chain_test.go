@@ -36,7 +36,13 @@ import (
 //	import/space/<path>   made as <path>, with a space after its name
 //	import/newline/<path> made as <path>, with a newline and x after its
 //	                      name
-//	import/error          returned as the error, less its final newline
+//	import/dup/<path>     made as <path>, twice
+//	import/case/<path>    made as <path>, and as <path> in upper case
+//	import/render/<path>  made as <path>, a tree that fails to render
+//	import/error          returned as the error, less its final newline,
+//	                      which decl.Reject marks as the rejection
+//	import/fail           returned as the error, less its final newline,
+//	                      unmarked
 //	import/panic          panicked with, less its final newline
 //
 // An export whose import/ tree has none of these is imported as an empty
@@ -56,6 +62,9 @@ func steerImport(name string, in fs.FS) (jenny.Files, error) {
 		panic(strings.TrimSuffix(string(data), "\n"))
 	}
 	if data, err := fs.ReadFile(in, name+"/error"); err == nil {
+		return nil, decl.Reject(errors.New(strings.TrimSuffix(string(data), "\n")))
+	}
+	if data, err := fs.ReadFile(in, name+"/fail"); err == nil {
 		return nil, errors.New(strings.TrimSuffix(string(data), "\n"))
 	}
 	paths, err := archive.Paths(in)
@@ -63,10 +72,24 @@ func steerImport(name string, in fs.FS) (jenny.Files, error) {
 		return nil, err
 	}
 	files := map[string][]byte{}
+	// faulty are files jenny refuses: two at one path, or a tree that
+	// fails to render.
+	var faulty jenny.Files
 	for _, p := range paths {
 		data, err := fs.ReadFile(in, p)
 		if err != nil {
 			return nil, err
+		}
+		if rest, ok := strings.CutPrefix(p, name+"/dup/"); ok {
+			faulty = append(faulty, jenny.NewFile(rest, data), jenny.NewFile(rest, data))
+		}
+		if rest, ok := strings.CutPrefix(p, name+"/case/"); ok {
+			faulty = append(faulty, jenny.NewFile(rest, data), jenny.NewFile(strings.ToUpper(rest), data))
+		}
+		if rest, ok := strings.CutPrefix(p, name+"/render/"); ok {
+			faulty = append(faulty, jenny.NewTree(rest, data, func(d []byte) ([]byte, error) {
+				return nil, errors.New("the tree won't render")
+			}))
 		}
 		if rest, ok := strings.CutPrefix(p, name+"/out/"); ok {
 			files[rest] = data
@@ -92,7 +115,7 @@ func steerImport(name string, in fs.FS) (jenny.Files, error) {
 	for _, p := range slices.Sorted(maps.Keys(files)) {
 		out = append(out, jenny.NewFile(p, files[p]))
 	}
-	return out, nil
+	return append(out, faulty...), nil
 }
 
 var (

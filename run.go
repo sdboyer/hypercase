@@ -674,8 +674,9 @@ type called struct {
 	panicked       bool
 	panicValue     any
 	stack          []byte
-	inProbe        bool // the panic was the probe's
-	noProduct      bool // a lift returned neither a product nor an error
+	inProbe        bool  // the panic was the probe's
+	noProduct      bool  // a lift returned neither a product nor an error
+	jennyErr       error // a bytes lift's jenny returned this error, which is no rejection, in place of err
 }
 
 // call runs fn, recovering a panic. A runtime.Goexit, as from t.FailNow,
@@ -708,7 +709,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	if by != nil {
 		st.applied++
 		if by.broken {
-			t.Errorf("%s\nThe lift %s, on %s's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.\nFix %s's jenny.", header, by.lift.name, col.name, by.lift.name)
+			t.Errorf("%s\nThe update writes nothing for the cell of the lift %s, on %s's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for %s, so the update writes nothing for this cell either, and the cell runs nothing.\nFix what %s's cell reports.", header, by.lift.name, col.name, by.lift.name, by.lift.name)
 			return
 		}
 		r.blocked(t, c, header, col, by, gap, marked, cf, res)
@@ -1043,6 +1044,9 @@ func (r *runner) outcome(m *msg, col *column, in any, out *called, files map[str
 	case out.noProduct:
 		m.add("%s returned no product and no error, so the cell has no outcome.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.", col.name)
 		return o, false
+	case out.jennyErr != nil:
+		// The cell's problems say why: its jenny's fault.
+		return o, false
 	case out.err != nil:
 		o.State = archive.Rejected
 		codes, ok := r.errorCodes(m, col, out.err)
@@ -1224,7 +1228,7 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 		m.add("%s's probe panicked: %v\nFix the probe. A panic is never an expected error.", col.name, out.panicValue)
 	case out.panicked:
 		m.add("%s panicked: %v\nFix the code. A panic is never an expected error.", col.name, out.panicValue)
-	case out.noProduct:
+	case out.noProduct || out.jennyErr != nil:
 	case out.err != nil && len(hit) == 0 && c.tr != nil:
 		m.add("%s returned an error, but the variant states no property %s rejects:\n  %s\n%s Fix the code or %s's jenny, or give the variant the property, in %s's Gives or Keeps, and list it in %s's Rejects.", col.name, col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "), c.tr.states(), c.tr.name, c.tr.name, col.name)
 	case out.err != nil && len(hit) == 0:

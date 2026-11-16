@@ -70,3 +70,7 @@ type Lift struct {
 // or a *Lift, and false for anything else. decl sets it when it is
 // initialized.
 var Of func(v any) (any, bool)
+
+// IsRejection reports whether an error a bytes lift's jenny returned wraps
+// one decl.Reject made. decl sets it when it is initialized.
+var IsRejection func(err error) bool

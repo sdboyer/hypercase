@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/internal/erase"
 	"github.com/sdboyer/jenny"
 )
 
@@ -230,8 +231,9 @@ type caseState struct {
 }
 
 // A liftRun is what one call of a lift's function left. A bytes lift's
-// also holds its product's files, and why an archive can't hold them, if
-// it can't; only a product it can hold has a view and a value.
+// also holds its product's files, and the faults of its jenny, if any: an
+// error that is no rejection, or a product an archive can't hold. Only a
+// product with no fault has a view and a value.
 type liftRun struct {
 	value    any
 	out      *called
@@ -263,9 +265,9 @@ type blockage struct {
 	outcome   string
 	committed string
 	missing   bool
-	// broken records that, in an update, the bytes lift's product can't be
-	// committed: the cell runs nothing, and the update writes nothing for
-	// it.
+	// broken records that, in an update, the bytes lift's jenny has a
+	// fault, so its cell isn't written: the cell runs nothing, and the
+	// update writes nothing for it.
 	broken bool
 }
 
@@ -332,7 +334,9 @@ func (s *caseState) read(l *lift) *liftRead {
 
 // runLift runs a lift on its input, once. A lift whose product type is an
 // interface can return neither a product nor an error, which is the lift's
-// own failure. A bytes lift's jenny makes its product's files.
+// own failure. A bytes lift's jenny makes its product's files, and rejects
+// the case only by an error decl.Reject marks: any other error is a fault
+// of the jenny, as a product an archive can't hold is.
 func (s *caseState) runLift(l *lift, in any) *liftRun {
 	if lr, ok := s.runs[l]; ok {
 		return lr
@@ -348,7 +352,14 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 	}
 	var made *jenny.FS
 	lr.out = call(func(o *called) { made, o.err = l.generate(in) })
-	if lr.out.panicked || lr.out.err != nil {
+	switch {
+	case lr.out.panicked:
+		return lr
+	case lr.out.err != nil && erase.IsRejection(lr.out.err):
+		return lr
+	case lr.out.err != nil:
+		lr.out.jennyErr, lr.out.err = lr.out.err, nil
+		lr.problems = []string{fmt.Sprintf("%s's jenny failed on the case, with an error that is no rejection:\n  %s\nIf %s rejects the case, return the error as decl.Reject(err). If not, fix %s's jenny. An update writes nothing for this cell.", l.name, indent(lr.out.jennyErr.Error(), "  "), l.name, l.name)}
 		return lr
 	}
 	lr.product, lr.problems = productOf(l, s.c.prefix, made)

@@ -406,7 +406,45 @@ func TestChainProductProblems(t *testing.T) {
 		s.fails(n, "--- FAIL: TestCorpus/export/names/import", tt.want)
 		s.contains(n, "--- PASS: TestCorpus/export/names/list")
 		before := s.snapshot()
-		s.fails(s.update("chain"), tt.want, "export/names: import makes files named as a cell's own files are, which list reads.\nlist: Lists the files of the script's input view, with their bytes.\nThe lift import, on list's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.\nFix import's jenny.")
+		s.fails(s.update("chain"), tt.want, listHeldBack)
+		s.unchanged(before)
+		s.write(names, clean, "restore it")
+	}
+	s.done()
+}
+
+// listHeldBack is how an update fails names' list, which it holds back
+// when it writes nothing for import's cell.
+const listHeldBack = "export/names: import makes files named as a cell's own files are, which list reads.\nlist: Lists the files of the script's input view, with their bytes.\nThe update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.\nFix what import's cell reports."
+
+// TestChainJennyFaults: a bytes lift's jenny rejects a case only by an
+// error decl.Reject marks. Any other error, jenny's own included, is a
+// fault of the jenny: it fails the lift's cell even on a case that states
+// a property the lift rejects, and an update writes nothing for the cell,
+// nor for the cells past it.
+func TestChainJennyFaults(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "chain")
+	s.passes(s.update("chain"))
+	clean := s.read(names)
+	fault := func(err string) string {
+		return "import's jenny failed on the case, with an error that is no rejection:\n  " + err + "\nIf import rejects the case, return the error as decl.Reject(err). If not, fix import's jenny. An update writes nothing for this cell."
+	}
+	for _, tt := range []struct{ why, section, want string }{
+		{"two files at one path", "in/import/dup/quote/x", fault("import returned invalid Files: multiple files at path quote/x from jennies: 'import', 'import'")},
+		{"two files whose paths differ only by case", "in/import/case/quote/x", fault("import returned invalid Files: multiple files at path quote/x from jennies: 'import', 'import'")},
+		{"a tree that fails to render", "in/import/render/quote/x", fault(`rendering quote/x from "import" failed: the tree won't render`)},
+		{"an error decl.Reject doesn't mark", "in/import/fail", fault("import: the generator's error")},
+	} {
+		s.edit(names, "names states unterminated, and import makes "+tt.why, func(a *archive.Archive) {
+			insert("properties", "unterminated\n", "in/")(a)
+			insert(tt.section, "the generator's error\n", "via/")(a)
+		})
+		n := s.normal("chain")
+		s.fails(n, "--- FAIL: TestCorpus/export/names/import", tt.want)
+		s.contains(n, "--- PASS: TestCorpus/export/names/list")
+		before := s.snapshot()
+		s.fails(s.update("chain"), tt.want, listHeldBack)
 		s.unchanged(before)
 		s.write(names, clean, "restore it")
 	}

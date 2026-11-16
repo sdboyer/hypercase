@@ -206,24 +206,24 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
     export/names: import makes files named as a cell's own files are, which list reads.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
-        The lift import, on evaluate's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on evaluate's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         import: Imports the export as a script, as its import/ tree says.
         via/import/stray/x is not declared.
         Declare it in import's Product, with a description, or fix import's jenny. An update writes nothing for this cell.
     export/names: import makes files named as a cell's own files are, which list reads.
         list: Lists the files of the script's input view, with their bytes.
-        The lift import, on list's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         parse: Parses the script, as its parse/ tree says.
-        The lift import, on parse's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on parse's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         resolve: Resolves the parsed script, as its resolve/ tree says.
-        The lift import, on resolve's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on resolve's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/variant/unclosed: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
@@ -427,8 +427,8 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
     export/names: import makes files named as a cell's own files are, which list reads.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
-        The lift import, on evaluate's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on evaluate's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         import: Imports the export as a script, as its import/ tree says.
         via/import/params/x: the tree name params is reserved in every input view, a product's included.
@@ -437,16 +437,16 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
         Declare it in import's Product, with a description, or fix import's jenny. An update writes nothing for this cell.
     export/names: import makes files named as a cell's own files are, which list reads.
         list: Lists the files of the script's input view, with their bytes.
-        The lift import, on list's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         parse: Parses the script, as its parse/ tree says.
-        The lift import, on parse's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on parse's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         resolve: Resolves the parsed script, as its resolve/ tree says.
-        The lift import, on resolve's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on resolve's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/variant/unclosed: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
@@ -650,8 +650,8 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
     export/names: import makes files named as a cell's own files are, which list reads.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
-        The lift import, on evaluate's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on evaluate's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         import: Imports the export as a script, as its import/ tree says.
         via/import/x: a product's file belongs in a tree, as via/import/<tree>/<file>.
@@ -660,16 +660,16 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
         Declare it in import's Product, with a description, or fix import's jenny. An update writes nothing for this cell.
     export/names: import makes files named as a cell's own files are, which list reads.
         list: Lists the files of the script's input view, with their bytes.
-        The lift import, on list's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         parse: Parses the script, as its parse/ tree says.
-        The lift import, on parse's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on parse's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         resolve: Resolves the parsed script, as its resolve/ tree says.
-        The lift import, on resolve's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on resolve's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/variant/unclosed: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
@@ -873,8 +873,8 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
     export/names: import makes files named as a cell's own files are, which list reads.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
-        The lift import, on evaluate's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on evaluate's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         import: Imports the export as a script, as its import/ tree says.
         via/import/quote/x: the section is also the directory of via/import/quote/x/below.
@@ -883,16 +883,16 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
         Declare it in import's Product, with a description, or fix import's jenny. An update writes nothing for this cell.
     export/names: import makes files named as a cell's own files are, which list reads.
         list: Lists the files of the script's input view, with their bytes.
-        The lift import, on list's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         parse: Parses the script, as its parse/ tree says.
-        The lift import, on parse's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on parse's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         resolve: Resolves the parsed script, as its resolve/ tree says.
-        The lift import, on resolve's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on resolve's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/variant/unclosed: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
@@ -1094,24 +1094,24 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
     export/names: import makes files named as a cell's own files are, which list reads.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
-        The lift import, on evaluate's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on evaluate's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         import: Imports the export as a script, as its import/ tree says.
         via/import/quote/x can't be held in an archive: it has no final newline, which an archive adds.
         Fix import's jenny so the file can be held. An update writes nothing for this cell.
     export/names: import makes files named as a cell's own files are, which list reads.
         list: Lists the files of the script's input view, with their bytes.
-        The lift import, on list's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         parse: Parses the script, as its parse/ tree says.
-        The lift import, on parse's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on parse's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         resolve: Resolves the parsed script, as its resolve/ tree says.
-        The lift import, on resolve's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on resolve's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/variant/unclosed: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
@@ -1313,24 +1313,24 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
     export/names: import makes files named as a cell's own files are, which list reads.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
-        The lift import, on evaluate's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on evaluate's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         import: Imports the export as a script, as its import/ tree says.
         via/import/quote/x can't be held in an archive: its line 2 is shaped like a section marker, which starts another section when the archive is read.
         Fix import's jenny so the file can be held. An update writes nothing for this cell.
     export/names: import makes files named as a cell's own files are, which list reads.
         list: Lists the files of the script's input view, with their bytes.
-        The lift import, on list's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         parse: Parses the script, as its parse/ tree says.
-        The lift import, on parse's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on parse's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         resolve: Resolves the parsed script, as its resolve/ tree says.
-        The lift import, on resolve's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on resolve's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/variant/unclosed: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
@@ -1532,24 +1532,24 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
     export/names: import makes files named as a cell's own files are, which list reads.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
-        The lift import, on evaluate's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on evaluate's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         import: Imports the export as a script, as its import/ tree says.
         "via/import/quote/x " can't be held in an archive: its name reads back as "via/import/quote/x", since an archive trims the spaces around a section's name.
         Fix import's jenny so the file's name can be held. An update writes nothing for this cell.
     export/names: import makes files named as a cell's own files are, which list reads.
         list: Lists the files of the script's input view, with their bytes.
-        The lift import, on list's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         parse: Parses the script, as its parse/ tree says.
-        The lift import, on parse's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on parse's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         resolve: Resolves the parsed script, as its resolve/ tree says.
-        The lift import, on resolve's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on resolve's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/variant/unclosed: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
@@ -1751,24 +1751,24 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
     export/names: import makes files named as a cell's own files are, which list reads.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
-        The lift import, on evaluate's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on evaluate's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         import: Imports the export as a script, as its import/ tree says.
         "via/import/quote/x\nx" can't be held in an archive: its name holds a newline, which ends a section's marker line.
         Fix import's jenny so the file's name can be held. An update writes nothing for this cell.
     export/names: import makes files named as a cell's own files are, which list reads.
         list: Lists the files of the script's input view, with their bytes.
-        The lift import, on list's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         parse: Parses the script, as its parse/ tree says.
-        The lift import, on parse's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on parse's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         resolve: Resolves the parsed script, as its resolve/ tree says.
-        The lift import, on resolve's path, made a product an archive can't hold, so the cell runs nothing, and the update writes nothing for it. The lift's cell says why, in the package that owns it.
-        Fix import's jenny.
+        The update writes nothing for the cell of the lift import, on resolve's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/variant/unclosed: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
