@@ -73,12 +73,25 @@ func TestCorpus(t *testing.T) {
 type sandbox struct {
 	t          *testing.T
 	dir        string
+	dirs       []string // the sandbox's paths, as given and with symlinks resolved, longest first
 	transcript strings.Builder
 }
 
 func newSandbox(t *testing.T, fixture string) *sandbox {
 	t.Helper()
 	s := &sandbox{t: t, dir: t.TempDir()}
+	// A message may name the sandbox by its path with symlinks resolved,
+	// as on macOS, whose temp dirs are under /var, a link to /private/var.
+	// The longer path is replaced first, so no part of it is left behind.
+	real, err := filepath.EvalSymlinks(s.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.dirs = []string{s.dir}
+	if real != s.dir {
+		s.dirs = append(s.dirs, real)
+	}
+	slices.SortFunc(s.dirs, func(a, b string) int { return len(b) - len(a) })
 	src := filepath.Join("testdata", "fixtures", fixture)
 	if fixture != "" {
 		err := filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
@@ -235,7 +248,10 @@ var (
 )
 
 func (s *sandbox) normalize(out []byte) string {
-	text := strings.ReplaceAll(string(out), s.dir, "$SANDBOX")
+	text := string(out)
+	for _, dir := range s.dirs {
+		text = strings.ReplaceAll(text, dir, "$SANDBOX")
+	}
 	if i := strings.Index(text, "\n\ngoroutine "); i >= 0 && strings.Contains(text[:i], "panic: ") {
 		// A panic the framework didn't recover: its stack holds addresses.
 		text = text[:i+1] + "[stack]\n"
