@@ -3,6 +3,7 @@ package snapshot
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -242,6 +243,26 @@ func TestCreateUndeclaredDir(t *testing.T) {
 	writeRegistryOf(t, filepath.Join(corp.Module(), "elsewhere"), registry.Registry{CorpusRoot: "other", Types: []registry.Type{{Dir: "away"}}}, true)
 	_, err = Create(corp, project, decl.Type[Sheet]{Dir: "away"}, "twice", ss)
 	fails(t, err, `declares the directory away`, `they declare "sheet", "undeclared".`)
+}
+
+// TestCreateMkdirFails: testdata/sheet/ there as a file fails Create's
+// MkdirAll, naming it. testdata/ there as a file fails it sooner: the walk
+// to the registries looks for testdata/hypercase.json in the corpus root,
+// as in every directory it visits. Nothing is written either way.
+func TestCreateMkdirFails(t *testing.T) {
+	for file, want := range map[string]string{
+		"testdata/sheet": "creating %[1]s/testdata/sheet: mkdir %[1]s/testdata/sheet: not a directory.\nFix what stopped it, and create the case again.",
+		"testdata":       "finding the registries under the module root %[2]s: stat corp/testdata/hypercase.json: not a directory.\nFix what stopped the walk, and create the case again.",
+	} {
+		corp := newCorpus(t)
+		writeFile(t, filepath.Join(corp.Dir(), filepath.FromSlash(file)), nil)
+		before := dirs(t, corp.Dir())
+		_, err := Create(corp, project, sheetType, "twice", serialize(t, cells))
+		fails(t, err, fmt.Sprintf(want, corp.Dir(), corp.Module()))
+		if got := dirs(t, corp.Dir()); !slices.Equal(got, before) {
+			t.Errorf("with %s a file, a failed Create left %q, not %q", file, got, before)
+		}
+	}
 }
 
 // TestCreateDuringUpdate: while the variable the project's UpdateVar

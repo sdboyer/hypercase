@@ -55,8 +55,8 @@ func TestLoad(t *testing.T) {
 // TestLoadRefuses: a hand-written archive with an in/params/ tree, or with
 // a top-level name outside the closed set; one that isn't in the type's
 // directory; one whose name breaks the naming rule, or isn't an archive's;
-// one outside testdata/<dir>/; and one that can't be read: Load refuses
-// each, naming the path.
+// one outside testdata/<dir>/; one that can't be read; and an empty path:
+// Load refuses each, naming the path.
 func TestLoadRefuses(t *testing.T) {
 	root := t.TempDir()
 	at := func(rel, data string) string {
@@ -81,6 +81,8 @@ func TestLoadRefuses(t *testing.T) {
 	}
 	_, err := Load(decl.Type[Sheet]{Dir: "checks"}, at("testdata/checks/x.txtar", "X.\n-- in/sheet/A1 --\n1\n"))
 	fails(t, err, "the corpus type's directory, checks, is reserved")
+	_, err = Load(sheetType, "")
+	fails(t, err, "the archive's path is empty.\nPass the path of the case's archive.")
 }
 
 // TestExtractBase: Extract of the base writes exactly the files and bytes

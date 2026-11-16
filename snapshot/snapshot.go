@@ -348,6 +348,9 @@ func read(path string) (*archive.Archive, []archive.Problem, error) {
 // checkPath refuses a path the runner reads no case from: one that isn't
 // testdata/<dir>/<name>.txtar, with a name the naming rule admits.
 func checkPath(path string) error {
+	if path == "" {
+		return errors.New("the archive's path is empty.\nPass the path of the case's archive.")
+	}
 	name, ok := strings.CutSuffix(filepath.Base(path), ".txtar")
 	if !ok {
 		return fmt.Errorf("%s isn't an archive: an archive's file name ends in .txtar.\nName the case's archive.", path)

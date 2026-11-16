@@ -59,8 +59,9 @@ func TestRewriteVariant(t *testing.T) {
 // passed twice, a variant the archive lacks, a transform's variant,
 // content holding a line shaped like a section marker, a rewrite that
 // leaves the archive with a problem of form, no sections, an archive
-// outside the corpus root, the path and the variant swapped, and no
-// corpus root: each fails, naming it, and the archive is byte-identical.
+// outside the corpus root, the path and the variant swapped either way,
+// and no corpus root: each fails, naming it, and the archive is
+// byte-identical.
 func TestRewriteRefuses(t *testing.T) {
 	corp, path := corpus(t)
 	before := readFile(t, path)
@@ -89,6 +90,8 @@ func TestRewriteRefuses(t *testing.T) {
 	// The path and the variant swapped: no variant's name is an archive's
 	// path.
 	fails(t, RewriteInputs(corp, project, "cycle", path, section("in/sheet/B1", "1\n")), "cycle isn't an archive")
+	same(t, path, before)
+	fails(t, RewriteInputs(corp, project, "", path, section("in/sheet/B1", "1\n")), "the archive's path is empty.\nPass the path of the case's archive.")
 	same(t, path, before)
 	fails(t, RewriteInputs(root.Corpus{}, project, path, "", section("in/sheet/B1", "4\n")), "RewriteInputs was given no corpus root.\nFind it with root.Find")
 	same(t, path, before)
@@ -276,6 +279,18 @@ func TestRewriteDuringUpdate(t *testing.T) {
 	for _, reg := range []string{"hypercase.json", filepath.Join("sheet", "hypercase.json")} {
 		absent(t, filepath.Join(corp.Dir(), "testdata", reg))
 	}
+}
+
+// TestRewriteNoRegistry: RewriteInputs reads no registry, so it rewrites
+// a case in a module that has none, as before a project's first update.
+func TestRewriteNoRegistry(t *testing.T) {
+	mod := newBareModule(t)
+	path := filepath.Join(mod, "corp", "testdata", "sheet", "twice.txtar")
+	writeFile(t, path, twice(t))
+	if err := RewriteInputs(corpusIn(t, mod, "corp"), project, path, "", section("in/sheet/B1", "4\n")); err != nil {
+		t.Fatal(err)
+	}
+	same(t, path, replaced(t, "in/sheet/B1", "3\n", "4\n"))
 }
 
 // TestRewriteFailedWrite: a RewriteInputs whose write fails after the
