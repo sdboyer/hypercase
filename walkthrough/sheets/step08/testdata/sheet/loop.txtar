@@ -10,7 +10,7 @@ A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1
   sheet/B1:1: =A1
 -- out/calc/outcome --
-rejected
+rejected S201
 -- out/evaluate/outcome --
 blocked resolve
 -- out/format/formulas.txt --
@@ -25,14 +25,14 @@ A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1
   sheet/B1:1: =A1
 -- out/resolve/outcome --
-rejected
+rejected S201
 -- transform/looped/in/sheet/A1 --
 =A1
 -- transform/looped/out/calc/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
 -- transform/looped/out/calc/outcome --
-rejected
+rejected S201
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
@@ -46,7 +46,7 @@ accepted
 A1 -> A1: cycle
   sheet/A1:1: =A1
 -- transform/looped/out/resolve/outcome --
-rejected
+rejected S201
 -- transform/renamed/in/sheet/A2 --
 =B2
 -- transform/renamed/in/sheet/B2 --
@@ -59,7 +59,7 @@ A2 -> B2 -> A2: cycle
   sheet/A2:1: =B2
   sheet/B2:1: =A2
 -- transform/renamed/out/calc/outcome --
-rejected
+rejected S201
 -- transform/renamed/out/evaluate/outcome --
 blocked resolve
 -- transform/renamed/out/format/formulas.txt --
@@ -74,4 +74,4 @@ A2 -> B2 -> A2: cycle
   sheet/A2:1: =B2
   sheet/B2:1: =A2
 -- transform/renamed/out/resolve/outcome --
-rejected
+rejected S201

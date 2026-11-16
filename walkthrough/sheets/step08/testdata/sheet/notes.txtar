@@ -9,7 +9,7 @@ malformed
 notes: not a cell name
   sheet/notes
 -- out/calc/outcome --
-rejected
+rejected S101
 -- out/evaluate/outcome --
 blocked parse
 -- out/format/outcome --
@@ -18,6 +18,6 @@ blocked parse
 notes: not a cell name
   sheet/notes
 -- out/parse/outcome --
-rejected
+rejected S101
 -- out/resolve/outcome --
 blocked parse

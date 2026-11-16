@@ -3,7 +3,7 @@
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step08",
   "rootPackage": false,
-  "codes": false,
+  "codes": true,
   "issueLinks": [],
   "properties": [
     {

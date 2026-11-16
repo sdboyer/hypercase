@@ -3,7 +3,7 @@
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step08",
   "rootPackage": true,
-  "codes": false,
+  "codes": true,
   "issueLinks": [],
   "properties": [
     {
@@ -105,7 +105,10 @@
         }
       ],
       "rejects": [],
-      "classifier": null
+      "classifier": {
+        "name": "div-zero",
+        "description": "Adds div-zero when some cell divides by zero."
+      }
     }
   ]
 }

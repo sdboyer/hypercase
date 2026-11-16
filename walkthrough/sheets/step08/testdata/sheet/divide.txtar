@@ -12,7 +12,7 @@ A1: divides by zero
 -- out/calc/stdout.txt --
 #DIV/0!,1,0
 -- out/evaluate/outcome --
-accepted
+accepted div-zero
 -- out/evaluate/values.txt --
 A1 #DIV/0!
 B1 1
@@ -31,7 +31,7 @@ accepted
 A1 -> A1: cycle
   sheet/A1:1: =A1
 -- transform/looped/out/calc/outcome --
-rejected
+rejected S201
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
@@ -44,7 +44,7 @@ accepted
 A1 -> A1: cycle
   sheet/A1:1: =A1
 -- transform/looped/out/resolve/outcome --
-rejected
+rejected S201
 -- transform/renamed/in/sheet/A2 --
 =B2/C2
 -- transform/renamed/in/sheet/B2 --
@@ -63,7 +63,7 @@ A2: divides by zero
 ,,
 #DIV/0!,1,0
 -- transform/renamed/out/evaluate/outcome --
-accepted
+accepted div-zero
 -- transform/renamed/out/evaluate/values.txt --
 A2 #DIV/0!
 B2 1

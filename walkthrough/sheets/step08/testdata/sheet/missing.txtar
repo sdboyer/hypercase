@@ -7,7 +7,7 @@ dangling
 A1: B1 doesn't exist
   sheet/A1:1: =B1+1
 -- out/calc/outcome --
-rejected
+rejected S202
 -- out/evaluate/outcome --
 blocked resolve
 -- out/format/formulas.txt --
@@ -20,7 +20,7 @@ accepted
 A1: B1 doesn't exist
   sheet/A1:1: =B1+1
 -- out/resolve/outcome --
-rejected
+rejected S202
 -- transform/renamed/in/sheet/A2 --
 =B2+1
 -- transform/renamed/delete --
@@ -29,7 +29,7 @@ sheet/A1
 A2: B2 doesn't exist
   sheet/A2:1: =B2+1
 -- transform/renamed/out/calc/outcome --
-rejected
+rejected S202
 -- transform/renamed/out/evaluate/outcome --
 blocked resolve
 -- transform/renamed/out/format/formulas.txt --
@@ -42,4 +42,4 @@ accepted
 A2: B2 doesn't exist
   sheet/A2:1: =B2+1
 -- transform/renamed/out/resolve/outcome --
-rejected
+rejected S202

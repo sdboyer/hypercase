@@ -29,7 +29,7 @@ accepted
 A1 -> A1: cycle
   sheet/A1:1: =A1
 -- transform/looped/out/calc/outcome --
-rejected
+rejected S201
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
@@ -43,7 +43,7 @@ accepted
 A1 -> A1: cycle
   sheet/A1:1: =A1
 -- transform/looped/out/resolve/outcome --
-rejected
+rejected S201
 -- transform/renamed/in/sheet/A2 --
 4
 -- transform/renamed/in/sheet/B2 --

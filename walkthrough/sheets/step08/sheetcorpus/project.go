@@ -3,6 +3,7 @@ package sheetcorpus
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/fs"
 
@@ -14,7 +15,16 @@ import (
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
+	Codes: func(err error) []string {
+		var e *sheet.Error
+		if errors.As(err, &e) {
+			return []string{e.Code}
+		}
+		return nil
+	},
 }
+
+// doc:end project
 
 // renderError writes the error's text, then quotes each line it points at. A
 // position about a file as a whole names only the file.
@@ -33,8 +43,6 @@ func renderError(in fs.FS, err error) []byte {
 	}
 	return out
 }
-
-// doc:end project
 
 // lineAt is line n, counted from 1, of the file at path in in, or "" when
 // there is no such line.

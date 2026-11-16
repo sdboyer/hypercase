@@ -31,7 +31,7 @@ A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1*2
   sheet/B1:1: =A1
 -- variant/cycle/out/calc/outcome --
-rejected
+rejected S201
 -- variant/cycle/out/evaluate/outcome --
 blocked resolve
 -- variant/cycle/out/format/formulas.txt --
@@ -46,7 +46,7 @@ A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1*2
   sheet/B1:1: =A1
 -- variant/cycle/out/resolve/outcome --
-rejected
+rejected S201
 -- variant/missing/about --
 B1 is gone, so A1 refers to a cell that doesn't exist.
 -- variant/missing/properties --
@@ -57,7 +57,7 @@ sheet/B1
 A1: B1 doesn't exist
   sheet/A1:1: =B1*2
 -- variant/missing/out/calc/outcome --
-rejected
+rejected S202
 -- variant/missing/out/evaluate/outcome --
 blocked resolve
 -- variant/missing/out/format/formulas.txt --
@@ -70,14 +70,14 @@ accepted
 A1: B1 doesn't exist
   sheet/A1:1: =B1*2
 -- variant/missing/out/resolve/outcome --
-rejected
+rejected S202
 -- transform/looped/in/sheet/A1 --
 =A1
 -- transform/looped/out/calc/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
 -- transform/looped/out/calc/outcome --
-rejected
+rejected S201
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
@@ -90,7 +90,7 @@ accepted
 A1 -> A1: cycle
   sheet/A1:1: =A1
 -- transform/looped/out/resolve/outcome --
-rejected
+rejected S201
 -- transform/renamed/in/sheet/A2 --
 =B2*2
 -- transform/renamed/in/sheet/B2 --

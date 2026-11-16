@@ -13,7 +13,7 @@ malformed
 D1: not a number or a formula: "total"
   sheet/D1:1: total
 -- out/calc/outcome --
-rejected
+rejected S101
 -- out/evaluate/outcome --
 blocked parse
 -- out/format/outcome --
@@ -22,6 +22,6 @@ blocked parse
 D1: not a number or a formula: "total"
   sheet/D1:1: total
 -- out/parse/outcome --
-rejected
+rejected S101
 -- out/resolve/outcome --
 blocked parse
