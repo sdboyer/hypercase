@@ -10,7 +10,6 @@ import (
 	"github.com/sdboyer/jenny"
 )
 
-// doc:begin types
 type Sheet struct{ fs.FS } // in/sheet/A1, in/sheet/B1, …
 
 // doc:begin transforms
@@ -86,5 +85,3 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 		return sheet.Resolve(p)
 	},
 }
-
-// doc:end types
