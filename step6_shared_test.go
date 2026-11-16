@@ -162,14 +162,18 @@ func TestRootCheckLiftSuiteNameUntested(t *testing.T) {
 }
 
 // TestRootCheckCorpusTypes: two corpus types of one directory under one
-// corpus root fail the root-package check. Under two roots, neither
-// refuses.
+// corpus root fail the root-package check, even when one is a registry's
+// in a package with no _test.go file. Under two roots, neither refuses.
 func TestRootCheckCorpusTypes(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared-ladder")
 	s.passes(s.update("ladder-a"))
 	s.passes(s.run("b", "ladder-b-grid", true))
-	s.fails(s.normal("ladder-a"), "the corpus directory script has two different corpus types:\n  .: github.com/sdboyer/hypercase_test.Script: \"Trees of instructions, under in/<tree>/, that the fixtures' columns follow.\"\n  ./b: github.com/sdboyer/hypercase_test.Grid: \"A grid, in the script directory.\"\nAn archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration.")
+	twoTypes := "the corpus directory script has two different corpus types:\n  .: github.com/sdboyer/hypercase_test.Script: \"Trees of instructions, under in/<tree>/, that the fixtures' columns follow.\"\n  ./b: github.com/sdboyer/hypercase_test.Grid: \"A grid, in the script directory.\"\nAn archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration."
+	s.fails(s.normal("ladder-a"), twoTypes)
+	s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
+	s.fails(s.normal("ladder-a"), "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.", twoTypes)
+	s.write("b/corpus_test.go", []byte(packageTestFile), "restore b's tests")
 	s.run("b", "ladder-b-grid-other", true)
 	s.lacks(s.normal("ladder-a"), "two different corpus types")
 	s.done()
