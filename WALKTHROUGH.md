@@ -315,6 +315,7 @@ what it registers (step 5).
 The project tells git that archives are not text, so no checkout rewrites
 their line endings. Its `.gitattributes` holds:
 
+<!-- source: walkthrough/sheets/.gitattributes -->
 ```
 *.txtar -text
 ```
