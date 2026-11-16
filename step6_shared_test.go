@@ -119,6 +119,12 @@ func TestRootCheckLiftUsedUntested(t *testing.T) {
 // suite named like a lift that another package uses collides with it, and
 // is no owner of the lift, which no package then owns. A suite named like
 // a lift another package owns is that column owned twice.
+//
+// Its transcript records today's messages, a known gap that waits on
+// github.com/sdboyer/hypercase/issues/31: beside the collision, the
+// no-owner message still says to own the lift, which makes the column
+// owned twice, and the duplicate-column message doesn't say which owner
+// is a suite, and offers hypercase.Use to both.
 func TestRootCheckLiftSuiteName(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared-ladder")
