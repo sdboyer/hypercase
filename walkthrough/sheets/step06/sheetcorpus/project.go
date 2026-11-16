@@ -2,7 +2,6 @@
 package sheetcorpus
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io/fs"
@@ -17,31 +16,42 @@ var Project = decl.Project{
 	RenderError: renderError,
 }
 
-// renderError writes the error's text, then quotes each line it points at.
+// renderError writes the error's text, then quotes each line it points at. A
+// position about a file as a whole names only the file.
 func renderError(in fs.FS, err error) []byte {
 	out := []byte(err.Error() + "\n")
 	for _, p := range sheet.Positions(err) {
-		out = fmt.Appendf(out, "  %s:%d: %s\n", p.Path, p.Line, lineAt(in, p.Path, p.Line))
+		switch line := lineAt(in, p.Path, p.Line); {
+		case p.Line == 0:
+			out = fmt.Appendf(out, "  %s\n", p.Path)
+		case line == "":
+			out = fmt.Appendf(out, "  %s:%d\n", p.Path, p.Line)
+		default:
+			out = fmt.Appendf(out, "  %s:%d: %s\n", p.Path, p.Line, line)
+		}
 	}
 	return out
 }
 
 // doc:end project
 
-// lineAt is line n of the file at path in in, or its first line when n is
-// 0.
+// lineAt is line n, counted from 1, of the file at path in in, or "" when
+// there is no such line.
 func lineAt(in fs.FS, path string, n int) string {
 	b, err := fs.ReadFile(in, path)
 	if err != nil {
 		return ""
 	}
-	s := bufio.NewScanner(bytes.NewReader(b))
-	for i := 1; s.Scan(); i++ {
-		if i == n || n == 0 {
-			return s.Text()
+	for i := 1; ; i++ {
+		line, rest, found := bytes.Cut(b, []byte("\n"))
+		if i == n {
+			return string(line)
 		}
+		if !found {
+			return ""
+		}
+		b = rest
 	}
-	return ""
 }
 
 var Circular = decl.Property{

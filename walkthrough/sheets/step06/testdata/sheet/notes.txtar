@@ -1,0 +1,13 @@
+A note kept beside the cells, in a file that is not a cell.
+-- in/sheet/A1 --
+1
+-- in/sheet/notes --
+remember the milk
+-- properties --
+malformed
+-- out/calc/error.txt --
+notes: not a cell name
+  sheet/notes
+-- out/parse/error.txt --
+notes: not a cell name
+  sheet/notes
