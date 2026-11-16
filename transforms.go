@@ -171,7 +171,8 @@ func (v *plannedVariant) runs() bool {
 // order written, then one per transform of its corpus type, by name. Each
 // transform runs here, on the base's input view, since whether its variant
 // has cells sets the count of each suite's cells, which doesn't depend on
-// -run. The view is made once, if a transform runs, and dropped after.
+// -run. It makes the view if a transform runs, and drops it once the
+// archive is planned; runCase makes it again for the base's cells.
 func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []*plannedVariant {
 	var vs []*plannedVariant
 	committed := map[string]archive.VariantCase{}
