@@ -29,7 +29,7 @@ rules below.
 4. **No internals.** The repo is public. Issues, PRs, code, comments,
    examples and test data carry nothing from a private system: no internal
    hostnames, service names, error codes, ticket keys, account ids or
-   people. Examples use the walkthrough's toy domains.
+   people. Examples use the walkthrough's toy domain, the sheets.
 5. **Adversarial review before a PR leaves draft:** `/code-review` at high
    effort or above.
 6. **Every review finding becomes a corpus case, fixed or not** (or a test,

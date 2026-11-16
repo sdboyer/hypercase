@@ -1474,7 +1474,17 @@ whether each has a probe, and whether the package owns it.
 **Known gaps in a transform's variant.** A known gap in a cell of a
 transform's variant is a line in the base's `gaps` section that names the
 transform. Its format (proposed) is `transform/<name>`, one space, the
-column's name, one space, then the text.
+column's name, one space, then the text. In `negative`, whose `renamed`
+variant moves the negative number to A2 and errs the same wrong way as the
+base:
+
+```
+-- gaps --
+parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
+calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+transform/renamed parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
+transform/renamed calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+```
 
 **Section order, whole.**
 
