@@ -696,8 +696,9 @@ column rejects.
   cell fails, in every run, updates included.
 - The one exception is for upgrades. An update adds to a frozen cell a
   framework file the cell lacks (`outcome` at step 8, `inputs` at step 11),
-  only when the cell's existing files match today's run. It never changes or
-  removes a file the cell has.
+  only when the cell's existing files match today's run and nothing else in
+  the run keeps an update from writing the cell. It never changes or removes
+  a file the cell has.
 - A person resolves a failing frozen cell: remove the line (the gap is
   closed, and the next update writes the cell), or delete the cell's files
   (the wrong behavior changed shape, and the next update writes them).
@@ -1963,9 +1964,11 @@ whether the project supplies `Codes`.
 - A frozen cell's `outcome` is one of its files. A cell frozen before this
   step has none: a normal run fails on the missing file and says to run the
   update, and the update adds it when the cell's other files match the run.
-  A cell whose files differ gains nothing and fails as before. That upgrade,
-  of `outcome` here and `inputs` at step 11, is the one write an update makes
-  to a frozen cell, and it never changes or removes a file the cell has.
+  A cell whose files differ gains nothing and fails as before, and so does
+  one whose run fails in a way that keeps an update from writing a cell,
+  such as an output no declaration matches. That upgrade, of `outcome` here
+  and `inputs` at step 11, is the one write an update makes to a frozen
+  cell, and it never changes or removes a file the cell has.
 - Between two revisions, a cell moves on two axes: outcome and bytes.
 
 **The `outcome` format** (proposed).

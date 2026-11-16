@@ -102,3 +102,50 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
             --- PASS: TestCorpus/script/unwritten/echo
 FAIL
 [exit 1]
+$ edit testdata/script/negative.txtar  # restore the frozen cell
+$ edit testdata/script/negative.txtar  # drop the outcome, and give the run an undeclared output, committed too
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/negative: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        out/echo/zz.undeclared is not declared.
+        Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/accepted-loop
+            --- PASS: TestCorpus/script/accepted-loop/echo
+        --- PASS: TestCorpus/script/div-zero
+            --- PASS: TestCorpus/script/div-zero/echo
+        --- FAIL: TestCorpus/script/negative
+            --- FAIL: TestCorpus/script/negative/echo
+        --- PASS: TestCorpus/script/other-column
+            --- PASS: TestCorpus/script/other-column/echo
+        --- PASS: TestCorpus/script/out-of-place
+            --- PASS: TestCorpus/script/out-of-place/echo
+        --- PASS: TestCorpus/script/unwritten
+            --- PASS: TestCorpus/script/unwritten/echo
+FAIL
+[exit 1]
+$ go test  # rejects
+    testdata/script/other-column.txtar: gaps, line 1, names format, and no registry has a column of that name over the corpus script.
+        Register the column, or remove the line.
+    script/negative: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        out/echo/zz.undeclared is not declared.
+        Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/accepted-loop
+            --- PASS: TestCorpus/script/accepted-loop/echo
+        --- PASS: TestCorpus/script/div-zero
+            --- PASS: TestCorpus/script/div-zero/echo
+        --- FAIL: TestCorpus/script/negative
+            --- FAIL: TestCorpus/script/negative/echo
+        --- PASS: TestCorpus/script/other-column
+            --- PASS: TestCorpus/script/other-column/echo
+        --- PASS: TestCorpus/script/out-of-place
+            --- PASS: TestCorpus/script/out-of-place/echo
+        --- PASS: TestCorpus/script/unwritten
+            --- PASS: TestCorpus/script/unwritten/echo
+FAIL
+[exit 1]

@@ -103,7 +103,8 @@ func TestClassifierRefusals(t *testing.T) {
 // A normal run fails on it, and says to run the update, which adds the
 // outcome and changes nothing else, when the cell's other files match the
 // run. A frozen cell whose files differ gains nothing, and fails as
-// before.
+// before, and so does one whose run fails in a way that keeps an update
+// from writing a cell.
 func TestFrozenOutcome(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "gaps")
@@ -125,6 +126,24 @@ func TestFrozenOutcome(t *testing.T) {
 	s.lacks(r, "which every cell has")
 	s.fails(s.update("rejects"), want)
 	s.same(negative, edited)
+
+	// A frozen cell whose run fails otherwise gains no outcome: an update
+	// writes nothing for it, and no run says to add one.
+	s.write(negative, before, "restore the frozen cell")
+	s.edit(negative, "drop the outcome, and give the run an undeclared output, committed too", func(a *archive.Archive) {
+		drop("out/echo/outcome")(a)
+		insert("in/do/out/zz.undeclared", "z\n", "gaps")(a)
+		set("out/echo/zz.undeclared", "z\n")(a)
+	})
+	edited = s.read(negative)
+	undeclared := "out/echo/zz.undeclared is not declared.\n    Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell."
+	r = s.update("rejects")
+	s.fails(r, undeclared)
+	s.lacks(r, "which every cell has")
+	s.same(negative, edited)
+	r = s.normal("rejects")
+	s.fails(r, undeclared)
+	s.lacks(r, "which every cell has")
 	s.done()
 }
 
