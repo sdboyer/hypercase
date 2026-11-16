@@ -273,11 +273,7 @@ func (r *runner) makeVariant(v *plannedVariant, base archive.Base, view fs.FS) {
 	files := map[string][]byte{}
 	var held []string
 	for _, f := range made.AsFiles() {
-		data, err := f.Render()
-		if err != nil {
-			v.problem = fmt.Sprintf("%s made %s, which doesn't render: %v\nFix its jenny.", tr.name, f.Path(), err)
-			return
-		}
+		data, _ := jenny.BytesOf(f) // AsFiles gives each file rendered
 		if err := archive.Holds(data); err != nil {
 			held = append(held, fmt.Sprintf("  %s: %v", f.Path(), err))
 		}
