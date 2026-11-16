@@ -283,17 +283,10 @@ func keyValue(line string) bool {
 	return true
 }
 
-// View returns the case's input view: every section under in/, with the
-// prefix removed.
-func (a *Archive) View() fs.FS {
-	files := map[string][]byte{}
-	for _, s := range a.Sections {
-		if rest, ok := strings.CutPrefix(s.Name, In+"/"); ok {
-			files[rest] = s.Data
-		}
-	}
-	return NewFS(files)
-}
+// View returns the base's input view: every section under in/, with the
+// prefix removed. It reads the base, as [Archive.Base] does; read the Base
+// once to make the views of the base and its variants.
+func (a *Archive) View() fs.FS { return a.Base().View() }
 
 // HandWrittenSections returns the archive's hand-written sections, in the
 // order the file holds them.

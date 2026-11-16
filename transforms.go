@@ -174,9 +174,8 @@ func (v *plannedVariant) runs() bool {
 
 // planVariants plans an archive's variants: its hand-written ones, in the
 // order written, then one per transform of its corpus type, by name.
-func (r *runner) planVariants(p *plan, a *archive.Archive) []*plannedVariant {
+func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []*plannedVariant {
 	var vs []*plannedVariant
-	base := a.Base()
 	committed := map[string]archive.VariantCase{}
 	for _, v := range a.Variants() {
 		if v.Kind == archive.Transform {

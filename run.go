@@ -279,6 +279,7 @@ type plannedCase struct {
 	path     string
 	data     []byte
 	a        *archive.Archive
+	base     archive.Base // read once, for the base's cells and the variants'
 	variants []*plannedVariant
 }
 
@@ -351,7 +352,8 @@ func (r *runner) planCorpus(t *testing.T, p *plan) []plannedCase {
 			t.Logf("%s has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.", r.rel(path))
 			continue
 		}
-		cases = append(cases, plannedCase{name: name, path: path, data: data, a: a, variants: r.planVariants(p, a)})
+		base := a.Base()
+		cases = append(cases, plannedCase{name: name, path: path, data: data, a: a, base: base, variants: r.planVariants(p, a, base)})
 	}
 	return cases
 }
@@ -470,7 +472,7 @@ func (r *runner) runCase(t *testing.T, p *plan, pc plannedCase) {
 		}
 	}
 	base := r.newCase(p, pc, "", pc.a.Comment, archive.Gaps, pc.a.Properties(), gaps)
-	base.setView(p, pc.a.View())
+	base.setView(p, pc.base.View())
 	w := &caseWrites{set: map[string][]byte{}}
 	r.runCells(t, base, p.cols, w)
 	for _, v := range pc.variants {
