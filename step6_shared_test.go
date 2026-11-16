@@ -143,6 +143,24 @@ func TestRootCheckLiftSuiteName(t *testing.T) {
 	s.done()
 }
 
+// TestRootCheckLiftSuiteNameUntested: a suite named like a used lift, and
+// an owner of the lift with no _test.go file, fail together: the
+// collision, and the lift owned by no package, naming the untested
+// owner. The messages wait on the same issue as TestRootCheckLiftSuiteName.
+func TestRootCheckLiftSuiteNameUntested(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared-ladder")
+	s.passes(s.update("ladder-a-useonly"))
+	s.write("c/corpus_test.go", []byte(packageTestFile), "a package c over the corpus")
+	s.passes(s.run("c", "ladder-b-owns", true))
+	s.remove("c/corpus_test.go", "remove c's tests, and leave its registry")
+	s.passes(s.run("b", "ladder-b-suite", true))
+	s.fails(s.normal("ladder-a-useonly"),
+		"the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root.\nRename the suite or the lift.",
+		"the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registry of ./c records that its package owns the lift, and ./c holds no _test.go file, so no test runs the lift there.\nRestore the tests of ./c, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.")
+	s.done()
+}
+
 // TestRootCheckCorpusTypes: two corpus types of one directory under one
 // corpus root fail the root-package check. Under two roots, neither
 // refuses.
