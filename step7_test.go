@@ -498,7 +498,8 @@ func TestTransformJennyChanges(t *testing.T) {
 // whose committed inputs differ from what its transform makes notes it
 // once for the variant, however a cell fails: here a run that fails its
 // test through its testing.TB, a probe that says no with no reason, and a
-// frozen cell, which the note says no update rewrites.
+// frozen cell, which the note says no update rewrites, and names if it
+// failed.
 func TestTransformStaleInputs(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -523,7 +524,20 @@ func TestTransformStaleInputs(t *testing.T) {
 		set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n")(a)
 	})
 	s.fails(s.run("b", "tr-b", false), "The cell is frozen by its known gap, gaps line 1: \"transform/upper copy Waits on sheets#9.\"",
-		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n- A1 SEVEN\n+ A1 SIX\nA normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, here copy's: no update writes a cell its known gap freezes, and a normal run checks what it produces on the rewritten inputs against its committed files.")
+		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n- A1 SEVEN\n+ A1 SIX\nA normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, which no update writes. A normal run checks each frozen cell that failed, here copy's, again on the rewritten inputs, against its committed files.")
+
+	// The note names only the frozen cells that failed: not one that
+	// passes, nor one its probe skips.
+	s.write(twice, settled, "restore the settled archive")
+	s.passes(s.run("b", "tr-b-keep", true))
+	s.edit(twice, "mark upper's cells of copy and keep, and add a probe instruction to upper's input by hand", func(a *archive.Archive) {
+		insert("gaps", "transform/upper copy Waits on sheets#9.\ntransform/upper keep Waits on sheets#10.\n", "out/")(a)
+		insert("transform/upper/in/do/probe", "not for copy\n", "transform/upper/out/")(a)
+	})
+	r := s.run("b", "tr-b-keep", false)
+	s.fails(r, "gaps, line 1, marks the cell, and copy's probe says the case isn't for it: not for copy",
+		"A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, which no update writes.\n")
+	s.lacks(r, "A normal run checks each frozen cell that failed", "keep's", "--- FAIL: TestCorpus/script/twice/transform/upper/keep")
 	s.done()
 }
 

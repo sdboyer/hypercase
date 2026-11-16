@@ -478,8 +478,9 @@ func (r *runner) runCase(t *testing.T, p *plan, pc plannedCase) {
 }
 
 // runCells runs a case's cells, one subtest each, named for its column, and
-// adds what an update writes for them to w.
-func (r *runner) runCells(t *testing.T, c *aCase, cols []*column, w *caseWrites) {
+// adds what an update writes for them to w. It returns each cell's result,
+// in the order of cols.
+func (r *runner) runCells(t *testing.T, c *aCase, cols []*column, w *caseWrites) []*cellResult {
 	results := make([]*cellResult, len(cols))
 	for i := range cols {
 		results[i] = &cellResult{}
@@ -502,6 +503,7 @@ func (r *runner) runCells(t *testing.T, c *aCase, cols []*column, w *caseWrites)
 			}
 		}
 	}
+	return results
 }
 
 // caseWrites is what an update writes to one archive: the sections it
@@ -588,6 +590,9 @@ type cellResult struct {
 	ran      bool
 	writable bool              // whether an update writes the cell's files
 	files    map[string][]byte // the cell's outputs, by path under out/<column>/
+	// frozenDiffers records a frozen cell whose run produced files other
+	// than its committed ones.
+	frozenDiffers bool
 }
 
 // The names the framework owns directly under a column's directory.
@@ -720,6 +725,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			}
 		}
 		if len(diffs) > 0 {
+			res.frozenDiffers = true
 			m.add("The cell is frozen by its known gap, %s line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s\nIf the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.", c.gapsAt, gap.Line, gap.Raw, strings.Join(diffs, "\n"))
 		}
 	} else {
