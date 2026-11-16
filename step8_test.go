@@ -155,6 +155,17 @@ func TestOutcomeFailures(t *testing.T) {
 		s.lacks(r, "the next update writes")
 	}
 	s.same(clError, committed)
+	s.edit(clError, "commit a file the run doesn't give, and the values.txt it does", func(a *archive.Archive) {
+		insert("out/echo/g.txt", "x\n", "out/echo/outcome")(a)
+		set("out/echo/values.txt", "A1 6\n")(a)
+	})
+	committed = s.read(clError)
+	for _, update := range []bool{false, true} {
+		r := s.run(".", "outcomes", update)
+		s.fails(r, frozen+"    out/echo/g.txt is no longer produced\n    The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.")
+		s.lacks(r, "the next update writes")
+	}
+	s.same(clError, committed)
 	s.done()
 }
 
