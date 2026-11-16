@@ -11,17 +11,19 @@ import (
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step07/sheetcorpus"
 )
 
-// doc:begin format
+// doc:begin register
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
 		hypercase.Root("step07"),
-		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.Circular, sheetcorpus.Dangling,
 		sheetcorpus.SheetType,
 		hypercase.Use(sheetcorpus.Parse), // computed here; parse's sections are left alone
 		hypercase.Own(format),
 	)
 }
+
+// doc:end register
 
 var format = hypercase.Suite[*sheet.Parsed]{
 	Name:        "format",
@@ -39,7 +41,5 @@ var format = hypercase.Suite[*sheet.Parsed]{
 		return []hypercase.File{{Path: "formulas.txt", Data: sheet.Format(p)}}, nil
 	},
 }
-
-// doc:end format
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }

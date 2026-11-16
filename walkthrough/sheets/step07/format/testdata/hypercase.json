@@ -13,10 +13,6 @@
     {
       "name": "dangling",
       "description": "Some formula refers to a cell the sheet doesn't have."
-    },
-    {
-      "name": "malformed",
-      "description": "Some cell holds neither a number nor a formula."
     }
   ],
   "types": [

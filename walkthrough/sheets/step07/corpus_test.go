@@ -11,7 +11,7 @@ import (
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step07/sheetcorpus"
 )
 
-// doc:begin evaluate
+// doc:begin register
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
@@ -23,6 +23,8 @@ func init() {
 		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
 	)
 }
+
+// doc:end register
 
 var evaluate = hypercase.Suite[*sheet.Graph]{
 	Name:        "evaluate",
@@ -36,5 +38,3 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 }
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }
-
-// doc:end evaluate
