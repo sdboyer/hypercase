@@ -1584,23 +1584,29 @@ Go code that makes a variant from the base, and the update writes its
 variant's sections.
 
 Proposed names: `decl.Transform` with its `Name`, `Description`, `Gives`,
-`Keeps`, `Probe` and `Run` fields, and `decl.Type`'s `Transforms` field. The
-variant prefixes `variant/<name>/` and `transform/<name>/` are proposed.
+`Keeps`, `Probe` and `Jenny` fields, and `decl.Type`'s `Transforms` field.
+The variant prefixes `variant/<name>/` and `transform/<name>/` are proposed.
 Trade-off: the prefix says whether a person or an update wrote the variant,
 at the cost of two reserved top-level names and longer section paths.
 
+A transform's `Jenny` is a
+[jenny](https://pkg.go.dev/github.com/sdboyer/jenny): a named generator
+function, which here generates the variant's whole input view from the
+base. `walkthrough/sheets/step07/sheetcorpus/types.go` declares both
+transforms and lists them in the corpus type. Beside them, `view` gives each
+file of the sheet that `sheet.Loop` or `sheet.MoveDown` returns as one of the
+jenny's files:
+
+<!-- source: walkthrough/sheets/step07/sheetcorpus/types.go#transforms -->
 ```go
-// walkthrough/sheets/step07/sheetcorpus/types.go
 var Looped = decl.Transform[Sheet]{
 	Name:        "looped",
 	Description: "The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.",
 	Gives:       []decl.Property{Circular},
-	Probe: func(base Sheet) (why string, ok bool) {
-		// declines an empty sheet, and one whose first cell already refers to itself
-	},
-	Run: func(archive string, base Sheet) (fs.FS, error) {
-		// the base, with its first cell replaced
-	},
+	Probe:       func(base Sheet) (why string, ok bool) { return sheet.Loopable(base) },
+	Jenny: jenny.For[Sheet]().New("looped", func(base Sheet) (jenny.Files, error) {
+		return view(sheet.Loop(base))
+	}),
 }
 
 var Renamed = decl.Transform[Sheet]{
@@ -1608,11 +1614,14 @@ var Renamed = decl.Transform[Sheet]{
 	Description: "Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.",
 	Keeps:       []decl.Property{Circular, Dangling},
 	Probe: func(base Sheet) (why string, ok bool) {
-		// declines an empty sheet
+		if entries, _ := fs.ReadDir(base, "sheet"); len(entries) == 0 {
+			return "the sheet has no cells", false
+		}
+		return "", true
 	},
-	Run: func(archive string, base Sheet) (fs.FS, error) {
-		return sheet.MoveDown(base)
-	},
+	Jenny: jenny.For[Sheet]().New("renamed", func(base Sheet) (jenny.Files, error) {
+		return view(sheet.MoveDown(base))
+	}),
 }
 
 var SheetType = decl.Type[Sheet]{
@@ -1622,49 +1631,144 @@ var SheetType = decl.Type[Sheet]{
 }
 ```
 
-One package owns each transform. The root package adds
-`hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed)` to its
-registration.
+One package owns each transform. The root package,
+`walkthrough/sheets/step07/corpus_test.go`, adds both to its registration:
+
+<!-- source: walkthrough/sheets/step07/corpus_test.go#register -->
+```go
+func init() {
+	hypercase.Register(
+		sheetcorpus.Project,
+		hypercase.Root("step07"),
+		hypercase.RootPackage(),
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.SheetType,
+		hypercase.Own(sheetcorpus.Parse, sheetcorpus.Resolve, evaluate),
+		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
+	)
+}
+```
+
+Every package that registers the corpus type registers the properties its
+transforms give and keep. `walkthrough/sheets/step07/format/corpus_test.go`
+adds `circular` and `dangling`, which `cli/` registers already for its
+`Rejects`:
+
+<!-- source: walkthrough/sheets/step07/format/corpus_test.go#register -->
+```go
+func init() {
+	hypercase.Register(
+		sheetcorpus.Project,
+		hypercase.Root("step07"),
+		sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.SheetType,
+		hypercase.Use(sheetcorpus.Parse), // computed here; parse's sections are left alone
+		hypercase.Own(format),
+	)
+}
+```
 
 ### How the files change
 
-Archives gain variants. `testdata/sheet/twice.txtar`, with two hand-written
-variants and both transforms' variants, and its `calc` and `format` sections
-left out. `evaluate` is blocked on every variant but `transform/renamed`:
+Archives gain variants. `testdata/sheet/twice.txtar` has two hand-written
+variants and both transforms' variants. `evaluate` is blocked on every
+variant but `transform/renamed`:
 
+<!-- source: walkthrough/sheets/step07/testdata/sheet/twice.txtar -->
 ```
 A1 is twice B1.
 -- in/sheet/A1 --
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/calc/outcome --
+accepted
+-- out/calc/stdout.txt --
+6,3
+-- out/evaluate/outcome --
+accepted
 -- out/evaluate/values.txt --
 A1 6
 B1 3
+-- out/format/formulas.txt --
+A1 =B1 * 2
+-- out/format/outcome --
+accepted
+-- out/parse/outcome --
+accepted
+-- out/resolve/outcome --
+accepted
 -- variant/cycle/about --
 B1 refers back to A1, so the sheet has a cycle.
 -- variant/cycle/properties --
 circular
 -- variant/cycle/in/sheet/B1 --
 =A1
+-- variant/cycle/out/calc/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1*2
+  sheet/B1:1: =A1
+-- variant/cycle/out/calc/outcome --
+rejected
+-- variant/cycle/out/evaluate/outcome --
+blocked resolve
+-- variant/cycle/out/format/formulas.txt --
+A1 =B1 * 2
+B1 =A1
+-- variant/cycle/out/format/outcome --
+accepted
+-- variant/cycle/out/parse/outcome --
+accepted
 -- variant/cycle/out/resolve/error.txt --
 A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1*2
   sheet/B1:1: =A1
+-- variant/cycle/out/resolve/outcome --
+rejected
 -- variant/missing/about --
 B1 is gone, so A1 refers to a cell that doesn't exist.
 -- variant/missing/properties --
 dangling
 -- variant/missing/delete --
 sheet/B1
+-- variant/missing/out/calc/error.txt --
+A1: B1 doesn't exist
+  sheet/A1:1: =B1*2
+-- variant/missing/out/calc/outcome --
+rejected
+-- variant/missing/out/evaluate/outcome --
+blocked resolve
+-- variant/missing/out/format/formulas.txt --
+A1 =B1 * 2
+-- variant/missing/out/format/outcome --
+accepted
+-- variant/missing/out/parse/outcome --
+accepted
 -- variant/missing/out/resolve/error.txt --
 A1: B1 doesn't exist
   sheet/A1:1: =B1*2
+-- variant/missing/out/resolve/outcome --
+rejected
 -- transform/looped/in/sheet/A1 --
 =A1
+-- transform/looped/out/calc/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/calc/outcome --
+rejected
+-- transform/looped/out/evaluate/outcome --
+blocked resolve
+-- transform/looped/out/format/formulas.txt --
+A1 =A1
+-- transform/looped/out/format/outcome --
+accepted
+-- transform/looped/out/parse/outcome --
+accepted
 -- transform/looped/out/resolve/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/resolve/outcome --
+rejected
 -- transform/renamed/in/sheet/A2 --
 =B2*2
 -- transform/renamed/in/sheet/B2 --
@@ -1672,9 +1776,24 @@ A1 -> A1: cycle
 -- transform/renamed/delete --
 sheet/A1
 sheet/B1
+-- transform/renamed/out/calc/outcome --
+accepted
+-- transform/renamed/out/calc/stdout.txt --
+,
+6,3
+-- transform/renamed/out/evaluate/outcome --
+accepted
 -- transform/renamed/out/evaluate/values.txt --
 A2 6
 B2 3
+-- transform/renamed/out/format/formulas.txt --
+A2 =B2 * 2
+-- transform/renamed/out/format/outcome --
+accepted
+-- transform/renamed/out/parse/outcome --
+accepted
+-- transform/renamed/out/resolve/outcome --
+accepted
 ```
 
 `hypercase.json` gains each corpus type's transforms, with `Gives`, `Keeps`,
@@ -1720,10 +1839,14 @@ whether each has a probe, and whether the package owns it.
 - Its probe decides from the input only: it receives the base's input view,
   never property names or the archive's name, and gives a reason when it
   declines.
-- Its `Run` receives the archive's name (proposed) and the base's input
-  view, and returns the variant's input view.
+- Its `Jenny` makes the variant's input view from the base's: the files it
+  generates are the variant's whole input view, by their paths in it, such
+  as `sheet/A1`. It receives the base alone, not the archive's name.
 - The registry lists `Gives` and `Keeps`, so every package computes the same
   variants without running anything.
+- A package that registers the corpus type registers each property its
+  transforms give or keep. Without one, the package's run fails before any
+  case runs, naming the property.
 - `looped` makes the first cell refer to itself and gives `circular`, so
   `resolve` is expected to err on every `looped` variant with nothing written
   by hand. `renamed` moves every cell one row down, rewriting each reference,
@@ -1777,14 +1900,76 @@ transform's variant is a line in the base's `gaps` section that names the
 transform. Its format (proposed) is `transform/<name>`, one space, the
 column's name, one space, then the text. In `negative`, whose `renamed`
 variant moves the negative number to A2 and errs the same wrong way as the
-base:
+base, the last two lines freeze that variant's `parse` and `calc` cells.
+Its `looped` variant replaces the number with a cycle, which `resolve`
+rejects rightly, so no line marks it:
 
+<!-- source: walkthrough/sheets/step07/testdata/sheet/negative.txtar -->
 ```
+A1 is a negative number.
+-- in/sheet/A1 --
+-3
 -- gaps --
 parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
 calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 transform/renamed parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
 transform/renamed calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+-- out/calc/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/parse/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
+-- out/parse/outcome --
+rejected
+-- out/resolve/outcome --
+blocked parse
+-- transform/looped/in/sheet/A1 --
+=A1
+-- transform/looped/out/calc/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/calc/outcome --
+rejected
+-- transform/looped/out/evaluate/outcome --
+blocked resolve
+-- transform/looped/out/format/formulas.txt --
+A1 =A1
+-- transform/looped/out/format/outcome --
+accepted
+-- transform/looped/out/parse/outcome --
+accepted
+-- transform/looped/out/resolve/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/resolve/outcome --
+rejected
+-- transform/renamed/in/sheet/A2 --
+-3
+-- transform/renamed/delete --
+sheet/A1
+-- transform/renamed/out/calc/error.txt --
+A2: unexpected "-"
+  sheet/A2:1: -3
+-- transform/renamed/out/calc/outcome --
+rejected
+-- transform/renamed/out/evaluate/outcome --
+blocked parse
+-- transform/renamed/out/format/outcome --
+blocked parse
+-- transform/renamed/out/parse/error.txt --
+A2: unexpected "-"
+  sheet/A2:1: -3
+-- transform/renamed/out/parse/outcome --
+rejected
+-- transform/renamed/out/resolve/outcome --
+blocked parse
 ```
 
 **Section order, whole.**
