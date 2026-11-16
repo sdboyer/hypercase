@@ -1655,12 +1655,12 @@ whether each has a probe, and whether the package owns it.
   inputs, and the cell passes. It fails until a person deletes its files,
   which the next update writes, or removes its `gaps` line, after which
   the next update writes the cell.
-- A package's update alone, after a transform changed, writes the
-  variant's cells on what the transform makes, while its normal run reads
-  the sections the owner has yet to rewrite. A cell whose output on those
-  sections differs from what the update wrote fails, and the failure shows
-  how the sections differ from what the transform makes, and names the
-  module's update.
+- The update of a package that doesn't own the transform, alone, after the
+  transform changed, writes the variant's cells on what the transform
+  makes, while its normal run reads the sections the owner has yet to
+  rewrite. A cell whose output on those sections differs from what the
+  update wrote fails, and the failure shows how the sections differ from
+  what the transform makes, and names the module's update.
 - An update replaces a transform's `in/…` and `delete` whole: a file the
   transform no longer produces is removed, and the removal shows in the diff.
 - When a transform no longer applies to a base, no cell runs on its

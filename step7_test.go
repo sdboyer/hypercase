@@ -496,6 +496,9 @@ func TestTransformJennyChanges(t *testing.T) {
 	// with the owner first too, and with both at once.
 	s.write(twice, before, "restore the archive from before the jenny changed")
 	s.passes(s.update("tr-jenny"))
+	// The owner's update alone rewrites the inputs, so its normal run,
+	// which reads them, passes.
+	s.passes(s.normal("tr-jenny"))
 	s.passes(s.run("b", "tr-b-jenny", true))
 	s.same(twice, settled)
 	s.write(twice, before, "restore the archive from before the jenny changed")
