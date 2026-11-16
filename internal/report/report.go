@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path"
 	"path/filepath"
 	"slices"
@@ -261,7 +262,7 @@ func fileChanges(a, b *cellAt) []FileChange {
 		paths[p] = true
 	}
 	var out []FileChange
-	for _, p := range sortedKeys(paths) {
+	for _, p := range slices.Sorted(maps.Keys(paths)) {
 		da, inA := fa[p]
 		db, inB := fb[p]
 		switch {

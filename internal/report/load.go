@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path"
 	"slices"
 	"strings"
@@ -167,7 +168,7 @@ func load(rev Rev, tree fs.FS, mod, root string) (*snapshot, error) {
 			}
 		}
 	}
-	for _, corpus := range sortedKeys(s.columns) {
+	for _, corpus := range slices.Sorted(maps.Keys(s.columns)) {
 		dir := path.Join(root, "testdata", corpus)
 		entries, err := fs.ReadDir(tree, dir)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -416,13 +417,4 @@ func relTo(dir, p string) string {
 		return p
 	}
 	return strings.TrimPrefix(p, dir+"/")
-}
-
-func sortedKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
 }

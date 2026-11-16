@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -418,7 +419,7 @@ func (r *runner) write(t *testing.T, pc plannedCase, cols []*column, results []*
 	}
 	apply := func(a *archive.Archive) *archive.Archive {
 		next := a.Clone()
-		for _, name := range sortedKeys(own) {
+		for _, name := range slices.Sorted(maps.Keys(own)) {
 			setSection(next, name, own[name])
 		}
 		return next.Place()
@@ -578,7 +579,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		// today's behavior, and no update writes to it.
 		writable = false
 		var diffs []string
-		for _, p := range sortedKeys(files) {
+		for _, p := range slices.Sorted(maps.Keys(files)) {
 			g, ok := goldens[p]
 			switch {
 			case unjudged[p]:
@@ -588,7 +589,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 				diffs = append(diffs, fmt.Sprintf("out/%s/%s differs (-committed +got):\n%s", col.name, p, strings.TrimSuffix(diff.Lines(g, files[p]), "\n")))
 			}
 		}
-		for _, p := range sortedKeys(goldens) {
+		for _, p := range slices.Sorted(maps.Keys(goldens)) {
 			if _, ok := files[p]; !ok {
 				diffs = append(diffs, fmt.Sprintf("out/%s/%s is no longer produced", col.name, p))
 			}
@@ -625,7 +626,7 @@ func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why
 	if marked {
 		m.add("gaps, line %d, marks the cell, and %s's probe says the case isn't for it: %s\nRemove the line, or fix the probe.", gap.Line, col.name, why)
 	}
-	for _, p := range sortedKeys(goldens) {
+	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		m.add("out/%s/%s is recorded, and %s's probe says the case isn't for it: %s\nIf the suite should run on the case, fix the probe. If not, delete the section by hand; %s leaves it in place.", col.name, p, col.name, why, r.updateCmd())
 	}
 	if !m.empty() {
@@ -643,7 +644,7 @@ func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, by 
 	if marked {
 		m.add("gaps, line %d, marks the cell, and the cell is blocked: the lift %s, on %s's path, failed on the case, so the cell runs nothing.\nRemove the line, or fix the lift or the case.", gap.Line, by.name, col.name)
 	}
-	for _, p := range sortedKeys(goldens) {
+	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		m.add("out/%s/%s is recorded, and the cell is blocked: the lift %s, on %s's path, failed on the case.\nIf the cell should run, fix the lift or the case. If not, delete the section by hand; %s leaves it in place.", col.name, p, by.name, col.name, r.updateCmd())
 	}
 	if !m.empty() {
@@ -698,14 +699,14 @@ func (r *runner) outputs(m *msg, c *aCase, col *column, out *called) (files map[
 		}
 	}
 	names := make([]string, 0, len(files))
-	for _, p := range sortedKeys(files) {
+	for _, p := range slices.Sorted(maps.Keys(files)) {
 		names = append(names, archive.Out+"/"+col.name+"/"+p)
 	}
 	for _, p := range archive.Conflicts(names) {
 		m.add("%s can't be held in an archive: %s.\nFix the code. An update writes nothing for this cell.", p.Section, p.Msg)
 		writable = false
 	}
-	for _, p := range sortedKeys(files) {
+	for _, p := range slices.Sorted(maps.Keys(files)) {
 		if unjudged[p] {
 			continue
 		}
@@ -721,7 +722,7 @@ func (r *runner) outputs(m *msg, c *aCase, col *column, out *called) (files map[
 			unjudged[p] = true
 		}
 	}
-	for _, p := range sortedKeys(files) {
+	for _, p := range slices.Sorted(maps.Keys(files)) {
 		if err := archive.Holds(files[p]); err != nil && !unjudged[p] {
 			m.add("out/%s/%s can't be held in an archive: %v.\nFix the code so the output can be held. An update writes nothing for this cell.", col.name, p, err)
 			writable = false
@@ -786,7 +787,7 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 // compare compares a cell's files with its goldens, and reports orphans.
 func (r *runner) compare(m *msg, col *column, files, goldens map[string][]byte, unjudged map[string]bool) {
 	if !r.update {
-		for _, p := range sortedKeys(files) {
+		for _, p := range slices.Sorted(maps.Keys(files)) {
 			g, ok := goldens[p]
 			switch {
 			case unjudged[p]:
@@ -797,7 +798,7 @@ func (r *runner) compare(m *msg, col *column, files, goldens map[string][]byte, 
 			}
 		}
 	}
-	for _, p := range sortedKeys(goldens) {
+	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		if _, ok := files[p]; ok {
 			continue
 		}
@@ -884,13 +885,4 @@ func problemLines(ps []archive.Problem) string {
 		lines[i] = p.String()
 	}
 	return strings.Join(lines, "\n")
-}
-
-func sortedKeys[V any](m map[string]V) []string {
-	ks := make([]string, 0, len(m))
-	for k := range m {
-		ks = append(ks, k)
-	}
-	slices.Sort(ks)
-	return ks
 }
