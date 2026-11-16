@@ -16,7 +16,7 @@ func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
 		hypercase.Root("step12"),
-		sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.Circular, sheetcorpus.Dangling, sheetcorpus.FirstRowEmpty,
 		sheetcorpus.SheetType,
 		hypercase.Use(sheetcorpus.Parse), // computed here; parse's sections are left alone
 		hypercase.Own(format),

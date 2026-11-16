@@ -16,7 +16,7 @@ import (
 )
 
 // properties are those the root package registers.
-var properties = []decl.Property{sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling}
+var properties = []decl.Property{sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling, sheetcorpus.FirstRowEmpty}
 
 // TestHypothesesSay: each hypothesis names its property, one the package
 // registers, describes itself, names its source, and claims at least one

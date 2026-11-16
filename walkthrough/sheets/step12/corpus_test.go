@@ -20,7 +20,7 @@ func init() {
 		sheetcorpus.Project,
 		hypercase.Root("step12"),
 		hypercase.RootPackage(),
-		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling, sheetcorpus.FirstRowEmpty,
 		sheetcorpus.SheetType,
 		hypercase.Own(sheetcorpus.Parse, sheetcorpus.Resolve, evaluate),
 		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
@@ -31,7 +31,7 @@ func init() {
 }
 
 // hypotheses are #20's, written by hand, each owned as a corpus check.
-var hypotheses = []hypothesis{circular, circularRelabelled, circularParsed}
+var hypotheses = []hypothesis{circular, circularRelabelled, circularParsed, firstRowEmpty}
 
 func checksOf(hs []hypothesis) []any {
 	var checks []any

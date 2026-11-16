@@ -31,6 +31,7 @@ var Looped = decl.Transform[Sheet]{
 var Renamed = decl.Transform[Sheet]{
 	Name:        "renamed",
 	Description: "Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.",
+	Gives:       []decl.Property{FirstRowEmpty},
 	Keeps:       []decl.Property{Circular, Dangling},
 	Probe: func(base Sheet) (why string, ok bool) {
 		Runs.Add("renamed")

@@ -13,6 +13,10 @@
     {
       "name": "dangling",
       "description": "Some formula refers to a cell the sheet doesn't have."
+    },
+    {
+      "name": "first-row-empty",
+      "description": "No cell is on the first row."
     }
   ],
   "types": [
@@ -34,7 +38,9 @@
         {
           "name": "renamed",
           "description": "Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.",
-          "gives": [],
+          "gives": [
+            "first-row-empty"
+          ],
           "keeps": [
             "circular",
             "dangling"

@@ -15,7 +15,7 @@ func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
 		hypercase.Root("step12"),
-		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling, sheetcorpus.FirstRowEmpty,
 		sheetcorpus.SheetType,
 		hypercase.Own(calc),
 	)

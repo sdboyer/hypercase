@@ -77,3 +77,10 @@ var Dangling = decl.Property{
 	Name:        "dangling",
 	Description: "Some formula refers to a cell the sheet doesn't have.",
 }
+
+// FirstRowEmpty is a fact about a valid sheet that no column rejects. Only
+// the hypothesis first-row-empty reads it.
+var FirstRowEmpty = decl.Property{
+	Name:        "first-row-empty",
+	Description: "No cell is on the first row.",
+}
