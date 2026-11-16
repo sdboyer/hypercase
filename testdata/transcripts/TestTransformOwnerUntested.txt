@@ -92,8 +92,61 @@ $ rm b/corpus_test.go  # remove b's tests, and leave its registry
 $ go test  # tr-owns-looped
     b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.
         Delete it, or restore the package's tests.
-    the transform upper, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
-        Give it to hypercase.Own in one package that registers its corpus type.
+    the transform upper, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes. The registry of ./b records that its package owns the transform, and ./b holds no _test.go file, so no test runs the transform there.
+        Restore the tests of ./b, or delete its registry and give the transform to hypercase.Own in another package that registers its corpus type.
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+FAIL
+[exit 1]
+$ edit c/corpus_test.go  # a package c over the corpus
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./c  # tr-b-owns
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/copy
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/copy
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/copy
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/copy
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/copy
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/copy
+PASS
+$ rm c/corpus_test.go  # remove c's tests, and leave its registry
+$ go test  # tr-owns-looped
+    b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+    c/testdata/hypercase.json is a registry, and c holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+    the transform upper, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes. The registries of ./b and ./c record that their packages own the transform, and they hold no _test.go file, so no test runs the transform there.
+        Restore the tests of one of them and delete the others' registries, or delete all their registries and give the transform to hypercase.Own in another package that registers its corpus type.
     script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
     script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
     script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps

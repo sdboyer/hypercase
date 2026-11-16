@@ -662,7 +662,9 @@ func TestTransformUnowned(t *testing.T) {
 // TestTransformOwnerUntested: a registry in a package with no _test.go
 // records what no test runs, so its package owns no transform: the
 // root-package check reports the transform as owned by no package, beside
-// the registry no test compares.
+// the registry no test compares, and names each package whose registry
+// records that it owns the transform, so the fix restores its tests or
+// moves the Own, and makes no second owner.
 func TestTransformOwnerUntested(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -676,8 +678,14 @@ func TestTransformOwnerUntested(t *testing.T) {
 	r := s.normal("tr-owns-looped")
 	s.fails(r,
 		"b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.",
-		"the transform upper, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.")
+		"the transform upper, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes. The registry of ./b records that its package owns the transform, and ./b holds no _test.go file, so no test runs the transform there.\nRestore the tests of ./b, or delete its registry and give the transform to hypercase.Own in another package that registers its corpus type.")
 	s.lacks(r, "the transform looped, of testdata/script/, is owned by no package")
+
+	// A second package's registry records it too, and loses its tests.
+	s.write("c/corpus_test.go", []byte(packageTestFile), "a package c over the corpus")
+	s.passes(s.run("c", "tr-b-owns", true))
+	s.remove("c/corpus_test.go", "remove c's tests, and leave its registry")
+	s.fails(s.normal("tr-owns-looped"), "the transform upper, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes. The registries of ./b and ./c record that their packages own the transform, and they hold no _test.go file, so no test runs the transform there.\nRestore the tests of one of them and delete the others' registries, or delete all their registries and give the transform to hypercase.Own in another package that registers its corpus type.")
 	s.done()
 }
 

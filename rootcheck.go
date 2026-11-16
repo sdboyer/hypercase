@@ -69,6 +69,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	propEntries := map[string]map[string][]string{} // property → description → packages
 	propOrder := map[string][]string{}              // property → descriptions, in the order of the packages
 	transforms := map[string]map[string][]string{}  // directory → transform → the packages that own it
+	untestedTrs := map[trKey][]string{}             // transform → the packages with no _test.go file whose registries own it
 	var rootPkgs []string
 	claim := func(owners map[string][]string, name string, corpora []string, pkg string) {
 		owners[name] = append(owners[name], pkg)
@@ -95,7 +96,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		// A registry in a package with no _test.go file records what no
 		// test runs, so its package owns nothing: no column, lift or
 		// transform. Its sections stay claimed, since the registry's own
-		// error reports them.
+		// error reports them, and a message that finds no owner names it.
 		owners := columnPkgs
 		if !g.tested {
 			owners = untestedCols
@@ -125,8 +126,12 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 			for _, tr := range ct.Transforms {
 				pkgs := transforms[ct.Dir][tr.Name]
-				if tr.Owned && g.tested {
+				switch {
+				case tr.Owned && g.tested:
 					pkgs = append(pkgs, g.pkg)
+				case tr.Owned:
+					k := trKey{ct.Dir, tr.Name}
+					untestedTrs[k] = append(untestedTrs[k], g.pkg)
 				}
 				transforms[ct.Dir][tr.Name] = pkgs
 			}
@@ -150,9 +155,17 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(usedPkgs)) {
-		if _, owned := columnPkgs[name]; !owned {
-			t.Errorf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.\nOwn the lift in one of them: give it to hypercase.Own in place of hypercase.Use.", name, andList(usedPkgs[name]))
+		if _, owned := columnPkgs[name]; owned {
+			continue
 		}
+		msg := fmt.Sprintf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.", name, andList(usedPkgs[name]))
+		fix := "Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use."
+		if pkgs := untestedCols[name]; len(pkgs) > 0 {
+			why, restore := untestedOwners("lift", pkgs)
+			msg += " " + why
+			fix = restore + " own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use."
+		}
+		t.Errorf("%s\n%s", msg, fix)
 	}
 	for _, dir := range slices.Sorted(maps.Keys(typeEntries)) {
 		entries := typeEntries[dir]
@@ -175,7 +188,14 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		for _, name := range slices.Sorted(maps.Keys(transforms[dir])) {
 			switch pkgs := transforms[dir][name]; {
 			case len(pkgs) == 0:
-				t.Errorf("the transform %s, of testdata/%s/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.\nGive it to hypercase.Own in one package that registers its corpus type.", name, dir)
+				msg := fmt.Sprintf("the transform %s, of testdata/%s/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.", name, dir)
+				fix := "Give it to hypercase.Own in one package that registers its corpus type."
+				if u := untestedTrs[trKey{dir, name}]; len(u) > 0 {
+					why, restore := untestedOwners("transform", u)
+					msg += " " + why
+					fix = restore + " give the transform to hypercase.Own in another package that registers its corpus type."
+				}
+				t.Errorf("%s\n%s", msg, fix)
 			case len(pkgs) > 1:
 				t.Errorf("the transform %s, of testdata/%s/, is owned by %s. One package owns each transform.\nOwn it in one of them.", name, dir, andList(pkgs))
 			}
@@ -241,6 +261,22 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			r.checkArchive(t, filepath.Join(td, corpus, file), corpus, cols, transforms[corpus], props)
 		}
 	}
+}
+
+// trKey names a transform by its corpus directory and its name.
+type trKey struct{ dir, name string }
+
+// untestedOwners words what the root-package check knows of a lift or
+// transform that no package owns, and that the registries of pkgs, which
+// hold no _test.go file, record their packages own: why no test runs it,
+// and the first half of the fix, which the caller ends.
+func untestedOwners(what string, pkgs []string) (why, restore string) {
+	if len(pkgs) == 1 {
+		return fmt.Sprintf("The registry of %s records that its package owns the %s, and %s holds no _test.go file, so no test runs the %s there.", pkgs[0], what, pkgs[0], what),
+			fmt.Sprintf("Restore the tests of %s, or delete its registry and", pkgs[0])
+	}
+	return fmt.Sprintf("The registries of %s record that their packages own the %s, and they hold no _test.go file, so no test runs the %s there.", andList(pkgs), what, what),
+		"Restore the tests of one of them and delete the others' registries, or delete all their registries and"
 }
 
 // rawEntry is how the root-package check names the raw input view, which

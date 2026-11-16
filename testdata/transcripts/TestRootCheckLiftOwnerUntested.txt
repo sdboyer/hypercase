@@ -72,8 +72,8 @@ PASS
 $ go test  # ladder-a-useonly
     b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.
         Delete it, or restore the package's tests.
-    the lift parse is used by ., and no package owns it, so its error is recorded nowhere.
-        Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
+    the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registry of ./b records that its package owns the lift, and ./b holds no _test.go file, so no test runs the lift there.
+        Restore the tests of ./b, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.
     what ran, in order:
         parse ran on x
         resolve ran on x
