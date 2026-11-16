@@ -203,7 +203,7 @@ func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []
 			tr:        tr,
 		}
 		if v.committed.Inputs {
-			v.invalid = a.InputProblems(base, v.committed)
+			v.invalid = base.InputProblems(v.committed)
 		}
 		for _, g := range gaps {
 			if g.Transform == tr.name {
