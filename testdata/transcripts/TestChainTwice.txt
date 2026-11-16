@@ -55,7 +55,7 @@ $ go test  # chain-twice
         + blocked export
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has no committed outcome, out/export/outcome, which a normal run reads.
-        export accepts the case now, so FIXTURE_UPDATE_GOLDEN=1 go test ./... reruns it and runs import. Delete nothing by hand.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand.
     what ran, in order:
         export ran
 --- FAIL: TestCorpus
@@ -124,3 +124,48 @@ $ go test  # chain-twice
     --- PASS: TestCorpus/script
 FAIL
 [exit 1]
+$ edit testdata/grid/sheet.txtar  # export accepts the grid again, and its error is deleted by hand
+$ go test  # chain-twice
+    grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
+        export: Exports the grid, as its export/ tree says.
+        out/export/outcome differs (-golden +got):
+        - rejected
+        + accepted
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        via/export/import/out/quote/A1 has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
+        import: Imports the export as a script, as its import/ tree says.
+        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome "rejected", in out/export/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand.
+    grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
+        list: Lists the files of the script's input view, with their bytes.
+        out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "blocked export", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand.
+    what ran, in order:
+        export ran
+        import ran
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+    --- FAIL: TestCorpus/grid
+        --- FAIL: TestCorpus/grid/sheet
+            --- FAIL: TestCorpus/grid/sheet/export
+            --- FAIL: TestCorpus/grid/sheet/import
+            --- FAIL: TestCorpus/grid/sheet/list
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-twice
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        export ran
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/sheet
+            --- PASS: TestCorpus/grid/sheet/export
+            --- PASS: TestCorpus/grid/sheet/import
+            --- PASS: TestCorpus/grid/sheet/list
+    --- PASS: TestCorpus/script
+PASS
