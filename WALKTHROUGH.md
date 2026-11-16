@@ -1589,7 +1589,8 @@ Proposed names: `decl.Transform` with its `Name`, `Description`, `Gives`,
 `Keeps`, `Probe` and `Jenny` fields, and `decl.Type`'s `Transforms` field.
 The variant prefixes `variant/<name>/` and `transform/<name>/` are proposed.
 Trade-off: the prefix says whether a person or an update wrote the variant,
-at the cost of two reserved top-level names and longer section paths.
+at the cost of reserving two names, as top-level section names and as
+column names, and of longer section paths.
 
 A transform's `Jenny` is a
 [jenny](https://pkg.go.dev/github.com/sdboyer/jenny): a named generator
@@ -2133,11 +2134,10 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 
 ### How the files change
 
-Every cell of the sheets examples gains an `outcome` file, skipped and
-blocked cells included. The archives shown in steps 3 to 7 come from their
-examples, which carry an `outcome` per cell, as every update writes from
-this step on. Their projects supply no `Codes`, so their rejected cells
-carry none.
+From this step, every cell has an `outcome` file, skipped and blocked cells
+included. The archives shown in steps 3 to 7 have them too: they come from
+their examples, which today's updates write. Their projects supply no
+`Codes`, so their rejected cells carry none.
 
 `testdata/sheet/divide.txtar`, whose `A1` is `=B1/C1` with `C1` at `0`. The
 classifier makes `evaluate`'s outcome `accepted div-zero`, on the base and
