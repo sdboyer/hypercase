@@ -454,14 +454,25 @@ Its `.gitignore` names the corpus root's lock, which an update takes
 - What an update writes to a cell depends only on the inputs and the code,
   never on committed outputs. Committed outputs decide whether a run fails,
   and, from step 4, that a frozen cell is left alone.
-- `hypercase strip` (#16) removes update-written sections, which it
-  recognizes by name, under the corpus root's lock (step 5). A person runs
-  it, never an update. With no flags it strips every archive under the corpus
-  root, and the registry and findings files (steps 5 and 8). `-column <name>`
-  and `-transform <name>` limit it. It leaves frozen cells (step 4) in place
-  and lists them, and `-frozen` strips those too.
+- `hypercase strip`, from `cmd/hypercase` (step 9), removes update-written
+  sections, which it tells from hand-written ones by name alone. Every
+  hand-written section keeps its bytes, and the sections left keep their
+  order. A person runs it, never an update. It strips each archive under
+  the corpus root's lock (step 5), and writes it by temp file and rename.
+- With no flags it strips every archive under the corpus root, and removes
+  the registries that record the root and the findings files in their
+  packages' `testdata/checks/` (steps 5 and 8). `-column <name>` limits it
+  to a column's sections, at every level, and `-transform <name>` to those
+  under a transform's variant (step 7). Either leaves the registries and
+  findings files. `-root <dir>` names the corpus root; without it, strip
+  finds the root as a test does.
+- It leaves frozen cells (step 4) in place and lists them, and `-frozen`
+  strips those too. It leaves an archive with a problem of form, or one no
+  corpus holds, as it was, lists it with the reason, and exits non-zero.
+  Its last line is the update to run next.
 - Stripping and then updating, repeated until an update changes nothing,
-  reaches a known state.
+  reaches what updating the hand-written sections alone reaches, frozen
+  cells excepted: a known state.
 
 **What an archive can't hold** (proposed).
 
@@ -1132,7 +1143,8 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
   - a column two packages register;
   - one property name with two different entries;
   - a section no registry claims, such as `out/<suite>/…` after that suite
-    was removed;
+    was removed, whose failure names `hypercase strip -column <suite>`,
+    then the update;
   - a problem of an archive as a whole: a missing description, a top-level
     name outside the closed set, hand-written sections that don't sit
     together, a `properties`
@@ -1761,7 +1773,8 @@ whether each has a probe, and whether the package owns it.
   its update removes them. What remains under `transform/<name>/out/` is
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
-  root-package check reports them and names the strip command.
+  root-package check reports them, and names `hypercase strip -transform
+  <name>`, then the update.
 - The root-package check fails on a transform that a package with tests
   lists in a corpus type and no package owns (step 5's rule for packages
   with no tests), and on one that two own.
@@ -2448,7 +2461,8 @@ lift.
   in every run. The cells past it are written by an update from what the
   lift makes, so they fail normal runs, which read the committed product,
   until a person resolves the frozen cell. Deleting the cell's files
-  includes deleting its product.
+  includes deleting its product. `hypercase strip` leaves both in place,
+  and `-frozen` strips both.
 - The properties a case states hold for every column the case reaches,
   through the lift too. A CSV with a quote that never closes states
   `unterminated`, which `import` rejects, and a CSV whose imported sheet has
@@ -2461,7 +2475,8 @@ lift.
 - Past a bytes lift, a cell's input view, which `RenderError` receives, is
   that lift's product.
 - The root-package check claims `via/<lift>/…` in a corpus for each bytes
-  lift a package owns over it; any other `via/` section is unclaimed.
+  lift a package owns over it; any other `via/` section is unclaimed, and
+  its failure names `hypercase strip -column <lift>`, then the update.
 - A corpus check (step 8) receives a bytes lift's committed product as its
   cell's `Product`, by each file's path under `via/<lift>/`.
 - `testdata/sheet/prices.txtar` and `testdata/csv/prices.txtar` both reach
