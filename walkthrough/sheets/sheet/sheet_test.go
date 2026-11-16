@@ -553,6 +553,7 @@ func TestLoop(t *testing.T) {
 		{"malformed first cell", map[string]string{"A1": "=A1 +"}, "sheet/A1 \"=A1\\n\"\n"},
 		{"not a cell", map[string]string{"A1": "1", "notes": "1"}, "S101 notes: not a cell name @ sheet/notes:0"},
 		{"only not a cell", map[string]string{"notes": "=notes"}, "S101 notes: not a cell name @ sheet/notes:0"},
+		{"not a cell, and the first cell refers to itself", map[string]string{"A1": "=A1", "notes": "1"}, "S101 notes: not a cell name @ sheet/notes:0"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -568,22 +569,23 @@ func TestLoop(t *testing.T) {
 	}
 }
 
-// Loopable declines exactly the sheets Loop would leave unchanged, and
-// leaves what's wrong with a sheet for Loop to report.
+// Loopable declines exactly the sheets Loop would leave unchanged, with
+// Loop's reason, and leaves what's wrong with a sheet for Loop to report.
 func TestLoopable(t *testing.T) {
 	tests := []struct {
-		name string
-		fsys fstest.MapFS
-		why  string // "" when loopable
+		name   string
+		fsys   fstest.MapFS
+		why    string // "" when loopable
+		broken bool   // loopable, and Loop fails on it
 	}{
-		{"twice", sheetFS(map[string]string{"A1": "=B1*2", "B1": "3"}), ""},
-		{"empty", sheetFS(map[string]string{}), "the sheet has no cells"},
-		{"refers to itself", sheetFS(map[string]string{"A1": "= (A1)\n", "B1": "1"}), "A1 already refers to itself"},
-		{"later cell refers to itself", sheetFS(map[string]string{"A1": "1", "B1": "=B1"}), ""},
-		{"not a cell", sheetFS(map[string]string{"A1": "1", "notes": "1"}), ""},
-		{"not a cell, and the first cell refers to itself", sheetFS(map[string]string{"A1": "=A1", "notes": "1"}), ""},
-		{"a directory", fstest.MapFS{"sheet/A1/x": {}}, ""},
-		{"sheet is a file", fstest.MapFS{"sheet": {}}, ""},
+		{"twice", sheetFS(map[string]string{"A1": "=B1*2", "B1": "3"}), "", false},
+		{"empty", sheetFS(map[string]string{}), "the sheet has no cells", false},
+		{"refers to itself", sheetFS(map[string]string{"A1": "= (A1)\n", "B1": "1"}), "A1 already refers to itself", false},
+		{"later cell refers to itself", sheetFS(map[string]string{"A1": "1", "B1": "=B1"}), "", false},
+		{"not a cell", sheetFS(map[string]string{"A1": "1", "notes": "1"}), "", true},
+		{"not a cell, and the first cell refers to itself", sheetFS(map[string]string{"A1": "=A1", "notes": "1"}), "", true},
+		{"a directory", fstest.MapFS{"sheet/A1/x": {}}, "", true},
+		{"sheet is a file", fstest.MapFS{"sheet": {}}, "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -591,10 +593,12 @@ func TestLoopable(t *testing.T) {
 			if why != tt.why || ok != (tt.why == "") {
 				t.Errorf("got %q, %v; want %q, %v", why, ok, tt.why, tt.why == "")
 			}
-			if _, err := sheet.Loop(tt.fsys); ok && err == nil {
-				return
-			} else if !ok && err == nil {
-				t.Errorf("Loop changed a sheet Loopable declined")
+			_, err := sheet.Loop(tt.fsys)
+			switch {
+			case !ok && (err == nil || err.Error() != why):
+				t.Errorf("Loopable declined with %q, and Loop gave %v", why, err)
+			case ok && tt.broken != (err != nil):
+				t.Errorf("Loop gave %v, on a sheet Loopable let through", err)
 			}
 		})
 	}
