@@ -265,6 +265,9 @@ type Head struct {
 	Format      int    `json:"format"`
 	CorpusRoot  string `json:"corpusRoot"`
 	RootPackage bool   `json:"rootPackage"`
+	// UpdateVar names the project's update variable. It is "" for a
+	// registry that holds none, as one of a later format might.
+	UpdateVar string `json:"updateVar"`
 }
 
 // Peek reads a registry's head, whatever its format, so a reader can tell
@@ -276,6 +279,7 @@ func Peek(data []byte) (Head, error) {
 		Format      int     `json:"format"`
 		CorpusRoot  *string `json:"corpusRoot"`
 		RootPackage bool    `json:"rootPackage"`
+		UpdateVar   string  `json:"updateVar"`
 	}
 	if err := json.Unmarshal(data, &h); err != nil {
 		return Head{}, fmt.Errorf("it is not a registry: %w", err)
@@ -286,7 +290,7 @@ func Peek(data []byte) (Head, error) {
 	case h.CorpusRoot == nil:
 		return Head{}, errors.New("it is not a registry: it names no corpus root")
 	}
-	return Head{Format: h.Format, CorpusRoot: *h.CorpusRoot, RootPackage: h.RootPackage}, nil
+	return Head{Format: h.Format, CorpusRoot: *h.CorpusRoot, RootPackage: h.RootPackage, UpdateVar: h.UpdateVar}, nil
 }
 
 // A Found is a registry file under a module root.
