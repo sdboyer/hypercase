@@ -132,17 +132,15 @@ var (
 )
 
 // located requires every rejected cell's error.txt to start with the
-// cell it is about, as "A1: ". A cell a gaps line marks is excused: its
-// finding names it, with its gap.
+// cell it is about, as "A1: ". A cell a gaps line marks is excused. Each
+// such cell is a finding, with its gap, whatever its outcome, so the
+// findings record every cell's Gap.
 var locatedCheck = hypercase.Check{
 	Name:        "located",
 	Description: "Every rejected cell's error starts with the cell it is about, but a known gap's.",
 	Run: func(cells []hypercase.Cell) ([]string, error) {
 		var findings, unlocated []string
 		for _, c := range cells {
-			if c.Outcome.State != archive.Rejected {
-				continue
-			}
 			name := c.Type + "/" + c.Archive
 			if c.Case != "" {
 				name += "/" + c.Case
@@ -151,7 +149,7 @@ var locatedCheck = hypercase.Check{
 			switch {
 			case c.Gap != "":
 				findings = append(findings, name+" is a known gap: "+c.Gap)
-			case !cellLead.Match(c.Files["error.txt"]):
+			case c.Outcome.State == archive.Rejected && !cellLead.Match(c.Files["error.txt"]):
 				unlocated = append(unlocated, name)
 			}
 		}

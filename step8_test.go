@@ -361,7 +361,9 @@ func TestChecks(t *testing.T) {
 
 // TestCheckGaps: a cell carries the text of the gaps line that marks it:
 // the case's own, or for a transform's variant, the base's line that names
-// the transform. The framework exempts no frozen cell from a check, and a
+// the transform. The check's findings record every cell's gap, so no line
+// reaches a cell it doesn't mark: not the base's, nor another transform's
+// variant's. The framework exempts no frozen cell from a check, and a
 // check that excuses a known gap passes while each cell that violates it
 // is frozen, and fails once a line is removed.
 func TestCheckGaps(t *testing.T) {
