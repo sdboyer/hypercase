@@ -48,11 +48,12 @@ func TestRootCheckLifts(t *testing.T) {
 
 // TestRootCheckLiftOwnerUntested: a registry in a package with no _test.go
 // file owns nothing, though it still claims its sections. A column it and
-// another package own is the other's alone, and a lift it alone owns is
-// owned by no package, which the failure says, naming the package, or
-// each of them when two such packages own it. Nor does such a package use
-// a lift, so the failure never sends a person to it to own the lift, and
-// a suite it owns of the lift's name isn't named as the lift's owner.
+// another package own is the other's alone, and a lift it alone owns,
+// which the root package uses, is owned by no package, which the failure
+// says, naming the package, or each of them when two such packages own
+// it. Nor does such a package use a lift, so the failure never sends a
+// person to it to own the lift, and a suite it owns of the lift's name
+// isn't named as the lift's owner.
 func TestRootCheckLiftOwnerUntested(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared-ladder")
