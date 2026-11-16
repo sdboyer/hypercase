@@ -343,7 +343,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if len(invalid) > 0 {
 			// An update reads what the transform makes instead, and its
 			// owner's rewrites them.
-			t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\nThe module's update, %s, rewrites them, in the package that owns %s.", c.header(), v.name, problemList(invalid), r.updateCmd(), v.name)
+			t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\n%s.", c.header(), v.name, problemList(invalid), r.rewritesInputs(p, v))
 			return
 		}
 		if owner {
@@ -409,7 +409,7 @@ func (r *runner) ownedByAny(dir, name string) bool {
 // transform's variant: the module's, in the package that owns the
 // transform, if a package does.
 func (r *runner) rewritesInputs(p *plan, v *plannedVariant) string {
-	if r.ownedByAny(p.root.dir, v.name) {
+	if r.owned[v.tr] || r.ownedByAny(p.root.dir, v.name) {
 		return fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s", r.updateCmd(), v.name)
 	}
 	return fmt.Sprintf("%s is owned by no package, so no update rewrites them. Give it to hypercase.Own in one package that registers its corpus type, and the module's update, %s, rewrites them there", v.name, r.updateCmd())
