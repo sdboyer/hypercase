@@ -1,0 +1,5 @@
+The run returns stdout.txt/a, and writes to stdout.
+-- in/do/out/stdout.txt/a --
+x
+-- in/do/stdout --
+y

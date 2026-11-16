@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime/debug"
 	"slices"
@@ -665,10 +664,6 @@ func (r *runner) outputs(m *msg, c *aCase, col *column, out *called) (files map[
 			}
 		}
 	}
-	if p, q, ok := fileDirConflict(files); ok {
-		m.add("The run returned an output at %s and another at %s, below it.\nFix the code. An update writes nothing for this cell.", p, q)
-		writable = false
-	}
 	if out.stdout.Len() > 0 {
 		files[stdoutFile] = out.stdout.Bytes()
 	}
@@ -685,6 +680,14 @@ func (r *runner) outputs(m *msg, c *aCase, col *column, out *called) (files map[
 			writable = false
 			unjudged[errorFile] = true
 		}
+	}
+	names := make([]string, 0, len(files))
+	for _, p := range sortedKeys(files) {
+		names = append(names, archive.Out+"/"+col.name+"/"+p)
+	}
+	for _, p := range archive.Conflicts(names) {
+		m.add("%s can't be held in an archive: %s.\nFix the code. An update writes nothing for this cell.", p.Section, p.Msg)
+		writable = false
 	}
 	for _, p := range sortedKeys(files) {
 		if unjudged[p] {
@@ -834,18 +837,6 @@ func andList(items []string) string {
 		return items[0]
 	}
 	return strings.Join(items[:len(items)-1], ", ") + " and " + items[len(items)-1]
-}
-
-// fileDirConflict reports an output that is also the directory of another.
-func fileDirConflict(files map[string][]byte) (string, string, bool) {
-	for _, p := range sortedKeys(files) {
-		for d := path.Dir(p); d != "."; d = path.Dir(d) {
-			if _, ok := files[d]; ok {
-				return d, p, true
-			}
-		}
-	}
-	return "", "", false
 }
 
 // msg collects the problems of one failure, each ending with what to do.

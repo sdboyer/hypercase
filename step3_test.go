@@ -273,6 +273,25 @@ func TestOutputsAnArchiveCantHold(t *testing.T) {
 	s.done()
 }
 
+// TestOutputsFileAndDirectory: a cell's files, the framework's included,
+// can't hold a file that is also the directory of another, which no archive
+// can hold.
+func TestOutputsFileAndDirectory(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "file-dir")
+	before := map[string][]byte{"stream": s.read("testdata/script/stream.txtar"), "outputs": s.read("testdata/script/outputs.txtar")}
+	want := []string{
+		"out/echo/stdout.txt can't be held in an archive: the section is also the directory of out/echo/stdout.txt/a.\nFix the code. An update writes nothing for this cell.",
+		"out/echo/a.txt can't be held in an archive: the section is also the directory of out/echo/a.txt/b.\nFix the code. An update writes nothing for this cell.",
+	}
+	s.fails(s.normal("nested"), want...)
+	s.fails(s.update("nested"), want...)
+	s.same("testdata/script/stream.txtar", before["stream"])
+	s.same("testdata/script/outputs.txtar", before["outputs"])
+	s.fails(s.normal("nested"), want...)
+	s.done()
+}
+
 func TestRunCantSkip(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "skip")
