@@ -1,3 +1,5 @@
 The probe says no to this case.
 -- in/do/probe --
 no formulas
+-- out/echo/outcome --
+skipped no formulas

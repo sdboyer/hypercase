@@ -7,3 +7,9 @@ yes
 D1: not a number
 -- properties --
 malformed
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/resolve/outcome --
+blocked parse

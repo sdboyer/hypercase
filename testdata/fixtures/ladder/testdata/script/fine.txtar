@@ -9,3 +9,5 @@ evaluate 1
 format 1
 -- in/parse/archive --
 yes
+-- out/resolve/outcome --
+accepted

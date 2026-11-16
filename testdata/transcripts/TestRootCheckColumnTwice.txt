@@ -7,7 +7,7 @@ PASS
 $ go test  # pkg-a
     the column echo is owned by . and ./b. Column names are unique per corpus root, and one package owns each column.
         Rename one of the columns, or remove one. A package that only reads a lift's product gives the lift to hypercase.Use.
-    testdata/script/twice.txtar: no registry claims out/shout/values.txt: no column named shout runs over the corpus script.
+    testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
         If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
     script/twice: A1 is twice B1. The root package, ., prints it with echo, and ./b with shout.
         echo: Does what the case's do/ tree says.

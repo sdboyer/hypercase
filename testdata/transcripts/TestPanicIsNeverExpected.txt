@@ -5,6 +5,8 @@ $ go test  # rejects
         Fix the code. A panic is never an expected error.
         out/echo/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/echo/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     stack of the panic: [stack]
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
@@ -33,6 +35,8 @@ stack overflow
 circular
 -- out/echo/error.txt --
 stack overflow
+-- out/echo/outcome --
+panicked
 $ edit testdata/script/loop.txtar  # mark the cell as a known gap
 $ go test  # rejects
 --- PASS: TestCorpus

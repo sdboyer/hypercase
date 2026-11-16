@@ -1,5 +1,7 @@
 The probe says yes, and the cell runs.
 -- in/do/out/values.txt --
 A1 6
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 A1 6

@@ -28,10 +28,18 @@ The root package, ., owns parse, resolve and evaluate, and ./b uses parse for ou
 evaluate 1
 -- in/outline/out/values.txt --
 outline 1
+-- out/evaluate/outcome --
+accepted
 -- out/evaluate/values.txt --
 evaluate 1
+-- out/outline/outcome --
+accepted
 -- out/outline/values.txt --
 outline 1
+-- out/parse/outcome --
+accepted
+-- out/resolve/outcome --
+accepted
 $ go test  # ladder-a
     what ran, in order:
         parse ran on x
@@ -85,7 +93,10 @@ $ go test ./b  # ladder-b
             --- PASS: TestCorpus/script/x/outline
 PASS
 $ go test  # ladder-a
-    script/bad: evaluate is blocked: the lift parse failed on the case, and testdata/script/bad.txtar, out/parse/error.txt, records its error.
+    script/bad: parse rejects the script, and nothing says it should.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/bad: parse rejects the script, and nothing says it should.
         parse: Parses the script, as its parse/ tree says.
         parse returned an error, but the case states no property parse rejects:
@@ -93,9 +104,14 @@ $ go test  # ladder-a
         Fix the code, or state the property on the case and in parse's Rejects.
         out/parse/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/parse/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/parse/stderr.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
-    script/bad: resolve is blocked: the lift parse failed on the case, and testdata/script/bad.txtar, out/parse/error.txt, records its error.
+    script/bad: parse rejects the script, and nothing says it should.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        out/resolve/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     what ran, in order:
         parse ran on bad
         parse ran on x
@@ -105,9 +121,9 @@ $ go test  # ladder-a
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/bad
-            --- SKIP: TestCorpus/script/bad/evaluate
+            --- FAIL: TestCorpus/script/bad/evaluate
             --- FAIL: TestCorpus/script/bad/parse
-            --- SKIP: TestCorpus/script/bad/resolve
+            --- FAIL: TestCorpus/script/bad/resolve
         --- PASS: TestCorpus/script/x
             --- PASS: TestCorpus/script/x/evaluate
             --- PASS: TestCorpus/script/x/parse

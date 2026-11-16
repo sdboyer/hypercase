@@ -7,3 +7,11 @@ D1: not a number
 malformed
 -- out/calc/error.txt --
 D1: not a number
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/resolve/outcome --
+blocked parse

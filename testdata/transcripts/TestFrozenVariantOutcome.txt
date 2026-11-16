@@ -1,0 +1,79 @@
+$ edit testdata/script/loop.txtar  # drop the frozen variants' outcomes, as before outcomes were written
+$ go test  # check-gaps
+    script/loop/variant/neg: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, variant/neg/gaps line 1: "echo A negative number is valid, and evaluates to itself. Waits on sheets#3."
+        Its committed files match the run, and it has no variant/neg/out/echo/outcome, which every cell has.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to add it. The update adds the outcome and changes nothing else.
+    script/loop/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "transform/looped echo A cycle's error starts with the cell where it starts. Waits on sheets#4."
+        Its committed files match the run, and it has no transform/looped/out/echo/outcome, which every cell has.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to add it. The update adds the outcome and changes nothing else.
+    script/negative/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/negative/transform/upper: upper declines the base: the base's do/ tree has no output
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+            --- FAIL: TestCorpus/script/loop/variant/neg
+                --- FAIL: TestCorpus/script/loop/variant/neg/echo
+            --- FAIL: TestCorpus/script/loop/transform/looped
+                --- FAIL: TestCorpus/script/loop/transform/looped/echo
+            --- PASS: TestCorpus/script/loop/transform/upper
+                --- PASS: TestCorpus/script/loop/transform/upper/echo
+        --- PASS: TestCorpus/script/negative
+            --- PASS: TestCorpus/script/negative/echo
+            --- PASS: TestCorpus/script/negative/variant/dangling
+                --- PASS: TestCorpus/script/negative/variant/dangling/echo
+            --- SKIP: TestCorpus/script/negative/transform/looped
+            --- SKIP: TestCorpus/script/negative/transform/upper
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/located
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # check-gaps
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/negative/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/negative/transform/upper: upper declines the base: the base's do/ tree has no output
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+            --- PASS: TestCorpus/script/loop/variant/neg
+                --- PASS: TestCorpus/script/loop/variant/neg/echo
+            --- PASS: TestCorpus/script/loop/transform/looped
+                --- PASS: TestCorpus/script/loop/transform/looped/echo
+            --- PASS: TestCorpus/script/loop/transform/upper
+                --- PASS: TestCorpus/script/loop/transform/upper/echo
+        --- PASS: TestCorpus/script/negative
+            --- PASS: TestCorpus/script/negative/echo
+            --- PASS: TestCorpus/script/negative/variant/dangling
+                --- PASS: TestCorpus/script/negative/variant/dangling/echo
+            --- SKIP: TestCorpus/script/negative/transform/looped
+            --- SKIP: TestCorpus/script/negative/transform/upper
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/located
+PASS
+$ go test  # check-gaps
+    script/negative/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/negative/transform/upper: upper declines the base: the base's do/ tree has no output
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+            --- PASS: TestCorpus/script/loop/variant/neg
+                --- PASS: TestCorpus/script/loop/variant/neg/echo
+            --- PASS: TestCorpus/script/loop/transform/looped
+                --- PASS: TestCorpus/script/loop/transform/looped/echo
+            --- PASS: TestCorpus/script/loop/transform/upper
+                --- PASS: TestCorpus/script/loop/transform/upper/echo
+        --- PASS: TestCorpus/script/negative
+            --- PASS: TestCorpus/script/negative/echo
+            --- PASS: TestCorpus/script/negative/variant/dangling
+                --- PASS: TestCorpus/script/negative/variant/dangling/echo
+            --- SKIP: TestCorpus/script/negative/transform/looped
+            --- SKIP: TestCorpus/script/negative/transform/upper
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/located
+PASS

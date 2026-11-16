@@ -67,6 +67,6 @@ panic: hypercase: hypercase.Use was given the suite calc. It takes lifts only: a
 [stack]
 [exit 2]
 $ go test  # own-other
-panic: hypercase: hypercase.Own was given a decl.Property. It takes the columns the package owns, hypercase.Suite and decl.Lift values, and the transforms it owns, decl.Transform values.
+panic: hypercase: hypercase.Own was given a decl.Property. It takes the columns the package owns, hypercase.Suite and decl.Lift values, the transforms it owns, decl.Transform values, and the corpus checks it owns, hypercase.Check values.
 [stack]
 [exit 2]

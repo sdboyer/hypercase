@@ -27,8 +27,12 @@ A1 6
 A1 SEVEN
 -- gaps --
 shout A1 is SIX. Waits on sheets#15.
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 A1 6
+-- out/shout/outcome --
+accepted
 -- out/shout/values.txt --
 A1 SIX
 $ go test  # pkg-a

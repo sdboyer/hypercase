@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/sdboyer/hypercase/archive"
 )
 
 // Step 6: corpus types and lifts, over the ladder of fixtures_lifts_test.go.
 
 // hasSections checks an archive holds each section, with its bytes, and
-// lacks each section named in lacking.
+// lacks each section whose name starts with one in lacking, but a cell's
+// outcome, which every cell has: lacking out/evaluate/ says the cell holds
+// nothing but its outcome.
 func (s *sandbox) hasSections(rel string, want map[string]string, lacking ...string) {
 	s.t.Helper()
 	data := s.read(rel)
@@ -19,10 +23,21 @@ func (s *sandbox) hasSections(rel string, want map[string]string, lacking ...str
 		}
 	}
 	for _, name := range lacking {
-		if bytes.Contains(data, []byte("-- "+name)) {
-			s.t.Errorf("%s holds %s, and shouldn't:\n%s", rel, name, data)
+		for _, sec := range archive.Parse(data).Sections {
+			if strings.HasPrefix(sec.Name, name) && !isOutcome(sec.Name) {
+				s.t.Errorf("%s holds %s, and shouldn't:\n%s", rel, name, data)
+				break
+			}
 		}
 	}
+}
+
+// isOutcome reports whether a section is a cell's outcome: out/<column>/outcome,
+// under a case's prefix.
+func isOutcome(section string) bool {
+	_, _, rest := archive.SplitCase(section)
+	col, file, _ := strings.Cut(strings.TrimPrefix(rest, archive.Out+"/"), "/")
+	return strings.HasPrefix(rest, archive.Out+"/") && col != "" && file == archive.OutcomeFile
 }
 
 func TestLadder(t *testing.T) {
@@ -34,14 +49,20 @@ func TestLadder(t *testing.T) {
 	}
 	// A lift's cell records its function's error once, and its stderr.
 	s.hasSections("testdata/script/stray.txtar", map[string]string{
-		"out/parse/error.txt": "D1: not a number or a formula: \"total\"\n",
-		"out/calc/error.txt":  "D1: not a number or a formula: \"total\"\n",
+		"out/parse/error.txt":  "D1: not a number or a formula: \"total\"\n",
+		"out/parse/outcome":    "rejected\n",
+		"out/calc/error.txt":   "D1: not a number or a formula: \"total\"\n",
+		"out/evaluate/outcome": "blocked parse\n",
+		"out/format/outcome":   "blocked parse\n",
+		"out/resolve/outcome":  "blocked parse\n",
 	}, "out/evaluate/", "out/format/", "out/resolve/")
 	s.hasSections("testdata/script/loop.txtar", map[string]string{
 		"out/resolve/error.txt": "A1 -> A1: cycle\n",
 		"out/format/trail.txt":  "parse\n",
+		"out/evaluate/outcome":  "blocked resolve\n",
+		"out/parse/outcome":     "accepted\n",
 	}, "out/evaluate/", "out/parse/")
-	s.hasSections("testdata/script/both.txtar", map[string]string{"out/parse/error.txt": "D1: not a number\n"}, "out/resolve/")
+	s.hasSections("testdata/script/both.txtar", map[string]string{"out/parse/error.txt": "D1: not a number\n", "out/resolve/outcome": "blocked parse\n"}, "out/resolve/")
 	s.hasSections("testdata/script/noisy.txtar", map[string]string{"out/parse/stderr.txt": "parse: a warning\n"}, "out/parse/error.txt")
 	// A lift and a suite's run receive the archive's name.
 	s.hasSections("testdata/script/fine.txtar", map[string]string{
@@ -233,13 +254,19 @@ func TestTwoCorpusTypes(t *testing.T) {
 
 // TestLiftNoProduct: a lift that returns no product and no error fails at
 // its own cell, and blocks the columns over its product, whose type is an
-// interface: a suite with a probe, and a lift.
+// interface: a suite with a probe, and a lift. Its cell fails whether or
+// not a gaps line marks it: it has no outcome, so no verdict to freeze.
 func TestLiftNoProduct(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "no-product")
 	none := s.read("testdata/script/none.txtar")
+	marked := s.read("testdata/script/marked.txtar")
+	const noProduct = "pick: Picks the script's view, as its pick/ tree says.\npick returned no product and no error, so the cell has no outcome.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell."
 	want := []string{
-		"script/none: pick returns no product.\npick: Picks the script's view, as its pick/ tree says.\npick returned no product and no error.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error.",
+		"script/none: pick returns no product.\n" + noProduct,
+		"script/marked: pick returns no product, and a gaps line marks its cell.\n" + noProduct,
+		"--- FAIL: TestCorpus/script/marked/pick",
+		"--- SKIP: TestCorpus/script/marked/walk",
 		"script/none: walk is blocked: the lift pick failed on the case: it returned no product and no error.",
 		"script/none: unpick is blocked: the lift pick failed on the case: it returned no product and no error.",
 		"script/none: format is blocked: the lift pick failed on the case: it returned no product and no error.",
@@ -253,6 +280,17 @@ func TestLiftNoProduct(t *testing.T) {
 	s.fails(s.normal("picked"), want...)
 	s.fails(s.update("picked"), want...)
 	s.same("testdata/script/none.txtar", none)
+	s.same("testdata/script/marked.txtar", marked)
+
+	// A committed file freezes the marked cell, and it fails the same.
+	s.edit("testdata/script/marked.txtar", "commit an outcome for the marked cell", insert("out/pick/outcome", "accepted\n", "out/unpick/"))
+	marked = s.read("testdata/script/marked.txtar")
+	for _, update := range []bool{false, true} {
+		r := s.run(".", "picked", update)
+		s.fails(r, "script/marked: pick returns no product, and a gaps line marks its cell.\n"+noProduct)
+		s.lacks(r, "The cell is frozen", "out/pick/outcome is")
+	}
+	s.same("testdata/script/marked.txtar", marked)
 	s.done()
 }
 
@@ -277,7 +315,7 @@ func TestLiftRefusals(t *testing.T) {
 		{"own-and-use-calls", "panic: hypercase: the lift parse is given to both hypercase.Own and hypercase.Use."},
 		{"bare-lift", "panic: hypercase: Register was given the lift parse. Pass it to hypercase.Own, in the package that owns its column, or to hypercase.Use, in a package that only reads its product."},
 		{"use-suite", "panic: hypercase: hypercase.Use was given the suite calc. It takes lifts only: a package runs only its own suites. Register the suite, or give it to hypercase.Own, in the package that runs it."},
-		{"own-other", "panic: hypercase: hypercase.Own was given a decl.Property. It takes the columns the package owns, hypercase.Suite and decl.Lift values, and the transforms it owns, decl.Transform values."},
+		{"own-other", "panic: hypercase: hypercase.Own was given a decl.Property. It takes the columns the package owns, hypercase.Suite and decl.Lift values, the transforms it owns, decl.Transform values, and the corpus checks it owns, hypercase.Check values."},
 	} {
 		r := s.normal(tt.reg)
 		s.fails(r, tt.want)

@@ -1,0 +1,5 @@
+echo panics, and a known gap marks the cell.
+-- in/do/panic --
+boom
+-- gaps --
+echo Panics on every input. Waits on sheets#9.

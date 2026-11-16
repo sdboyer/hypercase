@@ -7,3 +7,9 @@ D1: not a number or a formula: "total"
 evaluate's probe says no, if it is called.
 -- properties --
 malformed
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/resolve/outcome --
+blocked parse

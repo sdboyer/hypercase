@@ -5,11 +5,17 @@ Two prices and their total.
 6
 -- in/sheet/C1 --
 =A1+B1
+-- out/calc/outcome --
+accepted
 -- out/calc/stdout.txt --
 4,6,10
+-- out/evaluate/outcome --
+accepted
 -- out/evaluate/values.txt --
 A1 4
 B1 6
 C1 10
 -- out/format/formulas.txt --
 C1 =A1 + B1
+-- out/format/outcome --
+accepted

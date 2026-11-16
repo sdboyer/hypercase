@@ -173,7 +173,9 @@ var transformRegistrations = map[string]func(){
 	"variants-b": func() { hypercase.Register(append([]any{project, scriptType, own(shout)}, sheetsProps...)...) },
 	"transforms": func() { transforms(transformType, own(echoRejects, looped, upper)) },
 	"tr-ladder":  func() { transforms(transformType, own(parse, resolve, looped, upper)) },
-	"tr-unowned": func() { transforms(transformType, own(echoRejects)) },
+	// evaluate's cell of looped's variant is blocked: resolve errs on it.
+	"tr-ladder-eval": func() { transforms(transformType, own(parse, resolve, evaluate, looped, upper)) },
+	"tr-unowned":     func() { transforms(transformType, own(echoRejects)) },
 	// tr-owns-looped leaves upper to another package.
 	"tr-owns-looped": func() { transforms(transformType, own(echoRejects, looped)) },
 	// tr-unowned-noroot is tr-unowned without the root-package check.

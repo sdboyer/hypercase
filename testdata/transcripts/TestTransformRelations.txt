@@ -72,16 +72,22 @@ $ go test  # tr-no-description
         echo: Does what the case's do/ tree says.
         out/echo/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/echo/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/values.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
     script/garbled: A case that states malformed, which no transform gives or keeps.
         echo: Does what the case's do/ tree says.
+        out/echo/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/values.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
     script/twice: echo prints a1 six.
         echo: Does what the case's do/ tree says.
+        out/echo/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/values.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/twice/transform/looped: 
@@ -90,6 +96,8 @@ $ go test  # tr-no-description
     script/twice/transform/looped: 
         echo: Does what the case's do/ tree says.
         transform/looped/out/echo/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        transform/looped/out/echo/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         transform/looped/out/echo/values.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.

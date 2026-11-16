@@ -3,5 +3,7 @@ D1 holds a word, which echo doesn't reject, and echo handles it.
 D1 total
 -- properties --
 malformed
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 D1 total

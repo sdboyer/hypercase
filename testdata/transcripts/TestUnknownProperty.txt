@@ -3,6 +3,8 @@ $ go test  # rejects
         Declare the property, or correct the line.
     script/loopy: The case states a property nothing declares.
         echo: Does what the case's do/ tree says.
+        out/echo/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/values.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
 --- FAIL: TestCorpus
@@ -24,5 +26,7 @@ The case states a property nothing declares.
 A1 6
 -- properties --
 loopy
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 A1 6

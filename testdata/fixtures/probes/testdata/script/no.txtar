@@ -3,3 +3,5 @@ The probe says no, and the cell is skipped, though the case states a property ec
 already serves 4
 -- properties --
 circular
+-- out/echo/outcome --
+skipped already serves 4

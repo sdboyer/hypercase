@@ -5,13 +5,23 @@ A1 divides B1 by C1, which is zero.
 1
 -- in/sheet/C1 --
 0
+-- out/calc/outcome --
+accepted
 -- out/calc/stderr.txt --
 A1: divides by zero
 -- out/calc/stdout.txt --
 #DIV/0!,1,0
+-- out/evaluate/outcome --
+accepted
 -- out/evaluate/values.txt --
 A1 #DIV/0!
 B1 1
 C1 0
 -- out/format/formulas.txt --
 A1 =B1 / C1
+-- out/format/outcome --
+accepted
+-- out/parse/outcome --
+accepted
+-- out/resolve/outcome --
+accepted

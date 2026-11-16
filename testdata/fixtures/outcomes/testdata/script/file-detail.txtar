@@ -1,0 +1,5 @@
+The classifier reads the cell's file.
+-- in/cl/file --
+values.txt
+-- in/do/out/values.txt --
+big
