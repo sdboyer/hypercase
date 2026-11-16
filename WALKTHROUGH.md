@@ -304,6 +304,8 @@ A1 is twice B1.
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/evaluate/outcome --
+accepted
 -- out/evaluate/values.txt --
 A1 6
 B1 3
@@ -603,6 +605,8 @@ A1 and B1 refer to each other.
 circular
 -- out/evaluate/error.txt --
 A1 -> B1 -> A1: cycle
+-- out/evaluate/outcome --
+rejected
 ```
 
 `testdata/sheet/negative.txtar` records a known gap, a cell that errs when
@@ -617,6 +621,8 @@ A1 is a negative number.
 evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/evaluate/error.txt --
 A1: unexpected "-"
+-- out/evaluate/outcome --
+rejected
 ```
 
 `hypercase.json` gains the property, and `evaluate`'s `error.txt` and
@@ -888,13 +894,19 @@ A1 is twice B1.
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/calc/outcome --
+accepted
 -- out/calc/stdout.txt --
 6,3
+-- out/evaluate/outcome --
+accepted
 -- out/evaluate/values.txt --
 A1 6
 B1 3
 -- out/format/formulas.txt --
 A1 =B1 * 2
+-- out/format/outcome --
+accepted
 ```
 
 `testdata/sheet/stray.txtar`. Every column reads the raw cells, so each one
@@ -915,10 +927,16 @@ total
 malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
+-- out/calc/outcome --
+rejected
 -- out/evaluate/error.txt --
 D1: not a number or a formula: "total"
+-- out/evaluate/outcome --
+rejected
 -- out/format/error.txt --
 D1: not a number or a formula: "total"
+-- out/format/outcome --
+rejected
 ```
 
 `testdata/sheet/negative.txtar`. A known gap marks one cell, and `calc` errs
@@ -936,8 +954,14 @@ evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
 calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/calc/error.txt --
 A1: unexpected "-"
+-- out/calc/outcome --
+rejected
 -- out/evaluate/error.txt --
 A1: unexpected "-"
+-- out/evaluate/outcome --
+rejected
+-- out/format/outcome --
+skipped no formulas
 ```
 
 The root package's registry, `step05/testdata/hypercase.json`, holds the
@@ -949,10 +973,11 @@ check, the properties it registers, and `evaluate`: the type it consumes,
 <!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 4,
+  "format": 5,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
+  "codes": false,
   "issueLinks": [],
   "properties": [
     {
@@ -992,7 +1017,8 @@ check, the properties it registers, and `evaluate`: the type it consumes,
         "circular",
         "dangling",
         "malformed"
-      ]
+      ],
+      "classifier": null
     }
   ]
 }
@@ -1336,9 +1362,19 @@ malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
   sheet/D1:1: total
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
 -- out/parse/error.txt --
 D1: not a number or a formula: "total"
   sheet/D1:1: total
+-- out/parse/outcome --
+rejected
+-- out/resolve/outcome --
+blocked parse
 ```
 
 `testdata/sheet/negative.txtar`:
@@ -1354,9 +1390,19 @@ calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/calc/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
 -- out/parse/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/parse/outcome --
+rejected
+-- out/resolve/outcome --
+blocked parse
 ```
 
 ### Rules
