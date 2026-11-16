@@ -1394,8 +1394,8 @@ A1: unexpected "-"
 - Probes are distinct from corpus types: the type decides what a suite
   receives, and the probe decides whether a case is for it.
 - A suite's probe receives the value of the type the suite consumes, and
-  nothing else. Its run receives the archive's name too, and the stdout and
-  stderr writers.
+  nothing else. Its run receives that value where step 3's receives the
+  input view.
 
 **Ownership** (proposed). This step refines step 5's rules, under which a
 package owns every column it registers.
