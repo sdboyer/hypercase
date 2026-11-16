@@ -15,7 +15,7 @@ import (
 	"github.com/sdboyer/hypercase"
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
-	"github.com/sdboyer/hypercase/internal/root"
+	"github.com/sdboyer/hypercase/root"
 )
 
 // The fixtures' declarations. The child registers one set, chosen by name.

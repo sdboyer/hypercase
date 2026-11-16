@@ -17,7 +17,7 @@ import (
 	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/internal/diff"
 	"github.com/sdboyer/hypercase/internal/registry"
-	"github.com/sdboyer/hypercase/internal/root"
+	"github.com/sdboyer/hypercase/root"
 )
 
 // Test runs every case through every column the package registered, as
@@ -142,7 +142,10 @@ func newRunner(t *testing.T) (*runner, bool) {
 		t.Errorf("finding the module root: %v", err)
 		return nil, false
 	}
-	r.corpusRoot = filepath.Join(r.moduleRoot, filepath.FromSlash(rootRel))
+	if r.corpusRoot, err = root.Corpus(wd, rootRel); err != nil {
+		t.Errorf("finding the corpus root: %v", err)
+		return nil, false
+	}
 	if rootPackage && rootRel == "." && r.pkgDir != r.moduleRoot {
 		t.Errorf("the package registers the root-package check for the module-root corpus, and is not the module's root package, %s.\nRegister hypercase.RootPackage() in the module's root package, or pass this package's corpus root with hypercase.Root.", r.moduleRoot)
 		return nil, false
