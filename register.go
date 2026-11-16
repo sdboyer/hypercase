@@ -11,18 +11,20 @@ import (
 
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
+	"github.com/sdboyer/hypercase/internal/erase"
 )
 
 // Register registers what a package declares to hypercase: its project,
-// its properties, its suites and its options. It is called when the
-// package is initialized, from an init function, before any test runs. A
-// test function runs what was registered with [Test], and registers
-// nothing.
+// its properties, its corpus types, and its options, among them the
+// columns it owns and the lifts it uses. It is called when the package is
+// initialized, from an init function, before any test runs. A test
+// function runs what was registered with [Test], and registers nothing.
 //
-// A refusal, such as two suites with one name, panics with the message the
-// framework would otherwise print, so no test in the package runs. A check
-// that relates two registrations, such as a Rejects entry naming a
-// property, waits until initialization is over, and fails the run before
+// A refusal, such as two columns with one name, panics with the message
+// the framework would otherwise print, so no test in the package runs. A
+// check that needs the whole set, such as a Rejects entry naming a
+// property, or the paths from the corpus types to the types the columns
+// consume, waits until initialization is over, and fails the run before
 // any case runs.
 func Register(items ...any) {
 	reg.mu.Lock()
@@ -36,21 +38,72 @@ func Register(items ...any) {
 			reg.addProject(v)
 		case decl.Property:
 			reg.addProperty(v)
-		case columnDecl:
-			reg.addColumn(v.column())
 		case Option:
 			v.apply(&reg)
+		case columnDecl:
+			refuse(fmt.Sprintf("Register was given the suite %s. A package owns the suites it runs: pass it to hypercase.Own.", v.column().name))
 		default:
-			refuse(fmt.Sprintf("Register was given a %T, which is nothing hypercase registers. Pass a decl.Project, a decl.Property, a hypercase.Suite or an option, such as hypercase.Root.", item))
+			e, _ := erase.Of(item)
+			switch e := e.(type) {
+			case *erase.Type:
+				reg.addType(e)
+			case *erase.Lift:
+				refuse(fmt.Sprintf("Register was given the lift %s. Pass it to hypercase.Own, in the package that owns its column, or to hypercase.Use, in a package that only reads its product.", e.Name))
+			default:
+				refuse(fmt.Sprintf("Register was given a %T, which is nothing hypercase registers. Pass a decl.Project, a decl.Property, a decl.Type or an option, such as hypercase.Own or hypercase.Root.", item))
+			}
 		}
 	}
 }
 
-// An Option is a registration that declares nothing: where the package's
-// corpus root is, or that the package runs the root-package check.
-// [Register] takes it.
+// An Option is a registration that isn't a declaration: the columns the
+// package owns, the lifts it uses, where its corpus root is, or that it
+// runs the root-package check. [Register] takes it.
 type Option struct {
 	apply func(r *registrations)
+}
+
+// Own is the option that registers the columns the package owns: suites,
+// and lifts, [decl.Lift] values. The package runs their cells, and writes
+// and judges their sections. One package owns each column.
+func Own(columns ...any) Option {
+	return Option{apply: func(r *registrations) {
+		for _, item := range columns {
+			if c, ok := item.(columnDecl); ok {
+				r.addColumn(c.column())
+				continue
+			}
+			if e, _ := erase.Of(item); e != nil {
+				if l, ok := e.(*erase.Lift); ok {
+					r.addLift(newLift(l, true))
+					continue
+				}
+			}
+			refuse(fmt.Sprintf("hypercase.Own was given a %T. It takes the columns the package owns: hypercase.Suite and decl.Lift values.", item))
+		}
+	}}
+}
+
+// Use is the option that registers lifts, [decl.Lift] values, whose
+// products the package's columns read, and whose columns another package
+// owns. The package computes their products, and neither writes nor judges
+// their sections. A failing lift still blocks the package's cells past it,
+// and what it writes to stderr is dropped.
+func Use(lifts ...any) Option {
+	return Option{apply: func(r *registrations) {
+		for _, item := range lifts {
+			if e, _ := erase.Of(item); e != nil {
+				if l, ok := e.(*erase.Lift); ok {
+					r.addLift(newLift(l, false))
+					continue
+				}
+			}
+			if c, ok := item.(columnDecl); ok {
+				refuse(fmt.Sprintf("hypercase.Use was given the suite %s. It takes lifts only: a package runs only its own suites. Own the suite in the package that runs it.", c.column().name))
+			}
+			refuse(fmt.Sprintf("hypercase.Use was given a %T. It takes lifts, decl.Lift values.", item))
+		}
+	}}
 }
 
 // Root is the option that passes the package's corpus root, as a slash
@@ -93,8 +146,10 @@ type registrations struct {
 	started     bool
 	project     *decl.Project
 	properties  []decl.Property
-	columns     []*column
-	root        string // the corpus root, relative to the module root
+	types       []*corpusType
+	lifts       []*lift   // owned and used
+	columns     []*column // the owned suites and lifts
+	root        string    // the corpus root, relative to the module root
 	rootSet     bool
 	rootPackage bool
 }
@@ -128,33 +183,113 @@ func (r *registrations) addColumn(c *column) {
 	if c.run == nil {
 		refuse(fmt.Sprintf("the suite %s has no Run. Give it the function that runs a case.", c.name))
 	}
-	if c.consumes != fsType {
-		refuse(fmt.Sprintf("the suite %s consumes %s. A suite consumes the input view, fs.FS.", c.name, c.consumes))
+	if c.corpus != "" {
+		refuse(fmt.Sprintf("the suite %s names the Corpus %q. A suite runs over the archives whose corpus type reaches the type it consumes. Declare a decl.Type with Dir %q, make the suite consume it or a stage it reaches, and remove Corpus.", c.name, c.corpus, c.corpus))
 	}
-	if c.corpus == "" {
-		refuse(fmt.Sprintf("the suite %s names no Corpus. Name the directory of the archives it runs over, testdata/<corpus>/ under the corpus root.", c.name))
+	checkRejects("suite", c.name, c.rejects)
+	checkPatterns("suite", c.name, c.outputs)
+	r.checkColumnName(c.name, c.describe())
+	r.columns = append(r.columns, c)
+}
+
+func (r *registrations) addLift(l *lift) {
+	if !validName(l.name) {
+		refuse(fmt.Sprintf("the lift name %q breaks the naming rule: %s. Rename the lift.", l.name, nameRule))
 	}
-	if !validName(c.corpus) {
-		refuse(fmt.Sprintf("the suite %s names the corpus %q, which breaks the naming rule: %s. Rename the corpus's directory.", c.name, c.corpus, nameRule))
+	switch {
+	case isCorpusShape(l.out):
+		refuse(fmt.Sprintf("the lift %s's product, %s, is a corpus type, and this hypercase doesn't run lifts whose product is a corpus type. Make the product a stage, a type that isn't a named fs.FS wrapper.", l.name, l.out))
+	case l.jenny:
+		refuse(fmt.Sprintf("the lift %s gives a Jenny, which makes a product that is a corpus type, and its product is %s. Give it Run, which makes the product.", l.name, l.out))
+	case l.run == nil:
+		refuse(fmt.Sprintf("the lift %s has no Run. Give it the function that makes its product.", l.name))
 	}
-	for i, p := range c.rejects {
-		for _, q := range c.rejects[:i] {
-			if p.Name == q.Name {
-				refuse(fmt.Sprintf("the suite %s rejects %s twice. List each property once.", c.name, p.Name))
+	checkRejects("lift", l.name, l.rejects)
+	checkPatterns("lift", l.name, l.outputs)
+	for _, o := range l.outputs {
+		if a, _ := path.Match(o.Pattern, errorFile); !a {
+			if b, _ := path.Match(o.Pattern, stderrFile); !b {
+				refuse(fmt.Sprintf("the lift %s declares an output with the pattern %q, which matches neither %s nor %s, the only files a lift's cell writes. Remove the declaration.", l.name, o.Pattern, errorFile, stderrFile))
 			}
 		}
 	}
-	for _, o := range c.outputs {
+	for _, o := range r.lifts {
+		if o.name != l.name || o.in != l.in || o.out != l.out {
+			continue
+		}
+		switch {
+		case o.owned && l.owned:
+			refuse(fmt.Sprintf("the lift %s is given to hypercase.Own twice. Own it once.", l.name))
+		case !o.owned && !l.owned:
+			refuse(fmt.Sprintf("the lift %s is given to hypercase.Use twice. Use it once.", l.name))
+		default:
+			refuse(fmt.Sprintf("the lift %s is given to both hypercase.Own and hypercase.Use. A package owns a lift, or only uses it: pass it to one.", l.name))
+		}
+	}
+	r.checkColumnName(l.name, l.describe())
+	r.lifts = append(r.lifts, l)
+	if l.owned {
+		r.columns = append(r.columns, l.column())
+	}
+}
+
+// checkColumnName refuses a second column, or lift, of one name: lifts and
+// suites share the column names, and a lift the package uses is a column
+// of the corpus root.
+func (r *registrations) checkColumnName(name, what string) {
+	for _, c := range r.columns {
+		if c.name == name {
+			refuse(fmt.Sprintf("two columns are named %s: %s, and %s. Column names are unique; rename one.", name, c.describe(), what))
+		}
+	}
+	for _, l := range r.lifts {
+		if l.name == name {
+			refuse(fmt.Sprintf("two columns are named %s: %s, and %s. Column names are unique; rename one.", name, l.describe(), what))
+		}
+	}
+}
+
+func checkRejects(kind, name string, rejects []decl.Property) {
+	for i, p := range rejects {
+		for _, q := range rejects[:i] {
+			if p.Name == q.Name {
+				refuse(fmt.Sprintf("the %s %s rejects %s twice. List each property once.", kind, name, p.Name))
+			}
+		}
+	}
+}
+
+func checkPatterns(kind, name string, outputs []decl.Output) {
+	for _, o := range outputs {
 		if _, err := path.Match(o.Pattern, ""); err != nil || !fs.ValidPath(o.Pattern) || o.Pattern == "." {
-			refuse(fmt.Sprintf("the suite %s declares an output with the pattern %q, which is not a pattern of slash paths under out/%s/ in the syntax of path.Match. Fix the pattern.", c.name, o.Pattern, c.name))
+			refuse(fmt.Sprintf("the %s %s declares an output with the pattern %q, which is not a pattern of slash paths under out/%s/ in the syntax of path.Match. Fix the pattern.", kind, name, o.Pattern, name))
 		}
 	}
-	for _, o := range r.columns {
-		if o.name == c.name {
-			refuse(fmt.Sprintf("two suites are named %s. Column names are unique; rename one.", c.name))
+}
+
+// checksDir is the directory name that holds corpus check findings, which
+// no corpus type declares.
+const checksDir = "checks"
+
+func (r *registrations) addType(e *erase.Type) {
+	t := &corpusType{dir: e.Dir, description: e.Description, goType: e.GoType, new: e.New}
+	switch {
+	case !validName(t.dir):
+		refuse(fmt.Sprintf("the corpus type %s declares the directory %q, which breaks the naming rule: %s. Rename the directory.", t.goType, t.dir, nameRule))
+	case t.dir == checksDir:
+		refuse(fmt.Sprintf("the corpus type %s declares the directory %s, a name reserved for the findings of corpus checks. Name another directory.", t.goType, t.dir))
+	}
+	for _, o := range r.types {
+		switch {
+		case o.goType == t.goType && o.dir == t.dir:
+			refuse(fmt.Sprintf("the corpus type %s is registered twice. Register it once.", t.goType))
+		case o.dir == t.dir:
+			refuse(fmt.Sprintf("two corpus types declare the directory %s: %s and %s. An archive's directory gives its type; declare another directory for one of them.", t.dir, o.goType, t.goType))
+		case o.goType == t.goType:
+			refuse(fmt.Sprintf("the corpus type %s is declared twice, with the directories %s and %s. A corpus type has one directory; register one declaration.", t.goType, o.dir, t.dir))
 		}
 	}
-	r.columns = append(r.columns, c)
+	r.types = append(r.types, t)
 }
 
 // property returns the registered property of a name.

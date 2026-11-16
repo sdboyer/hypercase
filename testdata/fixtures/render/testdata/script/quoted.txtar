@@ -1,0 +1,9 @@
+parse rejects the script, and RenderError quotes the case's own quote/text.
+-- in/parse/error --
+A1: not a number
+-- in/quote/text --
+A1 holds one
+-- in/calc/error --
+D1: not a number
+-- properties --
+malformed

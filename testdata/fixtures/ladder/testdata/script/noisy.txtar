@@ -1,0 +1,3 @@
+parse warns on stderr, and goes on.
+-- in/parse/stderr --
+parse: a warning

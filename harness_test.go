@@ -32,6 +32,7 @@ import (
 
 const (
 	fixtureEnv     = "HYPERCASE_SELFTEST"
+	reverseEnv     = "HYPERCASE_SELFTEST_REVERSE"
 	fixtureUpdate  = "FIXTURE_UPDATE_GOLDEN"
 	transcriptsVar = "HYPERCASE_UPDATE_GOLDEN"
 )
@@ -42,6 +43,9 @@ func init() {
 		return
 	}
 	register, ok := registrations[name]
+	if !ok {
+		register, ok = liftRegistrations[name]
+	}
 	if !ok {
 		panic("selftest: no registration named " + name)
 	}
@@ -57,6 +61,9 @@ func TestCorpus(t *testing.T) {
 		during(t)
 	}
 	runTest(t)
+	if len(runLog) > 0 {
+		t.Logf("what ran, in order:\n%s", strings.Join(runLog, "\n"))
+	}
 }
 
 // sandbox is one self-test's copy of its fixture.
@@ -174,7 +181,7 @@ func (s *sandbox) exec(pkg, registration string, extra []string, args ...string)
 	var env []string
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
-		if k != fixtureEnv && k != fixtureUpdate && k != transcriptsVar && k != "GOFLAGS" && k != "PWD" {
+		if k != fixtureEnv && k != reverseEnv && k != fixtureUpdate && k != transcriptsVar && k != "GOFLAGS" && k != "PWD" {
 			env = append(env, kv)
 		}
 	}

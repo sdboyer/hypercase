@@ -1,0 +1,13 @@
+$ go test  # calc-only
+    testdata/script/params.txtar has problems of form, so none of its cells run, and no update writes it:
+          in/params/x: the tree name params is reserved: a column's parameters are fixed in Go, or derived from the archive's name, and an archive carries none
+        Fix the archive by hand.
+    testdata/script/params.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    what ran, in order:
+        calc ran on fine
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/calc
+FAIL
+[exit 1]

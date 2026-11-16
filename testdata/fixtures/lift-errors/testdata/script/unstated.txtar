@@ -1,0 +1,3 @@
+parse rejects a script that states nothing.
+-- in/parse/error --
+A1: not a number

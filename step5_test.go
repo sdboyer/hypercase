@@ -108,7 +108,7 @@ func TestAppliesToNoCase(t *testing.T) {
 	s.lacks(r, "applies to no case")
 
 	empty := newSandbox(t, "empty-corpus")
-	empty.fails(empty.normal("echo"), "the suite echo applies to no case: its corpus, testdata/script, holds no archive whose cells run.\nA suite that applies to no case checks nothing. Add a case to the corpus, or name another corpus.")
+	empty.fails(empty.normal("echo"), "the suite echo applies to no case: its corpus, testdata/script/, holds no archive whose cells run.\nA suite that applies to no case checks nothing. Add a case it applies to.")
 	s.transcript.WriteString(empty.transcript.String())
 	s.done()
 }
@@ -158,8 +158,8 @@ func TestSuiteRefusals(t *testing.T) {
 	for _, tt := range []struct{ reg, want string }{
 		{"bad-pattern", `panic: hypercase: the suite echo declares an output with the pattern "values[.txt", which is not a pattern of slash paths under out/echo/ in the syntax of path.Match.`},
 		{"bad-pattern-path", `panic: hypercase: the suite echo declares an output with the pattern "../values.txt", which is not a pattern`},
-		{"no-corpus", "panic: hypercase: the suite echo names no Corpus."},
-		{"bad-corpus", `panic: hypercase: the suite echo names the corpus "Script", which breaks the naming rule`},
+		{"corpus-set", `panic: hypercase: the suite echo names the Corpus "script". A suite runs over the archives whose corpus type reaches the type it consumes. Declare a decl.Type with Dir "script", make the suite consume it or a stage it reaches, and remove Corpus.`},
+		{"bad-dir", `panic: hypercase: the corpus type hypercase_test.Script declares the directory "Script", which breaks the naming rule`},
 		{"two-roots", `panic: hypercase: Register was given hypercase.Root a second time, with "b".`},
 		{"bad-root", `panic: hypercase: hypercase.Root was given "/abs", which is not a slash path relative to the module root`},
 		{"two-root-packages", "panic: hypercase: Register was given hypercase.RootPackage a second time."},

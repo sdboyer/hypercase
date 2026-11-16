@@ -1,0 +1,7 @@
+parse panics on the script, a known gap.
+-- in/parse/panic --
+parse: boom
+-- gaps --
+parse panics on any script with a panic tree. Waits on sheets#5.
+-- out/parse/error.txt --
+parse: boom

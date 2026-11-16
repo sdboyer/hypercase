@@ -1,0 +1,9 @@
+parse rejects the script, and RenderError panics on it.
+-- in/parse/error --
+A1: not a number
+-- in/render/panic --
+render: boom
+-- in/calc/error --
+D1: not a number
+-- properties --
+malformed

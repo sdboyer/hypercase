@@ -1,0 +1,268 @@
+$ go test  # lift-nodesc
+    the corpus type hypercase_test.Script, of testdata/script/, has no description.
+        Add one: it says what the type's inputs are, in prose.
+    the lift parse has no description.
+        Add one: it says what the lift does, in prose.
+    the lift parse declares the output error.txt with no description.
+        Add one: it says what the files hold, in prose.
+    testdata/hypercase.json differs from what the package registers (-committed +registered):
+            "rootPackage": true,
+            "properties": [
+              {
+        -       "name": "circular",
+        -       "description": "Some cell's formula refers back to itself, directly or through other cells."
+        -     },
+        -     {
+        -       "name": "dangling",
+        -       "description": "Some formula refers to a cell the sheet doesn't have."
+        -     },
+        -     {
+                "name": "malformed",
+                "description": "Some cell holds neither a number nor a formula."
+              }
+          ...
+            "types": [
+              {
+                "dir": "script",
+        -       "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
+        +       "description": "",
+                "goType": "github.com/sdboyer/hypercase_test.Script"
+              }
+            ],
+            "lifts": [
+              {
+                "name": "parse",
+        -       "description": "Parses the script, as its parse/ tree says.",
+        +       "description": "",
+                "input": "github.com/sdboyer/hypercase_test.Script",
+                "product": "*github.com/sdboyer/hypercase_test.Parsed",
+                "owned": true,
+          ...
+                "outputs": [
+                  {
+                    "pattern": "error.txt",
+        -           "description": "Why the lift rejects the case."
+        +           "description": " "
+                  },
+                  {
+                    "pattern": "stderr.txt",
+        -           "description": "What the lift writes to stderr."
+        +           "description": "What it writes."
+                  }
+                ],
+                "rejects": [
+                  "malformed"
+                ]
+        -     },
+        -     {
+        -       "name": "resolve",
+        -       "description": "Resolves the parsed script, as its resolve/ tree says.",
+        -       "input": "*github.com/sdboyer/hypercase_test.Parsed",
+        -       "product": "*github.com/sdboyer/hypercase_test.Graph",
+        -       "owned": true,
+        -       "corpora": [
+        -         "script"
+        -       ],
+        -       "outputs": [
+        -         {
+        -           "pattern": "error.txt",
+        -           "description": "Why the lift rejects the case."
+        -         },
+        -         {
+        -           "pattern": "stderr.txt",
+        -           "description": "What the lift writes to stderr."
+        -         }
+        -       ],
+        -       "rejects": [
+        -         "circular",
+        -         "dangling"
+        -       ]
+              }
+            ],
+            "suites": [
+          ...
+                "rejects": [
+                  "malformed"
+                ]
+        -     },
+        -     {
+        -       "name": "evaluate",
+        -       "description": "Does what the case's evaluate/ tree says, from the stage it consumes.",
+        -       "consumes": "*github.com/sdboyer/hypercase_test.Graph",
+        -       "corpora": [
+        -         "script"
+        -       ],
+        -       "outputs": [
+        -         {
+        -           "pattern": "?.txt",
+        -           "description": "A file the case's instructions name with one letter."
+        -         },
+        -         {
+        -           "pattern": "archive.txt",
+        -           "description": "The archive's name, as the run received it."
+        -         },
+        -         {
+        -           "pattern": "dir.txt",
+        -           "description": "The path of a temp dir the run made."
+        -         },
+        -         {
+        -           "pattern": "error.txt",
+        -           "description": "The error the case's instructions give."
+        -         },
+        -         {
+        -           "pattern": "stderr.txt",
+        -           "description": "What the case's instructions write to stderr."
+        -         },
+        -         {
+        -           "pattern": "stdout.txt",
+        -           "description": "What the case's instructions write to stdout."
+        -         },
+        -         {
+        -           "pattern": "values.txt",
+        -           "description": "The values the case's instructions give."
+        -         }
+        -       ],
+        -       "rejects": []
+        -     },
+        -     {
+        -       "name": "format",
+        -       "description": "Does what the case's format/ tree says, from the stage it consumes.",
+        -       "consumes": "*github.com/sdboyer/hypercase_test.Parsed",
+        -       "corpora": [
+        -         "script"
+        -       ],
+        -       "outputs": [
+        -         {
+        -           "pattern": "?.txt",
+        -           "description": "A file the case's instructions name with one letter."
+        -         },
+        -         {
+        -           "pattern": "archive.txt",
+        -           "description": "The archive's name, as the run received it."
+        -         },
+        -         {
+        -           "pattern": "dir.txt",
+        -           "description": "The path of a temp dir the run made."
+        -         },
+        -         {
+        -           "pattern": "error.txt",
+        -           "description": "The error the case's instructions give."
+        -         },
+        -         {
+        -           "pattern": "stderr.txt",
+        -           "description": "What the case's instructions write to stderr."
+        -         },
+        -         {
+        -           "pattern": "stdout.txt",
+        -           "description": "What the case's instructions write to stdout."
+        -         },
+        -         {
+        -           "pattern": "trail.txt",
+        -           "description": "The trail of the parsed script, as the suite received it."
+        -         },
+        -         {
+        -           "pattern": "values.txt",
+        -           "description": "The values the case's instructions give."
+        -         }
+        -       ],
+        -       "rejects": []
+              }
+            ]
+          }
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
+    script/both: The script is malformed and circular. parse rejects it, so resolve's cell is blocked, and nothing expects it to err.
+        calc: Does what the case's calc/ tree says.
+        out/calc/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/both: The script is malformed and circular. parse rejects it, so resolve's cell is blocked, and nothing expects it to err.
+        parse: 
+        out/parse/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/fine: A script every column reads, and no lift rejects.
+        calc: Does what the case's calc/ tree says.
+        out/calc/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/fine: A script every column reads, and no lift rejects.
+        parse: 
+        out/parse/stderr.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/noisy: parse warns on stderr, and goes on.
+        parse: 
+        out/parse/stderr.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/stray: parse rejects the script, which states malformed. calc reads the raw trees, and rejects it too.
+        calc: Does what the case's calc/ tree says.
+        out/calc/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/stray: parse rejects the script, which states malformed. calc reads the raw trees, and rejects it too.
+        parse: 
+        out/parse/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    what ran, in order:
+        calc ran on both
+        parse ran on both
+        calc ran on fine
+        parse ran on fine
+        calc ran on loop
+        parse ran on loop
+        calc ran on noisy
+        parse ran on noisy
+        calc ran on stray
+        parse ran on stray
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/both
+            --- FAIL: TestCorpus/script/both/calc
+            --- FAIL: TestCorpus/script/both/parse
+        --- FAIL: TestCorpus/script/fine
+            --- FAIL: TestCorpus/script/fine/calc
+            --- FAIL: TestCorpus/script/fine/parse
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/calc
+            --- PASS: TestCorpus/script/loop/parse
+        --- FAIL: TestCorpus/script/noisy
+            --- PASS: TestCorpus/script/noisy/calc
+            --- FAIL: TestCorpus/script/noisy/parse
+        --- FAIL: TestCorpus/script/stray
+            --- FAIL: TestCorpus/script/stray/calc
+            --- FAIL: TestCorpus/script/stray/parse
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # lift-nodesc
+    the corpus type hypercase_test.Script, of testdata/script/, has no description.
+        Add one: it says what the type's inputs are, in prose.
+    the lift parse has no description.
+        Add one: it says what the lift does, in prose.
+    the lift parse declares the output error.txt with no description.
+        Add one: it says what the files hold, in prose.
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        calc ran on both
+        parse ran on both
+        calc ran on fine
+        parse ran on fine
+        calc ran on loop
+        parse ran on loop
+        calc ran on noisy
+        parse ran on noisy
+        calc ran on stray
+        parse ran on stray
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/both
+            --- PASS: TestCorpus/script/both/calc
+            --- PASS: TestCorpus/script/both/parse
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/calc
+            --- PASS: TestCorpus/script/fine/parse
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/calc
+            --- PASS: TestCorpus/script/loop/parse
+        --- PASS: TestCorpus/script/noisy
+            --- PASS: TestCorpus/script/noisy/calc
+            --- PASS: TestCorpus/script/noisy/parse
+        --- PASS: TestCorpus/script/stray
+            --- PASS: TestCorpus/script/stray/calc
+            --- PASS: TestCorpus/script/stray/parse
+FAIL
+[exit 1]

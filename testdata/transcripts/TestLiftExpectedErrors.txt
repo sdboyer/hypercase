@@ -1,0 +1,293 @@
+$ go test  # ladder
+    script/blocked-gap: resolve rejects the script, and a gaps line names evaluate, which resolve blocks.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        gaps, line 1, marks the cell, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case, so the cell runs nothing.
+        Remove the line, or fix the lift or the case.
+    script/blocked-orphan: resolve now rejects the script, so evaluate's committed values are orphans.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/values.txt is recorded, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/gapped: evaluate is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
+    script/gapped: format is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
+    script/gapped: resolve is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
+    script/panics-gapped: evaluate is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
+    script/panics-gapped: format is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
+    script/panics-gapped: resolve is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
+    script/panics: evaluate is blocked: the lift parse failed on the case, and testdata/script/panics.txtar, out/parse/error.txt, records its error.
+    script/panics: format is blocked: the lift parse failed on the case, and testdata/script/panics.txtar, out/parse/error.txt, records its error.
+    script/panics: parse panics on the script, which states malformed.
+        parse: Parses the script, as its parse/ tree says.
+        parse panicked: parse: boom
+        Fix the code. A panic is never an expected error.
+        out/parse/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    stack of the panic: [stack]
+    script/panics: resolve is blocked: the lift parse failed on the case, and testdata/script/panics.txtar, out/parse/error.txt, records its error.
+    script/quiet: The script states malformed, and parse accepts it.
+        parse: Parses the script, as its parse/ tree says.
+        parse returned no error, but the case states malformed, which parse rejects.
+        Fix the code, or correct the case's properties or parse's Rejects.
+    script/unstated: evaluate is blocked: the lift parse failed on the case, and testdata/script/unstated.txtar, out/parse/error.txt, records its error.
+    script/unstated: format is blocked: the lift parse failed on the case, and testdata/script/unstated.txtar, out/parse/error.txt, records its error.
+    script/unstated: parse rejects a script that states nothing.
+        parse: Parses the script, as its parse/ tree says.
+        parse returned an error, but the case states no property parse rejects:
+          A1: not a number
+        Fix the code, or state the property on the case and in parse's Rejects.
+        out/parse/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/unstated: resolve is blocked: the lift parse failed on the case, and testdata/script/unstated.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on blocked-gap
+        parse ran on blocked-gap
+        resolve ran on blocked-gap
+        format's probe ran
+        format ran on blocked-gap
+        calc ran on blocked-orphan
+        parse ran on blocked-orphan
+        resolve ran on blocked-orphan
+        format's probe ran
+        format ran on blocked-orphan
+        calc ran on gapped
+        parse ran on gapped
+        calc ran on panics-gapped
+        parse ran on panics-gapped
+        calc ran on panics
+        parse ran on panics
+        calc ran on quiet
+        parse ran on quiet
+        resolve ran on quiet
+        evaluate's probe ran
+        evaluate ran on quiet
+        format's probe ran
+        format ran on quiet
+        calc ran on unstated
+        parse ran on unstated
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/blocked-gap
+            --- PASS: TestCorpus/script/blocked-gap/calc
+            --- FAIL: TestCorpus/script/blocked-gap/evaluate
+            --- PASS: TestCorpus/script/blocked-gap/format
+            --- PASS: TestCorpus/script/blocked-gap/parse
+            --- PASS: TestCorpus/script/blocked-gap/resolve
+        --- FAIL: TestCorpus/script/blocked-orphan
+            --- PASS: TestCorpus/script/blocked-orphan/calc
+            --- FAIL: TestCorpus/script/blocked-orphan/evaluate
+            --- PASS: TestCorpus/script/blocked-orphan/format
+            --- PASS: TestCorpus/script/blocked-orphan/parse
+            --- PASS: TestCorpus/script/blocked-orphan/resolve
+        --- PASS: TestCorpus/script/gapped
+            --- PASS: TestCorpus/script/gapped/calc
+            --- SKIP: TestCorpus/script/gapped/evaluate
+            --- SKIP: TestCorpus/script/gapped/format
+            --- PASS: TestCorpus/script/gapped/parse
+            --- SKIP: TestCorpus/script/gapped/resolve
+        --- PASS: TestCorpus/script/panics-gapped
+            --- PASS: TestCorpus/script/panics-gapped/calc
+            --- SKIP: TestCorpus/script/panics-gapped/evaluate
+            --- SKIP: TestCorpus/script/panics-gapped/format
+            --- PASS: TestCorpus/script/panics-gapped/parse
+            --- SKIP: TestCorpus/script/panics-gapped/resolve
+        --- FAIL: TestCorpus/script/panics
+            --- PASS: TestCorpus/script/panics/calc
+            --- SKIP: TestCorpus/script/panics/evaluate
+            --- SKIP: TestCorpus/script/panics/format
+            --- FAIL: TestCorpus/script/panics/parse
+            --- SKIP: TestCorpus/script/panics/resolve
+        --- FAIL: TestCorpus/script/quiet
+            --- PASS: TestCorpus/script/quiet/calc
+            --- PASS: TestCorpus/script/quiet/evaluate
+            --- PASS: TestCorpus/script/quiet/format
+            --- FAIL: TestCorpus/script/quiet/parse
+            --- PASS: TestCorpus/script/quiet/resolve
+        --- FAIL: TestCorpus/script/unstated
+            --- PASS: TestCorpus/script/unstated/calc
+            --- SKIP: TestCorpus/script/unstated/evaluate
+            --- SKIP: TestCorpus/script/unstated/format
+            --- FAIL: TestCorpus/script/unstated/parse
+            --- SKIP: TestCorpus/script/unstated/resolve
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/blocked-gap: resolve rejects the script, and a gaps line names evaluate, which resolve blocks.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        gaps, line 1, marks the cell, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case, so the cell runs nothing.
+        Remove the line, or fix the lift or the case.
+    script/blocked-orphan: resolve now rejects the script, so evaluate's committed values are orphans.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/values.txt is recorded, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/gapped: evaluate is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
+    script/gapped: format is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
+    script/gapped: resolve is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
+    script/panics-gapped: evaluate is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
+    script/panics-gapped: format is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
+    script/panics-gapped: resolve is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
+    script/panics: evaluate is blocked: the lift parse failed on the case, and testdata/script/panics.txtar, out/parse/error.txt, records its error.
+    script/panics: format is blocked: the lift parse failed on the case, and testdata/script/panics.txtar, out/parse/error.txt, records its error.
+    script/panics: parse panics on the script, which states malformed.
+        parse: Parses the script, as its parse/ tree says.
+        parse panicked: parse: boom
+        Fix the code. A panic is never an expected error.
+    stack of the panic: [stack]
+    script/panics: resolve is blocked: the lift parse failed on the case, and testdata/script/panics.txtar, out/parse/error.txt, records its error.
+    script/quiet: The script states malformed, and parse accepts it.
+        parse: Parses the script, as its parse/ tree says.
+        parse returned no error, but the case states malformed, which parse rejects.
+        Fix the code, or correct the case's properties or parse's Rejects.
+    script/unstated: evaluate is blocked: the lift parse failed on the case, and testdata/script/unstated.txtar, out/parse/error.txt, records its error.
+    script/unstated: format is blocked: the lift parse failed on the case, and testdata/script/unstated.txtar, out/parse/error.txt, records its error.
+    script/unstated: parse rejects a script that states nothing.
+        parse: Parses the script, as its parse/ tree says.
+        parse returned an error, but the case states no property parse rejects:
+          A1: not a number
+        Fix the code, or state the property on the case and in parse's Rejects.
+    script/unstated: resolve is blocked: the lift parse failed on the case, and testdata/script/unstated.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on blocked-gap
+        parse ran on blocked-gap
+        resolve ran on blocked-gap
+        format's probe ran
+        format ran on blocked-gap
+        calc ran on blocked-orphan
+        parse ran on blocked-orphan
+        resolve ran on blocked-orphan
+        format's probe ran
+        format ran on blocked-orphan
+        calc ran on gapped
+        parse ran on gapped
+        calc ran on panics-gapped
+        parse ran on panics-gapped
+        calc ran on panics
+        parse ran on panics
+        calc ran on quiet
+        parse ran on quiet
+        resolve ran on quiet
+        evaluate's probe ran
+        evaluate ran on quiet
+        format's probe ran
+        format ran on quiet
+        calc ran on unstated
+        parse ran on unstated
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/blocked-gap
+            --- PASS: TestCorpus/script/blocked-gap/calc
+            --- FAIL: TestCorpus/script/blocked-gap/evaluate
+            --- PASS: TestCorpus/script/blocked-gap/format
+            --- PASS: TestCorpus/script/blocked-gap/parse
+            --- PASS: TestCorpus/script/blocked-gap/resolve
+        --- FAIL: TestCorpus/script/blocked-orphan
+            --- PASS: TestCorpus/script/blocked-orphan/calc
+            --- FAIL: TestCorpus/script/blocked-orphan/evaluate
+            --- PASS: TestCorpus/script/blocked-orphan/format
+            --- PASS: TestCorpus/script/blocked-orphan/parse
+            --- PASS: TestCorpus/script/blocked-orphan/resolve
+        --- PASS: TestCorpus/script/gapped
+            --- PASS: TestCorpus/script/gapped/calc
+            --- SKIP: TestCorpus/script/gapped/evaluate
+            --- SKIP: TestCorpus/script/gapped/format
+            --- PASS: TestCorpus/script/gapped/parse
+            --- SKIP: TestCorpus/script/gapped/resolve
+        --- PASS: TestCorpus/script/panics-gapped
+            --- PASS: TestCorpus/script/panics-gapped/calc
+            --- SKIP: TestCorpus/script/panics-gapped/evaluate
+            --- SKIP: TestCorpus/script/panics-gapped/format
+            --- PASS: TestCorpus/script/panics-gapped/parse
+            --- SKIP: TestCorpus/script/panics-gapped/resolve
+        --- FAIL: TestCorpus/script/panics
+            --- PASS: TestCorpus/script/panics/calc
+            --- SKIP: TestCorpus/script/panics/evaluate
+            --- SKIP: TestCorpus/script/panics/format
+            --- FAIL: TestCorpus/script/panics/parse
+            --- SKIP: TestCorpus/script/panics/resolve
+        --- FAIL: TestCorpus/script/quiet
+            --- PASS: TestCorpus/script/quiet/calc
+            --- PASS: TestCorpus/script/quiet/evaluate
+            --- PASS: TestCorpus/script/quiet/format
+            --- FAIL: TestCorpus/script/quiet/parse
+            --- PASS: TestCorpus/script/quiet/resolve
+        --- FAIL: TestCorpus/script/unstated
+            --- PASS: TestCorpus/script/unstated/calc
+            --- SKIP: TestCorpus/script/unstated/evaluate
+            --- SKIP: TestCorpus/script/unstated/format
+            --- FAIL: TestCorpus/script/unstated/parse
+            --- SKIP: TestCorpus/script/unstated/resolve
+FAIL
+[exit 1]
+$ edit testdata/script/gapped.txtar  # parse's wrong error is reworded
+$ go test -run=TestCorpus/script/gapped/  # ladder
+    script/gapped: evaluate is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
+    script/gapped: format is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
+    script/gapped: parse rejects a valid script, a known gap.
+        parse: Parses the script, as its parse/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "parse rejects a valid script. Waits on sheets#3."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/parse/error.txt differs (-committed +got):
+        - A1: wrongly rejected
+        + A1: wrongly rejected, reworded
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+    script/gapped: resolve is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
+    script/panics-gapped: evaluate is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
+    script/panics-gapped: format is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
+    script/panics-gapped: resolve is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on gapped
+        parse ran on gapped
+        calc ran on panics-gapped
+        parse ran on panics-gapped
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/gapped
+            --- PASS: TestCorpus/script/gapped/calc
+            --- SKIP: TestCorpus/script/gapped/evaluate
+            --- SKIP: TestCorpus/script/gapped/format
+            --- FAIL: TestCorpus/script/gapped/parse
+            --- SKIP: TestCorpus/script/gapped/resolve
+        --- PASS: TestCorpus/script/panics-gapped
+            --- PASS: TestCorpus/script/panics-gapped/calc
+            --- SKIP: TestCorpus/script/panics-gapped/evaluate
+            --- SKIP: TestCorpus/script/panics-gapped/format
+            --- PASS: TestCorpus/script/panics-gapped/parse
+            --- SKIP: TestCorpus/script/panics-gapped/resolve
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/script/gapped/  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/gapped: evaluate is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
+    script/gapped: format is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
+    script/gapped: parse rejects a valid script, a known gap.
+        parse: Parses the script, as its parse/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "parse rejects a valid script. Waits on sheets#3."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/parse/error.txt differs (-committed +got):
+        - A1: wrongly rejected
+        + A1: wrongly rejected, reworded
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+    script/gapped: resolve is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
+    script/panics-gapped: evaluate is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
+    script/panics-gapped: format is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
+    script/panics-gapped: resolve is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on gapped
+        parse ran on gapped
+        calc ran on panics-gapped
+        parse ran on panics-gapped
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/gapped
+            --- PASS: TestCorpus/script/gapped/calc
+            --- SKIP: TestCorpus/script/gapped/evaluate
+            --- SKIP: TestCorpus/script/gapped/format
+            --- FAIL: TestCorpus/script/gapped/parse
+            --- SKIP: TestCorpus/script/gapped/resolve
+        --- PASS: TestCorpus/script/panics-gapped
+            --- PASS: TestCorpus/script/panics-gapped/calc
+            --- SKIP: TestCorpus/script/panics-gapped/evaluate
+            --- SKIP: TestCorpus/script/panics-gapped/format
+            --- PASS: TestCorpus/script/panics-gapped/parse
+            --- SKIP: TestCorpus/script/panics-gapped/resolve
+FAIL
+[exit 1]

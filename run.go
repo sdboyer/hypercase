@@ -64,28 +64,34 @@ func Test(t *testing.T) {
 type runner struct {
 	update      bool
 	updateVar   string
+	renderError func(in fs.FS, err error) []byte
 	moduleRoot  string
 	pkgDir      string
 	rootRel     string // the corpus root, relative to the module root
 	corpusRoot  string
 	rootPackage bool
 	properties  []decl.Property
-	columns     []*column // sorted by name
+	types       []*corpusType
+	lifts       []*lift             // owned and used
+	columns     []*column           // sorted by name
+	plans       []*plan             // one per corpus type, by directory
+	corpora     map[string][]string // each lift's and suite's corpus directories, sorted
 	stats       map[string]*colStats
 }
 
-// colStats counts a column's cells, for the check that it applies to some
+// colStats counts a suite's cells, for the check that it applies to some
 // case.
 type colStats struct {
-	total   int // the cells the column has: its corpus's archives whose cells run
+	total   int // the cells the suite has: its corpora's archives whose cells run
 	ran     int // those that ran, which -run can make fewer
-	applied int // those the column's probe said were for it
+	applied int // those the suite's probe said were for it
 }
 
 func newRunner(t *testing.T) (*runner, bool) {
 	t.Helper()
 	reg.mu.Lock()
 	project, properties, columns := reg.project, slices.Clone(reg.properties), slices.Clone(reg.columns)
+	types, lifts := slices.Clone(reg.types), slices.Clone(reg.lifts)
 	rootRel, rootPackage := reg.root, reg.rootPackage
 	reg.mu.Unlock()
 	if project == nil {
@@ -94,10 +100,14 @@ func newRunner(t *testing.T) (*runner, bool) {
 	}
 	r := &runner{
 		updateVar:   project.UpdateVar,
+		renderError: project.RenderError,
 		rootRel:     rootRel,
 		rootPackage: rootPackage,
 		properties:  properties,
+		types:       types,
+		lifts:       lifts,
 		columns:     columns,
+		corpora:     map[string][]string{},
 		stats:       map[string]*colStats{},
 	}
 	slices.SortFunc(r.columns, func(a, b *column) int { return strings.Compare(a.name, b.name) })
@@ -127,7 +137,8 @@ func newRunner(t *testing.T) (*runner, bool) {
 		t.Errorf("the package registers the root-package check for the module-root corpus, and is not the module's root package, %s.\nRegister hypercase.RootPackage() in the module's root package, or pass this package's corpus root with hypercase.Root.", r.moduleRoot)
 		return nil, false
 	}
-	return r, r.checkRelations(t)
+	related := r.checkRelations(t)
+	return r, r.planPaths(t) && related
 }
 
 // checkRelations checks what relates two registrations, once
@@ -140,10 +151,10 @@ func (r *runner) checkRelations(t *testing.T) bool {
 			q, found := reg.property(p.Name)
 			switch {
 			case !found:
-				t.Errorf("the suite %s rejects %s, and the package registers no property of that name.\nRegister the property, or remove it from %s's Rejects.", c.name, p.Name, c.name)
+				t.Errorf("the %s %s rejects %s, and the package registers no property of that name.\nRegister the property, or remove it from %s's Rejects.", c.kind(), c.name, p.Name, c.name)
 				ok = false
 			case q != p:
-				t.Errorf("the suite %s rejects a property named %s, which the package registers with another description.\nReject the registered property: declare it once, and use that declaration in both places.", c.name, p.Name)
+				t.Errorf("the %s %s rejects a property named %s, which the package registers with another description.\nReject the registered property: declare it once, and use that declaration in both places.", c.kind(), c.name, p.Name)
 				ok = false
 			}
 		}
@@ -182,14 +193,29 @@ func (r *runner) checkDescriptions(t *testing.T) {
 			t.Errorf("the property %s has no description.\nAdd one: it says what the fact about a case is, in prose.", p.Name)
 		}
 	}
-	for _, c := range r.columns {
-		if strings.TrimSpace(c.description) == "" {
-			t.Errorf("the suite %s has no description.\nAdd one: it says what the suite does, in prose.", c.name)
+	for _, ct := range r.types {
+		if strings.TrimSpace(ct.description) == "" {
+			t.Errorf("the corpus type %s, of testdata/%s/, has no description.\nAdd one: it says what the type's inputs are, in prose.", ct.goType, ct.dir)
 		}
-		for _, o := range c.outputs {
-			if strings.TrimSpace(o.Description) == "" {
-				t.Errorf("the suite %s declares the output %s with no description.\nAdd one: it says what the files hold, in prose.", c.name, o.Pattern)
-			}
+	}
+	for _, l := range r.lifts {
+		if !l.owned {
+			r.checkColumnDescriptions(t, "lift", l.name, l.description, l.outputs)
+		}
+	}
+	for _, c := range r.columns {
+		r.checkColumnDescriptions(t, c.kind(), c.name, c.description, c.outputs)
+	}
+}
+
+func (r *runner) checkColumnDescriptions(t *testing.T, kind, name, description string, outputs []decl.Output) {
+	t.Helper()
+	if strings.TrimSpace(description) == "" {
+		t.Errorf("the %s %s has no description.\nAdd one: it says what the %s does, in prose.", kind, name, kind)
+	}
+	for _, o := range outputs {
+		if strings.TrimSpace(o.Description) == "" {
+			t.Errorf("the %s %s declares the output %s with no description.\nAdd one: it says what the files hold, in prose.", kind, name, o.Pattern)
 		}
 	}
 }
@@ -219,40 +245,27 @@ type plannedCase struct {
 	a    *archive.Archive
 }
 
-// runCorpora runs the cases of each corpus the package's columns run over.
-// It reads every archive first, outside the subtests, so the count of each
-// column's cells doesn't depend on -run.
+// runCorpora runs the cases of each corpus type the package's columns run
+// over. It reads every archive first, outside the subtests, so the count
+// of each suite's cells doesn't depend on -run.
 func (r *runner) runCorpora(t *testing.T) {
 	t.Helper()
-	var corpora []string
-	for _, c := range r.columns {
-		if !slices.Contains(corpora, c.corpus) {
-			corpora = append(corpora, c.corpus)
+	for _, p := range r.plans {
+		if len(p.cols) == 0 {
+			continue
 		}
-	}
-	slices.Sort(corpora)
-	for _, corpus := range corpora {
-		cases := r.planCorpus(t, corpus)
-		cols := r.columnsOver(corpus)
-		for _, col := range cols {
-			r.stats[col.name].total += len(cases)
+		cases := r.planCorpus(t, p.root.dir)
+		for _, col := range p.cols {
+			if col.lift == nil {
+				r.stats[col.name].total += len(cases)
+			}
 		}
-		t.Run(corpus, func(t *testing.T) {
+		t.Run(p.root.dir, func(t *testing.T) {
 			for _, pc := range cases {
-				t.Run(pc.name, func(t *testing.T) { r.runCase(t, corpus, pc, cols) })
+				t.Run(pc.name, func(t *testing.T) { r.runCase(t, p, pc) })
 			}
 		})
 	}
-}
-
-func (r *runner) columnsOver(corpus string) []*column {
-	var cols []*column
-	for _, c := range r.columns {
-		if c.corpus == corpus {
-			cols = append(cols, c)
-		}
-	}
-	return cols
 }
 
 // planCorpus reads a corpus's archives. One the package can't run is left
@@ -295,10 +308,12 @@ func (r *runner) planCorpus(t *testing.T, corpus string) []plannedCase {
 type aCase struct {
 	name       string // <corpus>/<archive>
 	archive    string // the archive's name
+	path       string // the archive's file
 	a          *archive.Archive
 	view       fs.FS
 	properties []string
 	gaps       []archive.Gap
+	state      *caseState
 }
 
 // gap returns the known gap that marks a column's cell, if any.
@@ -327,19 +342,42 @@ func (c *aCase) header() string {
 	return c.name + ": " + indent(strings.TrimSpace(string(c.a.Comment)), "  ")
 }
 
-func (r *runner) runCase(t *testing.T, corpus string, pc plannedCase, cols []*column) {
+// reverseCells runs each case's cells in reverse column-name order. Only
+// hypercase's own tests set it, to show that no cell's bytes depend on the
+// cells before it.
+var reverseCells bool
+
+func (r *runner) runCase(t *testing.T, p *plan, pc plannedCase) {
+	view := pc.a.View()
 	c := &aCase{
-		name:       corpus + "/" + pc.name,
+		name:       p.root.dir + "/" + pc.name,
 		archive:    pc.name,
+		path:       pc.path,
 		a:          pc.a,
-		view:       pc.a.View(),
+		view:       view,
 		properties: pc.a.Properties(),
 		gaps:       pc.a.Gaps(),
+		state: &caseState{
+			archive: pc.name,
+			plan:    p,
+			root:    p.root.new(view),
+			runs:    map[*lift]*liftRun{},
+		},
 	}
+	cols := p.cols
 	results := make([]*cellResult, len(cols))
-	for i, col := range cols {
-		res := &cellResult{}
-		results[i] = res
+	for i := range cols {
+		results[i] = &cellResult{}
+	}
+	order := make([]int, len(cols))
+	for i := range order {
+		order[i] = i
+	}
+	if reverseCells {
+		slices.Reverse(order)
+	}
+	for _, i := range order {
+		col, res := cols[i], results[i]
 		t.Run(col.name, func(t *testing.T) { r.runCell(t, c, col, res) })
 	}
 	if r.update {
@@ -460,11 +498,22 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	gap, marked := c.gap(col.name)
 	goldens := c.goldens(col.name)
 
+	in, by := c.state.stage(col.consumes)
+	if by != nil {
+		st.applied++
+		r.blocked(t, c, header, col, by, gap, marked, goldens)
+		return
+	}
+
 	var out *called
-	if col.probe != nil {
+	if col.lift != nil {
+		// A lift's cell records its function's one run on the case, which
+		// an earlier cell may have made.
+		out = c.state.runLift(col.lift, in).out
+	} else if col.probe != nil {
 		var why string
 		var ok bool
-		p := call(func(*called) { why, ok = col.probe(c.view) })
+		p := call(func(*called) { why, ok = col.probe(in) })
 		switch {
 		case p.panicked:
 			p.inProbe = true
@@ -495,7 +544,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			r.failedTest(t, header)
 		}()
 		out = call(func(o *called) {
-			o.files, o.err = col.run(t, c.archive, c.view, &o.stdout, &o.stderr)
+			o.files, o.err = col.run(t, c.archive, in, &o.stdout, &o.stderr)
 		})
 		finished = true
 		if t.Failed() {
@@ -505,7 +554,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	}
 
 	m := &msg{}
-	files, unjudged, writable := r.outputs(m, col, out)
+	files, unjudged, writable := r.outputs(m, c, col, out)
 
 	if !marked {
 		r.expectedError(m, c, col, out)
@@ -572,11 +621,29 @@ func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why
 	t.Skipf("%s: %s's probe says the case isn't for it: %s", c.name, col.name, why)
 }
 
+// blocked finishes a cell that a lift on its path blocked, by failing on
+// the case. The cell runs nothing, so it isn't checked for an expected
+// error; its committed files are orphans.
+func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, by *lift, gap archive.Gap, marked bool, goldens map[string][]byte) {
+	m := &msg{}
+	if marked {
+		m.add("gaps, line %d, marks the cell, and the cell is blocked: the lift %s, on %s's path, failed on the case, so the cell runs nothing.\nRemove the line, or fix the lift or the case.", gap.Line, by.name, col.name)
+	}
+	for _, p := range sortedKeys(goldens) {
+		m.add("out/%s/%s is recorded, and the cell is blocked: the lift %s, on %s's path, failed on the case.\nIf the cell should run, fix the lift or the case. If not, delete the section by hand; %s leaves it in place.", col.name, p, by.name, col.name, r.updateCmd())
+	}
+	if !m.empty() {
+		t.Errorf("%s\n%s", header, m)
+		return
+	}
+	t.Skipf("%s: %s is blocked: the lift %s failed on the case, and %s, out/%s/%s, records its error.", c.name, col.name, by.name, r.rel(c.path), by.name, errorFile)
+}
+
 // outputs collects a cell's files: what its function returned, and what the
 // framework writes for it. It reports outputs whose shape is wrong or that
 // no declaration matches, which are left unjudged, and whether an update
 // may write the cell.
-func (r *runner) outputs(m *msg, col *column, out *called) (files map[string][]byte, unjudged map[string]bool, writable bool) {
+func (r *runner) outputs(m *msg, c *aCase, col *column, out *called) (files map[string][]byte, unjudged map[string]bool, writable bool) {
 	files, unjudged, writable = map[string][]byte{}, map[string]bool{}, true
 	for _, f := range out.files {
 		switch {
@@ -610,9 +677,17 @@ func (r *runner) outputs(m *msg, col *column, out *called) (files map[string][]b
 	case out.panicked:
 		files[errorFile] = fmt.Appendf(nil, "%v\n", out.panicValue)
 	case out.err != nil:
-		files[errorFile] = []byte(out.err.Error() + "\n")
+		data, ok := r.render(m, c, col, out.err)
+		files[errorFile] = data
+		if !ok {
+			writable = false
+			unjudged[errorFile] = true
+		}
 	}
 	for _, p := range sortedKeys(files) {
+		if unjudged[p] {
+			continue
+		}
 		switch hit := col.declared(p); len(hit) {
 		case 0:
 			m.add("out/%s/%s%s is not declared.\nDeclare it in %s's Outputs, with a description, or fix the code. An update writes nothing for this cell.", col.name, p, holds(p), col.name)
@@ -633,6 +708,26 @@ func (r *runner) outputs(m *msg, col *column, out *called) (files map[string][]b
 		}
 	}
 	return files, unjudged, writable
+}
+
+// render renders an error a column's function returned, for error.txt:
+// through the project's RenderError, or as the error's text. It reports a
+// RenderError that panics, or whose bytes don't end with a newline.
+func (r *runner) render(m *msg, c *aCase, col *column, err error) ([]byte, bool) {
+	if r.renderError == nil {
+		return []byte(err.Error() + "\n"), true
+	}
+	var data []byte
+	p := call(func(*called) { data = r.renderError(c.view, err) })
+	switch {
+	case p.panicked:
+		m.add("The project's RenderError panicked on %s's error: %v\nFix RenderError. An update writes nothing for this cell.", col.name, p.panicValue)
+		return []byte{}, false
+	case !bytes.HasSuffix(data, []byte("\n")):
+		m.add("The project's RenderError returned %q for %s's error, which doesn't end with a newline.\nIts output must end with a newline: fix RenderError. An update writes nothing for this cell.", data, col.name)
+		return []byte{}, false
+	}
+	return bytes.Clone(data), true
 }
 
 // holds says what a file the framework writes holds.
@@ -698,20 +793,33 @@ func (r *runner) compare(m *msg, col *column, files, goldens map[string][]byte, 
 	}
 }
 
-// appliesToNoCase fails each column that applies to no case: one whose
-// corpus holds no archive whose cells run, or whose probe said no to every
-// case. The verdict needs every one of the column's cells to have run, so
-// under a -run that leaves some out, it isn't given.
+// appliesToNoCase fails each suite that applies to no case: one whose
+// corpora hold no archive whose cells run, or whose probe said no to every
+// case. The verdict needs every one of the suite's cells to have run, so
+// under a -run that leaves some out, it isn't given. A lift's column that
+// no archive reaches is no failure: a lift is declared with its type,
+// often before the type's first archive.
 func (r *runner) appliesToNoCase(t *testing.T) {
 	t.Helper()
 	for _, c := range r.columns {
+		if c.lift != nil {
+			continue
+		}
 		st := r.stats[c.name]
 		switch {
 		case st.ran < st.total || st.applied > 0:
 		case st.total == 0:
-			t.Errorf("the suite %s applies to no case: its corpus, %s, holds no archive whose cells run.\nA suite that applies to no case checks nothing. Add a case to the corpus, or name another corpus.", c.name, r.rel(filepath.Join(r.corpusRoot, "testdata", c.corpus)))
+			var dirs []string
+			for _, d := range r.corpora[c.name] {
+				dirs = append(dirs, r.rel(filepath.Join(r.corpusRoot, "testdata", d))+"/")
+			}
+			what := "its corpus, " + andList(dirs) + ", holds"
+			if len(dirs) > 1 {
+				what = "its corpora, " + andList(dirs) + ", hold"
+			}
+			t.Errorf("the suite %s applies to no case: %s no archive whose cells run.\nA suite that applies to no case checks nothing. Add a case it applies to.", c.name, what)
 		default:
-			t.Errorf("the suite %s applies to no case: its probe says no to every case of %s.\nA suite that applies to no case checks nothing. Add a case it applies to, or fix the probe.", c.name, c.corpus)
+			t.Errorf("the suite %s applies to no case: its probe says no to every case of %s.\nA suite that applies to no case checks nothing. Add a case it applies to, or fix the probe.", c.name, andList(r.corpora[c.name]))
 		}
 	}
 }

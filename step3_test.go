@@ -320,7 +320,7 @@ func TestRegistrationRefusals(t *testing.T) {
 	s := newSandbox(t, "basic")
 	for _, tt := range []struct{ reg, want string }{
 		{"bad-name", `panic: hypercase: the suite name "Echo" breaks the naming rule`},
-		{"two-names", "panic: hypercase: two suites are named echo."},
+		{"two-names", "panic: hypercase: two columns are named echo: the suite echo, over hypercase_test.Script, and the suite echo, over hypercase_test.Script. Column names are unique; rename one."},
 		{"no-run", "panic: hypercase: the suite echo has no Run."},
 		{"two-projects", "panic: hypercase: Register was given a decl.Project a second time."},
 		{"unknown", "panic: hypercase: Register was given a int, which is nothing hypercase registers."},

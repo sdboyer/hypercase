@@ -27,7 +27,7 @@ $ go test  # rejects-registered-later
         -       "description": "Some cell holds neither a number nor a formula."
               }
             ],
-            "suites": [
+            "types": [
           ...
                   }
                 ],

@@ -1,0 +1,9 @@
+parse rejects the script, which states malformed. calc reads the raw trees, and rejects it too.
+-- in/parse/error --
+D1: not a number or a formula: "total"
+-- in/calc/error --
+D1: not a number or a formula: "total"
+-- in/evaluate/probe --
+evaluate's probe says no, if it is called.
+-- properties --
+malformed

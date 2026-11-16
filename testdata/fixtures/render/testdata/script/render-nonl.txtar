@@ -1,0 +1,9 @@
+parse rejects the script, and RenderError leaves off the final newline.
+-- in/parse/error --
+A1: not a number
+-- in/render/nonl --
+yes
+-- in/calc/error --
+D1: not a number
+-- properties --
+malformed

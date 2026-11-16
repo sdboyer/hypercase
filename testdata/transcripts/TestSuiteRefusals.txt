@@ -6,12 +6,12 @@ $ go test  # bad-pattern-path
 panic: hypercase: the suite echo declares an output with the pattern "../values.txt", which is not a pattern of slash paths under out/echo/ in the syntax of path.Match. Fix the pattern.
 [stack]
 [exit 2]
-$ go test  # no-corpus
-panic: hypercase: the suite echo names no Corpus. Name the directory of the archives it runs over, testdata/<corpus>/ under the corpus root.
+$ go test  # corpus-set
+panic: hypercase: the suite echo names the Corpus "script". A suite runs over the archives whose corpus type reaches the type it consumes. Declare a decl.Type with Dir "script", make the suite consume it or a stage it reaches, and remove Corpus.
 [stack]
 [exit 2]
-$ go test  # bad-corpus
-panic: hypercase: the suite echo names the corpus "Script", which breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter. Rename the corpus's directory.
+$ go test  # bad-dir
+panic: hypercase: the corpus type hypercase_test.Script declares the directory "Script", which breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter. Rename the directory.
 [stack]
 [exit 2]
 $ go test  # two-roots

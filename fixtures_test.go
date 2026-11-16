@@ -23,8 +23,26 @@ var project = decl.Project{UpdateVar: fixtureUpdate}
 
 var rootPkg = hypercase.RootPackage()
 
-// steered returns a suite its cases steer, over the corpus script. Each
-// file under the input view's <tree>/ is an instruction:
+var own = hypercase.Own
+
+// The fixtures' corpus types.
+type (
+	// Script holds the archives of testdata/script/, trees of instructions
+	// that the fixtures' columns follow.
+	Script struct{ fs.FS }
+	// Other and Later are corpus types of other directories.
+	Other struct{ fs.FS }
+	Later struct{ fs.FS }
+)
+
+var (
+	scriptType = decl.Type[Script]{Dir: "script", Description: "Trees of instructions, under in/<tree>/, that the fixtures' columns follow."}
+	otherType  = decl.Type[Other]{Dir: "other", Description: "Trees of instructions, in another directory."}
+	laterType  = decl.Type[Later]{Dir: "later", Description: "Trees of instructions, in a directory with no archive yet."}
+)
+
+// steered returns a suite its cases steer, over a corpus type. Each file
+// under the input view's <tree>/ is an instruction:
 //
 //	<tree>/out/<path>      returned as the output <path>
 //	<tree>/nonl/<path>     returned as <path>, less its final newline
@@ -38,20 +56,20 @@ var rootPkg = hypercase.RootPackage()
 //	<tree>/fatal           given to t.Fatal
 //	<tree>/skip            given to t.Skip
 //	<tree>/tempdir         returned as dir.txt: the path of a t.TempDir
+//	<tree>/archive         returned as archive.txt: the archive's name
 //	<tree>/edit            names a section of the archive, or "comment", then
 //	                       optionally a line: the run adds the line, or
 //	                       "edited", to it on disk, as a person's edit
 //	                       during the run would
 //	<tree>/probe           read by withProbe's probe, and ignored by the run
 //	<tree>/probe-panic     read by withProbe's probe, and ignored by the run
-func steered(name, tree string) hypercase.Suite[fs.FS] {
-	return hypercase.Suite[fs.FS]{
+func steered[T ~struct{ fs.FS }](name, tree string) hypercase.Suite[T] {
+	return hypercase.Suite[T]{
 		Name:        name,
 		Description: "Does what the case's " + tree + "/ tree says.",
-		Corpus:      "script",
 		Outputs:     steeredOutputs,
-		Run: func(t testing.TB, archiveName string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
-			return runSteered(t, archiveName, tree, in, stdout, stderr)
+		Run: func(t testing.TB, archiveName string, in T, stdout, stderr io.Writer) ([]hypercase.File, error) {
+			return runSteered(t, archiveName, tree, struct{ fs.FS }(in).FS, stdout, stderr)
 		},
 	}
 }
@@ -60,14 +78,15 @@ var steeredOutputs = []decl.Output{
 	{Pattern: "values.txt", Description: "The values the case's instructions give."},
 	{Pattern: "?.txt", Description: "A file the case's instructions name with one letter."},
 	{Pattern: "dir.txt", Description: "The path of a temp dir the run made."},
+	{Pattern: "archive.txt", Description: "The archive's name, as the run received it."},
 	{Pattern: "error.txt", Description: "The error the case's instructions give."},
 	{Pattern: "stdout.txt", Description: "What the case's instructions write to stdout."},
 	{Pattern: "stderr.txt", Description: "What the case's instructions write to stderr."},
 }
 
 var (
-	echo  = steered("echo", "do")
-	shout = steered("shout", "shout")
+	echo  = steered[Script]("echo", "do")
+	shout = steered[Script]("shout", "shout")
 )
 
 func runSteered(t testing.TB, archiveName, tree string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
@@ -113,6 +132,8 @@ func runSteered(t testing.TB, archiveName, tree string, in fs.FS, stdout, stderr
 			t.Skip(text)
 		case "tempdir":
 			files = append(files, hypercase.File{Path: "dir.txt", Data: []byte(t.TempDir() + "\n")})
+		case "archive":
+			files = append(files, hypercase.File{Path: "archive.txt", Data: []byte(archiveName + "\n")})
 		case "edit":
 			editArchive(t, archiveName, text)
 		case "probe", "probe-panic":
@@ -166,18 +187,23 @@ func editArchive(t testing.TB, archiveName, instruction string) {
 // withProbe gives a suite the probe that reads the do/ tree: do/probe holds
 // the reason it says no, and an empty one says no with no reason;
 // do/probe-panic holds what it panics with.
-func withProbe(s hypercase.Suite[fs.FS]) hypercase.Suite[fs.FS] {
-	s.Probe = func(in fs.FS) (string, bool) {
-		if data, err := fs.ReadFile(in, "do/probe-panic"); err == nil {
-			panic(strings.TrimSuffix(string(data), "\n"))
-		}
-		data, err := fs.ReadFile(in, "do/probe")
-		if err != nil {
-			return "", true
-		}
-		return strings.TrimSpace(string(data)), false
-	}
+func withProbe(s hypercase.Suite[Script]) hypercase.Suite[Script] {
+	s.Probe = func(in Script) (string, bool) { return steeredProbe(in, "do") }
 	return s
+}
+
+// steeredProbe is the probe that reads a tree: <tree>/probe holds the
+// reason it says no, and an empty one says no with no reason;
+// <tree>/probe-panic holds what it panics with.
+func steeredProbe(in fs.FS, tree string) (string, bool) {
+	if data, err := fs.ReadFile(in, tree+"/probe-panic"); err == nil {
+		panic(strings.TrimSuffix(string(data), "\n"))
+	}
+	data, err := fs.ReadFile(in, tree+"/probe")
+	if err != nil {
+		return "", true
+	}
+	return strings.TrimSpace(string(data)), false
 }
 
 func withName[T any](s hypercase.Suite[T], name string) hypercase.Suite[T] {
@@ -208,7 +234,8 @@ func withOutputs[T any](s hypercase.Suite[T], os ...decl.Output) hypercase.Suite
 var (
 	circular = decl.Property{Name: "circular", Description: "Some cell's formula refers back to itself, directly or through other cells."}
 	dangling = decl.Property{Name: "dangling", Description: "Some formula refers to a cell the sheet doesn't have."}
-	// malformed is registered, and no column of the fixtures rejects it.
+	// malformed is registered, and no column of the step 3 to 5 fixtures
+	// rejects it.
 	malformed = decl.Property{Name: "malformed", Description: "Some cell holds neither a number nor a formula."}
 	// loop is circular, declared again with another description.
 	loop = decl.Property{Name: "circular", Description: "A loop."}
@@ -216,93 +243,95 @@ var (
 
 // registrations are the fixtures' declaration sets, by name.
 var registrations = map[string]func(){
-	"echo":        func() { hypercase.Register(project, rootPkg, echo) },
-	"echo-nodesc": func() { hypercase.Register(project, rootPkg, withDescription(echo, " \n")) },
-	"bad-name":    func() { hypercase.Register(project, withName(echo, "Echo")) },
-	"two-names":   func() { hypercase.Register(project, echo, echo) },
-	"no-project":  func() { hypercase.Register(echo) },
+	"echo":        func() { hypercase.Register(project, rootPkg, scriptType, own(echo)) },
+	"echo-nodesc": func() { hypercase.Register(project, rootPkg, scriptType, own(withDescription(echo, " \n"))) },
+	"bad-name":    func() { hypercase.Register(project, scriptType, own(withName(echo, "Echo"))) },
+	"two-names":   func() { hypercase.Register(project, scriptType, own(echo, echo)) },
+	"no-project":  func() { hypercase.Register(scriptType, own(echo)) },
 	"no-run": func() {
-		hypercase.Register(project, hypercase.Suite[fs.FS]{Name: "echo", Description: "Runs nothing.", Corpus: "script"})
+		hypercase.Register(project, scriptType, own(hypercase.Suite[Script]{Name: "echo", Description: "Runs nothing."}))
 	},
 	"two-projects": func() {
-		hypercase.Register(project, echo)
+		hypercase.Register(project, scriptType, own(echo))
 		hypercase.Register(project)
 	},
-	"late":    func() { hypercase.Register(project, rootPkg, echo) },
+	"late":    func() { hypercase.Register(project, rootPkg, scriptType, own(echo)) },
 	"unknown": func() { hypercase.Register(project, 42) },
 
 	"rejects": func() {
-		hypercase.Register(project, rootPkg, circular, dangling, malformed, withRejects(echo, circular, dangling))
+		hypercase.Register(project, rootPkg, circular, dangling, malformed, scriptType, own(withRejects(echo, circular, dangling)))
 	},
-	"rejects-unregistered": func() { hypercase.Register(project, rootPkg, withRejects(echo, circular)) },
+	"rejects-unregistered": func() { hypercase.Register(project, rootPkg, scriptType, own(withRejects(echo, circular))) },
 	"rejects-registered-later": func() {
-		hypercase.Register(project, rootPkg, withRejects(echo, circular))
+		hypercase.Register(project, rootPkg, scriptType, own(withRejects(echo, circular)))
 		hypercase.Register(circular)
 	},
 	"rejects-other-description": func() {
-		hypercase.Register(project, rootPkg, loop, withRejects(echo, circular))
+		hypercase.Register(project, rootPkg, loop, scriptType, own(withRejects(echo, circular)))
 	},
 	"property-nodesc": func() {
 		p := decl.Property{Name: "circular"}
-		hypercase.Register(project, rootPkg, p, withRejects(echo, p))
+		hypercase.Register(project, rootPkg, p, scriptType, own(withRejects(echo, p)))
 	},
 	"two-properties":    func() { hypercase.Register(project, circular, circular) },
 	"bad-property-name": func() { hypercase.Register(project, decl.Property{Name: "Circular", Description: "A loop."}) },
 	"rejects-twice": func() {
-		hypercase.Register(project, circular, withRejects(echo, circular, circular))
+		hypercase.Register(project, circular, scriptType, own(withRejects(echo, circular, circular)))
 	},
 
-	"echo-shout":  func() { hypercase.Register(project, rootPkg, echo, shout) },
-	"two-corpora": func() { hypercase.Register(project, rootPkg, echo, withCorpus(shout, "other")) },
+	"echo-shout": func() { hypercase.Register(project, rootPkg, scriptType, own(echo, shout)) },
+	"two-corpora": func() {
+		hypercase.Register(project, rootPkg, scriptType, otherType, own(echo, steered[Other]("shout", "shout")))
+	},
 	"probe": func() {
-		hypercase.Register(project, rootPkg, circular, withRejects(withProbe(echo), circular))
+		hypercase.Register(project, rootPkg, circular, scriptType, own(withRejects(withProbe(echo), circular)))
 	},
 	"probe-none": func() {
-		hypercase.Register(project, rootPkg, circular, withRejects(echo, circular))
+		hypercase.Register(project, rootPkg, circular, scriptType, own(withRejects(echo, circular)))
 	},
 	"narrow": func() {
-		hypercase.Register(project, rootPkg, withOutputs(echo,
+		hypercase.Register(project, rootPkg, scriptType, own(withOutputs(echo,
 			decl.Output{Pattern: "values.txt", Description: "The values."},
 			decl.Output{Pattern: "?.txt", Description: "A file named with one letter."},
 			decl.Output{Pattern: "a.txt", Description: "The file a."},
-		))
+		)))
 	},
 	"output-nodesc": func() {
-		hypercase.Register(project, rootPkg, withOutputs(echo, decl.Output{Pattern: "values.txt", Description: "\n"}))
+		hypercase.Register(project, rootPkg, scriptType, own(withOutputs(echo, decl.Output{Pattern: "values.txt", Description: "\n"})))
 	},
 	"bad-pattern": func() {
-		hypercase.Register(project, withOutputs(echo, decl.Output{Pattern: "values[.txt", Description: "The values."}))
+		hypercase.Register(project, scriptType, own(withOutputs(echo, decl.Output{Pattern: "values[.txt", Description: "The values."})))
 	},
 	"bad-pattern-path": func() {
-		hypercase.Register(project, withOutputs(echo, decl.Output{Pattern: "../values.txt", Description: "The values."}))
+		hypercase.Register(project, scriptType, own(withOutputs(echo, decl.Output{Pattern: "../values.txt", Description: "The values."})))
 	},
-	"no-corpus":         func() { hypercase.Register(project, withCorpus(echo, "")) },
-	"bad-corpus":        func() { hypercase.Register(project, withCorpus(echo, "Script")) },
+	"corpus-set":        func() { hypercase.Register(project, scriptType, own(withCorpus(echo, "script"))) },
+	"bad-dir":           func() { hypercase.Register(project, decl.Type[Script]{Dir: "Script", Description: "A script."}) },
 	"two-roots":         func() { hypercase.Register(project, hypercase.Root("a"), hypercase.Root("b")) },
 	"bad-root":          func() { hypercase.Register(project, hypercase.Root("/abs")) },
 	"two-root-packages": func() { hypercase.Register(project, rootPkg, rootPkg) },
-	"no-root-check":     func() { hypercase.Register(project, echo) },
+	"no-root-check":     func() { hypercase.Register(project, scriptType, own(echo)) },
 
 	// Packages over one shared corpus: a at the module root, b below it.
-	"pkg-a":          func() { hypercase.Register(project, rootPkg, echo) },
-	"pkg-a-noroot":   func() { hypercase.Register(project, echo) },
-	"pkg-a-circular": func() { hypercase.Register(project, rootPkg, circular, echo) },
-	"pkg-b":          func() { hypercase.Register(project, shout) },
+	"pkg-a":          func() { hypercase.Register(project, rootPkg, scriptType, own(echo)) },
+	"pkg-a-noroot":   func() { hypercase.Register(project, scriptType, own(echo)) },
+	"pkg-a-circular": func() { hypercase.Register(project, rootPkg, circular, scriptType, own(echo)) },
+	"pkg-b":          func() { hypercase.Register(project, scriptType, own(shout)) },
 	"pkg-b-gone":     func() { hypercase.Register(project) },
-	"pkg-b-echo":     func() { hypercase.Register(project, withName(shout, "echo")) },
-	"pkg-b-circular": func() { hypercase.Register(project, circular, withRejects(shout, circular)) },
-	"pkg-b-loop":     func() { hypercase.Register(project, loop, withRejects(shout, loop)) },
-	"pkg-b-root":     func() { hypercase.Register(project, rootPkg, shout) },
-	"pkg-b-other":    func() { hypercase.Register(project, hypercase.Root("other"), shout) },
-	"pkg-b-later":    func() { hypercase.Register(project, withCorpus(shout, "later")) },
-	"corp-a":         func() { hypercase.Register(project, hypercase.Root("corp"), rootPkg, echo) },
-	"corp-b":         func() { hypercase.Register(project, hypercase.Root("corp"), rootPkg, shout) },
+	"pkg-b-echo":     func() { hypercase.Register(project, scriptType, own(withName(shout, "echo"))) },
+	"pkg-b-circular": func() { hypercase.Register(project, circular, scriptType, own(withRejects(shout, circular))) },
+	"pkg-b-loop":     func() { hypercase.Register(project, loop, scriptType, own(withRejects(shout, loop))) },
+	"pkg-b-root":     func() { hypercase.Register(project, rootPkg, scriptType, own(shout)) },
+	"pkg-b-other":    func() { hypercase.Register(project, hypercase.Root("other"), scriptType, own(shout)) },
+	"pkg-b-later":    func() { hypercase.Register(project, laterType, own(steered[Later]("shout", "shout"))) },
+	"corp-a":         func() { hypercase.Register(project, hypercase.Root("corp"), rootPkg, scriptType, own(echo)) },
+	"corp-b":         func() { hypercase.Register(project, hypercase.Root("corp"), rootPkg, scriptType, own(shout)) },
 }
 
 // duringTest are what some fixtures do in the child's test, before
 // hypercase.Test runs.
 var duringTest = map[string]func(t *testing.T){
-	"late": func(t *testing.T) { hypercase.Register(withName(echo, "late")) },
+	"late": func(t *testing.T) { hypercase.Register(own(withName(echo, "late"))) },
 }
 
 func runTest(t *testing.T) { hypercase.Test(t) }
@@ -347,6 +376,14 @@ var fixturePackages = map[string][]fixturePkg{
 	"empty-corpus": {{".", "echo"}},
 	"outputs":      {{".", "narrow"}},
 	"shared":       {{".", "pkg-a"}, {"b", "pkg-b"}},
+
+	"ladder":        {{".", "ladder"}},
+	"lift-errors":   {{".", "ladder"}},
+	"render":        {{".", "ladder-render"}},
+	"params":        {{".", "calc-only"}},
+	"two-types":     {{".", "two-types"}},
+	"shared-ladder": {{".", "ladder-a"}, {"b", "ladder-b"}},
+	"no-archive":    {{".", "lift-only"}},
 }
 
 type fixturePkg struct{ dir, registration string }

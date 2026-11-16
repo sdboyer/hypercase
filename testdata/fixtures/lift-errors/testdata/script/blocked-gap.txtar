@@ -1,0 +1,11 @@
+resolve rejects the script, and a gaps line names evaluate, which resolve blocks.
+-- in/resolve/error --
+A1 -> A1: cycle
+-- properties --
+circular
+-- gaps --
+evaluate prints A1 wrongly. Waits on sheets#4.
+-- out/format/trail.txt --
+parse
+-- out/resolve/error.txt --
+A1 -> A1: cycle

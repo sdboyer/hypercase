@@ -22,7 +22,7 @@ import (
 
 // Format is the version of what a registry holds. It changes on any change
 // to that.
-const Format = 1
+const Format = 2
 
 // Name is a registry's file name, in its package's testdata/ directory.
 const Name = "hypercase.json"
@@ -40,6 +40,8 @@ type Registry struct {
 	// its corpus root.
 	RootPackage bool       `json:"rootPackage"`
 	Properties  []Property `json:"properties"`
+	Types       []Type     `json:"types"`
+	Lifts       []Lift     `json:"lifts"`
 	Suites      []Suite    `json:"suites"`
 }
 
@@ -49,13 +51,42 @@ type Property struct {
 	Description string `json:"description"`
 }
 
+// A Type is a registered corpus type.
+type Type struct {
+	// Dir is the directory of the type's archives, under the corpus root's
+	// testdata/.
+	Dir         string `json:"dir"`
+	Description string `json:"description"`
+	// GoType is the Go type, by its package's import path and its name.
+	GoType string `json:"goType"`
+}
+
+// A Lift is a registered lift, which the package owns or only uses.
+type Lift struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// Input and Product are the Go types the lift goes from and to.
+	Input   string `json:"input"`
+	Product string `json:"product"`
+	// Owned records that the package owns the lift's column.
+	Owned bool `json:"owned"`
+	// Corpora are the directories of the corpus types that reach the
+	// lift's input, under the corpus root's testdata/.
+	Corpora []string `json:"corpora"`
+	Outputs []Output `json:"outputs"`
+	// Rejects names the properties the lift rejects.
+	Rejects []string `json:"rejects"`
+}
+
 // A Suite is a registered suite.
 type Suite struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	// Corpus is the directory, under the corpus root's testdata/, of the
-	// archives the suite runs over.
-	Corpus  string   `json:"corpus"`
+	// Consumes is the Go type the suite consumes.
+	Consumes string `json:"consumes"`
+	// Corpora are the directories of the corpus types that reach the type
+	// the suite consumes, under the corpus root's testdata/.
+	Corpora []string `json:"corpora"`
 	Outputs []Output `json:"outputs"`
 	// Rejects names the properties the suite rejects.
 	Rejects []string `json:"rejects"`
@@ -73,8 +104,18 @@ type Output struct {
 func (r Registry) Marshal() []byte {
 	r.Format = Format
 	r.Properties = sorted(r.Properties, func(p Property) string { return p.Name })
+	r.Types = sorted(r.Types, func(t Type) string { return t.Dir })
+	lifts := sorted(r.Lifts, func(l Lift) string { return l.Name })
+	for i, l := range lifts {
+		l.Corpora = sorted(l.Corpora, func(n string) string { return n })
+		l.Outputs = sorted(l.Outputs, func(o Output) string { return o.Pattern })
+		l.Rejects = sorted(l.Rejects, func(n string) string { return n })
+		lifts[i] = l
+	}
+	r.Lifts = lifts
 	suites := sorted(r.Suites, func(s Suite) string { return s.Name })
 	for i, s := range suites {
+		s.Corpora = sorted(s.Corpora, func(n string) string { return n })
 		s.Outputs = sorted(s.Outputs, func(o Output) string { return o.Pattern })
 		s.Rejects = sorted(s.Rejects, func(n string) string { return n })
 		suites[i] = s
