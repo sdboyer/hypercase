@@ -727,7 +727,9 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	if o, ok := r.outcome(m, col, in, out, files); ok {
 		files[outcomeFile] = o.Format()
 	} else {
+		// The cell has no outcome, so a committed one is no orphan.
 		writable = false
+		unjudged[outcomeFile] = true
 	}
 	if _, ok := goldens[outcomeFile]; !ok && !writable {
 		// No update writes the cell, so a missing outcome isn't one to
@@ -759,7 +761,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			}
 		}
 		for _, p := range slices.Sorted(maps.Keys(goldens)) {
-			if _, ok := files[p]; !ok {
+			if _, ok := files[p]; !ok && !unjudged[p] {
 				diffs = append(diffs, fmt.Sprintf("%s is no longer produced", c.out(col.name, p)))
 			}
 		}
@@ -1088,7 +1090,7 @@ func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[strin
 		}
 	}
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
-		if _, ok := files[p]; ok {
+		if _, ok := files[p]; ok || unjudged[p] {
 			continue
 		}
 		var what string

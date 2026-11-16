@@ -56,7 +56,8 @@ func TestOutcomes(t *testing.T) {
 
 // TestOutcomeFailures: a cell whose code, classifier or probe gives what
 // an outcome can't hold fails, naming it, and so does a classifier or a
-// Codes that fails or panics. An update writes nothing for such a cell.
+// Codes that fails or panics. An update writes nothing for such a cell,
+// and its committed outcome, if any, is left, not reported as an orphan.
 func TestOutcomeFailures(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "outcome-failures")
@@ -77,6 +78,30 @@ func TestOutcomeFailures(t *testing.T) {
 	}
 	s.hasSections("testdata/script/fine.txtar", map[string]string{"out/echo/outcome": "accepted\n"})
 	s.fails(s.normal("outcomes"), want...)
+
+	// Such a cell has no outcome to judge, so a committed one is no orphan,
+	// frozen or not, and the update leaves it.
+	const clError = "testdata/script/cl-error.txtar"
+	s.edit(clError, "commit the cell's files, as before the classifier failed", func(a *archive.Archive) {
+		set("out/echo/outcome", "accepted\n")(a)
+		set("out/echo/values.txt", "A1 6\n")(a)
+	})
+	committed := s.read(clError)
+	clFails := "script/cl-error: The classifier fails.\n    echo: Does what the case's do/ tree says.\n    echo's classifier steered failed: no detail today\n    Fix the classifier. An update writes nothing for this cell."
+	for _, update := range []bool{false, true} {
+		r := s.run(".", "outcomes", update)
+		s.fails(r, clFails)
+		s.lacks(r, "out/echo/outcome is an output the run no longer produces")
+	}
+	s.same(clError, committed)
+	s.edit(clError, "freeze the cell", insert("gaps", "echo The classifier gives a detail. Waits on sheets#10.\n", "out/"))
+	committed = s.read(clError)
+	for _, update := range []bool{false, true} {
+		r := s.run(".", "outcomes", update)
+		s.fails(r, clFails)
+		s.lacks(r, "out/echo/outcome is no longer produced", "The cell is frozen")
+	}
+	s.same(clError, committed)
 	s.done()
 }
 
