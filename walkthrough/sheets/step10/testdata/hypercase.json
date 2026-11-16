@@ -1,0 +1,118 @@
+{
+  "format": 6,
+  "updateVar": "SHEETS_UPDATE_GOLDEN",
+  "corpusRoot": "step10",
+  "rootPackage": true,
+  "codes": true,
+  "issueLinks": [],
+  "properties": [
+    {
+      "name": "circular",
+      "description": "Some cell's formula refers back to itself, directly or through other cells."
+    },
+    {
+      "name": "dangling",
+      "description": "Some formula refers to a cell the sheet doesn't have."
+    },
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    }
+  ],
+  "types": [
+    {
+      "dir": "sheet",
+      "description": "A spreadsheet: one file per cell under in/sheet/, holding a number or a formula.",
+      "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.Sheet",
+      "transforms": [
+        {
+          "name": "looped",
+          "description": "The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.",
+          "gives": [
+            "circular"
+          ],
+          "keeps": [],
+          "probe": true,
+          "owned": true
+        },
+        {
+          "name": "renamed",
+          "description": "Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.",
+          "gives": [],
+          "keeps": [
+            "circular",
+            "dangling"
+          ],
+          "probe": true,
+          "owned": true
+        }
+      ]
+    }
+  ],
+  "lifts": [
+    {
+      "name": "parse",
+      "description": "Parses every cell.",
+      "input": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.Sheet",
+      "product": "*github.com/sdboyer/hypercase/walkthrough/sheets/sheet.Parsed",
+      "owned": true,
+      "bytes": false,
+      "corpora": [
+        "sheet"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "The cell that is neither a number nor a formula."
+        }
+      ],
+      "productFiles": [],
+      "rejects": [
+        "malformed"
+      ]
+    },
+    {
+      "name": "resolve",
+      "description": "Orders the cells so that each comes after the cells it refers to.",
+      "input": "*github.com/sdboyer/hypercase/walkthrough/sheets/sheet.Parsed",
+      "product": "*github.com/sdboyer/hypercase/walkthrough/sheets/sheet.Graph",
+      "owned": true,
+      "bytes": false,
+      "corpora": [
+        "sheet"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "The cycle, or the reference to a missing cell."
+        }
+      ],
+      "productFiles": [],
+      "rejects": [
+        "circular",
+        "dangling"
+      ]
+    }
+  ],
+  "suites": [
+    {
+      "name": "evaluate",
+      "description": "Evaluates every cell of the sheet.",
+      "consumes": "*github.com/sdboyer/hypercase/walkthrough/sheets/sheet.Graph",
+      "corpora": [
+        "sheet"
+      ],
+      "outputs": [
+        {
+          "pattern": "values.txt",
+          "description": "Each cell's value, one per line, in cell order."
+        }
+      ],
+      "rejects": [],
+      "classifier": {
+        "name": "div-zero",
+        "description": "Adds div-zero when some cell divides by zero."
+      }
+    }
+  ]
+}
