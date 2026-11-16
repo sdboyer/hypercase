@@ -2583,16 +2583,11 @@ the jenny's error as the lift's rejection of the case: the importer's error
 is one, and a CSV archive without exactly one CSV is no rejection, so it
 fails the cell.
 
-This step's snippets come from no example yet: no directory under
-`walkthrough/` holds them, and the doc golden checks none of them. The
-framework's self-tests check what the framework does with the error: it
-starts with the jenny's name, and `Codes` reaches the importer's error
-through the jenny and `decl.Reject`, so the outcome carries its code. The
-rest, such as what `RenderError` quotes, is the sheets code's, and
-untested.
+`walkthrough/sheets/step10/sheetcorpus/types.go` declares the corpus type,
+its property and the lift:
 
+<!-- source: walkthrough/sheets/step10/sheetcorpus/types.go#import -->
 ```go
-// walkthrough/sheets/step10/sheetcorpus/types.go gains
 type CSV struct{ fs.FS } // in/csv/<name>.csv
 
 var CSVType = decl.Type[CSV]{
@@ -2624,22 +2619,55 @@ var Import = decl.Lift[CSV, Sheet]{
 		if err != nil {
 			return nil, decl.Reject(err)
 		}
-		return view(s), nil
+		return view(s, nil)
 	}),
 }
 ```
 
-The root package registers the new type and property, and owns the new lift.
+The root package registers the new type and property, and owns the new
+lift. `walkthrough/sheets/step10/corpus_test.go`:
+
+<!-- source: walkthrough/sheets/step10/corpus_test.go#register -->
+```go
+func init() {
+	hypercase.Register(
+		sheetcorpus.Project,
+		hypercase.Root("step10"),
+		hypercase.RootPackage(),
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling, sheetcorpus.Unterminated,
+		sheetcorpus.SheetType, sheetcorpus.CSVType,
+		hypercase.Own(sheetcorpus.Import, sheetcorpus.Parse, sheetcorpus.Resolve, evaluate),
+		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
+		hypercase.Own(codes),
+	)
+}
+```
+
 Each other package whose columns read past it registers the type and adds
-the lift to its `Use`: `format/` uses `sheetcorpus.Import` and
-`sheetcorpus.Parse`.
+the lift to its `Use`. `cli/` uses `sheetcorpus.Import`, for `calc`, and
+`format/` uses it beside `sheetcorpus.Parse`:
+
+<!-- source: walkthrough/sheets/step10/format/corpus_test.go#register -->
+```go
+func init() {
+	hypercase.Register(
+		sheetcorpus.Project,
+		hypercase.Root("step10"),
+		sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.SheetType, sheetcorpus.CSVType,
+		hypercase.Use(sheetcorpus.Import, sheetcorpus.Parse), // computed here; their sections are left alone
+		hypercase.Own(format),
+	)
+}
+```
 
 ### How the files change
 
-A new corpus directory, `testdata/csv/`. Each of its archives holds the
-product under `via/<lift>/`, and the cells of every column the product
-reaches. `testdata/csv/prices.txtar`:
+A new corpus directory, `testdata/csv/`. Each archive whose CSV `import`
+accepts holds the product under `via/<lift>/`, and every archive holds the
+cells of every column the product reaches. `testdata/csv/prices.txtar`:
 
+<!-- source: walkthrough/sheets/step10/testdata/csv/prices.txtar -->
 ```
 Two prices and their total, exported as CSV.
 -- in/csv/prices.csv --
@@ -2675,6 +2703,7 @@ accepted
 `testdata/csv/open-quote.txtar`. Every column past `import` is blocked by
 it:
 
+<!-- source: walkthrough/sheets/step10/testdata/csv/open-quote.txtar -->
 ```
 A quoted field that never closes.
 -- in/csv/open-quote.csv --
@@ -2699,7 +2728,49 @@ blocked import
 ```
 
 A jenny's error starts with the jenny's name, so `import`'s `error.txt` starts
-`import: `.
+`import: `. `Codes` reaches the importer's error through the jenny and
+`decl.Reject`, so the outcome carries its code.
+
+`testdata/csv/loop.txtar` states `circular`, which `resolve` rejects past
+the lift. Its `error.txt` quotes `sheet/A1` and `sheet/B1`, which only the
+product holds: past `import`, `RenderError` gets the product as the input
+view.
+
+<!-- source: walkthrough/sheets/step10/testdata/csv/loop.txtar -->
+```
+A1 and B1 refer to each other, exported as CSV.
+-- in/csv/loop.csv --
+=B1,=A1
+-- properties --
+circular
+-- via/import/sheet/A1 --
+=B1
+-- via/import/sheet/B1 --
+=A1
+-- out/calc/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1
+  sheet/B1:1: =A1
+-- out/calc/outcome --
+rejected S201
+-- out/evaluate/outcome --
+blocked resolve
+-- out/format/formulas.txt --
+A1 =B1
+B1 =A1
+-- out/format/outcome --
+accepted
+-- out/import/outcome --
+accepted
+-- out/parse/outcome --
+accepted
+-- out/resolve/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1
+  sheet/B1:1: =A1
+-- out/resolve/outcome --
+rejected S201
+```
 
 `hypercase.json` gives every lift `"bytes"`, true for a bytes lift, and
 `"productFiles"`, its product declarations, which are empty for every other
