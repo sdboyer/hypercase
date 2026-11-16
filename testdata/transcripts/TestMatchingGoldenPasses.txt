@@ -1,0 +1,5 @@
+$ go test  # echo
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/twice
+        --- PASS: TestCorpus/twice/echo
+PASS

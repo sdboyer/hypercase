@@ -1,0 +1,16 @@
+$ go test  # echo
+    testdata/.hypercase-tmp-twice.txtar-1234 is a temp file left by a write that was cut short.
+        Delete it.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/twice
+        --- PASS: TestCorpus/twice/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    testdata/.hypercase-tmp-twice.txtar-1234 is a temp file left by a write that was cut short.
+        Delete it.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/twice
+        --- PASS: TestCorpus/twice/echo
+FAIL
+[exit 1]

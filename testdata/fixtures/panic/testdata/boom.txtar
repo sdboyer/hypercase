@@ -1,0 +1,5 @@
+The code panics on this sheet.
+-- in/do/out/values.txt --
+A1 6
+-- in/do/panic --
+index out of range

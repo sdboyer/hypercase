@@ -1,0 +1,45 @@
+$ go test  # echo
+    testdata/blank.txtar: the archive has no description: its comment, the text before the first section, is empty
+        Write the case's description, in prose, as the archive's comment, the text before its first section.
+    blank: 
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    testdata/empty.txtar: the archive has no description: its comment, the text before the first section, is empty
+        Write the case's description, in prose, as the archive's comment, the text before its first section.
+    empty: 
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    testdata/key-value.txtar: line 2 of the comment is a key: value line, and the comment is prose: "cells: 1"
+        Write the case's description, in prose, as the archive's comment, the text before its first section.
+    key-value: A sheet whose comment sets a parameter.
+          cells: 1
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/blank
+        --- FAIL: TestCorpus/blank/echo
+    --- FAIL: TestCorpus/empty
+        --- FAIL: TestCorpus/empty/echo
+    --- FAIL: TestCorpus/key-value
+        --- FAIL: TestCorpus/key-value/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    testdata/blank.txtar: the archive has no description: its comment, the text before the first section, is empty
+        Write the case's description, in prose, as the archive's comment, the text before its first section.
+    testdata/empty.txtar: the archive has no description: its comment, the text before the first section, is empty
+        Write the case's description, in prose, as the archive's comment, the text before its first section.
+    testdata/key-value.txtar: line 2 of the comment is a key: value line, and the comment is prose: "cells: 1"
+        Write the case's description, in prose, as the archive's comment, the text before its first section.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/blank
+        --- PASS: TestCorpus/blank/echo
+    --- FAIL: TestCorpus/empty
+        --- PASS: TestCorpus/empty/echo
+    --- FAIL: TestCorpus/key-value
+        --- PASS: TestCorpus/key-value/echo
+FAIL
+[exit 1]

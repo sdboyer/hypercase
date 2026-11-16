@@ -1,0 +1,2 @@
+The run writes its temp dir's path into its output, and nothing scrubs it.
+-- in/do/tempdir --

@@ -1,0 +1,5 @@
+The run can't set up its fixture, and fails its test.
+-- in/do/fatal --
+the fixture's database won't start
+-- in/do/out/values.txt --
+A1 6

@@ -1,0 +1,9 @@
+A golden sits between two inputs.
+-- in/do/out/a.txt --
+a
+-- out/echo/a.txt --
+a
+-- in/do/out/b.txt --
+b
+-- out/echo/b.txt --
+b

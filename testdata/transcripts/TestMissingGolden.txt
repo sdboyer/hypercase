@@ -1,0 +1,28 @@
+$ go test  # echo
+    twice: A1 is twice B1, with no golden yet.
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/twice
+        --- FAIL: TestCorpus/twice/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/twice
+        --- PASS: TestCorpus/twice/echo
+PASS
+$ cat testdata/twice.txtar
+A1 is twice B1, with no golden yet.
+-- in/do/out/values.txt --
+A1 6
+B1 3
+-- out/echo/values.txt --
+A1 6
+B1 3
+$ go test  # echo
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/twice
+        --- PASS: TestCorpus/twice/echo
+PASS
