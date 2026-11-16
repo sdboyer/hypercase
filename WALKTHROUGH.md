@@ -1991,6 +1991,10 @@ S202
   and `Files`, the cell's committed files under its `out/<column>/`.
 - A check reads only committed files, and never runs a suite, a lift or a
   transform.
+- A check reads the cells as they are committed when it runs. The module's
+  update runs packages at once, so a check can run before another package
+  writes its cells: its findings can take a second update to settle, and a
+  normal run between the two fails on them.
 - Its findings are committed as a golden at `<pkg>/testdata/checks/<name>.txt`
   in the package that owns the check.
 - The findings format (proposed): one finding per line, each ending with a
