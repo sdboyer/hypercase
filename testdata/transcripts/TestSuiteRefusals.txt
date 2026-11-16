@@ -7,7 +7,7 @@ panic: hypercase: the suite echo declares an output with the pattern "../values.
 [stack]
 [exit 2]
 $ go test  # corpus-set
-panic: hypercase: the suite echo names the Corpus "script". A suite runs over the archives whose corpus type reaches the type it consumes. Declare a decl.Type with Dir "script", make the suite consume it or a stage it reaches, and remove Corpus.
+panic: hypercase: the suite echo consumes hypercase_test.Script and names the Corpus "script". Only a suite over the raw input view, fs.FS, names a Corpus: the type a suite consumes says which archives it runs over. Remove Corpus.
 [stack]
 [exit 2]
 $ go test  # bad-dir

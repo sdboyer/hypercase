@@ -74,7 +74,7 @@ type runner struct {
 	types       []*corpusType
 	lifts       []*lift             // owned and used
 	columns     []*column           // sorted by name
-	plans       []*plan             // one per corpus type, by directory
+	plans       []*plan             // one per corpus type and per suite's Corpus, by directory
 	corpora     map[string][]string // each lift's and suite's corpus directories, sorted
 	stats       map[string]*colStats
 }

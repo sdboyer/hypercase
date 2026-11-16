@@ -2,6 +2,7 @@ package hypercase
 
 import (
 	"fmt"
+	"io/fs"
 	"reflect"
 	"slices"
 	"strings"
@@ -10,7 +11,8 @@ import (
 
 // A plan is how the package's columns reach the types they consume from
 // one corpus type: along one path each, so each type reached on the way
-// has one lift that produces it.
+// has one lift that produces it. The plan of a directory a suite's Corpus
+// names has fs.FS as its root's type, and no lift.
 type plan struct {
 	root     *corpusType
 	producer map[reflect.Type]*lift
@@ -39,7 +41,9 @@ func (r *runner) planPaths(t *testing.T) bool {
 		consumers[typ] = append(consumers[typ], who)
 	}
 	for _, c := range r.columns {
-		addConsumer(c.consumes, "the "+c.kind()+" "+c.name)
+		if c.corpus == "" {
+			addConsumer(c.consumes, "the "+c.kind()+" "+c.name)
+		}
 	}
 	for _, l := range lifts {
 		if !l.owned {
@@ -81,7 +85,7 @@ func (r *runner) planPaths(t *testing.T) bool {
 			}
 		}
 		for _, c := range r.columns {
-			if len(paths[c.consumes]) == 1 && cyclic[c.consumes] == "" {
+			if c.corpus == "" && len(paths[c.consumes]) == 1 && cyclic[c.consumes] == "" {
 				p.cols = append(p.cols, c)
 			}
 		}
@@ -97,13 +101,14 @@ func (r *runner) planPaths(t *testing.T) bool {
 		}
 		r.plans = append(r.plans, p)
 	}
+	r.planRaw()
 	for _, typ := range consumed {
 		if reached[typ] {
 			continue
 		}
 		ok = false
 		if typ == fsType {
-			t.Errorf("%s fs.FS, which no corpus type is. A column consumes a corpus type, for the raw trees, or a stage a lift reaches.\nDeclare a decl.Type for the archives' directory, and consume it.", consume(typ))
+			t.Errorf("%s fs.FS, which no corpus type is. A lift consumes a corpus type, for the raw trees, or a stage another lift reaches; only a suite runs over the raw input view, by naming a Corpus.\nDeclare a decl.Type for the archives' directory, and consume it.", consume(typ))
 			continue
 		}
 		t.Errorf("%s %s, which no registered corpus type reaches.\nRegister the lift that produces it, or the corpus type.", consume(typ), typ)
@@ -112,6 +117,31 @@ func (r *runner) planPaths(t *testing.T) bool {
 		t.Log("No case runs until each type a column consumes is reached by one path.")
 	}
 	return ok
+}
+
+// planRaw adds a plan for each directory a suite's Corpus names: its
+// archives' raw input views are fs.FS values, with no corpus type and no
+// lift, and the suites that name it run over them. The plans join the
+// corpus types', in the order of their directories.
+func (r *runner) planRaw() {
+	raw := map[string]*plan{}
+	for _, c := range r.columns {
+		if c.corpus == "" {
+			continue
+		}
+		p := raw[c.corpus]
+		if p == nil {
+			p = &plan{
+				root:     &corpusType{dir: c.corpus, goType: fsType, new: func(view fs.FS) any { return view }},
+				producer: map[reflect.Type]*lift{},
+			}
+			raw[c.corpus] = p
+			r.plans = append(r.plans, p)
+		}
+		p.cols = append(p.cols, c)
+		r.corpora[c.name] = []string{c.corpus}
+	}
+	slices.SortFunc(r.plans, func(a, b *plan) int { return strings.Compare(a.root.dir, b.root.dir) })
 }
 
 // walkPaths returns every path of lifts from root to each type it reaches

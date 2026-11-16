@@ -58,16 +58,12 @@ $ go test  # own-and-use-calls
 panic: hypercase: the lift parse is given to both hypercase.Own and hypercase.Use. A package owns a lift, or only uses it: pass it to one.
 [stack]
 [exit 2]
-$ go test  # bare-suite
-panic: hypercase: Register was given the suite calc. A package owns the suites it runs: pass it to hypercase.Own.
-[stack]
-[exit 2]
 $ go test  # bare-lift
 panic: hypercase: Register was given the lift parse. Pass it to hypercase.Own, in the package that owns its column, or to hypercase.Use, in a package that only reads its product.
 [stack]
 [exit 2]
 $ go test  # use-suite
-panic: hypercase: hypercase.Use was given the suite calc. It takes lifts only: a package runs only its own suites. Own the suite in the package that runs it.
+panic: hypercase: hypercase.Use was given the suite calc. It takes lifts only: a package runs only its own suites. Register the suite, or give it to hypercase.Own, in the package that runs it.
 [stack]
 [exit 2]
 $ go test  # own-other

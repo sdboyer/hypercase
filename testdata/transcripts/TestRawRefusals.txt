@@ -1,0 +1,24 @@
+$ go test  # raw-no-corpus
+panic: hypercase: the suite echo consumes fs.FS and names no Corpus. Name the directory of the archives it runs over, testdata/<corpus>/ under the corpus root, or consume a corpus type.
+[stack]
+[exit 2]
+$ go test  # raw-bad-corpus
+panic: hypercase: the suite echo names the corpus "Script", which breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter. Rename the corpus's directory.
+[stack]
+[exit 2]
+$ go test  # raw-checks
+panic: hypercase: the suite echo names the corpus checks, a name reserved for the findings of corpus checks. Name another directory.
+[stack]
+[exit 2]
+$ go test  # raw-of-type
+panic: hypercase: the suite echo names the Corpus script, and the corpus type hypercase_test.Script declares that directory. An archive's directory gives its type: make the suite consume hypercase_test.Script, or a stage it reaches, and remove Corpus.
+[stack]
+[exit 2]
+$ go test  # raw-of-type-calls
+panic: hypercase: the suite echo names the Corpus script, and the corpus type hypercase_test.Script declares that directory. An archive's directory gives its type: make the suite consume hypercase_test.Script, or a stage it reaches, and remove Corpus.
+[stack]
+[exit 2]
+$ go test  # raw-two-names
+panic: hypercase: two columns are named echo: the suite echo, over the raw input views of testdata/script/, and the suite echo, over the raw input views of testdata/script/. Column names are unique; rename one.
+[stack]
+[exit 2]

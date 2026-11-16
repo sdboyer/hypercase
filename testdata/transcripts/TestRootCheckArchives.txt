@@ -18,9 +18,9 @@ PASS
 $ go test  # pkg-a
     testdata/ holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.
         Move the archives into one.
-    testdata/renamed/ holds archives, and no registry declares a corpus type of that directory.
+    testdata/renamed/ holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.
         Declare a decl.Type with that Dir, or move or delete the archives.
-    testdata/script/old/ holds archives, and no registry declares a corpus type of that directory.
+    testdata/script/old/ holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.
         Declare a decl.Type with that Dir, or move or delete the archives.
     testdata/script/loopy.txtar: properties states loopy, and no registry under the module-root corpus lists a property of that name.
         Declare the property, or correct the line.

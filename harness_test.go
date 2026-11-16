@@ -47,6 +47,9 @@ func init() {
 		register, ok = liftRegistrations[name]
 	}
 	if !ok {
+		register, ok = rawRegistrations[name]
+	}
+	if !ok {
 		panic("selftest: no registration named " + name)
 	}
 	register()

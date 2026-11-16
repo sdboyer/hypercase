@@ -23,15 +23,19 @@ type File struct {
 // command. T is the type the suite consumes: a corpus type, for the raw
 // trees, or a stage, the product of a lift. The suite runs over every
 // archive whose corpus type reaches T through the registered lifts, and
-// its outputs for a case are that cell's files, under out/<Name>/.
+// its outputs for a case are that cell's files, under out/<Name>/. A
+// Suite[fs.FS] runs over the archives of the directory its Corpus names,
+// on their raw input views, with no corpus type.
 type Suite[T any] struct {
 	// Name is the column's name, and names its directory, out/<Name>/.
 	// Column names are unique per corpus root, lifts' and suites' together.
 	Name string
 	// Description says what the suite does. It is required.
 	Description string
-	// Corpus is refused: the type the suite consumes says which archives
-	// it runs over.
+	// Corpus names the directory of the archives a Suite[fs.FS] runs over,
+	// testdata/<Corpus>/ under the corpus root, which no corpus type
+	// declares. A suite that consumes any other type names none: the type
+	// says which archives it runs over.
 	Corpus string
 	// Probe decides whether a case is for the suite, from the value of the
 	// type it consumes alone. When it says no, it gives the reason, and the
@@ -58,7 +62,7 @@ type Suite[T any] struct {
 type column struct {
 	name        string
 	description string
-	corpus      string // a suite's Corpus, which registration refuses
+	corpus      string // a Suite[fs.FS]'s Corpus
 	outputs     []decl.Output
 	rejects     []decl.Property
 	consumes    reflect.Type
@@ -79,6 +83,9 @@ func (c *column) kind() string {
 func (c *column) describe() string {
 	if c.lift != nil {
 		return c.lift.describe()
+	}
+	if c.corpus != "" {
+		return "the suite " + c.name + ", over the raw input views of testdata/" + c.corpus + "/"
 	}
 	return "the suite " + c.name + ", over " + c.consumes.String()
 }

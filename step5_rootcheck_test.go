@@ -77,8 +77,8 @@ func TestRootCheckArchives(t *testing.T) {
 		"testdata/script/loopy.txtar: properties states loopy, and no registry under the module-root corpus lists a property of that name.",
 		"testdata/script/loopy.txtar: gaps, line 1, names format, and no registry has a column of that name over the corpus script.",
 		"testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it:\n  ni/do/out/values.txt: ni is not one of the framework's top-level names",
-		"testdata/script/old/ holds archives, and no registry declares a corpus type of that directory.",
-		"testdata/renamed/ holds archives, and no registry declares a corpus type of that directory.\nDeclare a decl.Type with that Dir, or move or delete the archives.",
+		"testdata/script/old/ holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.",
+		"testdata/renamed/ holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.\nDeclare a decl.Type with that Dir, or move or delete the archives.",
 		"testdata/ holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.\nMove the archives into one.",
 		"--- PASS: TestCorpus/script/nameless/echo",
 		"--- PASS: TestCorpus/script/loopy/echo")

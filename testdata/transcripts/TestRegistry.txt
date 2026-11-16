@@ -137,7 +137,7 @@ $ go test  # echo-shout
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.
     no registry records a root-package check for the module-root corpus, so nothing reports what no column there owns.
         Register hypercase.RootPackage() in one package over it, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... to record it in the package's registry.
-    testdata/script/ holds archives, and no registry declares a corpus type of that directory.
+    testdata/script/ holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.
         Declare a decl.Type with that Dir, or move or delete the archives.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/script

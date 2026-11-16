@@ -53,7 +53,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	columnPkgs := map[string][]string{}             // column → the packages that own it
 	claimed := map[string]map[string]bool{}         // corpus → the columns over it
 	usedPkgs := map[string][]string{}               // lift → the packages that only use it
-	declared := map[string]bool{}                   // the corpus types' directories
+	declared := map[string]bool{}                   // the corpus types' directories, and the suites' Corpus
 	typeEntries := map[string]map[string][]string{} // directory → type entry → packages
 	typeOrder := map[string][]string{}              // directory → type entries, in the order of the packages
 	propEntries := map[string]map[string][]string{} // property → description → packages
@@ -68,12 +68,29 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			claimed[corpus][name] = true
 		}
 	}
+	declare := func(dir, entry, pkg string) {
+		declared[dir] = true
+		if typeEntries[dir] == nil {
+			typeEntries[dir] = map[string][]string{}
+		}
+		if typeEntries[dir][entry] == nil {
+			typeOrder[dir] = append(typeOrder[dir], entry)
+		}
+		if pkgs := typeEntries[dir][entry]; len(pkgs) == 0 || pkgs[len(pkgs)-1] != pkg {
+			typeEntries[dir][entry] = append(pkgs, pkg)
+		}
+	}
 	for _, g := range regs {
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
 		}
 		for _, s := range g.reg.Suites {
 			claim(s.Name, s.Corpora, g.pkg)
+			if s.Consumes == rawConsumes {
+				for _, dir := range s.Corpora {
+					declare(dir, rawEntry, g.pkg)
+				}
+			}
 		}
 		for _, l := range g.reg.Lifts {
 			if l.Owned {
@@ -83,15 +100,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 		}
 		for _, ct := range g.reg.Types {
-			declared[ct.Dir] = true
-			entry := fmt.Sprintf("%s: %q", ct.GoType, ct.Description)
-			if typeEntries[ct.Dir] == nil {
-				typeEntries[ct.Dir] = map[string][]string{}
-			}
-			if typeEntries[ct.Dir][entry] == nil {
-				typeOrder[ct.Dir] = append(typeOrder[ct.Dir], entry)
-			}
-			typeEntries[ct.Dir][entry] = append(typeEntries[ct.Dir][entry], g.pkg)
+			declare(ct.Dir, fmt.Sprintf("%s: %q", ct.GoType, ct.Description), g.pkg)
 		}
 		for _, p := range g.reg.Properties {
 			if propEntries[p.Name] == nil {
@@ -122,10 +131,16 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			continue
 		}
 		var lines []string
+		raw := false
 		for _, e := range typeOrder[dir] {
 			lines = append(lines, fmt.Sprintf("  %s: %s", andList(entries[e]), e))
+			raw = raw || e == rawEntry
 		}
-		t.Errorf("the corpus directory %s has two different corpus types:\n%s\nAn archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration.", dir, strings.Join(lines, "\n"))
+		fix := "Declare the type once, in a package the others import, and register that declaration."
+		if raw {
+			fix = "A suite that names the directory as its Corpus runs over its archives' raw input views, with no type. Make the suite consume the corpus type and remove its Corpus, or move one set of archives to another directory."
+		}
+		t.Errorf("the corpus directory %s has two different corpus types:\n%s\nAn archive's directory gives its type. %s", dir, strings.Join(lines, "\n"), fix)
 	}
 	for _, name := range sortedKeys(propEntries) {
 		entries := propEntries[name]
@@ -177,7 +192,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			t.Errorf("%s holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.\nMove the archives into one.", rel)
 			continue
 		}
-		t.Errorf("%s holds archives, and no registry declares a corpus type of that directory.\nDeclare a decl.Type with that Dir, or move or delete the archives.", rel)
+		t.Errorf("%s holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.\nDeclare a decl.Type with that Dir, or move or delete the archives.", rel)
 	}
 
 	props := func(name string) bool { _, ok := propEntries[name]; return ok }
@@ -188,6 +203,13 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 	}
 }
+
+// rawConsumes is what a registry records a suite that names a Corpus as
+// consuming, the raw input view, and rawEntry is how the root-package
+// check names that view as a directory's type.
+var rawConsumes = goTypeName(fsType)
+
+const rawEntry = "the raw input view, fs.FS, which a suite's Corpus names"
 
 // checkArchive reports the problems of one archive as a whole.
 func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bool, props func(string) bool) {
