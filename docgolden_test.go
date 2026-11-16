@@ -54,7 +54,9 @@ func TestWalkthrough(t *testing.T) {
 	for _, p := range problems {
 		t.Error(p)
 	}
-	_ = blocks
+	if blocks == 0 {
+		t.Error("WALKTHROUGH.md has no marked blocks, so nothing in it is checked")
+	}
 }
 
 type docProblem struct {
