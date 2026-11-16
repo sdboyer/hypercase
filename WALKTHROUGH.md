@@ -2679,7 +2679,7 @@ func init() {
 
 A new corpus directory, `testdata/csv/`. Each archive whose CSV `import`
 accepts holds the product under `via/<lift>/`, and every archive holds the
-cells of every column the product reaches. `testdata/csv/prices.txtar`:
+cells of every column past the lift. `testdata/csv/prices.txtar`:
 
 <!-- source: walkthrough/sheets/step10/testdata/csv/prices.txtar -->
 ```
