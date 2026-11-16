@@ -254,13 +254,19 @@ func TestTwoCorpusTypes(t *testing.T) {
 
 // TestLiftNoProduct: a lift that returns no product and no error fails at
 // its own cell, and blocks the columns over its product, whose type is an
-// interface: a suite with a probe, and a lift.
+// interface: a suite with a probe, and a lift. Its cell fails whether or
+// not a gaps line marks it: it has no outcome, so no verdict to freeze.
 func TestLiftNoProduct(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "no-product")
 	none := s.read("testdata/script/none.txtar")
+	marked := s.read("testdata/script/marked.txtar")
+	const noProduct = "pick: Picks the script's view, as its pick/ tree says.\npick returned no product and no error, so the cell has no outcome.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell."
 	want := []string{
-		"script/none: pick returns no product.\npick: Picks the script's view, as its pick/ tree says.\npick returned no product and no error, so the cell has no outcome.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.",
+		"script/none: pick returns no product.\n" + noProduct,
+		"script/marked: pick returns no product, and a gaps line marks its cell.\n" + noProduct,
+		"--- FAIL: TestCorpus/script/marked/pick",
+		"--- SKIP: TestCorpus/script/marked/walk",
 		"script/none: walk is blocked: the lift pick failed on the case: it returned no product and no error.",
 		"script/none: unpick is blocked: the lift pick failed on the case: it returned no product and no error.",
 		"script/none: format is blocked: the lift pick failed on the case: it returned no product and no error.",
@@ -274,6 +280,17 @@ func TestLiftNoProduct(t *testing.T) {
 	s.fails(s.normal("picked"), want...)
 	s.fails(s.update("picked"), want...)
 	s.same("testdata/script/none.txtar", none)
+	s.same("testdata/script/marked.txtar", marked)
+
+	// A committed file freezes the marked cell, and it fails the same.
+	s.edit("testdata/script/marked.txtar", "commit an outcome for the marked cell", insert("out/pick/outcome", "accepted\n", "out/unpick/"))
+	marked = s.read("testdata/script/marked.txtar")
+	for _, update := range []bool{false, true} {
+		r := s.run(".", "picked", update)
+		s.fails(r, "script/marked: pick returns no product, and a gaps line marks its cell.\n"+noProduct)
+		s.lacks(r, "The cell is frozen", "out/pick/outcome is")
+	}
+	s.same("testdata/script/marked.txtar", marked)
 	s.done()
 }
 

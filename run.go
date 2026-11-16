@@ -875,7 +875,9 @@ func (r *runner) ranNothing(m *msg, c *aCase, col *column, o archive.Outcome, ma
 // outcome is a cell's outcome, from what its run did, which its column's
 // classifier, if any, refines. It reports a code, a classifier or a detail
 // that fails, and a lift that returned neither a product nor an error; the
-// cell then has no outcome, and an update writes nothing for it.
+// cell then has no outcome, and an update writes nothing for it. Each fails
+// the cell whether or not a gaps line marks it: the line freezes the code's
+// verdict, and such a cell has none.
 func (r *runner) outcome(m *msg, col *column, in any, out *called, files map[string][]byte) (archive.Outcome, bool) {
 	var o archive.Outcome
 	switch {
