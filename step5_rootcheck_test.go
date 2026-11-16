@@ -107,7 +107,14 @@ func TestRootCheckRegistries(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared")
 	s.remove("b/corpus_test.go", "b's tests are deleted, and its registry left behind")
-	s.fails(s.normal("pkg-a"), "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests.")
+	untested := "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests."
+	s.fails(s.normal("pkg-a"), untested)
+	// Go ignores a file whose name starts with _ or ., so neither counts.
+	s.write("b/_corpus_test.go", []byte(packageTestFile), "a test file Go ignores, by its leading _")
+	s.write("b/.corpus_test.go", []byte(packageTestFile), "a test file Go ignores, by its leading .")
+	s.fails(s.normal("pkg-a"), untested)
+	s.remove("b/_corpus_test.go", "remove the file Go ignores")
+	s.remove("b/.corpus_test.go", "remove the file Go ignores")
 	s.write("b/corpus_test.go", []byte(packageTestFile), "restore b's tests")
 	s.write("b/testdata/hypercase.json", []byte("{\n  \"format\": 9\n}\n"), "a registry from a later hypercase")
 	s.fails(s.normal("pkg-a"), fmt.Sprintf("b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format %d.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.", registry.Format))
