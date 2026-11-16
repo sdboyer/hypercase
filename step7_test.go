@@ -523,9 +523,10 @@ func TestTransformJennyChanges(t *testing.T) {
 // cell reads the old inputs, and that package's run of the frozen cell
 // passes, while the transform owner's normal run fails on the inputs,
 // which differ from what the transform makes. It fails until a person
-// deletes its files or removes its gaps line; then the next update of the
-// package that owns its column writes the cell, and no other package's
-// update does.
+// deletes its files or removes its gaps line, and then the package that
+// owns its column runs its update, which writes the cell. Until then,
+// that package's normal run still fails on it, since no other package's
+// update writes it.
 func TestTransformJennyFrozen(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")

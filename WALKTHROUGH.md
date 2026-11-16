@@ -1655,8 +1655,9 @@ whether each has a probe, and whether the package owns it.
   inputs, and that package's run of the frozen cell passes, while the
   transform owner's normal run fails on the inputs, which differ from
   what the transform makes. It fails until a person deletes its files or
-  removes its `gaps` line; then the next update of the package that owns
-  its column writes the cell, and no other package's update does.
+  removes its `gaps` line, and then the package that owns its column runs
+  its update, which writes the cell. Until then, that package's normal
+  run still fails on it, since no other package's update writes it.
 - The update of a package that doesn't own the transform, alone, after the
   transform changed, writes the variant's cells on what the transform
   makes, while its normal run reads the sections the owner has yet to
