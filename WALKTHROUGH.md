@@ -705,7 +705,10 @@ column rejects.
   a file the cell has.
 - A person resolves a failing frozen cell: remove the line (the gap is
   closed, and the next update writes the cell), or delete the cell's files
-  (the wrong behavior changed shape, and the next update writes them).
+  (the wrong behavior changed shape, and the next update writes them). A
+  frozen cell no update writes, for one of step 3's reasons, waits on that
+  first: whatever its files show, its message says the update writes
+  nothing for it until the problems are fixed, and promises no write.
 - A marked cell with no committed files is written by an update like any
   other.
 - The expected-error check doesn't fail a marked cell. The freeze does that
