@@ -96,6 +96,25 @@ func TestRootCheckLiftOwnerUntested(t *testing.T) {
 	s.done()
 }
 
+// TestRootCheckLiftUsedUntested: a lift that only packages with no
+// _test.go file use needs no owner, as a transform that only they list
+// doesn't: nothing beyond their registries' failures is reported.
+func TestRootCheckLiftUsedUntested(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared-ladder")
+	// The root package registers no corpus type, and b uses parse, which
+	// no package owns.
+	s.passes(s.update("root-only"))
+	s.passes(s.run("b", "ladder-b", true))
+	s.fails(s.normal("root-only"), "the lift parse is used by ./b, and no package owns it, so its error is recorded nowhere.")
+
+	s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
+	r := s.normal("root-only")
+	s.fails(r, "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.")
+	s.lacks(r, "the lift parse", "no registry claims")
+	s.done()
+}
+
 // TestRootCheckLiftSuiteName: lifts share the suites' column names, so a
 // suite named like a lift that another package uses collides with it, and
 // is no owner of the lift, which no package then owns. A suite named like
