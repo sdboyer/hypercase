@@ -1,0 +1,62 @@
+$ go test  # rejects
+    testdata/other-column.txtar: gaps, line 1, names format, and no column of that name runs on the case.
+        Register the column, or remove the line.
+    testdata/out-of-place.txtar has update-written sections out of their place.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to put them in place.
+    unwritten: A1 rounds wrongly, and nothing has run the update since the gap was stated.
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/accepted-loop
+        --- PASS: TestCorpus/accepted-loop/echo
+    --- PASS: TestCorpus/div-zero
+        --- PASS: TestCorpus/div-zero/echo
+    --- PASS: TestCorpus/negative
+        --- PASS: TestCorpus/negative/echo
+    --- FAIL: TestCorpus/other-column
+        --- PASS: TestCorpus/other-column/echo
+    --- FAIL: TestCorpus/out-of-place
+        --- PASS: TestCorpus/out-of-place/echo
+    --- FAIL: TestCorpus/unwritten
+        --- FAIL: TestCorpus/unwritten/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
+    testdata/other-column.txtar: gaps, line 1, names format, and no column of that name runs on the case.
+        Register the column, or remove the line.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/accepted-loop
+        --- PASS: TestCorpus/accepted-loop/echo
+    --- PASS: TestCorpus/div-zero
+        --- PASS: TestCorpus/div-zero/echo
+    --- PASS: TestCorpus/negative
+        --- PASS: TestCorpus/negative/echo
+    --- FAIL: TestCorpus/other-column
+        --- PASS: TestCorpus/other-column/echo
+    --- PASS: TestCorpus/out-of-place
+        --- PASS: TestCorpus/out-of-place/echo
+    --- PASS: TestCorpus/unwritten
+        --- PASS: TestCorpus/unwritten/echo
+FAIL
+[exit 1]
+$ cat testdata/out-of-place.txtar
+A known gap whose committed sections sit out of their place.
+-- in/do/out/b.txt --
+b
+-- in/do/out/a.txt --
+a
+-- gaps --
+echo b.txt should say a. Waits on sheets#7.
+-- out/echo/a.txt --
+a
+-- out/echo/b.txt --
+b
+$ cat testdata/unwritten.txtar
+A1 rounds wrongly, and nothing has run the update since the gap was stated.
+-- in/do/out/values.txt --
+A1 0.3333
+-- gaps --
+echo A1 rounds to 0.33. Waits on sheets#6.
+-- out/echo/values.txt --
+A1 0.3333

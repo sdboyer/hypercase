@@ -1,0 +1,7 @@
+A1 and B1 refer to each other, and the case states the wrong one of the two properties echo rejects.
+-- in/do/error --
+A1 -> B1 -> A1: cycle
+-- properties --
+dangling
+-- out/echo/error.txt --
+A1 -> B1 -> A1: cycle

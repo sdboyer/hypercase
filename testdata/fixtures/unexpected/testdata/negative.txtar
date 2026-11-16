@@ -1,0 +1,7 @@
+A1 is a negative number, which the code rejects though nothing says it should.
+-- in/do/error --
+A1: unexpected "-"
+-- in/do/out/values.txt --
+A1 -3
+-- out/echo/values.txt --
+A1 3

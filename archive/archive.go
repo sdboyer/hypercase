@@ -88,8 +88,8 @@ var topLevel = map[string]bool{
 	In:         true,
 	Out:        true,
 	Via:        false,
-	Properties: false,
-	Gaps:       false,
+	Properties: true,
+	Gaps:       true,
 	Variant:    false,
 	Transform:  false,
 }
@@ -159,6 +159,18 @@ func (a *Archive) Check() []Problem {
 			col, file, _ := strings.Cut(rest, "/")
 			if col == "" || file == "" {
 				ps = append(ps, Problem{Section: s.Name, Msg: "an output belongs under its column, as out/<column>/<file>"})
+			}
+		case Properties, Gaps:
+			if rest != "" {
+				ps = append(ps, Problem{Section: s.Name, Msg: fmt.Sprintf("%s is one section, with nothing below it", top)})
+				continue
+			}
+			if top == Properties {
+				_, lps := ParseProperties(s.Data)
+				ps = append(ps, lps...)
+			} else {
+				_, lps := ParseGaps(s.Data)
+				ps = append(ps, lps...)
 			}
 		}
 	}

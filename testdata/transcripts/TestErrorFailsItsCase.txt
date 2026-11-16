@@ -1,9 +1,9 @@
 $ go test  # echo
     negative: A1 is a negative number, which the code rejects.
         echo: Does what the case's do/ tree says.
-        echo returned an error:
+        echo returned an error, but the case states no property echo rejects:
           A1: unexpected "-"
-        Fix the code.
+        Fix the code, or state the property on the case and in echo's Rejects.
         out/echo/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/values.txt differs (-golden +got):
@@ -18,9 +18,9 @@ FAIL
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
     negative: A1 is a negative number, which the code rejects.
         echo: Does what the case's do/ tree says.
-        echo returned an error:
+        echo returned an error, but the case states no property echo rejects:
           A1: unexpected "-"
-        Fix the code.
+        Fix the code, or state the property on the case and in echo's Rejects.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/negative
         --- FAIL: TestCorpus/negative/echo
@@ -39,9 +39,9 @@ A1 -3
 $ go test  # echo
     negative: A1 is a negative number, which the code rejects.
         echo: Does what the case's do/ tree says.
-        echo returned an error:
+        echo returned an error, but the case states no property echo rejects:
           A1: unexpected "-"
-        Fix the code.
+        Fix the code, or state the property on the case and in echo's Rejects.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/negative
         --- FAIL: TestCorpus/negative/echo

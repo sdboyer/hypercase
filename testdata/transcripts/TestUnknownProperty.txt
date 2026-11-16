@@ -1,0 +1,28 @@
+$ go test  # rejects
+    testdata/loopy.txtar: properties states loopy, and no property of that name is registered.
+        Declare the property, or correct the line.
+    loopy: The case states a property nothing declares.
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/loopy
+        --- FAIL: TestCorpus/loopy/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
+    testdata/loopy.txtar: properties states loopy, and no property of that name is registered.
+        Declare the property, or correct the line.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/loopy
+        --- PASS: TestCorpus/loopy/echo
+FAIL
+[exit 1]
+$ cat testdata/loopy.txtar
+The case states a property nothing declares.
+-- in/do/out/values.txt --
+A1 6
+-- properties --
+loopy
+-- out/echo/values.txt --
+A1 6

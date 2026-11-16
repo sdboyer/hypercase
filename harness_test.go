@@ -254,11 +254,13 @@ func (s *sandbox) fails(r result, want ...string) {
 	s.contains(r, want...)
 }
 
-// contains checks a run's output holds each string.
+// contains checks a run's output holds each string. Lines are compared
+// with their leading spaces removed, since go test indents a message's
+// lines after the first.
 func (s *sandbox) contains(r result, want ...string) {
 	s.t.Helper()
 	for _, w := range want {
-		if !strings.Contains(r.out, w) {
+		if !strings.Contains(flat(r.out), flat(w)) {
 			s.t.Errorf("the output doesn't hold %q:\n%s", w, r.out)
 		}
 	}
@@ -267,10 +269,18 @@ func (s *sandbox) contains(r result, want ...string) {
 func (s *sandbox) lacks(r result, unwanted ...string) {
 	s.t.Helper()
 	for _, w := range unwanted {
-		if strings.Contains(r.out, w) {
+		if strings.Contains(flat(r.out), flat(w)) {
 			s.t.Errorf("the output holds %q, and shouldn't:\n%s", w, r.out)
 		}
 	}
+}
+
+func flat(s string) string {
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimLeft(l, " ")
+	}
+	return strings.Join(lines, "\n")
 }
 
 // same checks a file's bytes are what they were.

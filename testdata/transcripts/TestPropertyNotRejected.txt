@@ -1,0 +1,13 @@
+$ go test  # rejects
+    errs: D1 holds a word, which echo doesn't reject, and echo errs on it.
+        echo: Does what the case's do/ tree says.
+        echo returned an error, but the case states no property echo rejects:
+          D1: not a number
+        Fix the code, or state the property on the case and in echo's Rejects.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/calm
+        --- PASS: TestCorpus/calm/echo
+    --- FAIL: TestCorpus/errs
+        --- FAIL: TestCorpus/errs/echo
+FAIL
+[exit 1]

@@ -1,0 +1,10 @@
+An empty properties section, and properties and gaps sections with names below them.
+-- in/do/out/values.txt --
+A1 6
+-- properties --
+-- properties/x --
+circular
+-- gaps/x --
+echo Waits on an issue.
+-- out/echo/values.txt --
+stale

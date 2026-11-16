@@ -1,0 +1,5 @@
+A1 and B1 refer to each other, and the code panics instead of rejecting the sheet.
+-- in/do/panic --
+stack overflow
+-- properties --
+circular

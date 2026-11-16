@@ -1,0 +1,7 @@
+D1 holds a word, which echo doesn't reject, and echo handles it.
+-- in/do/out/values.txt --
+D1 total
+-- properties --
+malformed
+-- out/echo/values.txt --
+D1 total

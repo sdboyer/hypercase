@@ -99,6 +99,18 @@ func withDescription[T any](s hypercase.Suite[T], d string) hypercase.Suite[T] {
 	return s
 }
 
+func withRejects[T any](s hypercase.Suite[T], ps ...decl.Property) hypercase.Suite[T] {
+	s.Rejects = ps
+	return s
+}
+
+var (
+	circular = decl.Property{Name: "circular", Description: "Some cell's formula refers back to itself, directly or through other cells."}
+	dangling = decl.Property{Name: "dangling", Description: "Some formula refers to a cell the sheet doesn't have."}
+	// malformed is registered, and no column of the fixtures rejects it.
+	malformed = decl.Property{Name: "malformed", Description: "Some cell holds neither a number nor a formula."}
+)
+
 // registrations are the fixtures' declaration sets, by name.
 var registrations = map[string]func(){
 	"echo":        func() { hypercase.Register(project, echo) },
@@ -115,6 +127,27 @@ var registrations = map[string]func(){
 	},
 	"late":    func() { hypercase.Register(project, echo) },
 	"unknown": func() { hypercase.Register(project, 42) },
+
+	"rejects": func() {
+		hypercase.Register(project, circular, dangling, malformed, withRejects(echo, circular, dangling))
+	},
+	"rejects-unregistered": func() { hypercase.Register(project, withRejects(echo, circular)) },
+	"rejects-registered-later": func() {
+		hypercase.Register(project, withRejects(echo, circular))
+		hypercase.Register(circular)
+	},
+	"rejects-other-description": func() {
+		hypercase.Register(project, decl.Property{Name: "circular", Description: "A loop."}, withRejects(echo, circular))
+	},
+	"property-nodesc": func() {
+		p := decl.Property{Name: "circular"}
+		hypercase.Register(project, p, withRejects(echo, p))
+	},
+	"two-properties":    func() { hypercase.Register(project, circular, circular) },
+	"bad-property-name": func() { hypercase.Register(project, decl.Property{Name: "Circular", Description: "A loop."}) },
+	"rejects-twice": func() {
+		hypercase.Register(project, circular, withRejects(echo, circular, circular))
+	},
 }
 
 // duringTest are what some fixtures do in the child's test, before

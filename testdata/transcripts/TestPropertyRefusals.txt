@@ -1,0 +1,12 @@
+$ go test  # two-properties
+panic: hypercase: two properties are named circular. Register each property once.
+[stack]
+[exit 2]
+$ go test  # bad-property-name
+panic: hypercase: the property name "Circular" breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter. Rename the property.
+[stack]
+[exit 2]
+$ go test  # rejects-twice
+panic: hypercase: the suite echo rejects circular twice. List each property once.
+[stack]
+[exit 2]

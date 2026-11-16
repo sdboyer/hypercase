@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/internal/diff"
 	"github.com/sdboyer/hypercase/internal/root"
 )
@@ -67,19 +68,20 @@ type runner struct {
 	updateVar  string
 	moduleRoot string
 	pkgDir     string
+	properties []decl.Property
 	columns    []*column // sorted by name
 }
 
 func newRunner(t *testing.T) (*runner, bool) {
 	t.Helper()
 	reg.mu.Lock()
-	project, columns := reg.project, slices.Clone(reg.columns)
+	project, properties, columns := reg.project, slices.Clone(reg.properties), slices.Clone(reg.columns)
 	reg.mu.Unlock()
 	if project == nil {
 		t.Errorf("the package registered no decl.Project.\nRegister the project, with its UpdateVar, from an init function.")
 		return nil, false
 	}
-	r := &runner{updateVar: project.UpdateVar, columns: columns}
+	r := &runner{updateVar: project.UpdateVar, properties: properties, columns: columns}
 	slices.SortFunc(r.columns, func(a, b *column) int { return strings.Compare(a.name, b.name) })
 	switch v := os.Getenv(project.UpdateVar); v {
 	case "":
@@ -99,7 +101,31 @@ func newRunner(t *testing.T) (*runner, bool) {
 		t.Errorf("finding the module root: %v", err)
 		return nil, false
 	}
-	return r, true
+	return r, r.checkRelations(t)
+}
+
+// checkRelations checks what relates two registrations, once
+// initialization is over: each property a column rejects is registered.
+func (r *runner) checkRelations(t *testing.T) bool {
+	t.Helper()
+	ok := true
+	for _, c := range r.columns {
+		for _, p := range c.rejects {
+			q, found := reg.property(p.Name)
+			switch {
+			case !found:
+				t.Errorf("the suite %s rejects %s, and the package registers no property of that name.\nRegister the property, or remove it from %s's Rejects.", c.name, p.Name, c.name)
+				ok = false
+			case q != p:
+				t.Errorf("the suite %s rejects a property named %s, which the package registers with another description.\nReject the registered property: declare it once, and use that declaration in both places.", c.name, p.Name)
+				ok = false
+			}
+		}
+	}
+	if !ok {
+		t.Log("No case runs until the registrations agree.")
+	}
+	return ok
 }
 
 // updateCmd is the command that runs an update.
@@ -113,6 +139,11 @@ func (r *runner) rel(p string) string { return root.Rel(r.moduleRoot, p) }
 
 func (r *runner) checkDescriptions(t *testing.T) {
 	t.Helper()
+	for _, p := range r.properties {
+		if strings.TrimSpace(p.Description) == "" {
+			t.Errorf("the property %s has no description.\nAdd one: it says what the fact about a case is, in prose.", p.Name)
+		}
+	}
 	for _, c := range r.columns {
 		if strings.TrimSpace(c.description) == "" {
 			t.Errorf("the suite %s has no description.\nAdd one: it says what the suite does, in prose.", c.name)
@@ -122,9 +153,21 @@ func (r *runner) checkDescriptions(t *testing.T) {
 
 // aCase is one case: an archive's base.
 type aCase struct {
-	name    string
-	archive *archive.Archive
-	view    fs.FS
+	name       string
+	archive    *archive.Archive
+	view       fs.FS
+	properties []string
+	gaps       []archive.Gap
+}
+
+// gap returns the known gap that marks a column's cell, if any.
+func (c *aCase) gap(col string) (archive.Gap, bool) {
+	for _, g := range c.gaps {
+		if g.Column == col {
+			return g, true
+		}
+	}
+	return archive.Gap{}, false
 }
 
 // goldens returns a column's committed files, by path under its directory.
@@ -162,7 +205,8 @@ func (r *runner) runCase(t *testing.T, path, name string) {
 	}
 	r.unclaimed(t, rel, a)
 
-	c := &aCase{name: name, archive: a, view: a.View()}
+	c := &aCase{name: name, archive: a, view: a.View(), properties: a.Properties(), gaps: a.Gaps()}
+	r.checkStatements(t, rel, c)
 	results := make([]*cellResult, len(r.columns))
 	for i, col := range r.columns {
 		res := &cellResult{}
@@ -188,6 +232,23 @@ func (r *runner) runCase(t *testing.T, path, name string) {
 	}
 	if err := archive.Write(path, next); err != nil {
 		t.Errorf("writing %s: %v", rel, err)
+	}
+}
+
+// checkStatements checks what the case states by hand: each property it
+// states is registered, and each known gap names a column that runs on it.
+func (r *runner) checkStatements(t *testing.T, rel string, c *aCase) {
+	t.Helper()
+	for i, name := range c.properties {
+		if !slices.ContainsFunc(r.properties, func(p decl.Property) bool { return p.Name == name }) {
+			t.Errorf("%s: properties states %s, and no property of that name is registered.\nDeclare the property, or correct the line.", rel, name)
+			_ = i
+		}
+	}
+	for _, g := range c.gaps {
+		if !slices.ContainsFunc(r.columns, func(col *column) bool { return col.name == g.Column }) {
+			t.Errorf("%s: gaps, line %d, names %s, and no column of that name runs on the case.\nRegister the column, or remove the line.", rel, g.Line, g.Column)
+		}
 	}
 }
 
@@ -295,6 +356,61 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	}
 
 	m := &msg{}
+	files, writable := r.outputs(m, col, out)
+	unheld := map[string]bool{}
+	for _, p := range sortedKeys(files) {
+		if err := archive.Holds(files[p]); err != nil {
+			m.add("out/%s/%s can't be held in an archive: %v.\nFix the code so the output can be held. An update writes nothing for this cell.", col.name, p, err)
+			writable = false
+			unheld[p] = true
+		}
+	}
+
+	gap, marked := c.gap(col.name)
+	goldens := c.goldens(col.name)
+	if !marked {
+		r.expectedError(m, c, col, out)
+	}
+	if marked && len(goldens) > 0 {
+		// The known gap freezes the cell: its committed files record
+		// today's behavior, and no update writes to it.
+		writable = false
+		var diffs []string
+		for _, p := range sortedKeys(files) {
+			g, ok := goldens[p]
+			switch {
+			case unheld[p]:
+			case !ok:
+				diffs = append(diffs, fmt.Sprintf("out/%s/%s is new", col.name, p))
+			case !bytes.Equal(g, files[p]):
+				diffs = append(diffs, fmt.Sprintf("out/%s/%s differs (-committed +got):\n%s", col.name, p, strings.TrimSuffix(diff.Lines(g, files[p]), "\n")))
+			}
+		}
+		for _, p := range sortedKeys(goldens) {
+			if _, ok := files[p]; !ok {
+				diffs = append(diffs, fmt.Sprintf("out/%s/%s is no longer produced", col.name, p))
+			}
+		}
+		if len(diffs) > 0 {
+			m.add("The cell is frozen by its known gap, gaps line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s\nIf the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.", gap.Line, gap.Raw, strings.Join(diffs, "\n"))
+		}
+	} else {
+		r.compare(m, col, files, goldens, unheld)
+	}
+	if !m.empty() {
+		t.Errorf("%s\n%s", header, m)
+		if out.panicked && !marked {
+			t.Logf("stack of the panic:\n%s", out.stack)
+		}
+	}
+	res.writable = writable
+	res.files = files
+}
+
+// outputs collects a cell's files: what its function returned, and what the
+// framework writes for it. It reports outputs whose shape is wrong, and
+// whether an update may write the cell.
+func (r *runner) outputs(m *msg, col *column, out *called) (map[string][]byte, bool) {
 	files := map[string][]byte{}
 	writable := true
 	for _, f := range out.files {
@@ -328,22 +444,29 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	switch {
 	case out.panicked:
 		files[errorFile] = fmt.Appendf(nil, "%v\n", out.panicValue)
-		m.add("%s panicked: %v\nFix the code. A panic is never an expected error.", col.name, out.panicValue)
-		defer t.Logf("stack of the panic:\n%s", out.stack)
 	case out.err != nil:
 		files[errorFile] = []byte(out.err.Error() + "\n")
-		m.add("%s returned an error:\n  %s\nFix the code.", col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "))
 	}
-	unheld := map[string]bool{}
-	for _, p := range sortedKeys(files) {
-		if err := archive.Holds(files[p]); err != nil {
-			m.add("out/%s/%s can't be held in an archive: %v.\nFix the code so the output can be held. An update writes nothing for this cell.", col.name, p, err)
-			writable = false
-			unheld[p] = true
-		}
-	}
+	return files, writable
+}
 
-	goldens := c.goldens(col.name)
+// expectedError is the expected-error check: a cell is expected to err
+// exactly when its case states a property its column rejects. A panic is
+// never an expected error.
+func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
+	hit := col.rejectsAny(c.properties)
+	switch {
+	case out.panicked:
+		m.add("%s panicked: %v\nFix the code. A panic is never an expected error.", col.name, out.panicValue)
+	case out.err != nil && len(hit) == 0:
+		m.add("%s returned an error, but the case states no property %s rejects:\n  %s\nFix the code, or state the property on the case and in %s's Rejects.", col.name, col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "), col.name)
+	case out.err == nil && len(hit) > 0:
+		m.add("%s returned no error, but the case states %s, which %s rejects.\nFix the code, or correct the case's properties or %s's Rejects.", col.name, andList(hit), col.name, col.name)
+	}
+}
+
+// compare compares a cell's files with its goldens, and reports orphans.
+func (r *runner) compare(m *msg, col *column, files, goldens map[string][]byte, unheld map[string]bool) {
 	if !r.update {
 		for _, p := range sortedKeys(files) {
 			g, ok := goldens[p]
@@ -373,11 +496,16 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		}
 		m.add("out/%s/%s %s.\nIf the run should still write it, fix the code. If not, delete the section by hand; %s leaves it in place.", col.name, p, what, r.updateCmd())
 	}
-	if !m.empty() {
-		t.Errorf("%s\n%s", header, m)
+}
+
+func andList(items []string) string {
+	switch len(items) {
+	case 0:
+		return ""
+	case 1:
+		return items[0]
 	}
-	res.writable = writable
-	res.files = files
+	return strings.Join(items[:len(items)-1], ", ") + " and " + items[len(items)-1]
 }
 
 // fileDirConflict reports an output that is also the directory of another.
