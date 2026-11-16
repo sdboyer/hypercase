@@ -519,10 +519,12 @@ func TestTransformJennyChanges(t *testing.T) {
 // the module's update settling a jenny's change. No update writes it, so
 // when the change moves its output, every update of the package that owns
 // its column fails on it, and so does each of that package's normal runs
-// once the transform's owner has rewritten the inputs. Before that, another
-// package's normal run reads the old inputs, and the cell passes. It fails
-// until a person deletes its files, which the next update writes, or
-// removes its gaps line, after which the next update writes the cell.
+// once the transform's owner has rewritten the inputs. Before that, the
+// cell reads the old inputs and passes: another package's normal run
+// passes, and the owner's fails on the inputs, which differ from what the
+// transform makes. It fails until a person deletes its files, which the
+// next update writes, or removes its gaps line, after which the next
+// update writes the cell.
 func TestTransformJennyFrozen(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -542,6 +544,11 @@ func TestTransformJennyFrozen(t *testing.T) {
 	}
 	s.fails(s.run("b", "tr-b-jenny", true), frozen("copy", "2"))
 	s.passes(s.run("b", "tr-b-jenny", false))
+	// The owner's normal run, on the old inputs too, passes its frozen
+	// cell, and fails on the inputs.
+	r := s.normal("tr-jenny")
+	s.fails(r, "upper's variant of the base differs from its committed inputs:")
+	s.lacks(r, "The cell is frozen by its known gap")
 
 	// The owner's update rewrites the inputs, and leaves its frozen cell.
 	s.fails(s.update("tr-jenny"), frozen("echo", "1"))
