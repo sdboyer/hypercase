@@ -398,6 +398,8 @@ func TestChainProductProblems(t *testing.T) {
 		{"a file below a file", "in/import/nest/quote/x", "via/import/quote/x: the section is also the directory of via/import/quote/x/below.\nFix import's jenny"},
 		{"a file with no final newline", "in/import/nonl/quote/x", "via/import/quote/x can't be held in an archive: it has no final newline, which an archive adds.\nFix import's jenny so the file can be held. An update writes nothing for this cell."},
 		{"a line shaped like a section marker", "in/import/marker/quote/x", "via/import/quote/x can't be held in an archive: its line 2 is shaped like a section marker, which starts another section when the archive is read.\nFix import's jenny so the file can be held. An update writes nothing for this cell."},
+		{"a name with a space after it", "in/import/space/quote/x", "\"via/import/quote/x \" can't be held in an archive: its name reads back as \"via/import/quote/x\", since an archive trims the spaces around a section's name.\nFix import's jenny so the file's name can be held. An update writes nothing for this cell."},
+		{"a name with a newline", "in/import/newline/quote/x", "\"via/import/quote/x\\nx\" can't be held in an archive: its name holds a newline, which ends a section's marker line.\nFix import's jenny so the file's name can be held. An update writes nothing for this cell."},
 	} {
 		s.edit(names, "import makes "+tt.why, insert(tt.section, "x\n", "via/"))
 		n := s.normal("chain")

@@ -33,6 +33,9 @@ import (
 //	                      section marker
 //	import/nest/<path>    made as <path>, and as <path>/below, a file
 //	                      below it
+//	import/space/<path>   made as <path>, with a space after its name
+//	import/newline/<path> made as <path>, with a newline and x after its
+//	                      name
 //	import/error          returned as the error, less its final newline
 //	import/panic          panicked with, less its final newline
 //
@@ -77,6 +80,12 @@ func steerImport(name string, in fs.FS) (jenny.Files, error) {
 		}
 		if rest, ok := strings.CutPrefix(p, name+"/marker/"); ok {
 			files[rest] = append(data, "-- x --\n"...)
+		}
+		if rest, ok := strings.CutPrefix(p, name+"/space/"); ok {
+			files[rest+" "] = data
+		}
+		if rest, ok := strings.CutPrefix(p, name+"/newline/"); ok {
+			files[rest+"\nx"] = data
 		}
 	}
 	var out jenny.Files

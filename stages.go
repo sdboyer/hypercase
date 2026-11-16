@@ -361,9 +361,10 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 
 // productOf reads a bytes lift's product from what its jenny made, for a
 // case whose sections start with prefix, and says why an archive can't
-// hold it, if it can't: a file outside any tree, or in the tree params; a
-// file that is also a directory; a file no declaration matches, or two
-// do; and a file an archive would read back differently.
+// hold it, if it can't: a file whose name doesn't read back as written; a
+// file outside any tree, or in the tree params; a file that is also a
+// directory; a file no declaration matches, or two do; and a file an
+// archive would read back differently.
 func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, []string) {
 	files := map[string][]byte{}
 	var problems []string
@@ -378,7 +379,16 @@ func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, []str
 		files[f.Path()] = data
 	}
 	dir := l.viaDir(prefix)
-	paths := slices.Sorted(maps.Keys(files))
+	// A name that doesn't read back is quoted, since it may hold a
+	// newline, and isn't checked further.
+	var paths []string
+	for _, p := range slices.Sorted(maps.Keys(files)) {
+		if err := archive.HoldsName(dir + p); err != nil {
+			problems = append(problems, fmt.Sprintf("%q can't be held in an archive: %v.\nFix %s's jenny so the file's name can be held. An update writes nothing for this cell.", dir+p, err, l.name))
+			continue
+		}
+		paths = append(paths, p)
+	}
 	for _, p := range archive.CheckVia(prefix, l.name, paths) {
 		problems = append(problems, fmt.Sprintf("%s.\nFix %s's jenny: what it makes is its product's input view, with the trees as its top-level directories. An update writes nothing for this cell.", p, l.name))
 	}

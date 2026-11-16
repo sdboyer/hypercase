@@ -433,3 +433,20 @@ func Holds(data []byte) error {
 	}
 	return fmt.Errorf("it doesn't read back as written")
 }
+
+// HoldsName reports why a section of the given name can't be held in an
+// archive, or nil when it can: what an archive holds reads back as
+// written, and a name ends at its marker line's end, less the spaces
+// around it.
+func HoldsName(name string) error {
+	got := Parse(txtar.Format(&txtar.Archive{Files: []txtar.File{{Name: name, Data: []byte("x\n")}}}))
+	switch {
+	case len(got.Sections) == 1 && got.Sections[0].Name == name:
+		return nil
+	case strings.Contains(name, "\n"):
+		return fmt.Errorf("its name holds a newline, which ends a section's marker line")
+	case len(got.Sections) == 1:
+		return fmt.Errorf("its name reads back as %q, since an archive trims the spaces around a section's name", got.Sections[0].Name)
+	}
+	return fmt.Errorf("its name doesn't read back as written")
+}

@@ -76,6 +76,29 @@ func TestHolds(t *testing.T) {
 	}
 }
 
+func TestHoldsName(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		want string // "" when it holds
+	}{
+		{"via/import/sheet/A1", ""},
+		{"via/import/sheet/A 1", ""},
+		{"via/import/sheet/A1 ", `its name reads back as "via/import/sheet/A1", since an archive trims the spaces around a section's name`},
+		{" via/import/sheet/A1", `its name reads back as "via/import/sheet/A1"`},
+		{"via/import/sheet/A1\t", `its name reads back as "via/import/sheet/A1"`},
+		{"via/import/sheet/A1\nB1", "its name holds a newline, which ends a section's marker line"},
+		{"via/import/sheet/A1\n", "its name holds a newline"},
+	} {
+		err := HoldsName(tt.name)
+		switch {
+		case tt.want == "" && err != nil:
+			t.Errorf("HoldsName(%q) = %v, want nil", tt.name, err)
+		case tt.want != "" && (err == nil || !strings.Contains(err.Error(), tt.want)):
+			t.Errorf("HoldsName(%q) = %v, want %q", tt.name, err, tt.want)
+		}
+	}
+}
+
 func TestWriteRefusesWhatReadsBackDifferently(t *testing.T) {
 	dir := t.TempDir()
 	name := filepath.Join(dir, "x.txtar")
