@@ -2039,11 +2039,11 @@ its `Name`, `Description` and `Classify` fields, set as a suite's
 `Classifier`; and `hypercase.Result`, what a run produced, which a
 classifier reads.
 
-This step's snippets come from no example yet: no directory under
-`walkthrough/` holds them, and the doc golden checks none of them.
+`walkthrough/sheets/step08/sheetcorpus/project.go` gives the project its
+`Codes`:
 
+<!-- source: walkthrough/sheets/step08/sheetcorpus/project.go#project -->
 ```go
-// sheetcorpus/project.go
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
@@ -2057,10 +2057,33 @@ var Project = decl.Project{
 }
 ```
 
-`evaluate` gains a classifier:
+`walkthrough/sheets/step08/corpus_test.go` gives `evaluate` a classifier,
+and owns the corpus check `codes` (below):
 
+<!-- source: walkthrough/sheets/step08/corpus_test.go#evaluate -->
 ```go
-// corpus_test.go: evaluate gains
+func init() {
+	hypercase.Register(
+		sheetcorpus.Project,
+		hypercase.Root("step08"),
+		hypercase.RootPackage(),
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.SheetType,
+		hypercase.Own(sheetcorpus.Parse, sheetcorpus.Resolve, evaluate),
+		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
+		hypercase.Own(codes),
+	)
+}
+
+var evaluate = hypercase.Suite[*sheet.Graph]{
+	Name:        "evaluate",
+	Description: "Evaluates every cell of the sheet.",
+	Outputs: []decl.Output{
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+	},
+	Run: func(t testing.TB, archive string, g *sheet.Graph, stdout, stderr io.Writer) ([]hypercase.File, error) {
+		return []hypercase.File{{Path: "values.txt", Data: g.Evaluate().Format()}}, nil
+	},
 	Classifier: hypercase.Classifier[*sheet.Graph]{
 		Name:        "div-zero",
 		Description: "Adds div-zero when some cell divides by zero.",
@@ -2071,79 +2094,119 @@ var Project = decl.Project{
 			return "", nil
 		},
 	},
+}
 ```
 
 ### How the files change
 
 Every cell of the sheets examples gains an `outcome` file, skipped and
-blocked cells included.
+blocked cells included. The archives shown in steps 3 to 7 come from their
+examples, which carry an `outcome` per cell, as every update writes from
+this step on. Their projects supply no `Codes`, so their rejected cells
+carry none.
 
-`testdata/sheet/twice.txtar`, with its `missing` variant and its transforms'
-variants left out:
+`testdata/sheet/divide.txtar`, whose `A1` is `=B1/C1` with `C1` at `0`. The
+classifier makes `evaluate`'s outcome `accepted div-zero`, on the base and
+on its `renamed` variant, and each rejected cell of its `looped` variant
+carries the cycle's code:
 
+<!-- source: walkthrough/sheets/step08/testdata/sheet/divide.txtar -->
 ```
-A1 is twice B1.
+A1 divides B1 by C1, which is zero.
 -- in/sheet/A1 --
-=B1*2
+=B1/C1
 -- in/sheet/B1 --
-3
+1
+-- in/sheet/C1 --
+0
 -- out/calc/outcome --
 accepted
+-- out/calc/stderr.txt --
+A1: divides by zero
 -- out/calc/stdout.txt --
-6,3
+#DIV/0!,1,0
 -- out/evaluate/outcome --
-accepted
+accepted div-zero
 -- out/evaluate/values.txt --
-A1 6
-B1 3
+A1 #DIV/0!
+B1 1
+C1 0
 -- out/format/formulas.txt --
-A1 =B1 * 2
+A1 =B1 / C1
 -- out/format/outcome --
 accepted
 -- out/parse/outcome --
 accepted
 -- out/resolve/outcome --
 accepted
--- variant/cycle/about --
-B1 refers back to A1, so the sheet has a cycle.
--- variant/cycle/properties --
-circular
--- variant/cycle/in/sheet/B1 --
+-- transform/looped/in/sheet/A1 --
 =A1
--- variant/cycle/out/calc/error.txt --
-A1 -> B1 -> A1: cycle
-  sheet/A1:1: =B1*2
-  sheet/B1:1: =A1
--- variant/cycle/out/calc/outcome --
+-- transform/looped/out/calc/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/calc/outcome --
 rejected S201
--- variant/cycle/out/evaluate/outcome --
+-- transform/looped/out/evaluate/outcome --
 blocked resolve
--- variant/cycle/out/format/formulas.txt --
-A1 =B1 * 2
-B1 =A1
--- variant/cycle/out/format/outcome --
+-- transform/looped/out/format/formulas.txt --
+A1 =A1
+-- transform/looped/out/format/outcome --
 accepted
--- variant/cycle/out/parse/outcome --
+-- transform/looped/out/parse/outcome --
 accepted
--- variant/cycle/out/resolve/error.txt --
-A1 -> B1 -> A1: cycle
-  sheet/A1:1: =B1*2
-  sheet/B1:1: =A1
--- variant/cycle/out/resolve/outcome --
+-- transform/looped/out/resolve/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/resolve/outcome --
 rejected S201
+-- transform/renamed/in/sheet/A2 --
+=B2/C2
+-- transform/renamed/in/sheet/B2 --
+1
+-- transform/renamed/in/sheet/C2 --
+0
+-- transform/renamed/delete --
+sheet/A1
+sheet/B1
+sheet/C1
+-- transform/renamed/out/calc/outcome --
+accepted
+-- transform/renamed/out/calc/stderr.txt --
+A2: divides by zero
+-- transform/renamed/out/calc/stdout.txt --
+,,
+#DIV/0!,1,0
+-- transform/renamed/out/evaluate/outcome --
+accepted div-zero
+-- transform/renamed/out/evaluate/values.txt --
+A2 #DIV/0!
+B2 1
+C2 0
+-- transform/renamed/out/format/formulas.txt --
+A2 =B2 / C2
+-- transform/renamed/out/format/outcome --
+accepted
+-- transform/renamed/out/parse/outcome --
+accepted
+-- transform/renamed/out/resolve/outcome --
+accepted
 ```
 
 A sheet with no formulas has `format`'s outcome `skipped no formulas`, as
 step 5's `negative` shows. From step 6 it needs to parse as well, since
 `format` reads `parse`'s product: step 6's `negative` has `blocked parse`
-there. With the classifier, `divide`, whose `A1` is `=B1/C1` with `C1` at
-`0`, has `evaluate`'s outcome `accepted div-zero`.
+there.
 
-The archives shown in steps 3 to 6 come from their examples, which carry an
-`outcome` per cell, as every update writes from this step on. Step 7's
-archives, which no example holds yet, are shown without one.
+`Codes` changes the outcome of every rejected cell, frozen ones included.
+In archives that already carry outcomes, as step 7's do, the committed
+outcome of `negative`'s four frozen cells is `rejected`, and their run now
+gives `rejected S101`. So they fail, and no update writes them. A person
+deletes those four `outcome` files, and the next update adds them, as step
+4's upgrade does for a frozen cell whose other files match its run.
+
 `hypercase.json` records each suite's classifier, and whether the project
-supplies `Codes`: step 5's shows them unset.
+supplies `Codes`: step 5's shows them unset, and the registry of step 8's
+root package sets both.
 
 ### Rules
 
@@ -2218,8 +2281,11 @@ Trade-off: step 12 would put them beside hypotheses, the other assertions
 about groups of cells, at the cost of placing a built feature in a step
 whose design isn't settled.
 
+`walkthrough/sheets/step08/corpus_test.go` declares `codes`, which its
+`init` gives to `Own`:
+
+<!-- source: walkthrough/sheets/step08/corpus_test.go#codes -->
 ```go
-// corpus_test.go, registered with the rest
 var codes = hypercase.Check{
 	Name:        "codes",
 	Description: "Every code the formula evaluator defines is the code of some rejected cell.",
@@ -2248,6 +2314,7 @@ var codes = hypercase.Check{
 
 The check's findings, `testdata/checks/codes.txt`:
 
+<!-- source: walkthrough/sheets/step08/testdata/checks/codes.txt -->
 ```
 S101
 S201
@@ -2297,8 +2364,8 @@ S202
 
 ### What can now be seen
 
-- The code's verdict on every cell, as a file: `twice`'s `cycle` variant is
-  `blocked resolve` in `evaluate`, and `rejected S201` in `resolve`.
+- The code's verdict on every cell, as a file: `divide`'s `looped` variant
+  is `blocked resolve` in `evaluate`, and `rejected S201` in `resolve`.
 - A change moves a cell on two axes. An outcome that changes is a different
   verdict; bytes that change under one outcome are a different rendering of
   the same verdict.
