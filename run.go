@@ -280,6 +280,7 @@ type plannedCase struct {
 	data     []byte
 	a        *archive.Archive
 	base     archive.Base // read once, for the base's cells and the variants'
+	view     fs.FS        // the base's input view, made once, for its cells and the transforms
 	variants []*plannedVariant
 }
 
@@ -353,7 +354,8 @@ func (r *runner) planCorpus(t *testing.T, p *plan) []plannedCase {
 			continue
 		}
 		base := a.Base()
-		cases = append(cases, plannedCase{name: name, path: path, data: data, a: a, base: base, variants: r.planVariants(p, a, base)})
+		view := base.View()
+		cases = append(cases, plannedCase{name: name, path: path, data: data, a: a, base: base, view: view, variants: r.planVariants(p, a, base, view)})
 	}
 	return cases
 }
@@ -472,7 +474,7 @@ func (r *runner) runCase(t *testing.T, p *plan, pc plannedCase) {
 		}
 	}
 	base := r.newCase(p, pc, "", pc.a.Comment, archive.Gaps, pc.a.Properties(), gaps)
-	base.setView(p, pc.base.View())
+	base.setView(p, pc.view)
 	w := &caseWrites{set: map[string][]byte{}}
 	r.runCells(t, base, p.cols, w)
 	for _, v := range pc.variants {
