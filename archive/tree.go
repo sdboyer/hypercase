@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"path"
@@ -53,8 +54,8 @@ func TreeSections(prefix string, tree fs.FS) ([]Section, error) {
 		if err := Holds(data); err != nil {
 			return &TreeError{Path: p, Err: err}
 		}
-		if !holdsName(s.Name) {
-			return &TreeError{Path: p, Err: fmt.Errorf("its section's name, %q, doesn't read back as written", s.Name)}
+		if err := HoldsName(s.Name); err != nil {
+			return &TreeError{Path: p, Err: fmt.Errorf("its section's name, %q, can't be held in an archive: %v", s.Name, err)}
 		}
 		ss = append(ss, s)
 		return nil
@@ -82,12 +83,25 @@ func (e *TreeError) Error() string { return e.Path + ": " + e.Err.Error() }
 
 func (e *TreeError) Unwrap() error { return e.Err }
 
-// holdsName reports whether a section of the given name reads back with
-// that name.
-func holdsName(name string) bool {
+// HoldsName reports why a section of the given name can't be held in an
+// archive, or nil when it can: a section's name is read from its marker
+// line, trimmed of white space, so it reads back as written only when it
+// is not empty, holds no newline, and neither starts nor ends with white
+// space.
+func HoldsName(name string) error {
 	a := &Archive{Sections: []Section{{Name: name}}}
-	_, err := a.ReadBack()
-	return err == nil
+	if _, err := a.ReadBack(); err == nil {
+		return nil
+	}
+	switch {
+	case name == "":
+		return errors.New("it is empty, and a marker line with no name starts no section")
+	case strings.Contains(name, "\n"):
+		return errors.New("it holds a newline, which ends the marker line that names a section")
+	case strings.TrimSpace(name) != name:
+		return errors.New("it starts or ends with white space, which reading the marker line trims")
+	}
+	return errors.New("it doesn't read back as written")
 }
 
 // kindOf names the kind of a file that isn't regular.

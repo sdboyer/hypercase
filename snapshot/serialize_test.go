@@ -124,7 +124,7 @@ func TestSerializeRefusesWhatCantRoundTrip(t *testing.T) {
 		{fstest.MapFS{"A1": a1, "notes": {Mode: fs.ModeDir}}, []string{"the tree sheet, at notes:", "an empty directory"}},
 		{fstest.MapFS{"A1": a1, "x/notes": {Mode: fs.ModeDir}}, []string{"the tree sheet, at x/notes:", "an empty directory"}},
 		{fstest.MapFS{"A1": a1, "B1": {Data: []byte("A1"), Mode: fs.ModeSymlink}}, []string{"the tree sheet, at B1:", "a symlink, not a regular file"}},
-		{fstest.MapFS{"A1 ": a1}, []string{"the tree sheet, at A1 :", `"in/sheet/A1 "`, "doesn't read back as written"}},
+		{fstest.MapFS{"A1 ": a1}, []string{"the tree sheet, at A1 :", `"in/sheet/A1 "`, "can't be held in an archive: it starts or ends with white space"}},
 		{fstest.MapFS{}, []string{"the tree sheet holds no files"}},
 	} {
 		ss, err := Serialize(map[string]fs.FS{"sheet": c.tree})
@@ -151,7 +151,7 @@ func TestSerializeTreeNames(t *testing.T) {
 	// its files'.
 	for _, name := range []string{"a\nb", "sheet\n"} {
 		_, err := Serialize(map[string]fs.FS{name: tree})
-		fails(t, err, "the tree name "+strconv.Quote(name)+" can't be held in an archive")
+		fails(t, err, "the tree name "+strconv.Quote(name)+" can't be held in an archive, in the names of its sections: it holds a newline, which ends the marker line that names a section.")
 	}
 	_, err := Serialize(map[string]fs.FS{"sheet": nil})
 	fails(t, err, "the tree sheet is nil")

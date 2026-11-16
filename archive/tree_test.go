@@ -3,6 +3,7 @@ package archive
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"testing/fstest"
 )
@@ -30,6 +31,35 @@ func TestTreeSections(t *testing.T) {
 	}
 	if ss, err := TreeSections("in/sheet/", fstest.MapFS{}); ss != nil || err != nil {
 		t.Errorf("an empty tree gave %v, %v", ss, err)
+	}
+}
+
+// TestHoldsName: a section's name holds unless it is empty, holds a
+// newline, or starts or ends with white space, and each of those is
+// named.
+func TestHoldsName(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		want string // "" when it holds
+	}{
+		{"in/sheet/A1", ""},
+		{"in/a b/c", ""},
+		{"in/a -- b/c", ""},
+		{"in/a\rb", ""},
+		{"", "it is empty"},
+		{"in/a\nb", "it holds a newline"},
+		{"in/a\n", "it holds a newline"},
+		{"in/a ", "it starts or ends with white space"},
+		{" in/a", "it starts or ends with white space"},
+		{"in/a\r", "it starts or ends with white space"},
+	} {
+		err := HoldsName(tt.name)
+		switch {
+		case tt.want == "" && err != nil:
+			t.Errorf("HoldsName(%q) = %v, want nil", tt.name, err)
+		case tt.want != "" && (err == nil || !strings.Contains(err.Error(), tt.want)):
+			t.Errorf("HoldsName(%q) = %v, want %q", tt.name, err, tt.want)
+		}
 	}
 }
 

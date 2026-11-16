@@ -78,7 +78,8 @@ func Serialize(trees map[string]fs.FS) ([]archive.Section, error) {
 }
 
 // checkTree checks a tree's name: one path element, not params, and one
-// a section's name holds.
+// a section's name holds. Every section of the tree is named
+// in/<name>/<path>, so the name holds where in/<name>/ does.
 func checkTree(name string) error {
 	switch {
 	case name == "." || !fs.ValidPath(name) || strings.Contains(name, "/"):
@@ -86,9 +87,8 @@ func checkTree(name string) error {
 	case name == archive.ParamsTree:
 		return errors.New("the tree name params is reserved: a column's parameters are fixed in Go, or derived from the archive's name, and an archive carries none.\nName the tree otherwise.")
 	}
-	a := &archive.Archive{Sections: []archive.Section{{Name: archive.In + "/" + name + "/x"}}}
-	if _, err := a.ReadBack(); err != nil {
-		return fmt.Errorf("the tree name %q can't be held in an archive: the names of its sections, under in/, wouldn't read back as written, as a name holding a newline doesn't.\nName the tree otherwise.", name)
+	if err := archive.HoldsName(archive.In + "/" + name + "/"); err != nil {
+		return fmt.Errorf("the tree name %q can't be held in an archive, in the names of its sections: %v.\nName the tree otherwise.", name, err)
 	}
 	return nil
 }
