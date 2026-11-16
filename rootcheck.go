@@ -73,8 +73,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	trPkgs := map[trKey][]string{}                  // transform → the packages that own it
 	untestedTrs := map[trKey][]string{}             // transform → the packages with no _test.go file whose registries own it
 	var rootPkgs []string
-	claim := func(owners map[string][]string, name string, corpora []string, pkg string) {
-		owners[name] = append(owners[name], pkg)
+	claim := func(name string, corpora []string) {
 		for _, corpus := range corpora {
 			if claimed[corpus] == nil {
 				claimed[corpus] = map[string]bool{}
@@ -98,17 +97,16 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		// A registry in a package with no _test.go file records what no
 		// test runs, so its package owns and uses nothing: no column, lift
 		// or transform. Its sections stay claimed, since the registry's own
-		// error reports them, and what it owns is kept apart, so a message
-		// that finds no owner names it.
-		suites, lifts, users, trOwners := columnPkgs, columnPkgs, usedPkgs, trPkgs
-		if !g.tested {
-			suites, lifts, users, trOwners = map[string][]string{}, untestedLifts, map[string][]string{}, untestedTrs
-		}
+		// error reports them, and the lifts and transforms it owns are kept
+		// apart, so a message that finds no owner names it.
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
 		}
 		for _, s := range g.reg.Suites {
-			claim(suites, s.Name, s.Corpora, g.pkg)
+			claim(s.Name, s.Corpora)
+			if g.tested {
+				columnPkgs[s.Name] = append(columnPkgs[s.Name], g.pkg)
+			}
 			if s.Consumes == registry.RawInput {
 				for _, dir := range s.Corpora {
 					declare(dir, rawEntry, g.pkg)
@@ -116,10 +114,17 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 		}
 		for _, l := range g.reg.Lifts {
-			if l.Owned {
-				claim(lifts, l.Name, l.Corpora, g.pkg)
+			if !l.Owned {
+				if g.tested {
+					usedPkgs[l.Name] = append(usedPkgs[l.Name], g.pkg)
+				}
+				continue
+			}
+			claim(l.Name, l.Corpora)
+			if g.tested {
+				columnPkgs[l.Name] = append(columnPkgs[l.Name], g.pkg)
 			} else {
-				users[l.Name] = append(users[l.Name], g.pkg)
+				untestedLifts[l.Name] = append(untestedLifts[l.Name], g.pkg)
 			}
 		}
 		for _, ct := range g.reg.Types {
@@ -129,9 +134,14 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 			for _, tr := range ct.Transforms {
 				transforms[ct.Dir][tr.Name] = true
-				if tr.Owned {
-					k := trKey{ct.Dir, tr.Name}
-					trOwners[k] = append(trOwners[k], g.pkg)
+				if !tr.Owned {
+					continue
+				}
+				k := trKey{ct.Dir, tr.Name}
+				if g.tested {
+					trPkgs[k] = append(trPkgs[k], g.pkg)
+				} else {
+					untestedTrs[k] = append(untestedTrs[k], g.pkg)
 				}
 			}
 		}
