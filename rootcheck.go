@@ -60,7 +60,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	// Columns, lifts, types, properties and root-package checks, merged
 	// across packages.
 	columnPkgs := map[string][]string{}             // column → the packages that own it
-	untestedCols := map[string][]string{}           // column → the packages with no _test.go file whose registries own it
+	untestedLifts := map[string][]string{}          // lift → the packages with no _test.go file whose registries own it
 	claimed := map[string]map[string]bool{}         // corpus → the columns over it
 	usedPkgs := map[string][]string{}               // lift → the packages that only use it
 	declared := map[string]bool{}                   // the corpus types' directories, and the suites' Corpus
@@ -99,15 +99,15 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		// or transform. Its sections stay claimed, since the registry's own
 		// error reports them, and what it owns is kept apart, so a message
 		// that finds no owner names it.
-		owners, users, trOwners := columnPkgs, usedPkgs, trPkgs
+		suites, lifts, users, trOwners := columnPkgs, columnPkgs, usedPkgs, trPkgs
 		if !g.tested {
-			owners, users, trOwners = untestedCols, map[string][]string{}, untestedTrs
+			suites, lifts, users, trOwners = map[string][]string{}, untestedLifts, map[string][]string{}, untestedTrs
 		}
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
 		}
 		for _, s := range g.reg.Suites {
-			claim(owners, s.Name, s.Corpora, g.pkg)
+			claim(suites, s.Name, s.Corpora, g.pkg)
 			if s.Consumes == registry.RawInput {
 				for _, dir := range s.Corpora {
 					declare(dir, rawEntry, g.pkg)
@@ -116,7 +116,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 		for _, l := range g.reg.Lifts {
 			if l.Owned {
-				claim(owners, l.Name, l.Corpora, g.pkg)
+				claim(lifts, l.Name, l.Corpora, g.pkg)
 			} else {
 				users[l.Name] = append(users[l.Name], g.pkg)
 			}
@@ -158,7 +158,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 		msg := fmt.Sprintf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.", name, andList(usedPkgs[name]))
 		fix := "Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use."
-		if pkgs := untestedCols[name]; len(pkgs) > 0 {
+		if pkgs := untestedLifts[name]; len(pkgs) > 0 {
 			why, restore := untestedOwners("lift", pkgs)
 			msg += " " + why
 			fix = restore + " own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use."

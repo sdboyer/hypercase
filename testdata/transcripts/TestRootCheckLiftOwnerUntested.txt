@@ -149,3 +149,30 @@ $ go test  # ladder-a-useonly
             --- PASS: TestCorpus/script/x/resolve
 FAIL
 [exit 1]
+$ edit b/corpus_test.go  # restore b's tests
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # ladder-b-suite
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+PASS
+$ rm b/corpus_test.go  # remove b's tests, and leave its registry
+$ go test  # ladder-a-useonly
+    b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+    c/testdata/hypercase.json is a registry, and c holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+    the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registry of ./c records that its package owns the lift, and ./c holds no _test.go file, so no test runs the lift there.
+        Restore the tests of ./c, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]
