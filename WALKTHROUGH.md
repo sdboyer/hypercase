@@ -971,7 +971,9 @@ The root package's registry, `step05/testdata/hypercase.json`, holds the
 update variable, the corpus root, that the package runs the root-package
 check, the properties it registers, and `evaluate`: the type it consumes,
 `io/fs.FS`, its corpora, its outputs and what it rejects. Its `types` and
-`lifts` stay empty until step 6, and `issueLinks` until step 9:
+`lifts` stay empty until step 6, and `issueLinks` until step 9. `codes`,
+whether the project supplies `Codes`, stays `false`, and `evaluate`'s
+`classifier` stays `null`, until step 8:
 
 <!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
@@ -1326,9 +1328,10 @@ on raw input: `hypercase.Suite[sheetcorpus.Sheet]`, with its outputs and
   names its `Corpus` runs over that directory's raw input views, with no
   corpus type. No archive moves.
 - A malformed input's error moves to the lift that rejects it. The cells
-  past that lift are blocked and write nothing, so their old sections are
-  orphans until a person removes them: `stray`'s `out/evaluate/error.txt`
-  and `out/format/error.txt`.
+  past that lift are blocked, and write no outputs, only the `outcome` step
+  8 adds, `blocked parse`. So their old outputs are orphans until a person
+  removes them: `stray`'s `out/evaluate/error.txt` and
+  `out/format/error.txt`.
 - A known gap moves with its error. `parse` now errs on `negative`'s `-3`,
   so `evaluate`, past it, is blocked, and a `gaps` line naming a column that
   didn't run fails. A person changes `negative`'s `evaluate` line to name
@@ -1484,7 +1487,8 @@ package owns every column it registers.
 **Blocked cells.**
 
 - When a lift on a cell's path fails, the cell is **blocked**: it writes no
-  outputs, and its old outputs are orphans.
+  outputs, only its `outcome` from step 8 on, and its old outputs are
+  orphans.
 - A blocked cell is not checked for an expected error, because it did not
   run. So a case that is invalid in more than one way states each property,
   the first lift to meet one rejects the case, and nothing is expected of
@@ -1993,7 +1997,8 @@ S202
 ```
 
 - A corpus check has a name, a description and a `Run` over every cell, and
-  is registered when its package is initialized. A test function runs it:
+  is registered when its package is initialized, given to `Register` or to
+  `Own`. The package that registers it owns it. A test function runs it:
   `hypercase.Test` runs each as the subtest `checks/<name>` (proposed).
 - A cell, as a check sees it, exposes its committed outcome, its committed
   sections, its column's registry entry and its case's stated properties.
@@ -2001,16 +2006,20 @@ S202
   `Outcome`, with its `State`, `Codes` and `Detail`; `Entry`; `Properties`;
   and `Files`, the cell's committed files under its `out/<column>/`.
 - A check reads only committed files, and never runs a suite, a lift or a
-  transform.
+  transform. An archive that can't be read fails every check of the
+  package, and an update writes no findings.
 - A check reads the cells as they are committed when it runs. The module's
   update runs packages at once, so a check can run before another package
   writes its cells: its findings can take a second update to settle, and a
   normal run between the two fails on them.
 - Its findings are committed as a golden at `<pkg>/testdata/checks/<name>.txt`
-  in the package that owns the check.
+  in the package that owns the check. A file under `testdata/checks/` that
+  is no registered check's findings fails a normal run, and an update
+  leaves it in place.
 - The findings format (proposed): one finding per line, each ending with a
   newline, sorted byte by byte, each once. An empty list is an empty file. A
-  finding that holds a newline fails the check.
+  finding that is empty or holds a newline fails the check, and an update
+  writes no findings.
 - An error from `Run` is a violated requirement: it fails every run, updates
   included, and an update writes no findings.
 - Corpus checks carry a description, under step 3's rule.
