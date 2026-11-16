@@ -328,8 +328,9 @@ func TestPageTwoTrackers(t *testing.T) {
 }
 
 // TestPageBadLink: a link pattern at b that isn't a regular expression is
-// one problem at b, naming every registry that gives it, and links nothing,
-// while the report still links through the patterns that are.
+// one problem at b, naming every registry that gives it, each once, and
+// links nothing, while the report still links through the patterns that
+// are.
 func TestPageBadLink(t *testing.T) {
 	t.Parallel()
 	reg := moduleRegistry()
@@ -354,4 +355,15 @@ func TestPageBadLink(t *testing.T) {
 	if back := ok(t, g, "", "report", c[1], c[0]); strings.Contains(back, `<section id="problems">`) {
 		t.Errorf("the report from b to a lists a problem, and a's registries give no pattern:\n%s", section(t, back, `<section id="problems">`, "</section>"))
 	}
+
+	// One registry that gives the pattern twice, with two URLs, is named
+	// once, in a problem of its own.
+	reg.IssueLinks = append(reg.IssueLinks, registry.IssueLink{Pattern: `calc-lib#(\d+`, URL: "https://example.com/calc-lib/issues/$1"})
+	files = module(map[string]string{"x": "A case.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"})
+	files["testdata/hypercase.json"] = string(reg.Marshal())
+	g = gittest.New(t)
+	c = revisions(t, g, module(nil), files)
+	ps = section(t, ok(t, g, "", "report", c[0], c[1]), `<section id="problems">`, "</section>")
+	holds(t, "the problems", ps, `<h2>Problems <span class="count">1</span></h2>`,
+		"<li>testdata/hypercase.json gives the issue link pattern &#34;calc-lib#(\\\\d&#43;&#34;, which is not a regular expression (error parsing regexp: missing closing ): `calc-lib#(\\d&#43;`), so the report links no text through it.</li>")
 }

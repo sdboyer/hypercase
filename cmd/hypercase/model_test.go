@@ -412,3 +412,29 @@ func TestPageDescriptions(t *testing.T) {
 	head, _ := matrixRow(t, page, "sheet", "sheet/kept/variant/v")
 	holds(t, "kept/variant/v's row", head, `<div class="desc">A variant both have, at b.</div>`)
 }
+
+// TestPageDescribeConflict: a column two registries claim at b has no
+// declarations there, and the page takes none of a's for it, whose outputs
+// and classifier b doesn't lack but declares twice: it shows neither
+// description, and none of a's declarations marked only at a.
+func TestPageDescribeConflict(t *testing.T) {
+	t.Parallel()
+	ra := moduleRegistry()
+	ra.Suites[0].Outputs = []registry.Output{{Pattern: "stdout.txt", Description: "What calc prints, at a."}}
+	ra.Suites[0].Classifier = &registry.Classifier{Name: "slow", Description: "Adds slow, at a."}
+	other := registry.Registry{UpdateVar: "M_UPDATE_GOLDEN", CorpusRoot: ".",
+		Suites: []registry.Suite{{Name: "calc", Description: "Runs calc, as another package says.", Consumes: registry.RawInput, Corpora: []string{"sheet"}}}}
+	const x = "A case.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"
+	a := module(map[string]string{"x": x})
+	a["testdata/hypercase.json"] = string(ra.Marshal())
+	b := module(map[string]string{"x": x})
+	b["pkg/testdata/hypercase.json"] = string(other.Marshal())
+	g := gittest.New(t)
+	c := revisions(t, g, a, b)
+	page := ok(t, g, "", "report", c[0], c[1])
+	d := section(t, page, `<section class="corpus" id="describe-sheet">`, "</section>")
+	holds(t, "the sheet corpus's descriptions", d, "<dt>calc</dt><dd></dd>")
+	lacks(t, "the sheet corpus's descriptions", d, "at a.", "only at")
+	holds(t, "the problems", section(t, page, `<section id="problems">`, "</section>"),
+		"each claim the column calc, and a column&#39;s name is unique per corpus root")
+}
