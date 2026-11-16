@@ -47,8 +47,9 @@ import (
 //	                      final newline, which decl.Reject marks
 //	import/panic          panicked with, less its final newline
 //
-// An export whose import/ tree has none of these is imported as an empty
-// product.
+// An import/ tree with more than one of error, fail and coded returns
+// their errors joined, with errors.Join, in that order. An export whose
+// import/ tree has none of these is imported as an empty product.
 type (
 	Export   struct{ fs.FS }
 	Unpacked struct{ view fs.FS }
@@ -80,14 +81,22 @@ func steerImport(name string, in fs.FS) (jenny.Files, error) {
 	if data, err := fs.ReadFile(in, name+"/panic"); err == nil {
 		panic(strings.TrimSuffix(string(data), "\n"))
 	}
+	var errs []error
 	if data, err := fs.ReadFile(in, name+"/error"); err == nil {
-		return nil, decl.Reject(errors.New(strings.TrimSuffix(string(data), "\n")))
+		errs = append(errs, decl.Reject(errors.New(strings.TrimSuffix(string(data), "\n"))))
 	}
 	if data, err := fs.ReadFile(in, name+"/fail"); err == nil {
-		return nil, errors.New(strings.TrimSuffix(string(data), "\n"))
+		errs = append(errs, errors.New(strings.TrimSuffix(string(data), "\n")))
 	}
 	if data, err := fs.ReadFile(in, name+"/coded"); err == nil {
-		return nil, decl.Reject(&codedError{code: strings.TrimSuffix(string(data), "\n")})
+		errs = append(errs, decl.Reject(&codedError{code: strings.TrimSuffix(string(data), "\n")}))
+	}
+	switch len(errs) {
+	case 0:
+	case 1:
+		return nil, errs[0]
+	default:
+		return nil, errors.Join(errs...)
 	}
 	paths, err := archive.Paths(in)
 	if err != nil {
@@ -297,6 +306,11 @@ func chain(p decl.Project, items ...any) {
 	hypercase.Register(append([]any{p, rootPkg, scriptType}, append(chainProps, items...)...)...)
 }
 
+// chainB registers ./b of the chain-shared fixture, with the Project p.
+func chainB(p decl.Project) {
+	hypercase.Register(append([]any{p, scriptType, exportType, hypercase.Use(importLift, parse, resolve), own(evaluate, list, louder)}, chainProps...)...)
+}
+
 // chainRegistrations are step 10's declaration sets, by name.
 var chainRegistrations = map[string]func(){
 	"chain": func() { chain(project, exportType, own(importLift, parse, resolve, evaluate, list, louder)) },
@@ -316,9 +330,17 @@ var chainRegistrations = map[string]func(){
 
 	// Packages over one export corpus: . owns import, parse and resolve,
 	// and ./b uses them, and owns evaluate, list and the transform louder.
-	"chain-a": func() { chain(project, exportType, own(importLift, parse, resolve)) },
-	"chain-b": func() {
-		hypercase.Register(append([]any{project, scriptType, exportType, hypercase.Use(importLift, parse, resolve), own(evaluate, list, louder)}, chainProps...)...)
+	// In the -render pairs, one package's Project is projectRender.
+	"chain-a":        func() { chain(project, exportType, own(importLift, parse, resolve)) },
+	"chain-b":        func() { chainB(project) },
+	"chain-a-render": func() { chain(projectRender, exportType, own(importLift, parse, resolve)) },
+	"chain-b-render": func() { chainB(projectRender) },
+
+	// Packages over one grid corpus: . owns export, and ./b uses it, and
+	// owns import and list.
+	"chain-twice-a": func() { chain(project, gridType, plainExportType, own(exportGrid)) },
+	"chain-twice-b": func() {
+		hypercase.Register(append([]any{project, scriptType, gridType, plainExportType, hypercase.Use(exportGrid), own(importLift, list)}, chainProps...)...)
 	},
 
 	// Refusals.

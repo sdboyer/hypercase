@@ -1,0 +1,117 @@
+$ edit testdata/export/quoted.txtar  # an export import rejects, on whose error projectRender panics
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/quoted: parse is blocked: the lift import failed on the case, and testdata/export/quoted.txtar, out/import/error.txt, records its error.
+    export/quoted: resolve is blocked: the lift import failed on the case, and testdata/export/quoted.txtar, out/import/error.txt, records its error.
+    export/quoted/transform/louder: louder declines the base: the export makes no output of evaluate
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+        --- PASS: TestCorpus/export/quoted
+            --- PASS: TestCorpus/export/quoted/import
+            --- SKIP: TestCorpus/export/quoted/parse
+            --- SKIP: TestCorpus/export/quoted/resolve
+            --- SKIP: TestCorpus/export/quoted/transform/louder
+    --- PASS: TestCorpus/script
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-b-render
+    export/quoted: evaluate is blocked: the lift import failed on the case, and testdata/export/quoted.txtar, out/import/error.txt, records its error.
+    export/quoted: list is blocked: the lift import failed on the case, and testdata/export/quoted.txtar, out/import/error.txt, records its error.
+    export/quoted/transform/louder: louder declines the base: the export makes no output of evaluate
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+        --- PASS: TestCorpus/export/quoted
+            --- SKIP: TestCorpus/export/quoted/evaluate
+            --- SKIP: TestCorpus/export/quoted/list
+            --- SKIP: TestCorpus/export/quoted/transform/louder
+    --- PASS: TestCorpus/script
+PASS
+$ go test  # chain-a
+    export/quoted: parse is blocked: testdata/export/quoted.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/quoted: resolve is blocked: testdata/export/quoted.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/quoted/transform/louder: louder declines the base: the export makes no output of evaluate
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+        --- PASS: TestCorpus/export/quoted
+            --- PASS: TestCorpus/export/quoted/import
+            --- SKIP: TestCorpus/export/quoted/parse
+            --- SKIP: TestCorpus/export/quoted/resolve
+            --- SKIP: TestCorpus/export/quoted/transform/louder
+    --- PASS: TestCorpus/script
+PASS
+$ go test ./b  # chain-b-render
+    export/quoted: evaluate is blocked: testdata/export/quoted.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/quoted: list is blocked: testdata/export/quoted.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/quoted/transform/louder: louder declines the base: the export makes no output of evaluate
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+        --- PASS: TestCorpus/export/quoted
+            --- SKIP: TestCorpus/export/quoted/evaluate
+            --- SKIP: TestCorpus/export/quoted/list
+            --- SKIP: TestCorpus/export/quoted/transform/louder
+    --- PASS: TestCorpus/script
+PASS

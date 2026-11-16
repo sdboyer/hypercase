@@ -448,13 +448,14 @@ func (r *runner) newCase(p *plan, pc plannedCase, prefix string, about []byte, g
 // setView gives the case its input view, and the values its cells read.
 func (c *aCase) setView(r *runner, p *plan, view fs.FS) {
 	c.state = &caseState{
-		r:     r,
-		c:     c,
-		plan:  p,
-		root:  p.root.new(view),
-		view:  view,
-		runs:  map[*lift]*liftRun{},
-		reads: map[*lift]*liftRead{},
+		r:      r,
+		c:      c,
+		plan:   p,
+		root:   p.root.new(view),
+		view:   view,
+		runs:   map[*lift]*liftRun{},
+		reads:  map[*lift]*liftRead{},
+		update: r.update,
 	}
 }
 
@@ -901,19 +902,35 @@ type liftVerdict struct {
 // the lift run only when the update writes the lift's cell, whose product
 // they read. A fault of the jenny keeps the update from writing the cell.
 func (s *caseState) liftVerdict(l *lift, lr *liftRun, in any, view fs.FS) *liftVerdict {
-	if lr.verdict != nil {
-		return lr.verdict
+	if lr.verdict == nil {
+		lr.verdict = s.judgeLift(s.r, l, lr, in, view)
 	}
+	return lr.verdict
+}
+
+// judgeLift judges a bytes lift's cell on the case, from its one run, as
+// the runner r judges a cell.
+func (s *caseState) judgeLift(r *runner, l *lift, lr *liftRun, in any, view fs.FS) *liftVerdict {
 	m := &msg{}
 	v := &liftVerdict{}
-	v.files, v.unjudged, v.writable = s.r.verdict(m, s.c, l.column(), in, view, lr.out)
+	v.files, v.unjudged, v.writable = r.verdict(m, s.c, l.column(), in, view, lr.out)
 	for _, p := range lr.problems {
 		m.add("%s", p)
 		v.writable = false
 	}
 	v.parts = m.parts
-	lr.verdict = v
 	return v
+}
+
+// bare is the runner as it judges a cell under a bare Project: one whose
+// RenderError renders every error as an empty line, and which gives no
+// Codes, so neither fails a cell. What keeps an update from writing a cell
+// under the bare Project keeps it from writing the cell under any Project.
+func (r *runner) bare() *runner {
+	b := *r
+	b.renderError = func(fs.FS, error) []byte { return []byte("\n") }
+	b.codes = nil
+	return &b
 }
 
 // cellFiles is what a case commits for a column's cell: its files, by path
@@ -1020,9 +1037,10 @@ func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why
 // blocked finishes a cell that a lift on its path blocked, by failing on
 // the case, in this run or as the archive commits it. The cell runs
 // nothing, so it isn't checked for an expected error; its outcome is its
-// one file, and its other committed files are orphans. A blocked bytes
-// lift has no product, so its owner's update removes the committed one,
-// which other cells read.
+// one file, and its other committed files are orphans, unless the update
+// runs the cell, as it may past a bytes lift. A blocked bytes lift has no
+// product, so its owner's update removes the committed one, which other
+// cells read.
 func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, b *blockage, gap archive.Gap, marked bool, cf cellFiles, res *cellResult) {
 	m := &msg{}
 	why := b.why(col)
@@ -1032,18 +1050,29 @@ func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, b *
 	}
 	frozen := cf.frozen(marked)
 	r.ranNothing(m, c, col, archive.Outcome{State: archive.Blocked, Detail: b.failed}, frozen, goldens, res)
-	// A normal run reads a bytes lift's committed outcome, which may be
-	// stale, or missing. When the lift accepts the case now, the update,
-	// which reruns it, runs the cell, so its files are no orphans. Only
-	// the lift's owner runs it in a normal run, so no other package can
-	// tell. keep is the advice for files that may be no orphans.
+	// Past a bytes lift, a normal run reads what the archive commits for
+	// it, which may be stale, or missing, where an update reruns the lift.
+	// When the update runs the cell, its files are no orphans. Only the
+	// package that owns a bytes lift runs it in a normal run, so a package
+	// that doesn't own every bytes lift on the cell's path can't tell.
+	// keep is the advice for files that may be no orphans, asked for only
+	// when the cell has such files, since telling may run lifts again.
+	files := len(goldens)
+	if _, ok := goldens[outcomeFile]; ok {
+		files--
+	}
+	if col.lift != nil && col.lift.bytes && !frozen {
+		files += len(cf.product)
+	}
 	var keep string
-	switch {
-	case b.outcome == "":
-	case !b.lift.owned:
-		keep = fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell whether %s accepts the case now. Run %s, which reruns it, and delete nothing by hand before it has.", b.lift.name, b.lift.name, r.updateCmd())
-	case c.state.acceptsNow(b.lift):
-		keep = fmt.Sprintf("%s accepts the case now, so %s reruns it and runs %s. Delete nothing by hand.", b.lift.name, r.updateCmd(), col.name)
+	if !r.update && files > 0 {
+		switch last, unowned := c.state.plan.bytesOnPath(col.consumes); {
+		case last == nil:
+		case unowned != nil:
+			keep = fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell whether an update runs %s. Run %s, which reruns %s, and delete nothing by hand before it has.", unowned.name, col.name, r.updateCmd(), unowned.name)
+		case c.state.updateRuns(col.consumes):
+			keep = fmt.Sprintf("%s runs %s: it reruns %s, whose outcome and product a normal run reads from the archive. Delete nothing by hand.", r.updateCmd(), col.name, last.name)
+		}
 	}
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		switch {
