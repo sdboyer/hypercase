@@ -1626,6 +1626,27 @@ var SheetType = decl.Type[Sheet]{
 	Description: "A spreadsheet: one file per cell under in/sheet/, holding a number or a formula.",
 	Transforms:  []decl.Transform[Sheet]{Looped, Renamed},
 }
+
+// view gives a sheet's every file as a transform's jenny returns them, by its
+// path in the sheet's input view.
+func view(fsys fs.FS, err error) (jenny.Files, error) {
+	if err != nil {
+		return nil, err
+	}
+	var files jenny.Files
+	err = fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := fs.ReadFile(fsys, p)
+		if err != nil {
+			return err
+		}
+		files = append(files, jenny.NewFile(p, data))
+		return nil
+	})
+	return files, err
+}
 ```
 
 One package owns each transform. The root package,

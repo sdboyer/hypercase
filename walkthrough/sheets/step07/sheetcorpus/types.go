@@ -40,8 +40,6 @@ var SheetType = decl.Type[Sheet]{
 	Transforms:  []decl.Transform[Sheet]{Looped, Renamed},
 }
 
-// doc:end transforms
-
 // view gives a sheet's every file as a transform's jenny returns them, by its
 // path in the sheet's input view.
 func view(fsys fs.FS, err error) (jenny.Files, error) {
@@ -62,6 +60,8 @@ func view(fsys fs.FS, err error) (jenny.Files, error) {
 	})
 	return files, err
 }
+
+// doc:end transforms
 
 var Parse = decl.Lift[Sheet, *sheet.Parsed]{
 	Name:        "parse",
