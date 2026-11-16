@@ -2049,7 +2049,9 @@ S202
   and `Files`, the cell's committed files under its `out/<column>/`.
 - A check reads only committed files, and never runs a suite, a lift or a
   transform. An archive that can't be read fails every check of the
-  package, and an update writes no findings.
+  package, and an update writes no findings. So does a transform's variant
+  whose properties can't be known: one no corpus type lists, or one its
+  transform declines.
 - A check reads the cells as they are committed when it runs. The module's
   update runs packages at once, so a check can run before another package
   writes its cells: its findings can take a second update to settle, and a

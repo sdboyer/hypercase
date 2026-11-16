@@ -212,7 +212,9 @@ func (r *runner) orphanFindings(t *testing.T) {
 // over, and each such column. They are sorted by corpus, then archive,
 // then case, the base first, then its hand-written variants in the order
 // written, then its transforms' by name, then column. A registry or an
-// archive that can't be read, or a cell's outcome, is an error.
+// archive that can't be read, or a cell's outcome, is an error, and so is
+// a transform's variant whose properties can't be known: one no corpus
+// type lists, or one its transform declines.
 func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 	columns := map[string][]Entry{}                          // corpus → its columns
 	transforms := map[string]map[string]registry.Transform{} // corpus → transform → its declaration
@@ -296,8 +298,14 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 			for _, v := range a.Variants() {
 				c := checkedCase{name: v.Case(), prefix: v.Prefix(), properties: v.Properties}
 				if v.Kind == archive.Transform {
-					tr := transforms[corpus][v.Name]
-					c.properties, _ = registry.VariantProperties(tr.Gives, tr.Keeps, stated)
+					tr, ok := transforms[corpus][v.Name]
+					if !ok {
+						return nil, fmt.Errorf("%s holds %s, and no corpus type of testdata/%s/ lists a transform named %s", r.rel(p), v.Case(), corpus, v.Name)
+					}
+					var neither []string
+					if c.properties, neither = registry.VariantProperties(tr.Gives, tr.Keeps, stated); len(neither) > 0 {
+						return nil, fmt.Errorf("%s holds %s, and %s declines the base: the base states %s, which %s neither gives nor keeps", r.rel(p), v.Case(), v.Name, andList(neither), v.Name)
+					}
 				}
 				cases = append(cases, c)
 			}

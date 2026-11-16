@@ -332,6 +332,22 @@ func TestChecks(t *testing.T) {
 	r = s.update("tr-checks")
 	s.fails(r, "the corpus check alters "+unreadable, "the corpus check cells "+unreadable, "the corpus check unsorted "+unreadable)
 	s.same("testdata/checks/cells.txt", findings)
+	s.remove("testdata/script/broken.txtar", "remove the broken archive")
+
+	// So does a transform's variant whose properties can't be known: one
+	// no corpus type lists, or one its transform declines.
+	before := s.read(twice)
+	s.edit(twice, "leave the cells of a transform no corpus type lists", insert("transform/gone/out/echo/outcome", "accepted\n", "transform/looped/"))
+	gone := "can't read its cells: testdata/script/twice.txtar holds transform/gone, and no corpus type of testdata/script/ lists a transform named gone\n    Fix what the message names. No check runs, and an update writes no findings."
+	for _, update := range []bool{false, true} {
+		s.fails(s.run(".", "tr-checks", update), "the corpus check alters "+gone, "the corpus check cells "+gone, "the corpus check unsorted "+gone)
+		s.same("testdata/checks/cells.txt", findings)
+	}
+	s.write(twice, before, "remove the transform's cells")
+	s.edit(twice, "state a property each transform declines", insert("properties", "malformed\n", "out/"))
+	declined := "can't read its cells: testdata/script/twice.txtar holds transform/looped, and looped declines the base: the base states malformed, which looped neither gives nor keeps\n    Fix what the message names. No check runs, and an update writes no findings."
+	s.fails(s.normal("tr-checks"), "the corpus check alters "+declined, "the corpus check cells "+declined, "the corpus check unsorted "+declined)
+	s.same("testdata/checks/cells.txt", findings)
 	s.done()
 }
 

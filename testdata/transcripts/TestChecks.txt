@@ -519,3 +519,123 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-checks
         --- FAIL: TestCorpus/checks/unsorted
 FAIL
 [exit 1]
+$ rm testdata/script/broken.txtar  # remove the broken archive
+$ edit testdata/script/twice.txtar  # leave the cells of a transform no corpus type lists
+$ go test  # tr-checks
+    testdata/script/twice.txtar: no registry claims transform/gone/out/echo/outcome: no corpus type of testdata/script/ lists a transform named gone.
+        If a transform should make the variant, list it in its corpus type's Transforms. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    the corpus check alters can't read its cells: testdata/script/twice.txtar holds transform/gone, and no corpus type of testdata/script/ lists a transform named gone
+        Fix what the message names. No check runs, and an update writes no findings.
+    the corpus check cells can't read its cells: testdata/script/twice.txtar holds transform/gone, and no corpus type of testdata/script/ lists a transform named gone
+        Fix what the message names. No check runs, and an update writes no findings.
+    the corpus check unsorted can't read its cells: testdata/script/twice.txtar holds transform/gone, and no corpus type of testdata/script/ lists a transform named gone
+        Fix what the message names. No check runs, and an update writes no findings.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/alters
+        --- FAIL: TestCorpus/checks/cells
+        --- FAIL: TestCorpus/checks/unsorted
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-checks
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    the corpus check alters can't read its cells: testdata/script/twice.txtar holds transform/gone, and no corpus type of testdata/script/ lists a transform named gone
+        Fix what the message names. No check runs, and an update writes no findings.
+    the corpus check cells can't read its cells: testdata/script/twice.txtar holds transform/gone, and no corpus type of testdata/script/ lists a transform named gone
+        Fix what the message names. No check runs, and an update writes no findings.
+    the corpus check unsorted can't read its cells: testdata/script/twice.txtar holds transform/gone, and no corpus type of testdata/script/ lists a transform named gone
+        Fix what the message names. No check runs, and an update writes no findings.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/alters
+        --- FAIL: TestCorpus/checks/cells
+        --- FAIL: TestCorpus/checks/unsorted
+FAIL
+[exit 1]
+$ edit testdata/script/twice.txtar  # remove the transform's cells
+$ edit testdata/script/twice.txtar  # state a property each transform declines
+$ go test  # tr-checks
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    script/twice/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.
+        transform/looped/in/do/error and transform/looped/in/resolve/error are written, and looped declines the base: the base states malformed, which looped neither gives nor keeps
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to remove them.
+        transform/looped/out/echo/error.txt is recorded, and looped declines the base: the base states malformed, which looped neither gives nor keeps
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/looped/out/echo/outcome is recorded, and looped declines the base: the base states malformed, which looped neither gives nor keeps
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/looped/out/echo/values.txt is recorded, and looped declines the base: the base states malformed, which looped neither gives nor keeps
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        transform/upper/in/do/out/values.txt is written, and upper declines the base: the base states malformed, which upper neither gives nor keeps
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to remove them.
+        transform/upper/out/echo/outcome is recorded, and upper declines the base: the base states malformed, which upper neither gives nor keeps
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/upper/out/echo/values.txt is recorded, and upper declines the base: the base states malformed, which upper neither gives nor keeps
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    the corpus check alters can't read its cells: testdata/script/twice.txtar holds transform/looped, and looped declines the base: the base states malformed, which looped neither gives nor keeps
+        Fix what the message names. No check runs, and an update writes no findings.
+    the corpus check cells can't read its cells: testdata/script/twice.txtar holds transform/looped, and looped declines the base: the base states malformed, which looped neither gives nor keeps
+        Fix what the message names. No check runs, and an update writes no findings.
+    the corpus check unsorted can't read its cells: testdata/script/twice.txtar holds transform/looped, and looped declines the base: the base states malformed, which looped neither gives nor keeps
+        Fix what the message names. No check runs, and an update writes no findings.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- FAIL: TestCorpus/script/twice/transform/looped
+            --- FAIL: TestCorpus/script/twice/transform/upper
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/alters
+        --- FAIL: TestCorpus/checks/cells
+        --- FAIL: TestCorpus/checks/unsorted
+FAIL
+[exit 1]
