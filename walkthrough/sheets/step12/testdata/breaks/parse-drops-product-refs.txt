@@ -22,10 +22,10 @@ index 4f97a4c..c6c9bc3 100644
 +sheet/twice/variant/cycle evaluate: predicted blocked resolve, committed accepted
 +sheet/twice/variant/cycle resolve: predicted rejected, committed accepted
 diff --git a/step12/testdata/checks/circular-sources.txt b/step12/testdata/checks/circular-sources.txt
-index 1566e94..413f75b 100644
+index 9555d6c..8c8b0eb 100644
 --- a/step12/testdata/checks/circular-sources.txt
 +++ b/step12/testdata/checks/circular-sources.txt
-@@ -17,6 +17,6 @@ sheet/prices: stated anti-P, parsed anti-P
+@@ -19,6 +19,6 @@ sheet/prices: stated anti-P, parsed anti-P
  sheet/stray: stated neither, parsed unclassified, neither of which predicts anything
  sheet/twice/transform/looped: stated P, parsed P
  sheet/twice/transform/renamed: stated anti-P, parsed anti-P

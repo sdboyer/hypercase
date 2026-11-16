@@ -10,10 +10,10 @@ The same base, low, states nothing, though its first row is empty.
 
 == findings
 diff --git a/step12/testdata/checks/circular-sources.txt b/step12/testdata/checks/circular-sources.txt
-index 1566e94..41ba3c0 100644
+index 9555d6c..87366b9 100644
 --- a/step12/testdata/checks/circular-sources.txt
 +++ b/step12/testdata/checks/circular-sources.txt
-@@ -5,6 +5,9 @@ sheet/divide: stated anti-P, parsed anti-P
+@@ -7,6 +7,9 @@ sheet/last-row: stated P, parsed P
  sheet/loop/transform/looped: stated P, parsed P
  sheet/loop/transform/renamed: stated P, parsed P
  sheet/loop: stated P, parsed P

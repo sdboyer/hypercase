@@ -49,6 +49,7 @@ index 4f97a4c..5f31d9f 100644
 
 == outcomes
 sheet/divide/transform/looped format: accepted -> skipped a cell refers to itself
+sheet/last-row format: accepted -> skipped a cell refers to itself
 sheet/loop/transform/looped format: accepted -> skipped a cell refers to itself
 sheet/negative/transform/looped format: accepted -> skipped a cell refers to itself
 sheet/prices/transform/looped format: accepted -> skipped a cell refers to itself
@@ -56,6 +57,7 @@ sheet/twice/transform/looped format: accepted -> skipped a cell refers to itself
 
 == failing
 step12/format TestCorpus/sheet/divide/transform/looped/format: orphan
+step12/format TestCorpus/sheet/last-row/format: orphan
 step12/format TestCorpus/sheet/loop/transform/looped/format: orphan
 step12/format TestCorpus/sheet/negative/transform/looped/format: orphan
 step12/format TestCorpus/sheet/prices/transform/looped/format: orphan

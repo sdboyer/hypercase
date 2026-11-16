@@ -10,10 +10,8 @@ import (
 	"github.com/sdboyer/jenny"
 )
 
-// doc:begin types
 type Sheet struct{ fs.FS } // in/sheet/A1, in/sheet/B1, …
 
-// doc:begin transforms
 var Looped = decl.Transform[Sheet]{
 	Name:        "looped",
 	Description: "The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.",
@@ -35,10 +33,7 @@ var Renamed = decl.Transform[Sheet]{
 	Keeps:       []decl.Property{Circular, Dangling},
 	Probe: func(base Sheet) (why string, ok bool) {
 		Runs.Add("renamed")
-		if entries, _ := fs.ReadDir(base, "sheet"); len(entries) == 0 {
-			return "the sheet has no cells", false
-		}
-		return "", true
+		return sheet.Movable(base)
 	},
 	Jenny: jenny.For[Sheet]().New("renamed", func(base Sheet) (jenny.Files, error) {
 		Runs.Add("renamed")
@@ -51,8 +46,6 @@ var SheetType = decl.Type[Sheet]{
 	Description: "A spreadsheet: one file per cell under in/sheet/, holding a number or a formula.",
 	Transforms:  []decl.Transform[Sheet]{Looped, Renamed},
 }
-
-// doc:end transforms
 
 // view gives a sheet's every file as a transform's jenny returns them, by its
 // path in the sheet's input view.
@@ -100,5 +93,3 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 		return sheet.Resolve(p)
 	},
 }
-
-// doc:end types

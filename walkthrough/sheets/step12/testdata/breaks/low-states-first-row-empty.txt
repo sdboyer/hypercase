@@ -12,10 +12,10 @@ A new base, low, starts on the second row, and states first-row-empty, which is 
 
 == findings
 diff --git a/step12/testdata/checks/circular-sources.txt b/step12/testdata/checks/circular-sources.txt
-index 1566e94..889f3ed 100644
+index 9555d6c..5b543e5 100644
 --- a/step12/testdata/checks/circular-sources.txt
 +++ b/step12/testdata/checks/circular-sources.txt
-@@ -5,6 +5,8 @@ sheet/divide: stated anti-P, parsed anti-P
+@@ -7,6 +7,8 @@ sheet/last-row: stated P, parsed P
  sheet/loop/transform/looped: stated P, parsed P
  sheet/loop/transform/renamed: stated P, parsed P
  sheet/loop: stated P, parsed P

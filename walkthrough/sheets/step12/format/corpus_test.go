@@ -11,7 +11,6 @@ import (
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step12/sheetcorpus"
 )
 
-// doc:begin register
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
@@ -22,8 +21,6 @@ func init() {
 		hypercase.Own(format),
 	)
 }
-
-// doc:end register
 
 var format = hypercase.Suite[*sheet.Parsed]{
 	Name:        "format",

@@ -2,6 +2,8 @@ sheet/blank: stated neither, parsed unclassified, neither of which predicts anyt
 sheet/divide/transform/looped: stated P, parsed P
 sheet/divide/transform/renamed: stated anti-P, parsed anti-P
 sheet/divide: stated anti-P, parsed anti-P
+sheet/last-row-ref: stated neither, parsed neither
+sheet/last-row: stated P, parsed P
 sheet/loop/transform/looped: stated P, parsed P
 sheet/loop/transform/renamed: stated P, parsed P
 sheet/loop: stated P, parsed P
