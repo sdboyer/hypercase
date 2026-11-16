@@ -315,3 +315,215 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # unwritable
             --- FAIL: TestCorpus/script/up/echo
 FAIL
 [exit 1]
+$ edit testdata/script/framework.txtar  # commit a file the run doesn't give
+$ edit testdata/script/doubled.txtar  # commit a file the run doesn't give
+$ edit testdata/script/up.txtar  # commit a file the run doesn't give
+$ edit testdata/script/render.txtar  # commit a file the run doesn't give
+$ edit testdata/script/render-nonl.txtar  # commit a file the run doesn't give
+$ edit testdata/script/conflict.txtar  # commit a file the run doesn't give
+$ edit testdata/script/undeclared.txtar  # commit a file the run doesn't give
+$ edit testdata/script/matched.txtar  # commit a file the run doesn't give
+$ edit testdata/script/unheld.txtar  # commit a file the run doesn't give
+$ go test  # unwritable
+    script/conflict: The run returns c.txt, and c.txt/d below it.
+        echo: Does what the case's do/ tree says.
+        out/echo/c.txt can't be held in an archive: the section is also the directory of out/echo/c.txt/d.
+        Fix the code. An update writes nothing for this cell.
+        out/echo/values.txt differs (-golden +got):
+        - A1 7
+        + A1 6
+        An update writes nothing for this cell until the problems above are fixed.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/doubled: The run returns two outputs at one path.
+        echo: Does what the case's do/ tree says.
+        The run returned two outputs at b.txt.
+        Fix the code. An update writes nothing for this cell.
+        out/echo/values.txt differs (-golden +got):
+        - A1 7
+        + A1 6
+        An update writes nothing for this cell until the problems above are fixed.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/framework: The run returns an output at a name the framework owns.
+        echo: Does what the case's do/ tree says.
+        The run returned an output at outcome, a name the framework owns under out/echo/.
+        Rename the output. An update writes nothing for this cell.
+        out/echo/values.txt differs (-golden +got):
+        - A1 7
+        + A1 6
+        An update writes nothing for this cell until the problems above are fixed.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/matched: The run returns an output two declarations match.
+        echo: Does what the case's do/ tree says.
+        out/echo/a.txt matches two of echo's output declarations, ?.txt and a.txt.
+        Change the patterns so that one declaration matches each file. An update writes nothing for this cell.
+        out/echo/values.txt differs (-golden +got):
+        - A1 7
+        + A1 6
+        An update writes nothing for this cell until the problems above are fixed.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/render-nonl: RenderError gives the run's error with no final newline.
+        echo: Does what the case's do/ tree says.
+        The project's RenderError returned "rendered: boom" for echo's error, which doesn't end with a newline.
+        Its output must end with a newline: fix RenderError. An update writes nothing for this cell.
+        echo returned an error, but the case states no property echo rejects:
+          boom
+        Fix the code, or state the property on the case and in echo's Rejects.
+        out/echo/values.txt differs (-golden +got):
+        - A1 7
+        + A1 6
+        An update writes nothing for this cell until the problems above are fixed.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/render: RenderError panics on the run's error.
+        echo: Does what the case's do/ tree says.
+        The project's RenderError panicked on echo's error: render boom
+        Fix RenderError. An update writes nothing for this cell.
+        echo returned an error, but the case states no property echo rejects:
+          boom
+        Fix the code, or state the property on the case and in echo's Rejects.
+        out/echo/values.txt differs (-golden +got):
+        - A1 7
+        + A1 6
+        An update writes nothing for this cell until the problems above are fixed.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/undeclared: The run returns an output no declaration matches.
+        echo: Does what the case's do/ tree says.
+        out/echo/notes.txt is not declared.
+        Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell.
+        out/echo/values.txt differs (-golden +got):
+        - A1 7
+        + A1 6
+        An update writes nothing for this cell until the problems above are fixed.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/unheld: The run returns an output with no final newline.
+        echo: Does what the case's do/ tree says.
+        out/echo/b.txt can't be held in an archive: it has no final newline, which an archive adds.
+        Fix the code so the output can be held. An update writes nothing for this cell.
+        out/echo/values.txt differs (-golden +got):
+        - A1 7
+        + A1 6
+        An update writes nothing for this cell until the problems above are fixed.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/up: The run returns an output outside its cell's directory.
+        echo: Does what the case's do/ tree says.
+        The run returned an output at "../b.txt", which is not a valid slash path under out/echo/.
+        Fix the code. An update writes nothing for this cell.
+        out/echo/values.txt differs (-golden +got):
+        - A1 7
+        + A1 6
+        An update writes nothing for this cell until the problems above are fixed.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/conflict
+            --- FAIL: TestCorpus/script/conflict/echo
+        --- FAIL: TestCorpus/script/doubled
+            --- FAIL: TestCorpus/script/doubled/echo
+        --- FAIL: TestCorpus/script/framework
+            --- FAIL: TestCorpus/script/framework/echo
+        --- FAIL: TestCorpus/script/matched
+            --- FAIL: TestCorpus/script/matched/echo
+        --- FAIL: TestCorpus/script/render-nonl
+            --- FAIL: TestCorpus/script/render-nonl/echo
+        --- FAIL: TestCorpus/script/render
+            --- FAIL: TestCorpus/script/render/echo
+        --- FAIL: TestCorpus/script/undeclared
+            --- FAIL: TestCorpus/script/undeclared/echo
+        --- FAIL: TestCorpus/script/unheld
+            --- FAIL: TestCorpus/script/unheld/echo
+        --- FAIL: TestCorpus/script/up
+            --- FAIL: TestCorpus/script/up/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # unwritable
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/conflict: The run returns c.txt, and c.txt/d below it.
+        echo: Does what the case's do/ tree says.
+        out/echo/c.txt can't be held in an archive: the section is also the directory of out/echo/c.txt/d.
+        Fix the code. An update writes nothing for this cell.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/doubled: The run returns two outputs at one path.
+        echo: Does what the case's do/ tree says.
+        The run returned two outputs at b.txt.
+        Fix the code. An update writes nothing for this cell.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/framework: The run returns an output at a name the framework owns.
+        echo: Does what the case's do/ tree says.
+        The run returned an output at outcome, a name the framework owns under out/echo/.
+        Rename the output. An update writes nothing for this cell.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/matched: The run returns an output two declarations match.
+        echo: Does what the case's do/ tree says.
+        out/echo/a.txt matches two of echo's output declarations, ?.txt and a.txt.
+        Change the patterns so that one declaration matches each file. An update writes nothing for this cell.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/render-nonl: RenderError gives the run's error with no final newline.
+        echo: Does what the case's do/ tree says.
+        The project's RenderError returned "rendered: boom" for echo's error, which doesn't end with a newline.
+        Its output must end with a newline: fix RenderError. An update writes nothing for this cell.
+        echo returned an error, but the case states no property echo rejects:
+          boom
+        Fix the code, or state the property on the case and in echo's Rejects.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/render: RenderError panics on the run's error.
+        echo: Does what the case's do/ tree says.
+        The project's RenderError panicked on echo's error: render boom
+        Fix RenderError. An update writes nothing for this cell.
+        echo returned an error, but the case states no property echo rejects:
+          boom
+        Fix the code, or state the property on the case and in echo's Rejects.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/undeclared: The run returns an output no declaration matches.
+        echo: Does what the case's do/ tree says.
+        out/echo/notes.txt is not declared.
+        Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/unheld: The run returns an output with no final newline.
+        echo: Does what the case's do/ tree says.
+        out/echo/b.txt can't be held in an archive: it has no final newline, which an archive adds.
+        Fix the code so the output can be held. An update writes nothing for this cell.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/up: The run returns an output outside its cell's directory.
+        echo: Does what the case's do/ tree says.
+        The run returned an output at "../b.txt", which is not a valid slash path under out/echo/.
+        Fix the code. An update writes nothing for this cell.
+        out/echo/g.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/conflict
+            --- FAIL: TestCorpus/script/conflict/echo
+        --- FAIL: TestCorpus/script/doubled
+            --- FAIL: TestCorpus/script/doubled/echo
+        --- FAIL: TestCorpus/script/framework
+            --- FAIL: TestCorpus/script/framework/echo
+        --- FAIL: TestCorpus/script/matched
+            --- FAIL: TestCorpus/script/matched/echo
+        --- FAIL: TestCorpus/script/render-nonl
+            --- FAIL: TestCorpus/script/render-nonl/echo
+        --- FAIL: TestCorpus/script/render
+            --- FAIL: TestCorpus/script/render/echo
+        --- FAIL: TestCorpus/script/undeclared
+            --- FAIL: TestCorpus/script/undeclared/echo
+        --- FAIL: TestCorpus/script/unheld
+            --- FAIL: TestCorpus/script/unheld/echo
+        --- FAIL: TestCorpus/script/up
+            --- FAIL: TestCorpus/script/up/echo
+FAIL
+[exit 1]

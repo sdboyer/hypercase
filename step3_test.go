@@ -114,7 +114,8 @@ func TestFrameworkNamesFail(t *testing.T) {
 // TestUnwritableCell: a cell whose outputs an update won't write, for any
 // of the reasons the run gives, fails on that reason first. A file of it
 // with no golden isn't asked for, and one that differs from its golden
-// says the update writes nothing until the problems above are fixed.
+// says the update writes nothing until the problems above are fixed. An
+// orphan is reported as in any other cell.
 func TestUnwritableCell(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "basic")
@@ -160,6 +161,23 @@ func TestUnwritableCell(t *testing.T) {
 	}
 	s.lacks(r, "has no golden", "If the change is intended")
 	s.fails(s.update("unwritable"), want...)
+	for _, c := range causes {
+		s.same("testdata/script/"+c.name+".txtar", committed[c.name])
+	}
+	// An orphan is still reported, in every run: no update removes a file,
+	// so a person deletes it, whatever keeps the update from the cell.
+	for _, c := range causes {
+		s.edit("testdata/script/"+c.name+".txtar", "commit a file the run doesn't give", insert("out/echo/g.txt", "x\n", "out/echo/values.txt"))
+		committed[c.name] = s.read("testdata/script/" + c.name + ".txtar")
+	}
+	orphan := "out/echo/g.txt is an output the run no longer produces."
+	for _, update := range []bool{false, true} {
+		r := s.run(".", "unwritable", update)
+		s.fails(r, want...)
+		if n := strings.Count(flat(r.out), orphan); n != len(causes) {
+			t.Errorf("%d cells say g.txt is an output the run no longer produces, want %d:\n%s", n, len(causes), r.out)
+		}
+	}
 	for _, c := range causes {
 		s.same("testdata/script/"+c.name+".txtar", committed[c.name])
 	}
