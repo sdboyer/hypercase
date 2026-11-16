@@ -1886,8 +1886,8 @@ var Project = decl.Project{
 
 ### How the files change
 
-Every cell gains an `outcome` file, skipped and blocked cells included. A
-cell that can't have one fails, as the rules on the outcome below say.
+Every cell of the sheets examples gains an `outcome` file, skipped and
+blocked cells included.
 
 `testdata/sheet/twice.txtar`, with its `missing` variant and its transforms'
 variants left out:
