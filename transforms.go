@@ -363,16 +363,17 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	// An update writes no frozen cell, so it rewrites none of those, and
 	// one whose files differ from its run's is checked on the new inputs.
 	cells := "the variant's cells."
-	var frozen, differs []string
+	frozen := false
+	var differs []string
 	for i, col := range p.cols {
 		if _, marked := c.gap(col.name); marked && len(c.goldens(col.name)) > 0 {
-			frozen = append(frozen, col.name)
+			frozen = true
 		}
 		if results[i].frozenDiffers {
 			differs = append(differs, col.name+"'s")
 		}
 	}
-	if len(frozen) > 0 {
+	if frozen {
 		cells = "the variant's cells but the frozen ones, which no update writes."
 	}
 	if len(differs) > 0 {
