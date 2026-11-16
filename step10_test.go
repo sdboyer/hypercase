@@ -369,6 +369,32 @@ func TestChainRenderError(t *testing.T) {
 	s.done()
 }
 
+// TestChainHeldBack: an update writes the cells past a bytes lift only
+// when it writes the lift's cell, since a normal run reads what that cell
+// commits. Here import now rejects quoted, and the renderer panics on its
+// error, so no update writes import's cell, and its committed product and
+// outcome stay: the cells past it run nothing, and the update writes
+// nothing for them.
+func TestChainHeldBack(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "chain-render")
+	quoted := "testdata/export/quoted.txtar"
+	s.passes(s.update("chain-render"))
+	s.edit(quoted, "import now rejects quoted, and the renderer panics on its error", func(a *archive.Archive) {
+		set("properties", "circular\nunterminated\n")(a)
+		insert("in/import/error", "line 1: unclosed quote\n", "in/quote/")(a)
+		insert("in/render/panic", "the renderer panicked\n", "via/")(a)
+	})
+	before := s.snapshot()
+	u := s.update("chain-render")
+	s.fails(u, "The project's RenderError panicked on import's error: the renderer panicked\nFix RenderError. An update writes nothing for this cell.")
+	for _, col := range []string{"evaluate", "parse", "resolve"} {
+		s.fails(u, "The update writes nothing for the cell of the lift import, on "+col+"'s path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.\nFix what import's cell reports.")
+	}
+	s.unchanged(before)
+	s.done()
+}
+
 // TestChainTwoPaths: from a corpus type, a path through a bytes lift
 // counts, so a second path to a type a column consumes fails the run
 // before any case runs.

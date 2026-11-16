@@ -240,6 +240,7 @@ type liftRun struct {
 	product  map[string][]byte // a bytes lift's product, by path in its view; nil when it made none
 	view     fs.FS
 	problems []string
+	verdict  *liftVerdict // a bytes lift's cell's, once judged
 }
 
 // A liftRead is what a normal run reads of a bytes lift on a case: the
@@ -265,9 +266,10 @@ type blockage struct {
 	outcome   string
 	committed string
 	missing   bool
-	// broken records that, in an update, the bytes lift's jenny has a
-	// fault, so its cell isn't written: the cell runs nothing, and the
-	// update writes nothing for it.
+	// broken records that, in an update, the bytes lift's cell isn't
+	// written, as a fault of its jenny or any other problem of the cell
+	// keeps it from being: the cell runs nothing, and the update writes
+	// nothing for it.
 	broken bool
 }
 
@@ -288,13 +290,17 @@ func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
 		return nil, nil, b
 	}
 	lr := s.runLift(l, in)
+	// Past a bytes lift, which runs here only in an update, a cell is
+	// written only with the lift's cell: a normal run reads what that
+	// writes.
+	if l.bytes && !s.liftVerdict(l, lr, in, view).writable {
+		return nil, nil, &blockage{lift: l, failed: l.name, broken: true}
+	}
 	switch {
 	case lr.out.panicked || lr.out.err != nil || lr.out.noProduct:
 		return nil, nil, &blockage{lift: l, failed: l.name}
 	case !l.bytes:
 		return lr.value, view, nil
-	case len(lr.problems) > 0:
-		return nil, nil, &blockage{lift: l, failed: l.name, broken: true}
 	}
 	return lr.value, lr.view, nil
 }

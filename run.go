@@ -772,25 +772,25 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	}
 
 	m := &msg{}
-	files, unjudged, writable := r.outputs(m, c, col, view, out)
-	if o, ok := r.outcome(m, col, in, out, files); ok {
-		files[outcomeFile] = o.Format()
-	} else {
-		// The cell has no outcome, so a committed one is no orphan.
-		writable = false
-		unjudged[outcomeFile] = true
-	}
-	// A bytes lift's cell includes its product. One an archive can't hold
-	// is left uncompared: its problems come first.
 	bytesLift := col.lift != nil && col.lift.bytes
+	var files map[string][]byte
+	var unjudged map[string]bool
+	var writable bool
+	if bytesLift {
+		// In an update, the cells past the lift may have asked for the
+		// verdict first, to learn whether the update writes this cell.
+		v := c.state.liftVerdict(col.lift, lr, in, view)
+		m.parts = append(m.parts, v.parts...)
+		files, unjudged, writable = maps.Clone(v.files), maps.Clone(v.unjudged), v.writable
+	} else {
+		files, unjudged, writable = r.verdict(m, c, col, in, view, out)
+	}
+	// A bytes lift's cell includes its product. A fault of its jenny
+	// leaves the product uncompared: the fault comes first.
 	var product map[string][]byte
 	held := true
 	if bytesLift {
-		product = lr.product
-		for _, p := range lr.problems {
-			m.add("%s", p)
-			writable, held = false, false
-		}
+		product, held = lr.product, len(lr.problems) == 0
 	}
 	frozen := cf.frozen(marked)
 
@@ -853,6 +853,50 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	// An update writes a frozen cell only to add its outcome.
 	res.via = bytesLift && !frozen
 	res.product = product
+}
+
+// verdict is a cell's files, what it made and what the framework writes
+// for it, with its outcome, the files left unjudged, and whether an update
+// may write the cell, its freeze aside. It adds what is wrong to m.
+func (r *runner) verdict(m *msg, c *aCase, col *column, in any, view fs.FS, out *called) (files map[string][]byte, unjudged map[string]bool, writable bool) {
+	files, unjudged, writable = r.outputs(m, c, col, view, out)
+	if o, ok := r.outcome(m, col, in, out, files); ok {
+		files[outcomeFile] = o.Format()
+	} else {
+		// The cell has no outcome, so a committed one is no orphan.
+		writable = false
+		unjudged[outcomeFile] = true
+	}
+	return files, unjudged, writable
+}
+
+// A liftVerdict is a bytes lift's cell's verdict on a case, and what the
+// cell reports of it.
+type liftVerdict struct {
+	files    map[string][]byte
+	unjudged map[string]bool
+	writable bool
+	parts    []string
+}
+
+// liftVerdict judges a bytes lift's cell on the case once, from its one
+// run: the lift's own cell reports it, and in an update the cells past
+// the lift run only when the update writes the lift's cell, whose product
+// they read. A fault of the jenny keeps the update from writing the cell.
+func (s *caseState) liftVerdict(l *lift, lr *liftRun, in any, view fs.FS) *liftVerdict {
+	if lr.verdict != nil {
+		return lr.verdict
+	}
+	m := &msg{}
+	v := &liftVerdict{}
+	v.files, v.unjudged, v.writable = s.r.verdict(m, s.c, l.column(), in, view, lr.out)
+	for _, p := range lr.problems {
+		m.add("%s", p)
+		v.writable = false
+	}
+	v.parts = m.parts
+	lr.verdict = v
+	return v
 }
 
 // cellFiles is what a case commits for a column's cell: its files, by path
