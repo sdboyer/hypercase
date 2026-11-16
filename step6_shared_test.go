@@ -38,7 +38,7 @@ func TestRootCheckLifts(t *testing.T) {
 	s := newSandbox(t, "shared-ladder")
 	s.passes(s.update("ladder-a"))
 	s.passes(s.run("b", "ladder-b-owns", true))
-	s.fails(s.normal("ladder-a"), "the column parse is owned by . and ./b. Column names are unique per corpus root, and one package owns each column.\nRename one of the columns, or remove one. A package that only reads a lift's product gives the lift to hypercase.Use.")
+	s.fails(s.normal("ladder-a"), "the column parse is owned by . and ./b, each as a lift. Column names are unique per corpus root, and one package owns each column.\nRename one of the lifts, or remove one. A package that only reads the lift's product gives it to hypercase.Use in place of hypercase.Own.")
 
 	s.passes(s.run("b", "ladder-b", true))
 	s.passes(s.update("ladder-a-useonly"))
@@ -59,7 +59,7 @@ func TestRootCheckLiftOwnerUntested(t *testing.T) {
 	s := newSandbox(t, "shared-ladder")
 	s.passes(s.update("ladder-a"))
 	s.passes(s.run("b", "ladder-b-owns", true))
-	s.fails(s.normal("ladder-a"), "the column parse is owned by . and ./b.")
+	s.fails(s.normal("ladder-a"), "the column parse is owned by . and ./b, each as a lift.")
 
 	s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
 	untested := "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections."
@@ -117,36 +117,36 @@ func TestRootCheckLiftUsedUntested(t *testing.T) {
 
 // TestRootCheckLiftSuiteName: lifts share the suites' column names, so a
 // suite named like a lift that another package uses collides with it, and
-// is no owner of the lift, which no package then owns. A suite named like
-// a lift another package owns is that column owned twice.
-//
-// Its transcript records today's messages, a known gap that waits on
-// github.com/sdboyer/hypercase/issues/31: beside the collision, the
-// no-owner message still says to own the lift, which makes the column
-// owned twice, and the duplicate-column message doesn't say which owner
-// is a suite, and offers hypercase.Use to both.
+// is no owner of the lift, which no package then owns. Owning the lift
+// while the suite holds its name would make the column owned twice, so
+// the no-owner failure says to give them different names first. A suite
+// named like a lift another package owns is that column owned twice: the
+// failure says which owner holds which, and offers hypercase.Use to no
+// one, since the lift's one owner is the owner it needs.
 func TestRootCheckLiftSuiteName(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared-ladder")
 	s.passes(s.update("ladder-a-useonly"))
 	s.passes(s.run("b", "ladder-b-suite", true))
-	s.fails(s.normal("ladder-a-useonly"),
+	r := s.normal("ladder-a-useonly")
+	s.fails(r,
 		"the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root.\nRename the suite or the lift.",
-		"the lift parse is used by ., and no package owns it, so its error is recorded nowhere.\nOwn the lift in one of them: give it to hypercase.Own in place of hypercase.Use.")
+		"the lift parse is used by ., and no package owns it, so its error is recorded nowhere.\nOnce the suite and the lift have different names, own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.")
+	s.lacks(r, "\nOwn the lift")
 
 	// The root package owns parse, and its update fails on what b's suite
 	// wrote under the same name.
 	s.fails(s.update("ladder-a"), "out/parse/values.txt is an output the run no longer produces.")
-	r := s.normal("ladder-a")
-	s.fails(r, "the column parse is owned by . and ./b. Column names are unique per corpus root, and one package owns each column.")
-	s.lacks(r, "as a suite", "the lift parse is used by")
+	r = s.normal("ladder-a")
+	s.fails(r, "the column parse is owned by ./b as a suite, and by . as a lift. Lifts share the suites' column names, which are unique per corpus root, and one package owns each column.\nRename the suite or the lift.")
+	s.lacks(r, "hypercase.Use", "the lift parse is used by")
 	s.done()
 }
 
 // TestRootCheckLiftSuiteNameUntested: a suite named like a used lift, and
 // an owner of the lift with no _test.go file, fail together: the
-// collision, and the lift owned by no package, naming the untested
-// owner. The messages wait on the same issue as TestRootCheckLiftSuiteName.
+// collision, and the lift owned by no package, naming the untested owner,
+// whose fix waits on the collision's.
 func TestRootCheckLiftSuiteNameUntested(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared-ladder")
@@ -157,7 +157,39 @@ func TestRootCheckLiftSuiteNameUntested(t *testing.T) {
 	s.passes(s.run("b", "ladder-b-suite", true))
 	s.fails(s.normal("ladder-a-useonly"),
 		"the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root.\nRename the suite or the lift.",
-		"the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registry of ./c records that its package owns the lift, and ./c holds no _test.go file, so no test runs the lift there.\nRestore the tests of ./c, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.")
+		"the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registry of ./c records that its package owns the lift, and ./c holds no _test.go file, so no test runs the lift there.\nOnce the suite and the lift have different names, restore the tests of ./c, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.")
+	s.done()
+}
+
+// TestRootCheckLiftSuiteNameMany: a column that more than two packages own
+// as suites and lifts names each owner's kind. Two owners of the lift are
+// offered hypercase.Use, by name, and two owners of a suite are told to
+// rename one of the columns, since renaming the lift leaves the suites
+// colliding.
+func TestRootCheckLiftSuiteNameMany(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared-ladder")
+	s.passes(s.update("ladder-a"))
+	s.write("c/corpus_test.go", []byte(packageTestFile), "a package c over the corpus")
+
+	// ./b owns a suite named parse, and . and ./c own the lift.
+	s.passes(s.run("b", "ladder-b-suite", true))
+	s.fails(s.run("c", "ladder-b-owns", true), "out/parse/values.txt is an output the run no longer produces.")
+	s.fails(s.normal("ladder-a"), "the column parse is owned by ./b as a suite, and by . and ./c, each as a lift. Lifts share the suites' column names, which are unique per corpus root, and one package owns each column.\nRename the suite or the lift. Of . and ./c, which own the lift, a package that only reads its product gives it to hypercase.Use in place of hypercase.Own.")
+
+	// ./b and ./c own suites named parse, and . owns the lift.
+	s.passes(s.run("c", "ladder-b-suite", true))
+	r := s.normal("ladder-a")
+	s.fails(r, "the column parse is owned by ./b and ./c, each as a suite, and by . as a lift. Lifts share the suites' column names, which are unique per corpus root, and one package owns each column.\nRename one of the columns, or remove one.")
+	s.lacks(r, "hypercase.Use")
+
+	// . uses the lift, which no package owns, and ./b and ./c own suites
+	// of its name.
+	s.passes(s.update("ladder-a-useonly"))
+	s.fails(s.normal("ladder-a-useonly"),
+		"the column parse is owned by ./b and ./c, each as a suite, and used by . as a lift.",
+		"the column parse is owned by ./b and ./c, each as a suite. Column names are unique per corpus root, and one package owns each column.\nRename one of the suites, or remove one.",
+		"\nOnce the suite and the lift have different names, own the lift in one of them:")
 	s.done()
 }
 

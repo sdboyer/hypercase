@@ -27,7 +27,9 @@ func TestRootCheckColumnTwice(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared")
 	s.run("b", "pkg-b-echo", true)
-	s.fails(s.normal("pkg-a"), "the column echo is owned by . and ./b. Column names are unique per corpus root, and one package owns each column.\nRename one of the columns, or remove one.")
+	r := s.normal("pkg-a")
+	s.fails(r, "the column echo is owned by . and ./b, each as a suite. Column names are unique per corpus root, and one package owns each column.\nRename one of the suites, or remove one.")
+	s.lacks(r, "hypercase.Use")
 	s.done()
 }
 

@@ -60,7 +60,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 
 	// Columns, lifts, types, properties and root-package checks, merged
 	// across packages.
-	columnPkgs := map[string][]string{}             // column → the packages that own it
+	suitePkgs := map[string][]string{}              // suite → the packages that own it
 	liftPkgs := map[string][]string{}               // lift → the packages that own it
 	untestedLifts := map[string][]string{}          // lift → the packages with no _test.go file whose registries own it
 	claimed := map[string]map[string]bool{}         // corpus → the columns over it
@@ -112,7 +112,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		for _, s := range g.reg.Suites {
 			claim(s.Name, s.Corpora)
 			if g.tested {
-				columnPkgs[s.Name] = append(columnPkgs[s.Name], g.pkg)
+				suitePkgs[s.Name] = append(suitePkgs[s.Name], g.pkg)
 			}
 			if s.Consumes == registry.RawInput {
 				for _, dir := range s.Corpora {
@@ -129,7 +129,6 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 			claim(l.Name, l.Corpora)
 			if g.tested {
-				columnPkgs[l.Name] = append(columnPkgs[l.Name], g.pkg)
 				liftPkgs[l.Name] = append(liftPkgs[l.Name], g.pkg)
 			} else {
 				untestedLifts[l.Name] = append(untestedLifts[l.Name], g.pkg)
@@ -172,19 +171,30 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	if len(rootPkgs) > 1 {
 		t.Errorf("%s register the root-package check for %s. It runs once per corpus root.\nRegister it in one package.", andList(rootPkgs), r.rootName())
 	}
-	for _, name := range slices.Sorted(maps.Keys(columnPkgs)) {
-		if pkgs := columnPkgs[name]; len(pkgs) > 1 {
-			t.Errorf("the column %s is owned by %s. Column names are unique per corpus root, and one package owns each column.\nRename one of the columns, or remove one. A package that only reads a lift's product gives the lift to hypercase.Use.", name, andList(pkgs))
+	// Lifts share the suites' column names, so the duplicate-column check
+	// runs over both.
+	columns := map[string]bool{}
+	for name := range suitePkgs {
+		columns[name] = true
+	}
+	for name := range liftPkgs {
+		columns[name] = true
+	}
+	for _, name := range slices.Sorted(maps.Keys(columns)) {
+		suites, lifts := suitePkgs[name], liftPkgs[name]
+		if len(suites)+len(lifts) > 1 {
+			t.Error(duplicateColumn(name, suites, lifts))
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(usedPkgs)) {
 		if len(liftPkgs[name]) > 0 {
 			continue
 		}
-		// No package owns the lift, so a column of its name is a suite,
-		// and the duplicate-column check above can't see the two collide.
-		if suites := columnPkgs[name]; len(suites) > 0 {
-			t.Errorf("the column %s is owned by %s as a suite, and used by %s as a lift. Lifts share the suites' column names, which are unique per corpus root.\nRename the suite or the lift.", name, andList(suites), andList(usedPkgs[name]))
+		// No package owns the lift, so the duplicate-column check above
+		// can't see it collide with a suite of its name.
+		suites := suitePkgs[name]
+		if len(suites) > 0 {
+			t.Errorf("the column %s is owned by %s, and used by %s as a lift. Lifts share the suites' column names, which are unique per corpus root.\nRename the suite or the lift.", name, ownedAs(suites, "suite"), andList(usedPkgs[name]))
 		}
 		msg := fmt.Sprintf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.", name, andList(usedPkgs[name]))
 		fix := "Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use."
@@ -192,6 +202,11 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			why, restore := untestedOwners("lift", pkgs)
 			msg += " " + why
 			fix = restore + " own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use."
+		}
+		// Owning the lift while a suite holds its name would make the
+		// column owned twice, so the fix waits on the collision's.
+		if len(suites) > 0 {
+			fix = "Once the suite and the lift have different names, " + lowerFirst(fix)
 		}
 		t.Errorf("%s\n%s", msg, fix)
 	}
@@ -290,6 +305,48 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 	}
 }
+
+// duplicateColumn words the failure of a column that more than one package
+// owns: suites are the packages that own it as a suite, and lifts those
+// that own it as a lift. Only a lift's owners are offered hypercase.Use,
+// and only when more than one owns the lift, since a lift that one package
+// owns has an owner it needs.
+func duplicateColumn(name string, suites, lifts []string) string {
+	var owners, why, fix string
+	switch {
+	case len(lifts) == 0:
+		owners = ownedAs(suites, "suite")
+		why = "Column names are unique per corpus root, and one package owns each column."
+		fix = "Rename one of the suites, or remove one."
+	case len(suites) == 0:
+		owners = ownedAs(lifts, "lift")
+		why = "Column names are unique per corpus root, and one package owns each column."
+		fix = "Rename one of the lifts, or remove one. A package that only reads the lift's product gives it to hypercase.Use in place of hypercase.Own."
+	default:
+		owners = ownedAs(suites, "suite") + ", and by " + ownedAs(lifts, "lift")
+		why = "Lifts share the suites' column names, which are unique per corpus root, and one package owns each column."
+		fix = "Rename the suite or the lift."
+		if len(suites) > 1 {
+			fix = "Rename one of the columns, or remove one."
+		}
+		if len(lifts) > 1 {
+			fix += fmt.Sprintf(" Of %s, which own the lift, a package that only reads its product gives it to hypercase.Use in place of hypercase.Own.", andList(lifts))
+		}
+	}
+	return fmt.Sprintf("the column %s is owned by %s. %s\n%s", name, owners, why, fix)
+}
+
+// ownedAs names the packages that own a column, and what they own it as:
+// "./b as a suite", ". and ./b, each as a lift".
+func ownedAs(pkgs []string, kind string) string {
+	if len(pkgs) == 1 {
+		return pkgs[0] + " as a " + kind
+	}
+	return andList(pkgs) + ", each as a " + kind
+}
+
+// lowerFirst lowers a sentence's first letter, so another can lead it.
+func lowerFirst(s string) string { return strings.ToLower(s[:1]) + s[1:] }
 
 // trKey names a transform by its corpus directory and its name.
 type trKey struct{ dir, name string }

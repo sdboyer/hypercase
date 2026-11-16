@@ -36,7 +36,7 @@ $ go test  # ladder-a-useonly
     the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root.
         Rename the suite or the lift.
     the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registry of ./c records that its package owns the lift, and ./c holds no _test.go file, so no test runs the lift there.
-        Restore the tests of ./c, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.
+        Once the suite and the lift have different names, restore the tests of ./c, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.
     what ran, in order:
         parse ran on x
         resolve ran on x
