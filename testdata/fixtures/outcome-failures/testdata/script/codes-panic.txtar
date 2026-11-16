@@ -1,0 +1,5 @@
+Codes panics on echo's error.
+-- in/do/error --
+codes-panic
+-- properties --
+circular

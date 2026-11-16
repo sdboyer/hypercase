@@ -154,7 +154,7 @@ func TestKnownGaps(t *testing.T) {
 	// The update moves a frozen cell's sections into place, and never
 	// changes their bytes.
 	s.cat("testdata/script/out-of-place.txtar")
-	if got := s.read("testdata/script/out-of-place.txtar"); bytes.Equal(got, outOfPlace) || !bytes.HasSuffix(got, []byte("-- out/echo/a.txt --\na\n-- out/echo/b.txt --\nb\n")) {
+	if got := s.read("testdata/script/out-of-place.txtar"); bytes.Equal(got, outOfPlace) || !bytes.HasSuffix(got, []byte("-- out/echo/a.txt --\na\n-- out/echo/b.txt --\nb\n-- out/echo/outcome --\naccepted\n")) {
 		t.Errorf("the update didn't put the frozen cell's sections in place, as they were")
 	}
 	// A marked cell with no committed files is written by an update.
@@ -213,7 +213,7 @@ func TestFrozenCellChanges(t *testing.T) {
 
 	// The wrong behavior changed shape: with the files deleted and the line
 	// kept, the next update writes them, and the cell is frozen again.
-	divZero := strings.Replace(string(edited["div-zero"]), "-- out/echo/values.txt --\nA1 0\n", "", 1)
+	divZero := strings.Replace(string(edited["div-zero"]), "-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 0\n", "", 1)
 	s.write("testdata/script/div-zero.txtar", []byte(divZero), "delete the frozen cell's files")
 	s.passes(s.update("rejects", "-test.run=TestCorpus/script/div-zero/"))
 	s.cat("testdata/script/div-zero.txtar")

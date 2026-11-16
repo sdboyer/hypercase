@@ -1,3 +1,4 @@
+$ edit testdata/script/x.txtar  # remove the outcomes of the root package's lifts, which it owns no longer
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # root-only
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
 --- PASS: TestCorpus

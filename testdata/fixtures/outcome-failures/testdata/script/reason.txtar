@@ -1,0 +1,4 @@
+echo's probe says no with a reason of two lines.
+-- in/do/probe --
+two
+lines

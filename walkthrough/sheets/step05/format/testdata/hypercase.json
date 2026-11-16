@@ -1,8 +1,9 @@
 {
-  "format": 4,
+  "format": 5,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": false,
+  "codes": false,
   "issueLinks": [],
   "properties": [
     {
@@ -32,7 +33,8 @@
       ],
       "rejects": [
         "malformed"
-      ]
+      ],
+      "classifier": null
     }
   ]
 }

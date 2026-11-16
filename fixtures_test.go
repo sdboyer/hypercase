@@ -50,6 +50,8 @@ var (
 //	<tree>/crlf/<path>     returned as <path>, with CRLF line endings
 //	<tree>/extranl/<path>  returned as <path>, with one more newline
 //	<tree>/marker/<path>   returned as <path>, with a line shaped like a section marker
+//	<tree>/twice/<path>    returned as <path>, twice
+//	<tree>/up/<path>       returned as ../<path>, outside the cell's directory
 //	<tree>/stdout          written to stdout
 //	<tree>/stderr          written to stderr
 //	<tree>/error           returned as the error, less its final newline
@@ -119,6 +121,10 @@ func runSteered(t testing.TB, archiveName, tree string, in fs.FS, stdout, stderr
 			files = append(files, hypercase.File{Path: sub, Data: append(bytes.Clone(data), '\n')})
 		case "marker":
 			files = append(files, hypercase.File{Path: sub, Data: append(bytes.Clone(data), "-- x --\n"...)})
+		case "twice":
+			files = append(files, hypercase.File{Path: sub, Data: data}, hypercase.File{Path: sub, Data: data})
+		case "up":
+			files = append(files, hypercase.File{Path: "../" + sub, Data: data})
 		case "stdout":
 			fmt.Fprint(stdout, string(data))
 		case "stderr":
@@ -294,6 +300,13 @@ var registrations = map[string]func(){
 		hypercase.Register(project, rootPkg, scriptType, own(withOutputs(echo, append(slices.Clone(steeredOutputs),
 			decl.Output{Pattern: "*/*", Description: "A file one directory down."})...)))
 	},
+	// unwritable can make each of outputs()'s problems: a.txt matches two
+	// declarations, and its RenderError is steered.
+	"unwritable": func() {
+		hypercase.Register(projectRender, rootPkg, scriptType, own(withOutputs(echo, append(slices.Clone(steeredOutputs),
+			decl.Output{Pattern: "a.txt", Description: "The file a, which ?.txt matches too."},
+			decl.Output{Pattern: "*/*", Description: "A file one directory down."})...)))
+	},
 	"narrow": func() {
 		hypercase.Register(project, rootPkg, scriptType, own(withOutputs(echo,
 			decl.Output{Pattern: "values.txt", Description: "The values."},
@@ -416,6 +429,10 @@ var fixturePackages = map[string][]fixturePkg{
 	"variants":           {{".", "variants"}},
 	"transforms":         {{".", "transforms"}},
 	"transform-failures": {{".", "poke"}},
+
+	"outcomes":         {{".", "outcomes"}},
+	"outcome-failures": {{".", "outcomes"}},
+	"check-gaps":       {{".", "check-gaps"}},
 }
 
 type fixturePkg struct{ dir, registration string }

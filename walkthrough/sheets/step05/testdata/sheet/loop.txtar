@@ -7,8 +7,14 @@ A1 and B1 refer to each other.
 circular
 -- out/calc/error.txt --
 A1 -> B1 -> A1: cycle
+-- out/calc/outcome --
+rejected
 -- out/evaluate/error.txt --
 A1 -> B1 -> A1: cycle
+-- out/evaluate/outcome --
+rejected
 -- out/format/formulas.txt --
 A1 =B1
 B1 =A1
+-- out/format/outcome --
+accepted

@@ -1,5 +1,7 @@
 Every output is declared.
 -- in/do/out/values.txt --
 A1 6
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 A1 6

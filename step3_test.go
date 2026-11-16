@@ -104,8 +104,83 @@ func TestFrameworkNamesFail(t *testing.T) {
 	for _, name := range []string{"error.txt", "inputs", "outcome", "stderr.txt", "stdout.txt"} {
 		s.contains(r, "The run returned an output at "+name+", a name the framework owns under out/echo/.")
 	}
+	// No update writes the cell, so no file of it is one to write.
+	s.lacks(r, "has no golden")
 	s.fails(s.update("echo"))
 	s.same("testdata/script/names.txtar", before)
+	s.done()
+}
+
+// TestUnwritableCell: a cell whose outputs an update won't write, for any
+// of the reasons the run gives, fails on that reason first. A file of it
+// with no golden isn't asked for, and one that differs from its golden
+// says the update writes nothing until the problems above are fixed. An
+// orphan is reported as in any other cell.
+func TestUnwritableCell(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "basic")
+	s.remove("testdata/script/twice.txtar", "leave only the unwritable cells")
+	causes := []struct{ name, comment, input, want string }{
+		{"framework", "The run returns an output at a name the framework owns.", "-- in/do/out/outcome --\nx\n", "The run returned an output at outcome, a name the framework owns under out/echo/."},
+		{"doubled", "The run returns two outputs at one path.", "-- in/do/twice/b.txt --\nx\n", "The run returned two outputs at b.txt."},
+		{"up", "The run returns an output outside its cell's directory.", "-- in/do/up/b.txt --\nx\n", `The run returned an output at "../b.txt", which is not a valid slash path under out/echo/.`},
+		{"render", "RenderError panics on the run's error.", "-- in/do/error --\nboom\n-- in/render/panic --\nrender boom\n", "The project's RenderError panicked on echo's error: render boom"},
+		{"render-nonl", "RenderError gives the run's error with no final newline.", "-- in/do/error --\nboom\n-- in/render/nonl --\n", `The project's RenderError returned "rendered: boom" for echo's error, which doesn't end with a newline.`},
+		{"conflict", "The run returns c.txt, and c.txt/d below it.", "-- in/do/extranl/c.txt/d --\nx\n-- in/do/out/c.txt --\nx\n", "out/echo/c.txt can't be held in an archive: the section is also the directory of out/echo/c.txt/d."},
+		{"undeclared", "The run returns an output no declaration matches.", "-- in/do/out/notes.txt --\nx\n", "out/echo/notes.txt is not declared."},
+		{"matched", "The run returns an output two declarations match.", "-- in/do/out/a.txt --\nx\n", "out/echo/a.txt matches two of echo's output declarations, ?.txt and a.txt."},
+		{"unheld", "The run returns an output with no final newline.", "-- in/do/nonl/b.txt --\nx\n", "out/echo/b.txt can't be held in an archive: it has no final newline, which an archive adds."},
+	}
+	var want []string
+	for _, c := range causes {
+		s.write("testdata/script/"+c.name+".txtar", []byte(c.comment+"\n"+c.input+"-- in/do/out/values.txt --\nA1 6\n"), "a cell the run can't write, which also gives values.txt")
+		want = append(want, "script/"+c.name+": "+c.comment+"\n    echo: Does what the case's do/ tree says.")
+		want = append(want, c.want)
+	}
+	committed := map[string][]byte{}
+	for _, c := range causes {
+		committed[c.name] = s.read("testdata/script/" + c.name + ".txtar")
+	}
+	// The update writes the registry, and nothing for these cells.
+	s.fails(s.update("unwritable"), want...)
+	for _, c := range causes {
+		s.same("testdata/script/"+c.name+".txtar", committed[c.name])
+	}
+	r := s.normal("unwritable")
+	s.fails(r, want...)
+	s.lacks(r, "has no golden")
+	for _, c := range causes {
+		s.edit("testdata/script/"+c.name+".txtar", "commit a values.txt the run no longer gives", set("out/echo/values.txt", "A1 7\n"))
+		committed[c.name] = s.read("testdata/script/" + c.name + ".txtar")
+	}
+	differs := "out/echo/values.txt differs (-golden +got):\n- A1 7\n+ A1 6\nAn update writes nothing for this cell until the problems above are fixed."
+	r = s.normal("unwritable")
+	s.fails(r, want...)
+	if n := strings.Count(flat(r.out), flat(differs)); n != len(causes) {
+		t.Errorf("%d cells say their values.txt differs, and the update writes nothing for them, want %d:\n%s", n, len(causes), r.out)
+	}
+	s.lacks(r, "has no golden", "If the change is intended")
+	s.fails(s.update("unwritable"), want...)
+	for _, c := range causes {
+		s.same("testdata/script/"+c.name+".txtar", committed[c.name])
+	}
+	// An orphan is still reported, in every run: no update removes a file,
+	// so a person deletes it, whatever keeps the update from the cell.
+	for _, c := range causes {
+		s.edit("testdata/script/"+c.name+".txtar", "commit a file the run doesn't give", insert("out/echo/g.txt", "x\n", "out/echo/values.txt"))
+		committed[c.name] = s.read("testdata/script/" + c.name + ".txtar")
+	}
+	orphan := "out/echo/g.txt is an output the run no longer produces."
+	for _, update := range []bool{false, true} {
+		r := s.run(".", "unwritable", update)
+		s.fails(r, want...)
+		if n := strings.Count(flat(r.out), orphan); n != len(causes) {
+			t.Errorf("%d cells say g.txt is an output the run no longer produces, want %d:\n%s", n, len(causes), r.out)
+		}
+	}
+	for _, c := range causes {
+		s.same("testdata/script/"+c.name+".txtar", committed[c.name])
+	}
 	s.done()
 }
 
@@ -264,7 +339,9 @@ func TestOutputsAnArchiveCantHold(t *testing.T) {
 		"out/echo/values.txt can't be held in an archive: it has no final newline, which an archive adds.",
 		"out/echo/values.txt can't be held in an archive: its line 2 is shaped like a section marker",
 	}
-	s.fails(s.normal("echo"), want...)
+	r := s.normal("echo")
+	s.fails(r, want...)
+	s.lacks(r, "has no golden")
 	s.fails(s.update("echo"), want...)
 	s.same("testdata/script/no-newline.txtar", before["no-newline"])
 	s.same("testdata/script/marker.txtar", before["marker"])
@@ -282,7 +359,9 @@ func TestOutputsFileAndDirectory(t *testing.T) {
 		"out/echo/stdout.txt can't be held in an archive: the section is also the directory of out/echo/stdout.txt/a.\nFix the code. An update writes nothing for this cell.",
 		"out/echo/a.txt can't be held in an archive: the section is also the directory of out/echo/a.txt/b.\nFix the code. An update writes nothing for this cell.",
 	}
-	s.fails(s.normal("nested"), want...)
+	r := s.normal("nested")
+	s.fails(r, want...)
+	s.lacks(r, "has no golden")
 	s.fails(s.update("nested"), want...)
 	s.same("testdata/script/stream.txtar", before["stream"])
 	s.same("testdata/script/outputs.txtar", before["outputs"])

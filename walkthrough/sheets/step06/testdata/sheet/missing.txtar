@@ -6,8 +6,18 @@ dangling
 -- out/calc/error.txt --
 A1: B1 doesn't exist
   sheet/A1:1: =B1+1
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked resolve
 -- out/format/formulas.txt --
 A1 =B1 + 1
+-- out/format/outcome --
+accepted
+-- out/parse/outcome --
+accepted
 -- out/resolve/error.txt --
 A1: B1 doesn't exist
   sheet/A1:1: =B1+1
+-- out/resolve/outcome --
+rejected

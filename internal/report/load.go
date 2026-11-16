@@ -1,7 +1,6 @@
 package report
 
 import (
-	"bytes"
 	"cmp"
 	"errors"
 	"fmt"
@@ -104,12 +103,9 @@ func (c *cellAt) state() string {
 	if c.outcome == nil {
 		return ""
 	}
-	state, _, _ := strings.Cut(c.outcomeLine(), " ")
-	return state
+	o, _ := archive.ParseOutcome(c.outcome) // addCellFile read it
+	return o.State
 }
-
-// outcomeFile is a cell's outcome, in its column's directory.
-const outcomeFile = "outcome"
 
 // load reads the corpus root at a revision: every registry under its
 // module root that records it, and every archive in the corpora they
@@ -341,39 +337,14 @@ func (s *snapshot) addCellFile(k caseKey, section, rest string, data []byte) err
 		c = &cellAt{files: map[string][]byte{}}
 		s.cells[ck] = c
 	}
-	if file == outcomeFile {
-		if err := checkOutcome(data); err != nil {
+	if file == archive.OutcomeFile {
+		if _, err := archive.ParseOutcome(data); err != nil {
 			return problem(section, 0, err.Error())
 		}
 		c.outcome = data
 		return nil
 	}
 	c.files[file] = data
-	return nil
-}
-
-// states are an outcome's states, its first word.
-var states = []string{"accepted", "rejected", "panicked", "blocked", "skipped"}
-
-// checkOutcome checks an outcome file is one the report can show: one
-// line, ending with a newline, whose first word is a state. panicked
-// stands alone, and blocked and skipped say what blocked or why.
-func checkOutcome(data []byte) error {
-	line, ok := bytes.CutSuffix(data, []byte("\n"))
-	if !ok || bytes.IndexByte(line, '\n') >= 0 {
-		return errors.New("an outcome is one line, ending with a newline")
-	}
-	state, detail, _ := strings.Cut(string(line), " ")
-	switch {
-	case !slices.Contains(states, state):
-		return fmt.Errorf("an outcome starts with its state, one of %s, not %q", strings.Join(states, ", "), state)
-	case state == "panicked" && detail != "":
-		return errors.New("panicked stands alone")
-	case state == "blocked" && detail == "":
-		return errors.New("blocked is followed by the lift that failed")
-	case state == "skipped" && detail == "":
-		return errors.New("skipped is followed by the probe's reason")
-	}
 	return nil
 }
 

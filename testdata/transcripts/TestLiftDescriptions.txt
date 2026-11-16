@@ -84,7 +84,8 @@ $ go test  # lift-nodesc
           ...
                 "rejects": [
                   "malformed"
-                ]
+                ],
+        -       "classifier": null
         -     },
         -     {
         -       "name": "evaluate",
@@ -123,7 +124,8 @@ $ go test  # lift-nodesc
         -           "description": "The values the case's instructions give."
         -         }
         -       ],
-        -       "rejects": []
+        -       "rejects": [],
+        -       "classifier": null
         -     },
         -     {
         -       "name": "format",
@@ -166,38 +168,52 @@ $ go test  # lift-nodesc
         -           "description": "The values the case's instructions give."
         -         }
         -       ],
-        -       "rejects": []
+        -       "rejects": [],
+                "classifier": null
               }
             ]
-          }
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
     script/both: The script is malformed and circular. parse rejects it, so resolve's cell is blocked, and nothing expects it to err.
         calc: Does what the case's calc/ tree says.
         out/calc/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/calc/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/both: The script is malformed and circular. parse rejects it, so resolve's cell is blocked, and nothing expects it to err.
         parse: 
         out/parse/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/parse/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/fine: A script every column reads, and no lift rejects.
         calc: Does what the case's calc/ tree says.
+        out/calc/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/calc/values.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/fine: A script every column reads, and no lift rejects.
         parse: 
+        out/parse/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/parse/stderr.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/noisy: parse warns on stderr, and goes on.
         parse: 
+        out/parse/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/parse/stderr.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/stray: parse rejects the script, which states malformed. calc reads the raw trees, and rejects it too.
         calc: Does what the case's calc/ tree says.
         out/calc/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/calc/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/stray: parse rejects the script, which states malformed. calc reads the raw trees, and rejects it too.
         parse: 
         out/parse/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/parse/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     what ran, in order:
         calc ran on both

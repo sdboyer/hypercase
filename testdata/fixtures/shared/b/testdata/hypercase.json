@@ -1,8 +1,9 @@
 {
-  "format": 4,
+  "format": 5,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": false,
+  "codes": false,
   "issueLinks": [],
   "properties": [],
   "types": [
@@ -52,7 +53,8 @@
           "description": "The values the case's instructions give."
         }
       ],
-      "rejects": []
+      "rejects": [],
+      "classifier": null
     }
   ]
 }

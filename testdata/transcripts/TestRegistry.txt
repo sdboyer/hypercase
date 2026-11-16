@@ -6,10 +6,11 @@ $ go test  # echo
 PASS
 $ cat testdata/hypercase.json
 {
-  "format": 4,
+  "format": 5,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
+  "codes": false,
   "issueLinks": [],
   "properties": [],
   "types": [
@@ -59,15 +60,16 @@ $ cat testdata/hypercase.json
           "description": "The values the case's instructions give."
         }
       ],
-      "rejects": []
+      "rejects": [],
+      "classifier": null
     }
   ]
 }
 $ go test  # echo-shout
     testdata/hypercase.json differs from what the package registers (-committed +registered):
-                  }
                 ],
-                "rejects": []
+                "rejects": [],
+                "classifier": null
         +     },
         +     {
         +       "name": "shout",
@@ -106,16 +108,21 @@ $ go test  # echo-shout
         +           "description": "The values the case's instructions give."
         +         }
         +       ],
-        +       "rejects": []
+        +       "rejects": [],
+        +       "classifier": null
               }
             ]
           }
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
+    script/twice: A1 is twice B1.
+        shout: Does what the case's shout/ tree says.
+        out/shout/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
 --- FAIL: TestCorpus
-    --- PASS: TestCorpus/script
-        --- PASS: TestCorpus/script/twice
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
             --- PASS: TestCorpus/script/twice/echo
-            --- PASS: TestCorpus/script/twice/shout
+            --- FAIL: TestCorpus/script/twice/shout
 FAIL
 [exit 1]
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo-shout

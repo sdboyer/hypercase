@@ -1,5 +1,7 @@
 The output ends its lines with CRLF, and its golden with LF.
 -- in/do/crlf/values.txt --
 A1 6
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 A1 6

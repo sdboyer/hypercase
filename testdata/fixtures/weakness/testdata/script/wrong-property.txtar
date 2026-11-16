@@ -5,3 +5,5 @@ A1 -> B1 -> A1: cycle
 dangling
 -- out/echo/error.txt --
 A1 -> B1 -> A1: cycle
+-- out/echo/outcome --
+rejected

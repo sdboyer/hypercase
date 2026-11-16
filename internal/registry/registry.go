@@ -23,7 +23,7 @@ import (
 
 // Format is the version of what a registry holds. It changes on any change
 // to that.
-const Format = 4
+const Format = 5
 
 // Name is a registry's file name, in its package's testdata/ directory.
 const Name = "hypercase.json"
@@ -40,6 +40,9 @@ type Registry struct {
 	// RootPackage records that the package runs the root-package check for
 	// its corpus root.
 	RootPackage bool `json:"rootPackage"`
+	// Codes records that the project supplies Codes, which gives a
+	// rejected cell's outcome its codes.
+	Codes bool `json:"codes"`
 	// IssueLinks are the project's link patterns, which link text naming an
 	// issue to the issue.
 	IssueLinks []IssueLink `json:"issueLinks"`
@@ -141,6 +144,15 @@ type Suite struct {
 	Outputs []Output `json:"outputs"`
 	// Rejects names the properties the suite rejects.
 	Rejects []string `json:"rejects"`
+	// Classifier is the suite's classifier, which refines its cells'
+	// outcomes, or nil.
+	Classifier *Classifier `json:"classifier"`
+}
+
+// A Classifier is a suite's classifier.
+type Classifier struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // An Output is one of a column's output declarations.

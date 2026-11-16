@@ -9,3 +9,5 @@ b
 printed
 -- out/echo/a.txt --
 stale a
+-- out/echo/outcome --
+accepted
