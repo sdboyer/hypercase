@@ -4,7 +4,9 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -112,6 +114,8 @@ func TestPrefixAndResolve(t *testing.T) {
 	g := gittest.New(t)
 	g.Write(map[string]string{"sub/dir/f.txt": "f\n"})
 	c := g.Commit("first")
+	g.Write(map[string]string{"sub/dir/f.txt": "g\n"})
+	d := g.Commit("second")
 
 	top := open(t, g.Dir)
 	if got := top.Prefix(); got != "." {
@@ -121,17 +125,134 @@ func TestPrefixAndResolve(t *testing.T) {
 	if got := sub.Prefix(); got != "sub/dir" {
 		t.Errorf("Prefix below the top = %q, want sub/dir", got)
 	}
-	for _, rev := range []string{"main", "HEAD", c, c[:10]} {
+	for _, rev := range []string{"main~1", "HEAD~", c, c[:10]} {
 		if got, err := sub.Resolve(rev); err != nil || got != c {
 			t.Errorf("Resolve(%q) = %q, %v; want %s", rev, got, err, c)
 		}
 	}
-	for _, rev := range []string{"nope", "--all", "HEAD~5"} {
+	// A range is no commit, though rev-parse prints the commits it names
+	// before it exits 1.
+	if out := g.Git("rev-parse", c+".."+d); !strings.Contains(out, c) {
+		t.Fatalf("git rev-parse %s..%s printed %q, and this test wants it to print the range's commits", c, d, out)
+	}
+	for _, rev := range []string{"nope", "--all", "-x", "HEAD~5", c + ".." + d, c + "..." + d, "main..HEAD"} {
 		if _, err := sub.Resolve(rev); err == nil || err.Error() != rev+" names no commit in this repository" {
 			t.Errorf("Resolve(%q): got %v", rev, err)
 		}
 	}
 	if _, err := gitfs.Open(t.TempDir(), gittest.Env()); err == nil {
 		t.Error("Open outside a repository: got no error")
+	}
+}
+
+// TestMissingBlob: a blob the object store has lost is an error that says
+// so, never an absent or empty file.
+func TestMissingBlob(t *testing.T) {
+	t.Parallel()
+	g := gittest.New(t)
+	g.Write(map[string]string{"kept.txt": "kept\n", "lost.txt": "lost\n"})
+	c := g.Commit("first")
+	hash := strings.TrimSpace(g.Git("rev-parse", c+":lost.txt"))
+	if err := os.Remove(filepath.Join(g.Dir, ".git", "objects", hash[:2], hash[2:])); err != nil {
+		t.Fatal(err)
+	}
+	tree, err := open(t, g.Dir).Tree(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := fs.ReadFile(tree, "kept.txt"); err != nil || string(got) != "kept\n" {
+		t.Errorf("kept.txt: got %q, %v", got, err)
+	}
+	want := "readfile lost.txt: git cat-file finds no object " + hash + " in the repository"
+	if _, err := fs.ReadFile(tree, "lost.txt"); err == nil || err.Error() != want {
+		t.Errorf("lost.txt: got %v, want %q", err, want)
+	}
+	if _, err := fs.Stat(tree, "lost.txt"); err == nil || !strings.Contains(err.Error(), "finds no object "+hash) {
+		t.Errorf("stat lost.txt: got %v", err)
+	}
+}
+
+// wrapGit puts a git on PATH that runs script, a shell script given the
+// real git as $GIT, before git's arguments.
+func wrapGit(t *testing.T, script string) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the wrapper is a shell script")
+	}
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	body := "#!/bin/sh\nGIT='" + real + "'\n" + script
+	if err := os.WriteFile(filepath.Join(dir, "git"), []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+// TestStderr: git's stderr never reaches a file's content, and a git
+// command that fails is an error that names the command and holds its
+// stderr. It sets PATH, so it can't run in parallel.
+func TestStderr(t *testing.T) {
+	g := gittest.New(t)
+	files := map[string]string{"a.txt": "a\n", "dir/b.txt": "b\n", "empty.txt": ""}
+	g.Write(files)
+	c := g.Commit("first")
+
+	t.Run("noise", func(t *testing.T) {
+		wrapGit(t, `echo "noise on stderr from git $1" >&2
+"$GIT" "$@"
+status=$?
+echo "more noise from git $1" >&2
+exit $status
+`)
+		r := open(t, g.Dir)
+		got, err := r.Resolve("HEAD")
+		if err != nil || got != c {
+			t.Fatalf("Resolve(HEAD) = %q, %v", got, err)
+		}
+		tree, err := r.Tree(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for name, want := range files {
+			if got, err := fs.ReadFile(tree, name); err != nil || string(got) != want {
+				t.Errorf("%s: got %q, %v; want %q", name, got, err, want)
+			}
+		}
+	})
+	for _, cmd := range []string{"rev-parse", "ls-tree", "cat-file"} {
+		t.Run(cmd, func(t *testing.T) {
+			wrapGit(t, `if [ "$1" = `+cmd+` ]; then echo "the wrapper fails $1" >&2; exit 3; fi
+exec "$GIT" "$@"
+`)
+			want := "git " + cmd + ": the wrapper fails " + cmd
+			r, err := gitfs.Open(g.Dir, gittest.Env())
+			if cmd == "rev-parse" {
+				if err == nil || err.Error() != want {
+					t.Errorf("Open: got %v, want %q", err, want)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer r.Close()
+			tree, err := r.Tree(c)
+			if cmd == "ls-tree" {
+				if err == nil || err.Error() != want {
+					t.Errorf("Tree: got %v, want %q", err, want)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			for range 2 { // the failure holds for every read after it
+				if _, err := fs.ReadFile(tree, "a.txt"); err == nil || err.Error() != "readfile a.txt: "+want {
+					t.Errorf("ReadFile: got %v, want %q", err, want)
+				}
+			}
+		})
 	}
 }

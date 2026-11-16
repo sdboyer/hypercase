@@ -98,10 +98,12 @@ func TestNestedModule(t *testing.T) {
 	fails(t, g, "", 1, []string{"report", c[0], c[1]}, "no registry records the corpus root .,")
 }
 
-// TestFormats: the report reads its own registry format, and refuses
-// another, older or newer, saying to run the report from that revision's
-// hypercase. A registry of another corpus root is left unread, whatever
-// its format.
+// TestFormats: the report reads every registry format from the oldest that
+// hypercase's main branch wrote to its own, and refuses another, older or
+// newer, saying to run the report from that revision's hypercase. It reads
+// both revisions' registries before anything else, so an archive it can't
+// read never hides the refusal. A registry of another corpus root is left
+// unread, whatever its format.
 func TestFormats(t *testing.T) {
 	t.Parallel()
 	arch := map[string]string{"x": "A case about sheets#4.\n-- out/calc/outcome --\naccepted\n"}
@@ -125,18 +127,21 @@ func TestFormats(t *testing.T) {
 		t.Errorf("beside another corpus root's registries, the report is:\n%s\nwant:\n%s", got, want)
 	}
 
+	// An archive the report can't read, which it never reaches.
+	broken := map[string]string{"x": "A case.\n-- out/calc/outcome --\nfine\n"}
 	for _, other := range []struct {
 		format int
 		data   string
 	}{
 		{1, v1},
+		{2, strings.Replace(v1, `"format": 1`, `"format": 2`, 1)},
 		{later, fmt.Sprintf(`{"format": %d, "issueLinks": "a field this hypercase doesn't know"}`+"\n", later)},
 		{later, fmt.Sprintf(`{"format": %d, "corpusRoot": ".", "issueLinks": "a field this hypercase doesn't know"}`+"\n", later)},
 	} {
 		g = gittest.New(t)
-		c = revisions(t, g, module(nil), withRegistry(module(arch), other.data))
+		c = revisions(t, g, module(broken), withRegistry(module(arch), other.data))
 		want := []string{
-			fmt.Sprintf("hypercase report: testdata/hypercase.json at %s holds registry format %d, and this hypercase reads format %d.\n", c[1], other.format, registry.Format) +
+			fmt.Sprintf("hypercase report: testdata/hypercase.json at %s holds registry format %d, and this hypercase reads formats %d to %d.\n", c[1], other.format, registry.Oldest, registry.Format) +
 				"Run the report from " + c[1] + "'s hypercase, which reads it: in a checkout of " + c[1] + ", run the same command as go run github.com/sdboyer/hypercase/cmd/hypercase.\n",
 		}
 		fails(t, g, "", 1, []string{"report", c[0], c[1]}, want...)
@@ -146,4 +151,73 @@ func TestFormats(t *testing.T) {
 	g = gittest.New(t)
 	c = revisions(t, g, module(nil), withRegistry(module(arch), "not json\n"))
 	fails(t, g, "", 1, []string{"report", c[0], c[1]}, "testdata/hypercase.json at "+c[1]+" can't be read: it is not a registry")
+}
+
+// format4 is a registry of format 4, the format before this hypercase's,
+// as hypercase's main branch wrote it: no codes and no classifiers.
+const format4 = `{
+  "format": 4,
+  "updateVar": "M_UPDATE_GOLDEN",
+  "corpusRoot": ".",
+  "rootPackage": true,
+  "issueLinks": [{"pattern": "sheets#(\\d+)", "url": "https://example.com/sheets/issues/$1"}],
+  "properties": [
+    {"name": "circular", "description": "A loop, as format 4 says."},
+    {"name": "retired", "description": "A property only format 4 lists."}
+  ],
+  "types": [{"dir": "sheet", "description": "A sheet, as format 4 says.", "goType": "example.com/m.Sheet", "transforms": [
+    {"name": "looped", "description": "Loops, as format 4 says.", "gives": ["circular"], "keeps": ["retired"], "probe": false, "owned": true}
+  ]}],
+  "lifts": [],
+  "suites": [
+    {"name": "calc", "description": "Runs calc, as format 4 says.", "consumes": "io/fs.FS", "corpora": ["sheet"],
+      "outputs": [{"pattern": "stdout.txt", "description": "What calc printed, as format 4 says."}], "rejects": []},
+    {"name": "old", "description": "A column only format 4 has.", "consumes": "io/fs.FS", "corpora": ["sheet"], "outputs": [], "rejects": []}
+  ]
+}
+`
+
+// TestPreviousFormat: a registry of the format before the report's own at
+// a, and one of its own at b. The page shows both revisions' cells,
+// properties and descriptions, each from b, or from a for what b lacks.
+func TestPreviousFormat(t *testing.T) {
+	t.Parallel()
+	const gone = "A case only a has.\n-- in/sheet/A1 --\n=A1\n-- properties --\nretired\n" +
+		"-- out/calc/outcome --\nrejected\n-- out/calc/stdout.txt --\nloop\n-- out/old/outcome --\naccepted\n" +
+		"-- transform/looped/in/sheet/A1 --\n=A1\n-- transform/looped/out/calc/outcome --\nrejected\n"
+	a := module(map[string]string{"gone": gone, "kept": "A case both have.\n-- out/calc/outcome --\naccepted\n"})
+	a["testdata/hypercase.json"] = format4
+	b := module(map[string]string{"kept": "A case both have.\n-- out/calc/outcome --\nrejected\n", "new": "A case only b has.\n-- out/evaluate/outcome --\naccepted\n"})
+	g := gittest.New(t)
+	c := revisions(t, g, a, b)
+
+	want := "outcome changed\n  sheet/kept calc: accepted -> rejected\n" +
+		"appeared\n  sheet/new evaluate: accepted\n" +
+		"disappeared\n  sheet/gone calc: rejected\n    stdout.txt removed\n  sheet/gone old: accepted\n  sheet/gone/transform/looped calc: rejected\n"
+	if got := ok(t, g, "", "report", "-text", c[0], c[1]); got != want {
+		t.Errorf("from format 4 to %d, the report is:\n%s\nwant:\n%s", registry.Format, got, want)
+	}
+	page := ok(t, g, "", "report", c[0], c[1])
+	holds(t, "gone calc's change", change(t, page, "sheet/gone", "calc"), `<span class="prop" title="A property only format 4 lists.">retired</span>`)
+	holds(t, "gone/transform/looped calc's change", change(t, page, "sheet/gone/transform/looped", "calc"),
+		`<span class="prop given" title="A loop.">circular <span class="how">given</span></span>`,
+		`<span class="prop kept" title="A property only format 4 lists.">retired <span class="how">kept</span></span>`)
+	d := section(t, page, `<section class="corpus" id="describe-sheet">`, "</section>")
+	only := `<span class="badge">only at ` + c[0] + `</span>`
+	holds(t, "the descriptions of sheet", d,
+		"<dt>calc</dt><dd>Runs calc.</dd>",
+		"<dt>old "+only+"</dt><dd>A column only format 4 has.</dd>",
+		"<dt>looped "+only+"</dt><dd>Loops, as format 4 says.<p>Gives <span class=\"prop\">circular</span>.</p><p>Keeps <span class=\"prop\">retired</span>.</p></dd>",
+		`<dt><span class="case">sheet/gone</span></dt><dd>A case only a has.</dd>`)
+	lacks(t, "the descriptions of sheet", d, "sheet/kept", "sheet/new", "transform/looped</span>")
+	props := section(t, page, `<section class="properties" id="describe-properties">`, "</section>")
+	holds(t, "the properties' descriptions", props, "<dt>circular</dt><dd>A loop.</dd>", "<dt>retired "+only+"</dt><dd>A property only format 4 lists.</dd>")
+
+	// From b to a, the matrix is a's, at format 4.
+	back := ok(t, g, "", "report", c[1], c[0])
+	_, cells := matrixRow(t, back, "sheet", "sheet/gone")
+	holds(t, "gone's calc at format 4", cells[0], `class="cell s-rejected appeared"`)
+	holds(t, "gone's old at format 4", cells[1], `class="cell s-accepted appeared"`)
+	head, _ := matrixRow(t, back, "sheet", "sheet/gone/transform/looped")
+	holds(t, "gone/transform/looped's row at format 4", head, `<span class="prop given" title="A loop, as format 4 says.">circular <span class="how">given</span></span>`)
 }

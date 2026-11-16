@@ -4,13 +4,17 @@ import (
 	"html/template"
 	"io"
 	"strings"
+
+	"github.com/sdboyer/hypercase/internal/diff"
 )
 
 // WriteHTML writes the report as one static HTML page, which loads
 // nothing: its style sheet is inline, and it has no scripts. It holds the
-// ranked changes, then the matrix of each corpus at B, each case with the
-// properties it states and each known gap on the cell it marks, linked to
-// its issue.
+// problems the report found, the ranked changes with each changed file's
+// line diff, then the matrix of each corpus at B, each case with the
+// properties it states and each known gap on the cell it marks, then the
+// descriptions of what the registries declare. Text that names an issue
+// links to it.
 func (r *Report) WriteHTML(w io.Writer) error {
 	return page.Execute(w, r)
 }
@@ -32,12 +36,25 @@ func groups(changes []Change) []rankGroup {
 	return out
 }
 
-// stateOf returns an outcome's state, or "none" for a cell with no outcome
-// file.
-func stateOf(outcome string) string {
-	if outcome == "" || outcome == noOutcome {
-		return "none"
+// A problemGroup is the problems at one revision, for the page.
+type problemGroup struct {
+	At       string
+	Problems []Problem
+}
+
+func problemGroups(ps []Problem) []problemGroup {
+	var out []problemGroup
+	for _, p := range ps {
+		if len(out) == 0 || out[len(out)-1].At != p.At {
+			out = append(out, problemGroup{At: p.At})
+		}
+		out[len(out)-1].Problems = append(out[len(out)-1].Problems, p)
 	}
+	return out
+}
+
+// stateOf returns an outcome's state, its first word.
+func stateOf(outcome string) string {
 	state, _, _ := strings.Cut(outcome, " ")
 	return state
 }
@@ -57,12 +74,35 @@ func short(commit string) string {
 	return commit
 }
 
+// diffLine returns a diff line as the page shows it, and the class that
+// styles it.
+func diffLine(l diff.Line) (class, text string) {
+	switch l.Kind {
+	case diff.Skip:
+		return "skip", "  ..."
+	case '+':
+		class = "add"
+	case '-':
+		class = "del"
+	default:
+		class = "ctx"
+	}
+	text = string(l.Kind) + " " + l.Text
+	if l.NoNewline {
+		text += "\n" + string(l.Kind) + ` \ no final newline`
+	}
+	return class, text
+}
+
 var page = template.Must(template.New("page").Funcs(template.FuncMap{
-	"groups":  groups,
-	"stateOf": stateOf,
-	"plain":   plain,
-	"short":   short,
-	"class":   Rank.class,
+	"groups":        groups,
+	"problemGroups": problemGroups,
+	"stateOf":       stateOf,
+	"plain":         plain,
+	"short":         short,
+	"class":         Rank.class,
+	"diffClass":     func(l diff.Line) string { c, _ := diffLine(l); return c },
+	"diffText":      func(l diff.Line) string { _, t := diffLine(l); return t },
 }).Parse(pageTemplate))
 
 const pageTemplate = `<!doctype html>
@@ -79,6 +119,19 @@ const pageTemplate = `<!doctype html>
 <p class="revs"><span class="rev">{{.A.Name}}</span> <code>{{short .A.Commit}}</code> to <span class="rev">{{.B.Name}}</span> <code>{{short .B.Commit}}</code>, over the corpus root <code>{{.Root}}</code></p>
 </header>
 <main>
+{{- if .Problems}}
+<section id="problems">
+<h2>Problems <span class="count">{{len .Problems}}</span></h2>
+{{- range problemGroups .Problems}}
+<h3>At <span class="rev">{{.At}}</span></h3>
+<ul class="problems">
+{{- range .Problems}}
+<li>{{if .Where}}<code>{{.Where}}</code>: {{end}}{{.Msg}}</li>
+{{- end}}
+</ul>
+{{- end}}
+</section>
+{{- end}}
 <section id="changes">
 <h2>Changes</h2>
 {{- if not .Changes}}
@@ -95,7 +148,8 @@ const pageTemplate = `<!doctype html>
 {{- if .Files}}
 <ul class="files">
 {{- range .Files}}
-<li class="{{.How}}"><code>{{.Path}}</code> {{.How}}</li>
+<li class="{{.How}}"><details><summary><code>{{.Path}}</code> {{.How}} <span class="stat"><span class="add">+{{.Added}}</span> <span class="del">-{{.Removed}}</span></span></summary>
+<pre class="diff">{{range .Diff}}<span class="{{diffClass .}}">{{diffText .}}</span>{{end}}</pre></details></li>
 {{- end}}
 </ul>
 {{- end}}
@@ -110,6 +164,9 @@ const pageTemplate = `<!doctype html>
 {{- range .Matrices}}
 <section class="matrix" id="corpus-{{.Corpus}}">
 <h2>{{.Corpus}}</h2>
+{{- if .Description}}
+<p class="desc">{{template "text" .Description}}</p>
+{{- end}}
 <div class="scroll">
 <table>
 <thead>
@@ -121,8 +178,8 @@ const pageTemplate = `<!doctype html>
 <th scope="row"><span class="case">{{.Case}}</span>{{template "props" .Properties}}
 {{- if .Description}}<div class="desc">{{template "text" .Description}}</div>{{end}}</th>
 {{- range .Cells}}
-<td class="cell s-{{if .Present}}{{stateOf .Outcome}}{{else}}empty{{end}}{{if .Changed}} {{class .Change}}{{end}}{{if .Frozen}} frozen{{end}}">
-{{- if .Present}}<span class="outcome">{{if .Outcome}}{{.Outcome}}{{else}}(no outcome){{end}}</span>{{end}}
+<td class="cell s-{{if .Present}}{{.State}}{{else}}empty{{end}}{{if .Changed}} {{class .Change}}{{end}}{{if .Frozen}} frozen{{end}}">
+{{- if .Present}}<span class="outcome">{{.Outcome}}</span>{{end}}
 {{- if .Frozen}} <span class="badge">frozen</span>{{end}}
 {{- if .Changed}} <span class="badge">{{.Change}}</span>{{end}}
 {{- if .Gap}}<div class="gap">{{template "text" .Gap}}</div>{{end -}}
@@ -133,31 +190,79 @@ const pageTemplate = `<!doctype html>
 </tbody>
 </table>
 </div>
+</section>
+{{- end}}
+<section id="descriptions">
+<h2>Descriptions</h2>
+{{- range .Corpora}}
+<section class="corpus" id="describe-{{.Name}}">
+<h3>{{.Name}}{{if .OnlyAtA}} <span class="badge">only at {{$.A.Name}}</span>{{end}}</h3>
+{{- if .Description}}
+<p>{{template "text" .Description}}</p>
+{{- end}}
+{{- if .Columns}}
+<h4>Columns</h4>
 <dl class="columns">
 {{- range .Columns}}
-<dt>{{.Name}}</dt><dd>{{if .Description}}{{template "text" .Description}}{{else}}No registry records this column.{{end}}</dd>
+<dt>{{.Name}}{{if .OnlyAtA}} <span class="badge">only at {{$.A.Name}}</span>{{end}}</dt><dd>{{template "text" .Description}}
+{{- if .Outputs}}<ul class="outputs">{{range .Outputs}}<li><code>{{.Name}}</code>: {{template "text" .Description}}</li>{{end}}</ul>{{end}}
+{{- with .Classifier}}<p class="classifier">Its classifier, <code>{{.Name}}</code>: {{template "text" .Description}}</p>{{end -}}
+</dd>
+{{- end}}
+</dl>
+{{- end}}
+{{- if .Transforms}}
+<h4>Transforms</h4>
+<dl class="transforms">
+{{- range .Transforms}}
+<dt>{{.Name}}{{if .OnlyAtA}} <span class="badge">only at {{$.A.Name}}</span>{{end}}</dt><dd>{{template "text" .Description}}
+{{- if .Gives}}<p>Gives {{range $i, $p := .Gives}}{{if $i}}, {{end}}<span class="prop">{{$p}}</span>{{end}}.</p>{{end}}
+{{- if .Keeps}}<p>Keeps {{range $i, $p := .Keeps}}{{if $i}}, {{end}}<span class="prop">{{$p}}</span>{{end}}.</p>{{end -}}
+</dd>
+{{- end}}
+</dl>
+{{- end}}
+{{- if .Cases}}
+<h4>Cases only at <span class="rev">{{$.A.Name}}</span></h4>
+<dl class="cases">
+{{- range .Cases}}
+<dt><span class="case">{{.Name}}</span></dt><dd>{{template "text" .Description}}</dd>
+{{- end}}
+</dl>
+{{- end}}
+</section>
+{{- end}}
+{{- if .Properties}}
+<section class="properties" id="describe-properties">
+<h3>Properties</h3>
+<dl class="properties">
+{{- range .Properties}}
+<dt>{{.Name}}{{if .OnlyAtA}} <span class="badge">only at {{$.A.Name}}</span>{{end}}</dt><dd>{{template "text" .Description}}</dd>
 {{- end}}
 </dl>
 </section>
 {{- end}}
+</section>
 </main>
 </body>
 </html>
 {{define "text"}}{{range .}}{{if .URL}}<a href="{{.URL}}">{{.Text}}</a>{{else}}{{.Text}}{{end}}{{end}}{{end}}
-{{- define "props"}}{{if .}} <span class="props">{{range .}}<span class="prop" title="{{plain .Description}}">{{.Name}}</span>{{end}}</span>{{end}}{{end}}`
+{{- define "props"}}{{if .}} <span class="props">{{range .}}<span class="prop{{if .How}} {{.How}}{{end}}" title="{{plain .Description}}">{{.Name}}{{if .How}} <span class="how">{{.How}}</span>{{end}}</span>{{end}}</span>{{end}}{{end}}`
 
 const pageStyle = `
 :root {
   color-scheme: light dark;
   --bg: #fdfdfc; --fg: #1d1d1b; --muted: #6b6b66; --line: #deddd8; --head: #f3f2ee;
-  --accepted: #e3f1e4; --rejected: #fbecd6; --panicked: #f8dcdc; --blocked: #e9e4f3; --skipped: #ecebe8; --none: #f6e9f0;
+  --accepted: #e3f1e4; --rejected: #fbecd6; --panicked: #f8dcdc; --blocked: #e9e4f3; --skipped: #ecebe8;
   --changed: #c0392b; --appeared: #1f7a3f; --bytes: #9a6b00; --link: #1f5fa8;
+  --add: #e3f1e4; --del: #f8dcdc;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #171716; --fg: #e8e7e3; --muted: #a09f99; --line: #3a3936; --head: #22221f;
-    --accepted: #1f3a24; --rejected: #44341a; --panicked: #4a2222; --blocked: #322b45; --skipped: #2b2a27; --none: #40283a;
+    --accepted: #1f3a24; --rejected: #44341a; --panicked: #4a2222; --blocked: #322b45; --skipped: #2b2a27;
     --changed: #ff7b6b; --appeared: #6fd08f; --bytes: #e0b24a; --link: #8cbcff;
+    --add: #1f3a24; --del: #4a2222;
   }
 }
 * { box-sizing: border-box; }
@@ -167,11 +272,14 @@ header, main { max-width: 1200px; margin: 0 auto; }
 h1 { font-size: 1.5rem; margin: 24px 0 4px; }
 h2 { font-size: 1.2rem; margin: 32px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
 h3 { font-size: 1rem; margin: 20px 0 6px; }
-code, .case, .col, .outcome, .prop { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+h4 { font-size: 0.95rem; margin: 12px 0 4px; color: var(--muted); }
+code, pre, .case, .col, .outcome, .prop { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
 a { color: var(--link); }
 .revs { color: var(--muted); margin: 0; }
-.rev { color: var(--fg); font-weight: 600; }
+.rev { font-weight: 600; }
 .count { color: var(--muted); font-weight: normal; }
+ul.problems { padding-left: 20px; }
+ul.problems li { margin: 2px 0; overflow-wrap: anywhere; }
 .rank.outcome-changed { color: var(--changed); }
 .rank.appeared, .rank.disappeared { color: var(--appeared); }
 .rank.bytes-changed { color: var(--bytes); }
@@ -185,12 +293,21 @@ li.change { padding: 6px 0; border-bottom: 1px solid var(--line); }
 .s-panicked .outcome, .outcome.s-panicked { background: var(--panicked); }
 .s-blocked .outcome, .outcome.s-blocked { background: var(--blocked); }
 .s-skipped .outcome, .outcome.s-skipped { background: var(--skipped); }
-.s-none .outcome, .outcome.s-none { background: var(--none); }
 .arrow { color: var(--muted); }
-ul.files { margin: 4px 0 0 20px; padding: 0; color: var(--muted); }
+ul.files { list-style: none; margin: 4px 0 0 20px; padding: 0; color: var(--muted); }
+summary { cursor: pointer; }
+.stat .add { color: var(--appeared); }
+.stat .del { color: var(--changed); }
+pre.diff { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
+pre.diff span { display: block; padding: 0 8px; white-space: pre; }
+pre.diff .add { background: var(--add); }
+pre.diff .del { background: var(--del); }
+pre.diff .skip { color: var(--muted); }
 .props { margin-left: 6px; }
 .prop { display: inline-block; margin: 0 4px 0 0; padding: 0 6px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); }
-.badge { display: inline-block; padding: 0 6px; border-radius: 10px; font-size: 0.8em; background: var(--head); color: var(--muted); border: 1px solid var(--line); }
+.prop.kept { border-style: dashed; }
+.how { font-size: 0.85em; font-style: italic; }
+.badge { display: inline-block; padding: 0 6px; border-radius: 10px; font-size: 0.8em; font-weight: normal; background: var(--head); color: var(--muted); border: 1px solid var(--line); }
 .gap { margin: 4px 0 0; font-size: 0.9em; }
 .scroll { overflow-x: auto; }
 table { border-collapse: collapse; min-width: 100%; }
@@ -204,14 +321,15 @@ td.s-rejected { background: var(--rejected); }
 td.s-panicked { background: var(--panicked); }
 td.s-blocked { background: var(--blocked); }
 td.s-skipped { background: var(--skipped); }
-td.s-none { background: var(--none); }
 td.cell .outcome { background: transparent; padding: 0; }
 td.outcome-changed { box-shadow: inset 0 0 0 2px var(--changed); }
 td.appeared { box-shadow: inset 0 0 0 2px var(--appeared); }
 td.bytes-changed { box-shadow: inset 0 0 0 2px var(--bytes); }
 td.frozen { background-image: repeating-linear-gradient(135deg, transparent 0 8px, rgba(127,127,127,0.12) 8px 16px); }
-dl.columns { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 12px 0 0; }
-dl.columns dt { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 600; }
-dl.columns dd { margin: 0; color: var(--muted); }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 4px 0 0; }
+dt { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 600; }
+dd { margin: 0; color: var(--muted); }
+dd p, dd ul { margin: 2px 0 0; }
+ul.outputs { padding-left: 18px; }
 .none { color: var(--muted); }
 `
