@@ -396,8 +396,13 @@ func TestCreateFailsBesideAnother(t *testing.T) {
 // though A fails meanwhile, since A keeps the directories it made. B's
 // hook, between its MkdirAll and its temp file, waits until A has failed.
 // A Create that removed the empty directories it made would remove
-// testdata/sheet/ then, and B couldn't open its temp file.
+// testdata/sheet/ then, and B couldn't open its temp file. A's hook stops
+// waiting for B once B returns, or after a timeout, so a B that returns
+// before its own hook runs, or never reaches it, fails the test, naming
+// which, and doesn't hang it.
 func TestCreateBesideARemoval(t *testing.T) {
+	t.Cleanup(func() { hooks.AfterMkdir, hooks.AfterTemp = nil, nil })
+	const timeout = 30 * time.Second
 	corp := newCorpus(t)
 	ss := serialize(t, cells)
 	var calls atomic.Int32
@@ -409,37 +414,48 @@ func TestCreateBesideARemoval(t *testing.T) {
 			<-aFailed
 		}
 	}
-	type result struct {
-		path string
-		err  error
-	}
-	bDone := make(chan result, 1)
+	var bPath string
+	var bErr error
+	bDone := make(chan struct{}) // closed once B has returned, and set bPath and bErr
+	started := false             // A's hook started B
+	stopped := ""                // why A's hook stopped waiting, when B never found the directory
 	hooks.AfterTemp = func(tmp string) error {
 		if !strings.HasPrefix(filepath.Base(tmp), ".hypercase-tmp-first.txtar-") {
 			return nil
 		}
+		started = true
 		go func() {
-			p, err := Create(corp, project, sheetType, "second", ss)
-			bDone <- result{p, err}
+			defer close(bDone)
+			bPath, bErr = Create(corp, project, sheetType, "second", ss)
 		}()
-		<-bFound
+		select {
+		case <-bFound:
+		case <-bDone:
+			stopped = "B returned before its AfterMkdir hook ran"
+		case <-time.After(timeout):
+			stopped = fmt.Sprintf("B had neither reached its AfterMkdir hook nor returned %v after A's temp file was written", timeout)
+		}
 		return errors.New("the disk is full")
 	}
 	_, err := Create(corp, project, sheetType, "first", ss)
 	close(aFailed)
-	var b result
-	select {
-	case b = <-bDone:
-	case <-time.After(30 * time.Second):
-		t.Fatal("B never returned")
+	if !started {
+		t.Fatalf("A failed before its temp file was written, so B never ran: %v", err)
 	}
-	hooks.AfterMkdir, hooks.AfterTemp = nil, nil
+	select {
+	case <-bDone:
+	case <-time.After(timeout):
+		t.Fatalf("B hadn't returned %v after A failed. %s", timeout, stopped)
+	}
+	if stopped != "" {
+		t.Fatalf("%s: B returned %q, %v", stopped, bPath, bErr)
+	}
 	dir := filepath.Join(corp.Dir(), "testdata", "sheet")
 	fails(t, err, "creating "+filepath.Join(dir, "first.txtar")+": the disk is full.")
-	if b.err != nil {
-		t.Fatalf("B failed beside A's failure: %v", b.err)
+	if bErr != nil {
+		t.Fatalf("B failed beside A's failure: %v", bErr)
 	}
-	same(t, b.path, format(ss))
+	same(t, bPath, format(ss))
 	absent(t, filepath.Join(dir, "first.txtar"))
 	noTemps(t, dir)
 }
