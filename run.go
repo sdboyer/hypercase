@@ -221,21 +221,33 @@ func (r *runner) checkColumnDescriptions(t *testing.T, kind, name, description s
 	}
 }
 
-// requireRootCheck fails unless some registry records the root-package
-// check for the package's corpus root, since nothing else reports what no
-// column owns. Updates write registries, so only a normal run checks.
+// requireRootCheck fails unless the registry of some package with tests
+// records the root-package check for the package's corpus root, since
+// nothing else reports what no column owns. A registry in a package with
+// no _test.go file records a check no test runs, as the root-package check
+// itself holds. Updates write registries, so only a normal run checks.
 func (r *runner) requireRootCheck(t *testing.T, found []registry.Found) {
 	t.Helper()
+	var stale []registry.Found
 	for _, f := range found {
 		data, err := os.ReadFile(f.Path)
 		if err != nil {
 			continue
 		}
 		if h, err := registry.Peek(data); err == nil && h.CorpusRoot == r.rootRel && h.RootPackage {
-			return
+			if hasTestFile(f.Pkg) {
+				return
+			}
+			stale = append(stale, f)
 		}
 	}
-	t.Errorf("no registry records a root-package check for %s, so nothing reports what no column there owns.\nRegister hypercase.RootPackage() in one package over it, then run %s to record it in the package's registry.", r.rootName(), r.updateCmd())
+	if len(stale) == 0 {
+		t.Errorf("no registry records a root-package check for %s, so nothing reports what no column there owns.\nRegister hypercase.RootPackage() in one package over it, then run %s to record it in the package's registry.", r.rootName(), r.updateCmd())
+		return
+	}
+	for _, f := range stale {
+		t.Errorf("%s records the root-package check for %s, and %s holds no _test.go file, so no test runs the check, and nothing reports what no column there owns.\nRestore the package's tests, or register hypercase.RootPackage() in another package over it, then run %s to record it in that package's registry.", r.rel(f.Path), r.rootName(), r.rel(f.Pkg), r.updateCmd())
+	}
 }
 
 // A plannedCase is an archive whose cells run.

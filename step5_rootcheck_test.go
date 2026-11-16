@@ -158,6 +158,19 @@ func TestRootCheckRequired(t *testing.T) {
 	s.done()
 }
 
+// TestRootCheckStale: a registry that records the root-package check, in a
+// package with no tests, records a check that no test runs, so every
+// other package's normal run fails, naming it.
+func TestRootCheckStale(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.passes(s.normal("pkg-a"))
+	s.passes(s.run("b", "pkg-b", false))
+	s.remove("corpus_test.go", "the root package's tests are deleted, and its registry left behind")
+	s.fails(s.run("b", "pkg-b", false), "testdata/hypercase.json records the root-package check for the module-root corpus, and . holds no _test.go file, so no test runs the check, and nothing reports what no column there owns.\nRestore the package's tests, or register hypercase.RootPackage() in another package over it, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... to record it in that package's registry.")
+	s.done()
+}
+
 func TestTwoRootPackages(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared")
