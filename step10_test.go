@@ -900,21 +900,32 @@ func TestChainSharedProjects(t *testing.T) {
 		s.done()
 	})
 
-	// import's jenny faults on the case: no Project's update writes import's
-	// cell, so b's update holds the cells past it back, as the owner's does.
-	t.Run("a fault of the jenny", func(t *testing.T) {
+	// import's jenny faults on one export, and makes a product an archive
+	// can't hold of another: no Project's update writes import's cell on
+	// either, so b's update holds the cells past it back, as the owner's
+	// does.
+	t.Run("a fault or a product an archive can't hold", func(t *testing.T) {
 		t.Parallel()
 		s := newSandbox(t, "chain-shared")
 		for _, r := range s.parallel(childRun{"", "chain-a", true}, childRun{"b", "chain-b", true}) {
 			s.passes(r)
 		}
 		s.write("testdata/export/faulty.txtar", []byte("import's jenny fails on the export, with an error decl.Reject doesn't mark.\n-- in/import/fail --\nthe generator's error\n"), "an export on which import's jenny faults")
+		s.write("testdata/export/stray.txtar", []byte("import makes a file its Product doesn't declare.\n-- in/import/out/stray/x --\nx\n"), "an export of which import makes an undeclared file")
 		before := s.snapshot()
-		heldBack := func(col string) string {
-			return "The update writes nothing for the cell of the lift import, on " + col + "'s path: the lift's cell says why, in the package that owns it."
+		heldBack := func(name, about, col, desc string) string {
+			return "export/" + name + ": " + about + "\n" + col + ": " + desc + "\nThe update writes nothing for the cell of the lift import, on " + col + "'s path: the lift's cell says why, in the package that owns it."
 		}
-		s.fails(s.run("b", "chain-b", true), heldBack("evaluate"), heldBack("list"))
-		s.fails(s.update("chain-a"), "import's jenny failed on the case, with an error that is no rejection:\n  import: the generator's error", heldBack("parse"))
+		const (
+			faultyAbout = "import's jenny fails on the export, with an error decl.Reject doesn't mark."
+			strayAbout  = "import makes a file its Product doesn't declare."
+			listDesc    = "Lists the files of the script's input view, with their bytes."
+		)
+		s.fails(s.run("b", "chain-b", true), heldBack("faulty", faultyAbout, "list", listDesc), heldBack("stray", strayAbout, "list", listDesc))
+		s.fails(s.update("chain-a"),
+			"import's jenny failed on the case, with an error that is no rejection:\n  import: the generator's error",
+			"via/import/stray/x is not declared.",
+			"The update writes nothing for the cell of the lift import, on parse's path")
 		s.unchanged(before)
 		s.done()
 	})
