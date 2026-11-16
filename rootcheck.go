@@ -25,8 +25,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	type pkgReg struct {
 		pkg string
 		reg *registry.Registry
-		// tested records that the package holds a _test.go file, so some
-		// test runs what its registry records.
+		// tested records that the package's directory holds a file whose
+		// name ends in _test.go. Any such file counts, even one with no
+		// test that runs what the registry records.
 		tested bool
 	}
 	var regs []pkgReg
