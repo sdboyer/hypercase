@@ -2,10 +2,31 @@ package sheet
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/fs"
 	"testing/fstest"
 )
+
+// Movable reports whether MoveDown would move the sheet in fsys, and why not
+// when it wouldn't: the sheet has no cells, or a cell, or a reference in a
+// formula, is on the last row, with no row below it. A sheet holding
+// something that is not a cell file, or one that can't be read, is movable:
+// MoveDown reports what is wrong with it.
+func Movable(fsys fs.FS) (why string, ok bool) {
+	files, err := readCells(fsys)
+	if err != nil {
+		return "", true
+	}
+	at, err := checkFiles(files)
+	if err != nil {
+		return "", true
+	}
+	if _, err := moveDown(files, at); err != nil {
+		return err.Error(), false
+	}
+	return "", true
+}
 
 // MoveDown returns the sheet in fsys moved one row down: A1 becomes A2, and
 // every reference in a formula is rewritten to the moved cell, so =B1*2
@@ -13,26 +34,50 @@ import (
 // and a cell that is not a formula moves unchanged, however malformed. A
 // reference to a missing cell moves too. The sheet is at sheet/ in the
 // returned file system. MoveDown fails on anything under sheet/ that is not a
-// cell file, and on a cell or reference on the last row.
+// cell file, and on a sheet Movable declines.
 func MoveDown(fsys fs.FS) (fs.FS, error) {
 	files, err := readCells(fsys)
 	if err != nil {
 		return nil, err
 	}
-	out := fstest.MapFS{}
-	for _, f := range files {
+	at, err := checkFiles(files)
+	if err != nil {
+		return nil, err
+	}
+	return moveDown(files, at)
+}
+
+// checkFiles returns each cell file's position, and fails on the first file,
+// in cell order, that can't be a cell.
+func checkFiles(files []cellFile) ([]pos, error) {
+	at := make([]pos, len(files))
+	for i, f := range files {
 		p, err := checkFile(f)
 		if err != nil {
 			return nil, err
 		}
-		if p.row == lastRow {
+		at[i] = p
+	}
+	return at, nil
+}
+
+// moveDown moves cell files, at their positions, one row down. It fails,
+// saying why, on a sheet with no cells, which it would leave unchanged, and
+// on a cell or reference on the last row.
+func moveDown(files []cellFile, at []pos) (fs.FS, error) {
+	if len(files) == 0 {
+		return nil, errors.New("the sheet has no cells")
+	}
+	out := fstest.MapFS{}
+	for i, f := range files {
+		if at[i].row == lastRow {
 			return nil, fmt.Errorf("%s is on the last row, so it can't move down", f.name)
 		}
 		data, err := moveRefs(f.name, f.data)
 		if err != nil {
 			return nil, err
 		}
-		out["sheet/"+pos{p.col, p.row + 1}.String()] = &fstest.MapFile{Data: data}
+		out["sheet/"+pos{at[i].col, at[i].row + 1}.String()] = &fstest.MapFile{Data: data}
 	}
 	return out, nil
 }

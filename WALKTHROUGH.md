@@ -1613,12 +1613,7 @@ var Renamed = decl.Transform[Sheet]{
 	Name:        "renamed",
 	Description: "Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.",
 	Keeps:       []decl.Property{Circular, Dangling},
-	Probe: func(base Sheet) (why string, ok bool) {
-		if entries, _ := fs.ReadDir(base, "sheet"); len(entries) == 0 {
-			return "the sheet has no cells", false
-		}
-		return "", true
-	},
+	Probe:       func(base Sheet) (why string, ok bool) { return sheet.Movable(base) },
 	Jenny: jenny.For[Sheet]().New("renamed", func(base Sheet) (jenny.Files, error) {
 		return view(sheet.MoveDown(base))
 	}),
@@ -1860,6 +1855,13 @@ whether each has a probe, and whether the package owns it.
   by hand. `renamed` moves every cell one row down, rewriting each reference,
   and keeps `circular` and `dangling`, so it runs over bases that state
   either; a base that states `malformed` is declined.
+- Their probes decline a base only when the transform can't apply to it,
+  which is a fact about the sheet: it has no cells; for `looped`, its first
+  cell already refers to itself; for `renamed`, a cell or a reference is on
+  the last row, with no row below. A sheet a probe can't read, or one
+  holding a file that isn't a cell, is malformed, and no reason to decline:
+  the probe leaves it to the jenny, which fails on it, and so the transform
+  fails.
 - It is materialized. An update writes `transform/<name>/in/…` and
   `transform/<name>/delete`, and the owner's normal run checks them like
   goldens.

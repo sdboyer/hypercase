@@ -28,12 +28,7 @@ var Renamed = decl.Transform[Sheet]{
 	Name:        "renamed",
 	Description: "Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.",
 	Keeps:       []decl.Property{Circular, Dangling},
-	Probe: func(base Sheet) (why string, ok bool) {
-		if entries, _ := fs.ReadDir(base, "sheet"); len(entries) == 0 {
-			return "the sheet has no cells", false
-		}
-		return "", true
-	},
+	Probe:       func(base Sheet) (why string, ok bool) { return sheet.Movable(base) },
 	Jenny: jenny.For[Sheet]().New("renamed", func(base Sheet) (jenny.Files, error) {
 		return view(sheet.MoveDown(base))
 	}),
