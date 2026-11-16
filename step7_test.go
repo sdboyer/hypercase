@@ -839,7 +839,7 @@ func TestTransformOwners(t *testing.T) {
 
 // TestTransformFailures: a transform that fails on a base, or makes a
 // variant that can't be one, fails in the package that owns it, and is
-// skipped in the others.
+// skipped in the others, in their updates and their normal runs.
 func TestTransformFailures(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transform-failures")
@@ -859,9 +859,18 @@ func TestTransformFailures(t *testing.T) {
 	for _, a := range []string{"error", "same", "probe-no"} {
 		s.cat("testdata/script/" + a + ".txtar")
 	}
-	b := s.run("b", "poke-b", true)
-	s.passes(b)
-	s.contains(b, "script/error/transform/poke: the transform poke failed on the base, and the package that owns it reports why.")
+	// A package that doesn't own the transform skips the variant on every
+	// failure, in its update and in its normal run, and leaves the owner to
+	// report why.
+	var skipped []string
+	for _, a := range []string{"error", "panic", "same", "flat", "marker", "nest", "probe-panic", "probe-none"} {
+		skipped = append(skipped, "script/"+a+"/transform/poke: the transform poke failed on the base, and the package that owns it reports why.")
+	}
+	for _, update := range []bool{true, false} {
+		b := s.run("b", "poke-b", update)
+		s.passes(b)
+		s.contains(b, skipped...)
+	}
 	s.done()
 }
 
