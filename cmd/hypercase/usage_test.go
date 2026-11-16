@@ -13,8 +13,9 @@ func TestUsage(t *testing.T) {
 	g := gittest.New(t)
 	c := revisions(t, g, module(nil))
 	const usage = "usage: hypercase report [-root dir] [-text] <a> <b>"
-	fails(t, g, "", 2, nil, usage)
-	fails(t, g, "", 2, []string{"strip"}, `hypercase: no command "strip"`, usage)
+	const both = usage + "\n       hypercase strip [-root dir] [-column name] [-transform name] [-frozen]\n"
+	fails(t, g, "", 2, nil, both)
+	fails(t, g, "", 2, []string{"nope"}, `hypercase: no command "nope"`, both)
 	fails(t, g, "", 2, []string{"report", c[0]}, "hypercase report takes two revisions, and was given 1.", usage)
 	fails(t, g, "", 2, []string{"report", "-nope", c[0], c[0]}, "flag provided but not defined: -nope", usage)
 	fails(t, g, "", 1, []string{"report", c[0], "nope"}, "hypercase report: nope names no commit in this repository\n")
