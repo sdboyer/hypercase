@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -371,7 +372,47 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	if len(frozen) > 0 {
 		cells = fmt.Sprintf("the variant's cells but the frozen ones, here %s: no update writes a cell its known gap freezes, and a normal run checks what it produces on the rewritten inputs against its committed files.", andList(frozen))
 	}
-	t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and %s", c.header(), v.name, v.name, m, v.name, r.updateCmd(), v.name, cells)
+	t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. %s, and %s", c.header(), v.name, v.name, m, v.name, r.rewritesInputs(p, v), cells)
+}
+
+// ownedByAny reports whether some package's registry over the corpus root
+// records that it owns the transform name, of the corpus directory dir.
+// The registries are read when a message first needs to know.
+func (r *runner) ownedByAny(dir, name string) bool {
+	if r.trOwners == nil {
+		r.trOwners = map[string]bool{}
+		for _, f := range r.found {
+			data, err := os.ReadFile(f.Path)
+			if err != nil {
+				continue
+			}
+			if h, err := registry.Peek(data); err != nil || h.CorpusRoot != r.rootRel {
+				continue
+			}
+			g, err := registry.Parse(data)
+			if err != nil {
+				continue
+			}
+			for _, ct := range g.Types {
+				for _, tr := range ct.Transforms {
+					if tr.Owned {
+						r.trOwners[ct.Dir+"/"+tr.Name] = true
+					}
+				}
+			}
+		}
+	}
+	return r.trOwners[dir+"/"+name]
+}
+
+// rewritesInputs says which update rewrites the committed inputs of a
+// transform's variant: the module's, in the package that owns the
+// transform, if a package does.
+func (r *runner) rewritesInputs(p *plan, v *plannedVariant) string {
+	if r.ownedByAny(p.root.dir, v.name) {
+		return fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s", r.updateCmd(), v.name)
+	}
+	return fmt.Sprintf("%s is owned by no package, so no update rewrites them. Give it to hypercase.Own in one package that registers its corpus type, and the module's update, %s, rewrites them there", v.name, r.updateCmd())
 }
 
 // inputDiffs says how the committed inputs of a transform's variant differ

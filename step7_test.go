@@ -527,6 +527,24 @@ func TestTransformStaleInputs(t *testing.T) {
 	s.done()
 }
 
+// TestTransformUnowned: when no package owns a transform, no update
+// rewrites its variants' inputs, and a message that would name the update
+// in the package that owns it says so instead.
+func TestTransformUnowned(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "a package b over the corpus")
+	s.passes(s.update("transforms"))
+	s.passes(s.run("b", "tr-b", true))
+	// The root package gives up its transforms, and its update records it.
+	s.passes(s.update("tr-unowned"))
+
+	s.edit(twice, "edit upper's input by hand", set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n"))
+	s.fails(s.run("b", "tr-b", false), "transform/upper/out/copy/values.txt differs (-golden +got):",
+		"A normal run reads the inputs, and an update what upper makes. upper is owned by no package, so no update rewrites them. Give it to hypercase.Own in one package that registers its corpus type, and the module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them there, and the variant's cells.")
+	s.done()
+}
+
 // TestTransformOwners: the root-package check fails a transform no package
 // owns, or two own, and a corpus type two packages list differently.
 func TestTransformOwners(t *testing.T) {
