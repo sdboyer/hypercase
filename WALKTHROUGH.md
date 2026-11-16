@@ -2581,8 +2581,8 @@ not by the archive's name. `view` gives each file of the sheet that
 `sheet.ImportCSV` returns as one of the jenny's files. `decl.Reject` marks
 the jenny's error as the lift's rejection of the case: the importer's own
 error, a `*sheet.Error`, is one. Any other error is no rejection, so it
-fails the cell: a CSV archive without exactly one CSV, and a CSV the jenny
-can't read.
+fails the cell: an input that is not one file, `csv/<name>.csv`, and a CSV
+the jenny can't read.
 
 `walkthrough/sheets/step10/sheetcorpus/types.go` declares the corpus type,
 its property and the lift:
@@ -2593,7 +2593,7 @@ type CSV struct{ fs.FS } // in/csv/<name>.csv
 
 var CSVType = decl.Type[CSV]{
 	Dir:         "csv",
-	Description: "A CSV export: one file under in/csv/, one row of the sheet per line.",
+	Description: "A CSV export: one file, in/csv/<name>.csv, one row of the sheet per line.",
 }
 
 var Unterminated = decl.Property{
@@ -2612,9 +2612,18 @@ var Import = decl.Lift[CSV, Sheet]{
 	},
 	Rejects: []decl.Property{Unterminated},
 	Jenny: jenny.For[CSV]().New("import", func(in CSV) (jenny.Files, error) {
-		paths, _ := fs.Glob(in, "csv/*.csv")
-		if len(paths) != 1 {
-			return nil, fmt.Errorf("%d files under csv/, not one", len(paths))
+		var paths []string
+		err := fs.WalkDir(in, ".", func(p string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				paths = append(paths, p)
+			}
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(paths) != 1 || path.Dir(paths[0]) != "csv" || path.Ext(paths[0]) != ".csv" {
+			return nil, fmt.Errorf("the input holds %q, and a CSV export is one file, csv/<name>.csv", paths)
 		}
 		s, err := sheet.ImportCSV(in, paths[0])
 		var e *sheet.Error

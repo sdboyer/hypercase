@@ -13,27 +13,38 @@ import (
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus"
 )
 
-// TestImportCount: import finds its CSV by its tree, and errs on a CSV
-// archive without exactly one, with an error of its own, not the
-// importer's, so the error carries no code.
-func TestImportCount(t *testing.T) {
+// TestImportInput: import finds its CSV by its tree, and errs on an input
+// that is not one file, csv/<name>.csv, with an error of its own, not the
+// importer's, so the error carries no code, and is no rejection.
+func TestImportInput(t *testing.T) {
 	csv := &fstest.MapFile{Data: []byte("4,6\n")}
 	for _, tt := range []struct {
 		name string
 		in   fstest.MapFS
-		want string
+		want string // the files the error names
 	}{
-		{"none", fstest.MapFS{"notes/about": {Data: []byte("no CSV\n")}}, "import: 0 files under csv/, not one"},
-		{"two", fstest.MapFS{"csv/a.csv": csv, "csv/b.csv": csv}, "import: 2 files under csv/, not one"},
+		{"empty", fstest.MapFS{}, `[]`},
+		{"none", fstest.MapFS{"notes/about": {Data: []byte("no CSV\n")}}, `["notes/about"]`},
+		{"two", fstest.MapFS{"csv/a.csv": csv, "csv/b.csv": csv}, `["csv/a.csv" "csv/b.csv"]`},
+		{"upper", fstest.MapFS{"csv/prices.CSV": csv}, `["csv/prices.CSV"]`},
+		{"txt", fstest.MapFS{"csv/prices.txt": csv}, `["csv/prices.txt"]`},
+		{"nested", fstest.MapFS{"csv/sub/a.csv": csv}, `["csv/sub/a.csv"]`},
+		{"readme", fstest.MapFS{"csv/a.csv": csv, "csv/README": csv}, `["csv/README" "csv/a.csv"]`},
+		{"outside", fstest.MapFS{"csv/a.csv": csv, "notes/about": csv}, `["csv/a.csv" "notes/about"]`},
+		{"directory", fstest.MapFS{"csv/x.csv/y": csv}, `["csv/x.csv/y"]`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: tt.in})
-			if err == nil || err.Error() != tt.want {
-				t.Fatalf("got %v, want %s", err, tt.want)
+			want := "import: the input holds " + tt.want + ", and a CSV export is one file, csv/<name>.csv"
+			if err == nil || err.Error() != want {
+				t.Fatalf("got %v, want %s", err, want)
 			}
 			var e *sheet.Error
 			if errors.As(err, &e) {
 				t.Errorf("the error carries the importer's code %s", e.Code)
+			}
+			if rejected(err) {
+				t.Errorf("import rejects the case: %v", err)
 			}
 		})
 	}

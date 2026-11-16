@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"path"
 
 	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
@@ -90,7 +91,7 @@ type CSV struct{ fs.FS } // in/csv/<name>.csv
 
 var CSVType = decl.Type[CSV]{
 	Dir:         "csv",
-	Description: "A CSV export: one file under in/csv/, one row of the sheet per line.",
+	Description: "A CSV export: one file, in/csv/<name>.csv, one row of the sheet per line.",
 }
 
 var Unterminated = decl.Property{
@@ -109,9 +110,18 @@ var Import = decl.Lift[CSV, Sheet]{
 	},
 	Rejects: []decl.Property{Unterminated},
 	Jenny: jenny.For[CSV]().New("import", func(in CSV) (jenny.Files, error) {
-		paths, _ := fs.Glob(in, "csv/*.csv")
-		if len(paths) != 1 {
-			return nil, fmt.Errorf("%d files under csv/, not one", len(paths))
+		var paths []string
+		err := fs.WalkDir(in, ".", func(p string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				paths = append(paths, p)
+			}
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(paths) != 1 || path.Dir(paths[0]) != "csv" || path.Ext(paths[0]) != ".csv" {
+			return nil, fmt.Errorf("the input holds %q, and a CSV export is one file, csv/<name>.csv", paths)
 		}
 		s, err := sheet.ImportCSV(in, paths[0])
 		var e *sheet.Error
