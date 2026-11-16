@@ -209,10 +209,14 @@ func checkOut(section, rest string) []Problem {
 }
 
 // checkVia reports the problems of the name of one file of a bytes lift's
-// product: section is the whole name, and rest its part below via/. The
-// product is an input view, laid out as an archive's in/ is.
+// product: section is the whole name, and rest its part below via/, empty
+// for a section named via itself. The product is an input view, laid out
+// as an archive's in/ is.
 func checkVia(section, rest string) []Problem {
 	prefix := strings.TrimSuffix(section, rest)
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
 	lift, file, _ := strings.Cut(rest, "/")
 	tree, below, _ := strings.Cut(file, "/")
 	switch {

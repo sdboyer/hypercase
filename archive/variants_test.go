@@ -213,6 +213,8 @@ func TestVariantProblems(t *testing.T) {
 		{"via", "-- variant/cycle/in/sheet/B1 --\n=A1\n-- variant/cycle/via/parse/sheet/x --\nx\n", nil},
 		{"transform via", "-- transform/looped/via/parse/sheet/x --\nx\n", nil},
 		{"via with no lift", "-- variant/cycle/in/sheet/B1 --\n=A1\n-- variant/cycle/via/x --\nx\n", []string{"variant/cycle/via/x: a product belongs under its lift, as variant/cycle/via/<lift>/<tree>/<file>"}},
+		{"bare via", "-- via --\nx\n", []string{"via: a product belongs under its lift, as via/<lift>/<tree>/<file>"}},
+		{"variant's bare via", "-- variant/cycle/in/sheet/B1 --\n=A1\n-- variant/cycle/via --\nx\n", []string{"variant/cycle/via: a product belongs under its lift, as variant/cycle/via/<lift>/<tree>/<file>"}},
 		{"via with no tree", "-- variant/cycle/in/sheet/B1 --\n=A1\n-- variant/cycle/via/parse/x --\nx\n", []string{"variant/cycle/via/parse/x: a product's file belongs in a tree, as variant/cycle/via/parse/<tree>/<file>"}},
 		{"transform via with no tree", "-- transform/looped/via/parse/x --\nx\n", []string{"transform/looped/via/parse/x: a product's file belongs in a tree, as transform/looped/via/parse/<tree>/<file>"}},
 		{"via params", "-- variant/cycle/in/sheet/B1 --\n=A1\n-- variant/cycle/via/parse/params/x --\nx\n", []string{"variant/cycle/via/parse/params/x: the tree name params is reserved in every input view, a product's included"}},
