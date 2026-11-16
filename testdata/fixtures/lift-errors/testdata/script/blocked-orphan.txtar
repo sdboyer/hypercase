@@ -1,0 +1,11 @@
+resolve now rejects the script, so evaluate's committed values are orphans.
+-- in/resolve/error --
+A1 -> A1: cycle
+-- properties --
+circular
+-- out/evaluate/values.txt --
+evaluate 1
+-- out/format/trail.txt --
+parse
+-- out/resolve/error.txt --
+A1 -> A1: cycle

@@ -1,0 +1,10 @@
+The script is malformed and circular. parse rejects it, so resolve's cell is blocked, and nothing expects it to err.
+-- in/parse/error --
+D1: not a number
+-- in/resolve/error --
+A1 -> A1: cycle
+-- in/calc/error --
+D1: not a number
+-- properties --
+malformed
+circular

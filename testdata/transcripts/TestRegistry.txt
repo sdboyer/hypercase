@@ -6,20 +6,35 @@ $ go test  # echo
 PASS
 $ cat testdata/hypercase.json
 {
-  "format": 1,
+  "format": 2,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
   "properties": [],
+  "types": [
+    {
+      "dir": "script",
+      "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
+      "goType": "github.com/sdboyer/hypercase_test.Script"
+    }
+  ],
+  "lifts": [],
   "suites": [
     {
       "name": "echo",
       "description": "Does what the case's do/ tree says.",
-      "corpus": "script",
+      "consumes": "github.com/sdboyer/hypercase_test.Script",
+      "corpora": [
+        "script"
+      ],
       "outputs": [
         {
           "pattern": "?.txt",
           "description": "A file the case's instructions name with one letter."
+        },
+        {
+          "pattern": "archive.txt",
+          "description": "The archive's name, as the run received it."
         },
         {
           "pattern": "dir.txt",
@@ -55,11 +70,18 @@ $ go test  # echo-shout
         +     {
         +       "name": "shout",
         +       "description": "Does what the case's shout/ tree says.",
-        +       "corpus": "script",
+        +       "consumes": "github.com/sdboyer/hypercase_test.Script",
+        +       "corpora": [
+        +         "script"
+        +       ],
         +       "outputs": [
         +         {
         +           "pattern": "?.txt",
         +           "description": "A file the case's instructions name with one letter."
+        +         },
+        +         {
+        +           "pattern": "archive.txt",
+        +           "description": "The archive's name, as the run received it."
         +         },
         +         {
         +           "pattern": "dir.txt",
@@ -115,8 +137,8 @@ $ go test  # echo-shout
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.
     no registry records a root-package check for the module-root corpus, so nothing reports what no column there owns.
         Register hypercase.RootPackage() in one package over it, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... to record it in the package's registry.
-    testdata/script/ holds archives, and no registry declares it as a corpus.
-        Declare the directory as a suite's corpus, or move or delete the archives.
+    testdata/script/ holds archives, and no registry declares a corpus type of that directory.
+        Declare a decl.Type with that Dir, or move or delete the archives.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/script
         --- PASS: TestCorpus/script/twice

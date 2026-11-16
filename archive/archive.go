@@ -83,6 +83,10 @@ const (
 	Transform  = "transform"
 )
 
+// ParamsTree is the input tree name reserved for parameters, which no
+// archive carries: in/params/ is a problem of the archive's form.
+const ParamsTree = "params"
+
 // topLevel is the closed set, each with whether this hypercase reads it yet.
 // A section under a name it doesn't read yet is a problem of form, so it
 // can't pass unread while an update rewrites the goldens beside it.
@@ -154,8 +158,12 @@ func (a *Archive) Check() []Problem {
 		}
 		switch top {
 		case In:
-			if _, file, _ := strings.Cut(rest, "/"); file == "" {
+			tree, file, _ := strings.Cut(rest, "/")
+			switch {
+			case file == "":
 				ps = append(ps, Problem{Section: s.Name, Msg: "an input belongs in a tree, as in/<tree>/<file>"})
+			case tree == ParamsTree:
+				ps = append(ps, Problem{Section: s.Name, Msg: "the tree name params is reserved: a column's parameters are fixed in Go, or derived from the archive's name, and an archive carries none"})
 			}
 		case Out:
 			col, file, _ := strings.Cut(rest, "/")

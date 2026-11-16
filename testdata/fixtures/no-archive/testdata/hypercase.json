@@ -1,0 +1,45 @@
+{
+  "format": 2,
+  "updateVar": "FIXTURE_UPDATE_GOLDEN",
+  "corpusRoot": ".",
+  "rootPackage": true,
+  "properties": [
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    }
+  ],
+  "types": [
+    {
+      "dir": "script",
+      "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
+      "goType": "github.com/sdboyer/hypercase_test.Script"
+    }
+  ],
+  "lifts": [
+    {
+      "name": "parse",
+      "description": "Parses the script, as its parse/ tree says.",
+      "input": "github.com/sdboyer/hypercase_test.Script",
+      "product": "*github.com/sdboyer/hypercase_test.Parsed",
+      "owned": true,
+      "corpora": [
+        "script"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why the lift rejects the case."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "What the lift writes to stderr."
+        }
+      ],
+      "rejects": [
+        "malformed"
+      ]
+    }
+  ],
+  "suites": []
+}

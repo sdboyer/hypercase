@@ -1,0 +1,154 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # two-types
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        grid-parse ran on b
+        format's probe ran
+        format ran on b
+        parse ran on a
+        format's probe ran
+        format ran on a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/b
+            --- PASS: TestCorpus/grid/b/format
+            --- PASS: TestCorpus/grid/b/grid-parse
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/a
+            --- PASS: TestCorpus/script/a/format
+            --- PASS: TestCorpus/script/a/parse
+PASS
+$ go test  # two-types
+    what ran, in order:
+        grid-parse ran on b
+        format's probe ran
+        format ran on b
+        parse ran on a
+        format's probe ran
+        format ran on a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/b
+            --- PASS: TestCorpus/grid/b/format
+            --- PASS: TestCorpus/grid/b/grid-parse
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/a
+            --- PASS: TestCorpus/script/a/format
+            --- PASS: TestCorpus/script/a/parse
+PASS
+$ cat testdata/hypercase.json
+{
+  "format": 2,
+  "updateVar": "FIXTURE_UPDATE_GOLDEN",
+  "corpusRoot": ".",
+  "rootPackage": true,
+  "properties": [
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    }
+  ],
+  "types": [
+    {
+      "dir": "grid",
+      "description": "Trees of instructions, in a grid.",
+      "goType": "github.com/sdboyer/hypercase_test.Grid"
+    },
+    {
+      "dir": "script",
+      "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
+      "goType": "github.com/sdboyer/hypercase_test.Script"
+    }
+  ],
+  "lifts": [
+    {
+      "name": "grid-parse",
+      "description": "Parses a grid, as its parse/ tree says.",
+      "input": "github.com/sdboyer/hypercase_test.Grid",
+      "product": "*github.com/sdboyer/hypercase_test.Parsed",
+      "owned": true,
+      "corpora": [
+        "grid"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why the lift rejects the case."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "What the lift writes to stderr."
+        }
+      ],
+      "rejects": []
+    },
+    {
+      "name": "parse",
+      "description": "Parses the script, as its parse/ tree says.",
+      "input": "github.com/sdboyer/hypercase_test.Script",
+      "product": "*github.com/sdboyer/hypercase_test.Parsed",
+      "owned": true,
+      "corpora": [
+        "script"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why the lift rejects the case."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "What the lift writes to stderr."
+        }
+      ],
+      "rejects": [
+        "malformed"
+      ]
+    }
+  ],
+  "suites": [
+    {
+      "name": "format",
+      "description": "Does what the case's format/ tree says, from the stage it consumes.",
+      "consumes": "*github.com/sdboyer/hypercase_test.Parsed",
+      "corpora": [
+        "grid",
+        "script"
+      ],
+      "outputs": [
+        {
+          "pattern": "?.txt",
+          "description": "A file the case's instructions name with one letter."
+        },
+        {
+          "pattern": "archive.txt",
+          "description": "The archive's name, as the run received it."
+        },
+        {
+          "pattern": "dir.txt",
+          "description": "The path of a temp dir the run made."
+        },
+        {
+          "pattern": "error.txt",
+          "description": "The error the case's instructions give."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "What the case's instructions write to stderr."
+        },
+        {
+          "pattern": "stdout.txt",
+          "description": "What the case's instructions write to stdout."
+        },
+        {
+          "pattern": "trail.txt",
+          "description": "The trail of the parsed script, as the suite received it."
+        },
+        {
+          "pattern": "values.txt",
+          "description": "The values the case's instructions give."
+        }
+      ],
+      "rejects": []
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # pkg-b-later
-    the suite shout applies to no case: its corpus, testdata/later, holds no archive whose cells run.
-        A suite that applies to no case checks nothing. Add a case to the corpus, or name another corpus.
+    the suite shout applies to no case: its corpus, testdata/later/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/later
 FAIL

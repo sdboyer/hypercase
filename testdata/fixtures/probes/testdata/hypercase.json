@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -9,15 +9,30 @@
       "description": "Some cell's formula refers back to itself, directly or through other cells."
     }
   ],
+  "types": [
+    {
+      "dir": "script",
+      "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
+      "goType": "github.com/sdboyer/hypercase_test.Script"
+    }
+  ],
+  "lifts": [],
   "suites": [
     {
       "name": "echo",
       "description": "Does what the case's do/ tree says.",
-      "corpus": "script",
+      "consumes": "github.com/sdboyer/hypercase_test.Script",
+      "corpora": [
+        "script"
+      ],
       "outputs": [
         {
           "pattern": "?.txt",
           "description": "A file the case's instructions name with one letter."
+        },
+        {
+          "pattern": "archive.txt",
+          "description": "The archive's name, as the run received it."
         },
         {
           "pattern": "dir.txt",

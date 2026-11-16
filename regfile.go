@@ -6,10 +6,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/internal/diff"
 	"github.com/sdboyer/hypercase/internal/registry"
 )
@@ -24,17 +26,65 @@ func (r *runner) ownRegistry() registry.Registry {
 	for _, p := range r.properties {
 		g.Properties = append(g.Properties, registry.Property{Name: p.Name, Description: p.Description})
 	}
+	for _, ct := range r.types {
+		g.Types = append(g.Types, registry.Type{Dir: ct.dir, Description: ct.description, GoType: goTypeName(ct.goType)})
+	}
+	for _, l := range r.lifts {
+		g.Lifts = append(g.Lifts, registry.Lift{
+			Name:        l.name,
+			Description: l.description,
+			Input:       goTypeName(l.in),
+			Product:     goTypeName(l.out),
+			Owned:       l.owned,
+			Corpora:     r.corpora[l.name],
+			Outputs:     registryOutputs(l.outputs),
+			Rejects:     propertyNames(l.rejects),
+		})
+	}
 	for _, c := range r.columns {
-		s := registry.Suite{Name: c.name, Description: c.description, Corpus: c.corpus}
-		for _, o := range c.outputs {
-			s.Outputs = append(s.Outputs, registry.Output{Pattern: o.Pattern, Description: o.Description})
+		if c.lift != nil {
+			continue
 		}
-		for _, p := range c.rejects {
-			s.Rejects = append(s.Rejects, p.Name)
-		}
-		g.Suites = append(g.Suites, s)
+		g.Suites = append(g.Suites, registry.Suite{
+			Name:        c.name,
+			Description: c.description,
+			Consumes:    goTypeName(c.consumes),
+			Corpora:     r.corpora[c.name],
+			Outputs:     registryOutputs(c.outputs),
+			Rejects:     propertyNames(c.rejects),
+		})
 	}
 	return g
+}
+
+func registryOutputs(os []decl.Output) []registry.Output {
+	var out []registry.Output
+	for _, o := range os {
+		out = append(out, registry.Output{Pattern: o.Pattern, Description: o.Description})
+	}
+	return out
+}
+
+func propertyNames(ps []decl.Property) []string {
+	var names []string
+	for _, p := range ps {
+		names = append(names, p.Name)
+	}
+	return names
+}
+
+// goTypeName names a Go type by its package's import path and its name, so
+// two packages' types of one name differ.
+func goTypeName(t reflect.Type) string {
+	switch {
+	case t.Name() != "" && t.PkgPath() != "":
+		return t.PkgPath() + "." + t.Name()
+	case t.Kind() == reflect.Pointer:
+		return "*" + goTypeName(t.Elem())
+	case t.Kind() == reflect.Slice:
+		return "[]" + goTypeName(t.Elem())
+	}
+	return t.String()
 }
 
 // checkRegistry compares the package's registry, testdata/hypercase.json,

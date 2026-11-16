@@ -7,11 +7,11 @@ panic: hypercase: the suite name "Echo" breaks the naming rule: lowercase ASCII 
 [stack]
 [exit 2]
 $ go test  # two-names
-panic: hypercase: two suites are named echo. Column names are unique; rename one.
+panic: hypercase: two columns are named echo: the suite echo, over hypercase_test.Script, and the suite echo, over hypercase_test.Script. Column names are unique; rename one.
 [stack]
 [exit 2]
 $ go test -run=^$  # two-names
-panic: hypercase: two suites are named echo. Column names are unique; rename one.
+panic: hypercase: two columns are named echo: the suite echo, over hypercase_test.Script, and the suite echo, over hypercase_test.Script. Column names are unique; rename one.
 [stack]
 [exit 2]
 $ go test  # no-run
@@ -31,11 +31,11 @@ panic: hypercase: Register was given a decl.Project a second time. Register the 
 [stack]
 [exit 2]
 $ go test  # unknown
-panic: hypercase: Register was given a int, which is nothing hypercase registers. Pass a decl.Project, a decl.Property, a hypercase.Suite or an option, such as hypercase.Root.
+panic: hypercase: Register was given a int, which is nothing hypercase registers. Pass a decl.Project, a decl.Property, a decl.Type or an option, such as hypercase.Own or hypercase.Root.
 [stack]
 [exit 2]
 $ go test -run=^$  # unknown
-panic: hypercase: Register was given a int, which is nothing hypercase registers. Pass a decl.Project, a decl.Property, a hypercase.Suite or an option, such as hypercase.Root.
+panic: hypercase: Register was given a int, which is nothing hypercase registers. Pass a decl.Project, a decl.Property, a decl.Type or an option, such as hypercase.Own or hypercase.Root.
 [stack]
 [exit 2]
 $ go test  # late

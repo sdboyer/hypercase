@@ -48,22 +48,50 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 	}
 
-	// Columns, properties and root-package checks, merged across packages.
-	columnPkgs := map[string][]string{}
+	// Columns, lifts, types, properties and root-package checks, merged
+	// across packages.
+	columnPkgs := map[string][]string{}             // column → the packages that own it
 	claimed := map[string]map[string]bool{}         // corpus → the columns over it
+	usedPkgs := map[string][]string{}               // lift → the packages that only use it
+	declared := map[string]bool{}                   // the corpus types' directories
+	typeEntries := map[string]map[string][]string{} // directory → type entry → packages
+	typeOrder := map[string][]string{}              // directory → type entries, in the order of the packages
 	propEntries := map[string]map[string][]string{} // property → description → packages
 	propOrder := map[string][]string{}              // property → descriptions, in the order of the packages
 	var rootPkgs []string
+	claim := func(name string, corpora []string, pkg string) {
+		columnPkgs[name] = append(columnPkgs[name], pkg)
+		for _, corpus := range corpora {
+			if claimed[corpus] == nil {
+				claimed[corpus] = map[string]bool{}
+			}
+			claimed[corpus][name] = true
+		}
+	}
 	for _, g := range regs {
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
 		}
 		for _, s := range g.reg.Suites {
-			columnPkgs[s.Name] = append(columnPkgs[s.Name], g.pkg)
-			if claimed[s.Corpus] == nil {
-				claimed[s.Corpus] = map[string]bool{}
+			claim(s.Name, s.Corpora, g.pkg)
+		}
+		for _, l := range g.reg.Lifts {
+			if l.Owned {
+				claim(l.Name, l.Corpora, g.pkg)
+			} else {
+				usedPkgs[l.Name] = append(usedPkgs[l.Name], g.pkg)
 			}
-			claimed[s.Corpus][s.Name] = true
+		}
+		for _, ct := range g.reg.Types {
+			declared[ct.Dir] = true
+			entry := fmt.Sprintf("%s: %q", ct.GoType, ct.Description)
+			if typeEntries[ct.Dir] == nil {
+				typeEntries[ct.Dir] = map[string][]string{}
+			}
+			if typeEntries[ct.Dir][entry] == nil {
+				typeOrder[ct.Dir] = append(typeOrder[ct.Dir], entry)
+			}
+			typeEntries[ct.Dir][entry] = append(typeEntries[ct.Dir][entry], g.pkg)
 		}
 		for _, p := range g.reg.Properties {
 			if propEntries[p.Name] == nil {
@@ -80,8 +108,24 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	}
 	for _, name := range sortedKeys(columnPkgs) {
 		if pkgs := columnPkgs[name]; len(pkgs) > 1 {
-			t.Errorf("the column %s is registered by %s. Column names are unique per corpus root.\nRename one of the columns, or remove one.", name, andList(pkgs))
+			t.Errorf("the column %s is owned by %s. Column names are unique per corpus root, and one package owns each column.\nRename one of the columns, or remove one. A package that only reads a lift's product gives the lift to hypercase.Use.", name, andList(pkgs))
 		}
+	}
+	for _, name := range sortedKeys(usedPkgs) {
+		if _, owned := columnPkgs[name]; !owned {
+			t.Errorf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.\nOwn the lift in one of them: give it to hypercase.Own in place of hypercase.Use.", name, andList(usedPkgs[name]))
+		}
+	}
+	for _, dir := range sortedKeys(typeEntries) {
+		entries := typeEntries[dir]
+		if len(entries) < 2 {
+			continue
+		}
+		var lines []string
+		for _, e := range typeOrder[dir] {
+			lines = append(lines, fmt.Sprintf("  %s: %s", andList(entries[e]), e))
+		}
+		t.Errorf("the corpus directory %s has two different corpus types:\n%s\nAn archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration.", dir, strings.Join(lines, "\n"))
 	}
 	for _, name := range sortedKeys(propEntries) {
 		entries := propEntries[name]
@@ -113,7 +157,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			return nil
 		}
 		dir := filepath.ToSlash(mustRel(td, filepath.Dir(p)))
-		_, isCorpus := claimed[dir]
+		isCorpus := declared[dir]
 		switch {
 		case archive.IsTemp(d.Name()) && isCorpus:
 			t.Errorf("%s is a temp file left by a write that was cut short.\nDelete it.", r.rel(p))
@@ -133,7 +177,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			t.Errorf("%s holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.\nMove the archives into one.", rel)
 			continue
 		}
-		t.Errorf("%s holds archives, and no registry declares it as a corpus.\nDeclare the directory as a suite's corpus, or move or delete the archives.", rel)
+		t.Errorf("%s holds archives, and no registry declares a corpus type of that directory.\nDeclare a decl.Type with that Dir, or move or delete the archives.", rel)
 	}
 
 	props := func(name string) bool { _, ok := propEntries[name]; return ok }

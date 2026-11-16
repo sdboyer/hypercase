@@ -1,0 +1,7 @@
+parse rejects a valid script, a known gap.
+-- in/parse/error --
+A1: wrongly rejected
+-- gaps --
+parse rejects a valid script. Waits on sheets#3.
+-- out/parse/error.txt --
+A1: wrongly rejected

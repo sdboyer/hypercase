@@ -24,7 +24,7 @@ func TestRootCheckColumnTwice(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared")
 	s.run("b", "pkg-b-echo", true)
-	s.fails(s.normal("pkg-a"), "the column echo is registered by . and ./b. Column names are unique per corpus root.\nRename one of the columns, or remove one.")
+	s.fails(s.normal("pkg-a"), "the column echo is owned by . and ./b. Column names are unique per corpus root, and one package owns each column.\nRename one of the columns, or remove one.")
 	s.done()
 }
 
@@ -77,8 +77,8 @@ func TestRootCheckArchives(t *testing.T) {
 		"testdata/script/loopy.txtar: properties states loopy, and no registry under the module-root corpus lists a property of that name.",
 		"testdata/script/loopy.txtar: gaps, line 1, names format, and no registry has a column of that name over the corpus script.",
 		"testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it:\n  ni/do/out/values.txt: ni is not one of the framework's top-level names",
-		"testdata/script/old/ holds archives, and no registry declares it as a corpus.",
-		"testdata/renamed/ holds archives, and no registry declares it as a corpus.\nDeclare the directory as a suite's corpus, or move or delete the archives.",
+		"testdata/script/old/ holds archives, and no registry declares a corpus type of that directory.",
+		"testdata/renamed/ holds archives, and no registry declares a corpus type of that directory.\nDeclare a decl.Type with that Dir, or move or delete the archives.",
 		"testdata/ holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.\nMove the archives into one.",
 		"--- PASS: TestCorpus/script/nameless/echo",
 		"--- PASS: TestCorpus/script/loopy/echo")
@@ -107,7 +107,7 @@ func TestRootCheckRegistries(t *testing.T) {
 	s.fails(s.normal("pkg-a"), "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests.")
 	s.write("b/corpus_test.go", []byte(packageTestFile), "restore b's tests")
 	s.write("b/testdata/hypercase.json", []byte("{\n  \"format\": 9\n}\n"), "a registry from a later hypercase")
-	s.fails(s.normal("pkg-a"), "b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format 1.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.")
+	s.fails(s.normal("pkg-a"), "b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format 2.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.")
 	s.done()
 }
 

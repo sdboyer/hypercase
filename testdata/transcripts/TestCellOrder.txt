@@ -1,0 +1,120 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/both: evaluate is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: format is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: resolve is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/loop: evaluate is blocked: the lift resolve failed on the case, and testdata/script/loop.txtar, out/resolve/error.txt, records its error.
+    script/stray: evaluate is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: format is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: resolve is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on both
+        parse ran on both
+        calc ran on fine
+        parse ran on fine
+        resolve ran on fine
+        evaluate's probe ran
+        evaluate ran on fine
+        format's probe ran
+        format ran on fine
+        calc ran on loop
+        parse ran on loop
+        resolve ran on loop
+        format's probe ran
+        format ran on loop
+        calc ran on noisy
+        parse ran on noisy
+        resolve ran on noisy
+        evaluate's probe ran
+        evaluate ran on noisy
+        format's probe ran
+        format ran on noisy
+        calc ran on stray
+        parse ran on stray
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/both
+            --- PASS: TestCorpus/script/both/calc
+            --- SKIP: TestCorpus/script/both/evaluate
+            --- SKIP: TestCorpus/script/both/format
+            --- PASS: TestCorpus/script/both/parse
+            --- SKIP: TestCorpus/script/both/resolve
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/calc
+            --- PASS: TestCorpus/script/fine/evaluate
+            --- PASS: TestCorpus/script/fine/format
+            --- PASS: TestCorpus/script/fine/parse
+            --- PASS: TestCorpus/script/fine/resolve
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/calc
+            --- SKIP: TestCorpus/script/loop/evaluate
+            --- PASS: TestCorpus/script/loop/format
+            --- PASS: TestCorpus/script/loop/parse
+            --- PASS: TestCorpus/script/loop/resolve
+        --- PASS: TestCorpus/script/noisy
+            --- PASS: TestCorpus/script/noisy/calc
+            --- PASS: TestCorpus/script/noisy/evaluate
+            --- PASS: TestCorpus/script/noisy/format
+            --- PASS: TestCorpus/script/noisy/parse
+            --- PASS: TestCorpus/script/noisy/resolve
+        --- PASS: TestCorpus/script/stray
+            --- PASS: TestCorpus/script/stray/calc
+            --- SKIP: TestCorpus/script/stray/evaluate
+            --- SKIP: TestCorpus/script/stray/format
+            --- PASS: TestCorpus/script/stray/parse
+            --- SKIP: TestCorpus/script/stray/resolve
+PASS
+$ go test -run=TestCorpus/script/fine/  # ladder
+    what ran, in order:
+        calc ran on fine
+        parse ran on fine
+        resolve ran on fine
+        evaluate's probe ran
+        evaluate ran on fine
+        format's probe ran
+        format ran on fine
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/calc
+            --- PASS: TestCorpus/script/fine/evaluate
+            --- PASS: TestCorpus/script/fine/format
+            --- PASS: TestCorpus/script/fine/parse
+            --- PASS: TestCorpus/script/fine/resolve
+PASS
+$ go test -run=TestCorpus/script/fine/  # ladder-shuffled
+    what ran, in order:
+        calc ran on fine
+        parse ran on fine
+        resolve ran on fine
+        evaluate's probe ran
+        evaluate ran on fine
+        format's probe ran
+        format ran on fine
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/calc
+            --- PASS: TestCorpus/script/fine/evaluate
+            --- PASS: TestCorpus/script/fine/format
+            --- PASS: TestCorpus/script/fine/parse
+            --- PASS: TestCorpus/script/fine/resolve
+PASS
+$ HYPERCASE_SELFTEST_REVERSE=1 go test -run=TestCorpus/script/fine/  # ladder
+    what ran, in order:
+        parse ran on fine
+        resolve ran on fine
+        format's probe ran
+        format ran on fine
+        evaluate's probe ran
+        evaluate ran on fine
+        calc ran on fine
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/resolve
+            --- PASS: TestCorpus/script/fine/parse
+            --- PASS: TestCorpus/script/fine/format
+            --- PASS: TestCorpus/script/fine/evaluate
+            --- PASS: TestCorpus/script/fine/calc
+PASS
