@@ -580,6 +580,7 @@ func TestLoopable(t *testing.T) {
 		{"refers to itself", sheetFS(map[string]string{"A1": "= (A1)\n", "B1": "1"}), "A1 already refers to itself"},
 		{"later cell refers to itself", sheetFS(map[string]string{"A1": "1", "B1": "=B1"}), ""},
 		{"not a cell", sheetFS(map[string]string{"A1": "1", "notes": "1"}), ""},
+		{"not a cell, and the first cell refers to itself", sheetFS(map[string]string{"A1": "=A1", "notes": "1"}), ""},
 		{"a directory", fstest.MapFS{"sheet/A1/x": {}}, ""},
 		{"sheet is a file", fstest.MapFS{"sheet": {}}, ""},
 	}

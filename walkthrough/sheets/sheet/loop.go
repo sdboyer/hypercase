@@ -16,6 +16,9 @@ func Loopable(fsys fs.FS) (why string, ok bool) {
 	if err != nil {
 		return "", true
 	}
+	if _, err := checkFiles(files); err != nil {
+		return "", true
+	}
 	if why := loopRefusal(files); why != "" {
 		return why, false
 	}
