@@ -363,8 +363,12 @@ update takes (step 5).
   and `stderr.txt` goldens. Each of those files exists when the run wrote to
   its stream. The process's `os.Stdout` is never replaced.
 - At this step an error fails its case; step 4 lets a case expect one. The
-  error is recorded as `out/<suite>/error.txt`: its text, with a final
-  newline. When the run errs, the outputs it did produce are still compared.
+  error is recorded as `out/<suite>/error.txt`, its text with a final
+  newline, when the suite declares `error.txt` (below), and an update writes
+  it there though the cell still fails. Step 3's example declares none,
+  since none of its cases errs: an error there also fails as an undeclared
+  output, and an update writes nothing for its cell. When the run errs, the
+  outputs it did produce are still compared.
 - `error.txt`, `stdout.txt` and `stderr.txt` directly under a column's
   directory are the framework's, and so are the names later steps add there:
   `outcome` (step 8) and `inputs` (step 11). A run that returns an output at
