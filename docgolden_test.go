@@ -42,13 +42,9 @@ var (
 // source under walkthrough/ byte for byte. With HYPERCASE_UPDATE_GOLDEN=1, it
 // rewrites the blocks that differ.
 func TestWalkthrough(t *testing.T) {
-	var update bool
-	switch v := os.Getenv(docUpdateVar); v {
-	case "":
-	case "1":
-		update = true
-	default:
-		t.Fatalf("%s is %q; set it to 1 to update the walkthrough's blocks, or leave it unset", docUpdateVar, v)
+	update, err := docUpdateMode(os.Getenv(docUpdateVar))
+	if err != nil {
+		t.Fatal(err)
 	}
 	blocks, problems := docGolden(".", "WALKTHROUGH.md", update)
 	for _, p := range problems {
@@ -57,6 +53,19 @@ func TestWalkthrough(t *testing.T) {
 	if blocks == 0 {
 		t.Error("WALKTHROUGH.md has no marked blocks, so nothing in it is checked")
 	}
+}
+
+// docUpdateMode reads the update variable's value: unset or empty checks the
+// doc, 1 updates it, and anything else is refused, so that a value such as
+// "true" can't pass for a check.
+func docUpdateMode(v string) (bool, error) {
+	switch v {
+	case "":
+		return false, nil
+	case "1":
+		return true, nil
+	}
+	return false, fmt.Errorf("%s is %q; set it to 1 to update the walkthrough's blocks, or leave it unset", docUpdateVar, v)
 }
 
 type docProblem struct {

@@ -282,3 +282,42 @@ func TestDocGoldenNotAFence(t *testing.T) {
 	root := docFixture(t, map[string]string{"doc.md": doc, "walkthrough/a/x.md": "    ```\n"})
 	checkDoc(t, root, false)
 }
+
+// A marker naming something that can't be read fails, naming it. The reason
+// after it is the operating system's.
+func TestDocGoldenUnreadable(t *testing.T) {
+	doc := "<!-- source: walkthrough/a -->\n```\n```\n"
+	root := docFixture(t, map[string]string{"doc.md": doc, "walkthrough/a/x.go": docGoSource})
+	for _, update := range []bool{false, true} {
+		_, got := docGolden(root, "doc.md", update)
+		if len(got) != 1 || !strings.HasPrefix(got[0], "doc.md:1: can't read walkthrough/a: ") {
+			t.Errorf("update=%v: got %q, want one problem naming walkthrough/a", update, got)
+		}
+	}
+	if got := readDoc(t, root); got != doc {
+		t.Errorf("an update changed the doc:\n%s", got)
+	}
+}
+
+func TestDocUpdateMode(t *testing.T) {
+	tests := []struct {
+		value  string
+		update bool
+		err    string
+	}{
+		{"", false, ""},
+		{"1", true, ""},
+		{"0", false, `HYPERCASE_UPDATE_GOLDEN is "0"; set it to 1 to update the walkthrough's blocks, or leave it unset`},
+		{"true", false, `HYPERCASE_UPDATE_GOLDEN is "true"; set it to 1 to update the walkthrough's blocks, or leave it unset`},
+	}
+	for _, tt := range tests {
+		update, err := docUpdateMode(tt.value)
+		msg := ""
+		if err != nil {
+			msg = err.Error()
+		}
+		if update != tt.update || msg != tt.err {
+			t.Errorf("%q: got %v, %q; want %v, %q", tt.value, update, msg, tt.update, tt.err)
+		}
+	}
+}
