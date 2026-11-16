@@ -95,12 +95,13 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	}
 	for _, g := range regs {
 		// A registry in a package with no _test.go file records what no
-		// test runs, so its package owns nothing: no column, lift or
-		// transform. Its sections stay claimed, since the registry's own
-		// error reports them, and a message that finds no owner names it.
-		owners, trOwners := columnPkgs, trPkgs
+		// test runs, so its package owns and uses nothing: no column, lift
+		// or transform. Its sections stay claimed, since the registry's own
+		// error reports them, and what it owns is kept apart, so a message
+		// that finds no owner names it.
+		owners, users, trOwners := columnPkgs, usedPkgs, trPkgs
 		if !g.tested {
-			owners, trOwners = untestedCols, untestedTrs
+			owners, users, trOwners = untestedCols, map[string][]string{}, untestedTrs
 		}
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
@@ -117,7 +118,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			if l.Owned {
 				claim(owners, l.Name, l.Corpora, g.pkg)
 			} else {
-				usedPkgs[l.Name] = append(usedPkgs[l.Name], g.pkg)
+				users[l.Name] = append(users[l.Name], g.pkg)
 			}
 		}
 		for _, ct := range g.reg.Types {
