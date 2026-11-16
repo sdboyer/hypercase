@@ -255,4 +255,15 @@ exec "$GIT" "$@"
 			}
 		})
 	}
+	// A revision git resolves to no commit writes nothing on stderr, and a
+	// rev-parse that fails otherwise is the failure, with its stderr.
+	t.Run("resolve", func(t *testing.T) {
+		wrapGit(t, `if [ "$1" = rev-parse ] && [ "$2" = --verify ]; then echo "the wrapper fails $1" >&2; exit 3; fi
+exec "$GIT" "$@"
+`)
+		r := open(t, g.Dir)
+		if _, err := r.Resolve("HEAD"); err == nil || err.Error() != "git rev-parse: the wrapper fails rev-parse" {
+			t.Errorf("Resolve(HEAD): got %v, want %q", err, "git rev-parse: the wrapper fails rev-parse")
+		}
+	})
 }
