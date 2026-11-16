@@ -241,6 +241,9 @@ var transformRegistrations = map[string]func(){
 	"tr-unregistered-gives": func() {
 		hypercase.Register(project, rootPkg, dangling, typeWith(looped), own(withRejects(echo, dangling), looped))
 	},
+	"tr-unregistered-keeps": func() {
+		hypercase.Register(project, rootPkg, dangling, typeWith(upper), own(withRejects(echo, dangling), upper))
+	},
 	"tr-other-description": func() {
 		hypercase.Register(project, rootPkg, loop, dangling, typeWith(upper), own(withRejects(echo, loop), upper))
 	},

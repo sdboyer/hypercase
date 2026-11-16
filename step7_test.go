@@ -901,6 +901,7 @@ func TestTransformRelations(t *testing.T) {
 		{"tr-own-no-type", "the package owns the transform looped, of the corpus type hypercase_test.Script, and registers no such corpus type.\nRegister the corpus type, which lists the transform in its Transforms."},
 		{"tr-own-differs", "the package owns a transform named looped that differs from the one the corpus type hypercase_test.Script lists.\nOwn the declaration the type lists: declare the transform once, and use that declaration in both places."},
 		{"tr-unregistered-gives", "the transform looped, of the corpus type hypercase_test.Script, gives circular, and the package registers no property of that name.\nRegister the property, or remove it from looped's Gives."},
+		{"tr-unregistered-keeps", "the transform upper, of the corpus type hypercase_test.Script, keeps circular, and the package registers no property of that name.\nRegister the property, or remove it from upper's Keeps."},
 		{"tr-other-description", "the transform upper, of the corpus type hypercase_test.Script, keeps a property named circular, which the package registers with another description.\nKeep one declaration of circular, with one description: register it, and list it in upper's Keeps."},
 		{"tr-other-gives", "the transform looped, of the corpus type hypercase_test.Script, gives a property named circular, which the package registers with another description.\nKeep one declaration of circular, with one description: register it, and list it in looped's Gives."},
 	} {
