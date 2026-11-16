@@ -19,20 +19,35 @@
 // inputs and the code. The archives are the *.txtar files directly in the
 // directories directly under the corpus root's testdata/. With no flags it
 // strips every archive, and removes the registries that record the corpus
-// root and the findings files in their packages' testdata/checks/.
+// root and the findings files in their packages' testdata/checks/. It
+// keeps a package's registry while a findings file of the package is
+// left, so that strip run again finds it.
 // -column limits it to a column's sections, at every level, and -transform
 // to those under a transform's variant, transform/<name>/; given together,
 // they limit it to the column's sections under that variant. Either leaves
 // the registries and findings files as they are. It leaves a frozen cell's
 // sections in place, and lists the cell; -frozen strips them too. It
 // prints a line for each archive it changed, each frozen cell it left and
-// each archive it left with a problem, then the update to run. It exits 1
-// when it left an archive or a file in place for a problem, a failed
-// write or removal included.
+// each file it left with a problem, then the update to run. A line that
+// says to run strip again gives the command, with -root unless strip ran
+// at the module root on the module-root corpus.
+//
+// strip exits 1 having removed nothing when it can't find the corpus root
+// or the module root, or the corpus root holds no testdata/; when a
+// registry under the module can't be read, or the registries that record
+// the corpus root record different update variables; when reading the
+// corpus root's testdata/ fails; and when -column or -transform matches no
+// section that strip removes. It exits 1 too when it left an archive or a
+// file in place for a problem, a failed write or removal included. It
+// exits 2 for a usage error: a flag given twice, an unknown flag, an
+// argument, an empty -root, or an empty or ill-formed -column or
+// -transform.
 //
 // -root names the corpus root, relative to the current directory. Without
-// it, the corpus root is found as a test finds it: the one the registry of
-// the package in the current directory records, or else the module root.
+// it, the corpus root is the one the registry of the package in the
+// current directory records, or, at the module root with no registry
+// there, the module root. Anywhere else with no registry, strip asks for
+// -root.
 package main
 
 import (

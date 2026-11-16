@@ -267,7 +267,7 @@ func TestRefusals(t *testing.T) {
 	}
 	root := corpusRoot(t, archives)
 	for _, tt := range []struct{ path, want string }{
-		{"sheet/notes.txtar", "the archive has problems of form, so no update writes it: variant/cycle/notes: notes is not one of a hand-written variant's sections: about, in, delete, properties, gaps, via and out. Fix the archive by hand, and strip it again"},
+		{"sheet/notes.txtar", "the archive has problems of form, so no update writes it: variant/cycle/notes: notes is not one of a hand-written variant's sections: about, in, delete, properties, gaps, via and out. Fix the archive by hand"},
 		{"sheet/twice.txtar", "the archive has problems of form, so no update writes it: out/evaluate/outcome: the section appears twice."},
 		{"x.txtar", "an archive belongs in a corpus's directory, testdata/<corpus>/, and this one is directly in testdata/. Move it into one"},
 		{"sheet/old/y.txtar", "an archive belongs directly in a corpus's directory, testdata/<corpus>/, and this one is below testdata/sheet/, so it is no case."},
@@ -302,5 +302,65 @@ func TestRefusals(t *testing.T) {
 		if _, err := Archive(root, p, tt.sel); err == nil || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("Archive with %+v = %v, want it refused with %q", tt.sel, err, tt.want)
 		}
+	}
+}
+
+// TestFrozenVia: a via/<column>/… section is part of a frozen cell when
+// BytesLifts says the column is a bytes lift, or doesn't know the column,
+// and of no cell when BytesLifts says it is no bytes lift: then the
+// section is removed, and the cell's out/<column>/… is left.
+func TestFrozenVia(t *testing.T) {
+	t.Parallel()
+	a := archive.Parse([]byte(`A CSV that import makes a sheet of, with a via/ for resolve too.
+-- in/csv/prices.csv --
+A1,3
+-- gaps --
+import Keeps the price's currency. Waits on sheets#7.
+resolve Names the cycle's cells. Waits on sheets#5.
+-- via/import/sheet/A1 --
+3
+-- via/resolve/sheet/A1 --
+3
+-- out/import/outcome --
+accepted
+-- out/resolve/outcome --
+accepted
+`))
+	if ps := a.Check(); len(ps) > 0 {
+		t.Fatalf("the archive has problems of form: %v", ps)
+	}
+	importCell := []string{"via/import/sheet/A1", "out/import/outcome"}
+	for _, tt := range []struct {
+		name    string
+		lifts   map[string]bool
+		removed []string
+		resolve []string // resolve's frozen cell's sections
+	}{
+		{"known", map[string]bool{"import": true, "resolve": false}, []string{"via/resolve/sheet/A1"}, []string{"out/resolve/outcome"}},
+		{"unknown", nil, nil, []string{"via/resolve/sheet/A1", "out/resolve/outcome"}},
+		{"import alone", map[string]bool{"import": true}, nil, []string{"via/resolve/sheet/A1", "out/resolve/outcome"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, sel := range []Selection{{BytesLifts: tt.lifts}, {Column: "resolve", BytesLifts: tt.lifts}} {
+				r := Plan(a, sel)
+				if !slices.Equal(r.Removed, tt.removed) {
+					t.Errorf("Plan(%+v) removes %q, not %q", sel, r.Removed, tt.removed)
+				}
+				frozen := map[string][]string{}
+				for _, f := range r.Frozen {
+					frozen[f.Column] = f.Sections
+				}
+				if !slices.Equal(frozen["resolve"], tt.resolve) {
+					t.Errorf("Plan(%+v) leaves resolve's frozen cell %q, not %q", sel, frozen["resolve"], tt.resolve)
+				}
+				if want := importCell; sel.Column != "" {
+					if _, ok := frozen["import"]; ok {
+						t.Errorf("Plan(%+v) leaves import's cell, which the selection doesn't select", sel)
+					}
+				} else if !slices.Equal(frozen["import"], want) {
+					t.Errorf("Plan(%+v) leaves import's frozen cell %q, not %q", sel, frozen["import"], want)
+				}
+			}
+		})
 	}
 }

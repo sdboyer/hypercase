@@ -143,7 +143,7 @@ FAIL
 [exit 1]
 $ hypercase strip
 testdata/export/prices.txtar: removed 29 sections
-testdata/export/prices.txtar: left the cell list, frozen by its known gap, gaps line 1; -frozen strips it too
+testdata/export/prices.txtar: left the cell list, frozen by its known gap, gaps line 1; hypercase strip -frozen strips it too
 testdata/script/plain.txtar: removed 12 sections
 Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
 # the update, run until a pass changes nothing; that pass:

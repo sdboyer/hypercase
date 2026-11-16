@@ -7,7 +7,10 @@
 // It tells the sections apart by name alone, as [archive.HandWritten]
 // does: it reads no registry and runs no Go. A frozen cell's sections,
 // those of a cell a gaps line marks, are left in place unless the
-// selection says to strip them too.
+// selection says to strip them too. Whether a via/<column>/… section is
+// part of a cell turns on whether the column is a bytes lift, which no
+// name tells, so the caller says what it knows in
+// [Selection.BytesLifts].
 //
 // The package doesn't import testing.
 package strip
@@ -35,16 +38,30 @@ type Selection struct {
 	Transform string
 	// Frozen strips frozen cells' sections too.
 	Frozen bool
+	// BytesLifts says, of the columns over the archive's corpus that the
+	// caller knows, which are bytes lifts: true for a bytes lift, false
+	// for any other column. A via/<column>/… section is a bytes lift's
+	// product, part of the lift's cell, and of no other column's. So a
+	// frozen cell keeps its via/<column>/… unless BytesLifts gives its
+	// column false, and then that section is removed like one of no cell.
+	// A column BytesLifts doesn't hold may be a bytes lift, so its cell
+	// keeps its via/<column>/… when frozen. nil knows no column.
+	BytesLifts map[string]bool
 }
+
+// Selects reports whether sel selects the named section: an
+// update-written one within its limits, whether or not a frozen cell
+// keeps it.
+func (sel Selection) Selects(section string) bool { return selected(section, sel) }
 
 // check reports a selection whose column or transform is no name, by the
 // naming rule.
 func (sel Selection) check() error {
 	if sel.Column != "" && !archive.ValidName(sel.Column) {
-		return fmt.Errorf("the column %q is no column's name, which is %s", sel.Column, archive.NameRule)
+		return fmt.Errorf("the column %q is no column's name, which is %s. Give a column's name", sel.Column, archive.NameRule)
 	}
 	if sel.Transform != "" && !archive.ValidName(sel.Transform) {
-		return fmt.Errorf("the transform %q is no transform's name, which is %s", sel.Transform, archive.NameRule)
+		return fmt.Errorf("the transform %q is no transform's name, which is %s. Give a transform's name", sel.Transform, archive.NameRule)
 	}
 	return nil
 }
@@ -74,8 +91,8 @@ type Frozen struct {
 	Gaps string
 	Line int
 	// Sections are the cell's sections left, in the order the archive
-	// holds them: its out/<Column>/…, and its via/<Column>/… when the
-	// column is a bytes lift.
+	// holds them: its out/<Column>/…, and its via/<Column>/… unless the
+	// selection's BytesLifts says the column is no bytes lift.
 	Sections []string
 }
 
@@ -90,7 +107,7 @@ func Plan(a *archive.Archive, sel Selection) Result {
 		if !selected(s.Name, sel) {
 			continue
 		}
-		if c, ok := cellOf(s.Name); ok && !sel.Frozen {
+		if c, ok := cellOf(s.Name); ok && !sel.Frozen && sel.ofCell(s.Name, c) {
 			if f, ok := marked[c]; ok {
 				i, seen := frozen[c]
 				if !seen {
@@ -141,6 +158,18 @@ func cellOf(section string) (cell, bool) {
 	return cell{kind, name, col}, true
 }
 
+// ofCell reports whether the named section, one whose name gives the cell
+// c, is part of that cell: an out/<column>/… is, and a via/<column>/… is
+// unless sel.BytesLifts says the column is no bytes lift.
+func (sel Selection) ofCell(section string, c cell) bool {
+	_, _, rest := archive.SplitCase(section)
+	if !strings.HasPrefix(rest, archive.Via+"/") {
+		return true
+	}
+	bytes, known := sel.BytesLifts[c.column]
+	return bytes || !known
+}
+
 // marks returns the cells the archive's gaps lines mark: the base's gaps
 // mark the base's cells and, by lines that name a transform, its
 // variant's; a hand-written variant's gaps mark its own.
@@ -187,7 +216,7 @@ func Archive(root, path string, sel Selection) (Result, error) {
 	var r Result
 	var refused error
 	err := archive.Modify(lockPath(root), path, func(a *archive.Archive) (*archive.Archive, error) {
-		if refused = checkForm(a); refused != nil {
+		if refused = CheckForm(a); refused != nil {
 			return nil, refused
 		}
 		r = Plan(a, sel)
@@ -208,7 +237,7 @@ func failed(err, refused error) error {
 	if err == nil || err == refused {
 		return err
 	}
-	return fmt.Errorf("stripping it failed, and the archive is as it was: %w. Fix what failed, and strip it again", err)
+	return fmt.Errorf("stripping it failed, and the archive is as it was: %w. Fix what failed", err)
 }
 
 // Remove removes the named sections from the archive at path, under the
@@ -227,7 +256,7 @@ func Remove(root, path string, names []string) error {
 	}
 	var refused error
 	err := archive.Modify(lockPath(root), path, func(a *archive.Archive) (*archive.Archive, error) {
-		if refused = checkForm(a); refused != nil {
+		if refused = CheckForm(a); refused != nil {
 			return nil, refused
 		}
 		have := map[string]bool{}
@@ -272,9 +301,10 @@ func without(a *archive.Archive, names []string) *archive.Archive {
 	return next
 }
 
-// checkForm refuses an archive with problems of form: none of its cells
-// run, so no update writes it, and no strip does either.
-func checkForm(a *archive.Archive) error {
+// CheckForm reports why [Archive] and [Remove] refuse an archive for its
+// form, or nil when they don't: an archive with problems of form, none of
+// whose cells run, so that no update writes it, and no strip does either.
+func CheckForm(a *archive.Archive) error {
 	ps := a.Check()
 	if len(ps) == 0 {
 		return nil
@@ -283,7 +313,7 @@ func checkForm(a *archive.Archive) error {
 	for _, p := range ps {
 		lines = append(lines, p.String())
 	}
-	return fmt.Errorf("the archive has problems of form, so no update writes it: %s. Fix the archive by hand, and strip it again", strings.Join(lines, "; "))
+	return fmt.Errorf("the archive has problems of form, so no update writes it: %s. Fix the archive by hand", strings.Join(lines, "; "))
 }
 
 // lockPath is the corpus root's lock file, which every update under the

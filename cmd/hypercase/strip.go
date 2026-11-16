@@ -111,6 +111,10 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 		fmt.Fprintf(stderr, "hypercase strip: "+format+"\n", args...)
 		return 1
 	}
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		return fail("finding the current directory failed: %v.\nRun strip from a directory that exists.", err)
+	}
 	corpusRoot, err := findCorpusRoot(dir, given)
 	if err != nil {
 		return fail("%v", err)
@@ -120,7 +124,7 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	}
 	mod, err := root.Module(corpusRoot)
 	if err != nil {
-		return fail("finding the module root: %v", err)
+		return fail("finding the module root of %s failed: %v.\nName a corpus root inside a Go module with -root, relative to the current directory.", corpusRoot, err)
 	}
 	rootRel := root.Rel(mod, corpusRoot)
 	rootName := "the corpus root " + rootRel
@@ -128,24 +132,26 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 		rootName = "the module-root corpus"
 	}
 	rel := func(p string) string { return root.Rel(corpusRoot, p) }
+	again := rerun(dir, mod, corpusRoot, sel)
 
 	// The registries, read before anything is removed: those that record
 	// the corpus root, and the corpus roots the others record.
 	found, err := registry.Find(mod)
 	if err != nil {
-		return fail("finding the module's registries: %v", err)
+		return fail("finding the module's registries failed: %v. Nothing was removed.\nFix what failed, then run %s again.", err, again)
 	}
 	var own []ownRegistry
 	others := map[string]bool{}
-	vars := map[string][]string{} // update variable → the registries that record it
+	vars := map[string][]string{}         // update variable → the registries that record it
+	lifts := map[string]map[string]bool{} // corpus → column → whether it is a bytes lift
 	for _, f := range found {
 		data, err := os.ReadFile(f.Path)
 		if err != nil {
-			return fail("reading %s: %v", rel(f.Path), err)
+			return fail("reading %s failed: %v. Nothing was removed.\nFix what failed, then run %s again.", rel(f.Path), err, again)
 		}
 		h, err := registry.Peek(data)
 		if err != nil {
-			return fail("%s can't be read as a registry: %v. So strip can't tell which corpus root it records, or the update to run.\nFix the file or delete it, and run strip again.", rel(f.Path), err)
+			return fail("%s can't be read as a registry: %v. So strip can't tell which corpus root it records, or the update to run. Nothing was removed.\nFix the file or delete it, then run %s again.", rel(f.Path), err, again)
 		}
 		if h.CorpusRoot != rootRel {
 			others[filepath.Join(mod, filepath.FromSlash(h.CorpusRoot))] = true
@@ -155,13 +161,39 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 		if h.UpdateVar != "" {
 			vars[h.UpdateVar] = append(vars[h.UpdateVar], rel(f.Path))
 		}
+		// The columns it registers over each corpus, so that strip can
+		// tell a bytes lift's via/ from a section of no cell. A registry
+		// of another format holds them in a form this strip doesn't read,
+		// and tells it of no column.
+		reg, err := registry.Parse(data)
+		var format *registry.FormatError
+		switch {
+		case errors.As(err, &format):
+			continue
+		case err != nil:
+			return fail("%s can't be read as a registry: %v. So strip can't tell which of the columns it registers are bytes lifts. Nothing was removed.\nFix the file or delete it, then run %s again.", rel(f.Path), err, again)
+		}
+		column := func(name string, bytes bool, corpora []string) {
+			for _, c := range corpora {
+				if lifts[c] == nil {
+					lifts[c] = map[string]bool{}
+				}
+				lifts[c][name] = lifts[c][name] || bytes
+			}
+		}
+		for _, s := range reg.Suites {
+			column(s.Name, false, s.Corpora)
+		}
+		for _, l := range reg.Lifts {
+			column(l.Name, l.Bytes, l.Corpora)
+		}
 	}
 	if len(vars) > 1 {
 		var each []string
 		for _, v := range slices.Sorted(maps.Keys(vars)) {
 			each = append(each, fmt.Sprintf("%s, in %s", v, strings.Join(vars[v], " and ")))
 		}
-		return fail("the registries that record %s record different update variables: %s. Nothing was removed.\nOne project's registries record its one update variable: give every package over the corpus root the same decl.Project, run its update, and run strip again.", rootName, strings.Join(each, "; "))
+		return fail("the registries that record %s record different update variables: %s. Nothing was removed.\nOne project's registries record its one update variable: give every package over the corpus root the same decl.Project, run its update, then run %s again.", rootName, strings.Join(each, "; "), again)
 	}
 
 	// The archives: every *.txtar under the root's testdata/, as the
@@ -179,17 +211,23 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 			}
 			return nil
 		}
-		if strings.HasSuffix(d.Name(), ".txtar") && !archive.IsTemp(d.Name()) {
+		if strings.HasSuffix(d.Name(), ".txtar") {
 			paths = append(paths, p)
 		}
 		return nil
 	})
 	if err != nil {
-		return fail("reading %s: %v", rel(td), err)
+		return fail("reading %s failed: %v. Nothing was removed.\nFix what failed, then run %s again.", rel(td), err, again)
 	}
 	if sel.Column != "" || sel.Transform != "" {
-		if !matches(corpusRoot, paths, sel) {
+		if ok, left := matches(corpusRoot, paths, sel); !ok && len(left) == 0 {
 			return fail("%s matches no section under %s: no archive holds %s.\nName a column or transform whose sections an archive holds.", flags(sel), rootName, what(sel))
+		} else if !ok {
+			var each []string
+			for _, l := range left {
+				each = append(each, l.path+": "+l.text)
+			}
+			return fail("%s matches no section that strip removes under %s. Only archives that it leaves as they are hold %s, or can't be read:\n%s\nFix them, then run %s again.", flags(sel), rootName, what(sel), strings.Join(each, "\n"), again)
 		}
 	}
 
@@ -197,14 +235,21 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	add := func(p, text string, problem bool) {
 		lines = append(lines, stripped{path: rel(p), text: text, problem: problem})
 	}
+	thaw := sel
+	thaw.Frozen = true
+	thawCmd := rerun(dir, mod, corpusRoot, thaw)
 	for _, p := range paths {
 		if err := strip.CheckPath(corpusRoot, p); err != nil {
 			add(p, "left as it was: "+err.Error()+".", true)
 			continue
 		}
-		r, err := strip.Archive(corpusRoot, p, sel)
+		// What the registries say of the bytes lifts over the corpus.
+		each := sel
+		corpus, _, _ := strings.Cut(root.Rel(td, p), "/")
+		each.BytesLifts = lifts[corpus]
+		r, err := strip.Archive(corpusRoot, p, each)
 		if err != nil {
-			add(p, "left as it was: "+err.Error()+".", true)
+			add(p, fmt.Sprintf("left as it was: %v, then run %s again.", err, again), true)
 			continue
 		}
 		if n := len(r.Removed); n == 1 {
@@ -217,23 +262,32 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 			if f.Case != "" {
 				name = f.Case + "/" + f.Column
 			}
-			add(p, fmt.Sprintf("left the cell %s, frozen by its known gap, %s line %d; -frozen strips it too", name, f.Gaps, f.Line), false)
+			add(p, fmt.Sprintf("left the cell %s, frozen by its known gap, %s line %d; %s strips it too", name, f.Gaps, f.Line, thawCmd), false)
 		}
 	}
 	if sel.Column == "" && sel.Transform == "" {
+		// A registry goes only once its package's findings files have, so
+		// that a strip run again finds those left.
 		lock := filepath.Join(td, archive.LockFile)
 		for _, g := range own {
+			left := false
 			ps, err := findings(g.pkg)
 			if err != nil {
-				add(filepath.Join(g.pkg, "testdata", archive.ChecksDir), fmt.Sprintf("left as it was: reading it failed: %v. Fix what failed, and run strip again.", err), true)
+				add(filepath.Join(g.pkg, "testdata", archive.ChecksDir), fmt.Sprintf("left as it was: reading it failed: %v. Fix what failed, then run %s again.", err, again), true)
+				left = true
 			}
 			for _, p := range ps {
 				if err := archive.RemoveFile(lock, p); err != nil {
-					add(p, fmt.Sprintf("left in place: removing it failed: %v. Fix what failed, and run strip again.", err), true)
+					add(p, fmt.Sprintf("left in place: removing it failed: %v. Fix what failed, then run %s again.", err, again), true)
+					left = true
 				}
 			}
+			if left {
+				add(g.path, "left in place, so that strip run again finds the findings files of its package that this run left.", false)
+				continue
+			}
 			if err := archive.RemoveFile(lock, g.path); err != nil {
-				add(g.path, fmt.Sprintf("left in place: removing it failed: %v. Fix what failed, and run strip again.", err), true)
+				add(g.path, fmt.Sprintf("left in place: removing it failed: %v. Fix what failed, then run %s again.", err, again), true)
 			}
 		}
 	}
@@ -256,14 +310,31 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	return code
 }
 
-// findCorpusRoot returns the corpus root: given, relative to dir, or else
-// the one that the registry of the package in dir records, or else the
-// module root.
-func findCorpusRoot(dir, given string) (string, error) {
-	dir, err := filepath.Abs(dir)
-	if err != nil {
-		return "", err
+// rerun returns the command that strips sel from the corpus root again,
+// run from dir. It names the root with -root, unless dir is the module
+// root and the corpus root is the module-root corpus, which strip finds
+// there with no registry: a strip with no flags removes the registry that
+// may have named the root.
+func rerun(dir, mod, corpusRoot string, sel strip.Selection) string {
+	cmd := []string{"hypercase", "strip"}
+	if dir != mod || corpusRoot != mod {
+		cmd = append(cmd, "-root", root.Rel(dir, corpusRoot))
 	}
+	if f := flags(sel); f != "" {
+		cmd = append(cmd, f)
+	}
+	if sel.Frozen {
+		cmd = append(cmd, "-frozen")
+	}
+	return strings.Join(cmd, " ")
+}
+
+// findCorpusRoot returns the corpus root, from dir, an absolute path:
+// given, relative to dir; or else the one that the registry of the package
+// in dir records; or else, when dir is the module root, the module root.
+// Anywhere else with no registry, strip can't tell the package's corpus
+// root, and asks for -root.
+func findCorpusRoot(dir, given string) (string, error) {
 	if given != "" {
 		p := given
 		if !filepath.IsAbs(p) {
@@ -276,15 +347,17 @@ func findCorpusRoot(dir, given string) (string, error) {
 	}
 	mod, err := root.Module(dir)
 	if err != nil {
-		return "", fmt.Errorf("finding the module root: %v", err)
+		return "", fmt.Errorf("finding the module root failed: %v.\nRun strip inside a Go module, or name the corpus root with -root, relative to the current directory.", err)
 	}
 	p := filepath.Join(dir, "testdata", registry.Name)
 	data, err := os.ReadFile(p)
 	switch {
-	case errors.Is(err, fs.ErrNotExist):
+	case errors.Is(err, fs.ErrNotExist) && dir == mod:
 		return mod, nil
+	case errors.Is(err, fs.ErrNotExist):
+		return "", fmt.Errorf("the current directory holds no registry, testdata/%s, to say which corpus root its package's tests read, and it isn't the module root, %s, where strip finds the module-root corpus.\nName the corpus root with -root, relative to the current directory, or run strip at the module root.", registry.Name, root.Rel(dir, mod))
 	case err != nil:
-		return "", err
+		return "", fmt.Errorf("reading %s failed: %v, so strip can't tell which corpus root it records.\nFix what failed, or name the corpus root with -root, relative to the current directory.", root.Rel(dir, p), err)
 	}
 	h, err := registry.Peek(data)
 	if err != nil {
@@ -297,25 +370,32 @@ func findCorpusRoot(dir, given string) (string, error) {
 }
 
 // matches reports whether sel selects a section of an archive of the
-// corpus root that strip would strip.
-func matches(corpusRoot string, paths []string, sel strip.Selection) bool {
+// corpus root that strip strips. When it selects none, it also returns,
+// with why, each archive that strip leaves as it is and that holds a
+// section sel selects, or that it can't read.
+func matches(corpusRoot string, paths []string, sel strip.Selection) (bool, []stripped) {
+	var left []stripped
 	for _, p := range paths {
-		if strip.CheckPath(corpusRoot, p) != nil {
-			continue
-		}
+		rel := root.Rel(corpusRoot, p)
 		data, err := os.ReadFile(p)
 		if err != nil {
+			left = append(left, stripped{path: rel, text: fmt.Sprintf("reading it failed: %v.", err)})
 			continue
 		}
 		a := archive.Parse(data)
-		if len(a.Check()) > 0 {
+		if !slices.ContainsFunc(a.Sections, func(s archive.Section) bool { return sel.Selects(s.Name) }) {
 			continue
 		}
-		if r := strip.Plan(a, sel); len(r.Removed) > 0 || len(r.Frozen) > 0 {
-			return true
+		why := strip.CheckPath(corpusRoot, p)
+		if why == nil {
+			why = strip.CheckForm(a)
 		}
+		if why == nil {
+			return true, nil
+		}
+		left = append(left, stripped{path: rel, text: why.Error() + "."})
 	}
-	return false
+	return false, left
 }
 
 // flags gives a selection as the flags that limit it.

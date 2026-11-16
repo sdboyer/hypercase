@@ -413,6 +413,77 @@ func TestStripNoMatch(t *testing.T) {
 	sameTree(t, top, files)
 }
 
+// TestStripNoMatchLeft: when only archives that strip leaves as they are
+// hold the sections -column names, the failure lists those archives, each
+// with why, and no other, and nothing is written.
+func TestStripNoMatchLeft(t *testing.T) {
+	t.Parallel()
+	const twin = "A1 is 3.\n-- in/sheet/A1 --\n3\n-- out/nutrition/outcome --\naccepted\n-- out/nutrition/outcome --\naccepted\n"
+	const stray = "A1 is 3.\n-- in/sheet/A1 --\n3\n-- out/nutrition/outcome --\naccepted\n"
+	files := with(stripModule(), map[string]string{
+		"testdata/sheet/twin.txtar":  twin,
+		"testdata/sheet/old/y.txtar": stray,
+		"testdata/x.txtar":           strings.ReplaceAll(stray, "nutrition", "evaluate"),
+	})
+	top := writeTree(t, files)
+	r := stripIn(t, top, "", "-column", "nutrition")
+	const want = `hypercase strip: -column nutrition matches no section that strip removes under the module-root corpus. Only archives that it leaves as they are hold out/nutrition/… or via/nutrition/…, at any level, or can't be read:
+testdata/sheet/old/y.txtar: an archive belongs directly in a corpus's directory, testdata/<corpus>/, and this one is below testdata/sheet/, so it is no case. Move it into a corpus's directory, or delete it.
+testdata/sheet/twin.txtar: the archive has problems of form, so no update writes it: out/nutrition/outcome: the section appears twice. Fix the archive by hand.
+Fix them, then run hypercase strip -column nutrition again.
+`
+	if r.code != 1 || r.stdout != "" || r.stderr != want {
+		t.Errorf("strip -column nutrition exited %d, printing %q, with stderr (-want +got):\n%s", r.code, r.stdout, diff.Lines([]byte(want), []byte(r.stderr)))
+	}
+	sameTree(t, top, files)
+}
+
+// TestStripWalk: the walk for archives skips a directory under testdata/
+// that holds a go.mod, a nested module, and one that is another corpus
+// root, which a registry records. Strip leaves their files as they are,
+// and doesn't list them.
+func TestStripWalk(t *testing.T) {
+	t.Parallel()
+	const stray = "A1 is 3.\n-- in/sheet/A1 --\n3\n-- out/evaluate/outcome --\naccepted\n"
+	files := with(stripModule(), map[string]string{
+		"testdata/nested/go.mod":                  "module example.com/nested\n\ngo 1.27\n",
+		"testdata/nested/testdata/sheet/a.txtar":  stray,
+		"testdata/nested/sheet/b.txtar":           stray,
+		"other/testdata/hypercase.json":           stripRegistry("testdata/inner", sheetsVar),
+		"testdata/inner/testdata/sheet/c.txtar":   stray,
+		"testdata/inner/testdata/sheet/d/e.txtar": stray,
+	})
+	top := writeTree(t, files)
+	stripOK(t, top, "", fmt.Sprintf("testdata/csv/prices.txtar: removed %d sections\ntestdata/sheet/twice.txtar: removed %d sections\n", sectionCount(pricesFull)-sectionCount(pricesHand), sectionCount(twiceFull)-sectionCount(twiceHand))+nextLine)
+	sameTree(t, top, with(files, map[string]string{
+		"testdata/sheet/twice.txtar":          twiceHand,
+		"testdata/csv/prices.txtar":           pricesHand,
+		"testdata/hypercase.json":             "",
+		"testdata/checks/located.txt":         "",
+		"format/testdata/hypercase.json":      "",
+		"format/testdata/checks/formulas.txt": "",
+		"a/b/c/testdata/hypercase.json":       "",
+	}))
+}
+
+// TestStripNoVariable: a registry that records no update variable counts
+// toward none, so the variable the others record names the update.
+func TestStripNoVariable(t *testing.T) {
+	t.Parallel()
+	files := with(stripModule(), map[string]string{"format/testdata/hypercase.json": stripRegistry(".", "")})
+	top := writeTree(t, files)
+	stripOK(t, top, "", fmt.Sprintf("testdata/csv/prices.txtar: removed %d sections\ntestdata/sheet/twice.txtar: removed %d sections\n", sectionCount(pricesFull)-sectionCount(pricesHand), sectionCount(twiceFull)-sectionCount(twiceHand))+nextLine)
+	sameTree(t, top, with(files, map[string]string{
+		"testdata/sheet/twice.txtar":          twiceHand,
+		"testdata/csv/prices.txtar":           pricesHand,
+		"testdata/hypercase.json":             "",
+		"testdata/checks/located.txt":         "",
+		"format/testdata/hypercase.json":      "",
+		"format/testdata/checks/formulas.txt": "",
+		"a/b/c/testdata/hypercase.json":       "",
+	}))
+}
+
 // TestStripUsage: a repeated flag, an unknown flag, an argument and an
 // empty or ill-formed name each fail with the usage, and nothing is
 // written.
@@ -460,11 +531,11 @@ func TestStripFrozen(t *testing.T) {
 	files := with(stripModule(), map[string]string{"testdata/sheet/twice.txtar": twice, "testdata/csv/prices.txtar": prices})
 	top := writeTree(t, files)
 	stripOK(t, top, "", `testdata/csv/prices.txtar: removed 11 sections
-testdata/csv/prices.txtar: left the cell import, frozen by its known gap, gaps line 1; -frozen strips it too
+testdata/csv/prices.txtar: left the cell import, frozen by its known gap, gaps line 1; hypercase strip -frozen strips it too
 testdata/sheet/twice.txtar: removed 10 sections
-testdata/sheet/twice.txtar: left the cell evaluate, frozen by its known gap, gaps line 1; -frozen strips it too
-testdata/sheet/twice.txtar: left the cell variant/cycle/resolve, frozen by its known gap, variant/cycle/gaps line 1; -frozen strips it too
-testdata/sheet/twice.txtar: left the cell transform/looped/resolve, frozen by its known gap, gaps line 2; -frozen strips it too
+testdata/sheet/twice.txtar: left the cell evaluate, frozen by its known gap, gaps line 1; hypercase strip -frozen strips it too
+testdata/sheet/twice.txtar: left the cell variant/cycle/resolve, frozen by its known gap, variant/cycle/gaps line 1; hypercase strip -frozen strips it too
+testdata/sheet/twice.txtar: left the cell transform/looped/resolve, frozen by its known gap, gaps line 2; hypercase strip -frozen strips it too
 `+nextLine)
 	got := tree(t, top)
 	for _, tt := range []struct{ path, want string }{
@@ -534,6 +605,61 @@ A1,6
 	}
 }
 
+// TestStripFrozenVia: a via/<column>/… goes with a frozen cell only for a
+// bytes lift, as the runner reads a cell. Where the registries say the
+// column is a lift of no bytes, resolve here, a via/resolve/… is part of
+// no cell, and -column resolve removes it while it leaves the frozen
+// out/resolve/…. Where no registry says, it may be a bytes lift's, and is
+// left with the cell: the registries record no column, or one of them is
+// of another format. A registry that names the corpus root and can't be
+// read fails strip, and nothing is written.
+func TestStripFrozenVia(t *testing.T) {
+	t.Parallel()
+	twice := strings.Replace(twiceFull, "-- out/evaluate/outcome --", "-- gaps --\nresolve Names the cycle's cells. Waits on sheets#5.\n-- via/resolve/sheet/A1 --\n6\n-- out/evaluate/outcome --", 1)
+	lifts := string(registry.Registry{UpdateVar: sheetsVar, CorpusRoot: ".", Lifts: []registry.Lift{
+		{Name: "resolve", Corpora: []string{"sheet"}},
+		{Name: "import", Bytes: true, Corpora: []string{"csv"}},
+	}}.Marshal())
+	older := strings.Replace(lifts, `"format": 6`, `"format": 5`, 1)
+	if older == lifts {
+		t.Fatal("the registry holds no format 6")
+	}
+	const frozen = "testdata/sheet/twice.txtar: left the cell resolve, frozen by its known gap, gaps line 1; hypercase strip -column resolve -frozen strips it too\n"
+	for _, tt := range []struct {
+		name, registry string
+		out            string
+		removed        []string
+	}{
+		{"known", lifts, "testdata/sheet/twice.txtar: removed 6 sections\n" + frozen + nextLine, []string{"via/resolve/sheet/A1"}},
+		{"unknown", stripRegistry(".", sheetsVar), "testdata/sheet/twice.txtar: removed 5 sections\n" + frozen + nextLine, nil},
+		{"older", older, "testdata/sheet/twice.txtar: removed 5 sections\n" + frozen + nextLine, nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			files := with(stripModule(), map[string]string{"testdata/hypercase.json": tt.registry, "testdata/sheet/twice.txtar": twice})
+			top := writeTree(t, files)
+			stripOK(t, top, "", tt.out, "-column", "resolve")
+			got := archive.Parse([]byte(tree(t, top)["testdata/sheet/twice.txtar"]))
+			var left []string
+			for _, s := range got.Sections {
+				if !archive.HandWritten(s.Name) {
+					left = append(left, s.Name)
+				}
+			}
+			want := []string{"via/resolve/sheet/A1", "out/evaluate/outcome", "out/evaluate/values.txt", "out/resolve/outcome", "variant/cycle/out/evaluate/outcome", "transform/looped/in/sheet/A1", "transform/looped/out/evaluate/outcome", "transform/renamed/in/sheet/A2", "transform/renamed/in/sheet/B2", "transform/renamed/delete", "transform/renamed/out/evaluate/outcome", "transform/renamed/out/evaluate/values.txt"}
+			want = slices.DeleteFunc(want, func(n string) bool { return slices.Contains(tt.removed, n) })
+			if !slices.Equal(left, want) {
+				t.Errorf("strip -column resolve left the update-written sections %q, not %q", left, want)
+			}
+		})
+	}
+
+	files := with(stripModule(), map[string]string{"testdata/hypercase.json": strings.Replace(lifts, "{\n", "{\n  \"nope\": 1,\n", 1), "testdata/sheet/twice.txtar": twice})
+	top := writeTree(t, files)
+	stripFails(t, top, "", 1, []string{"-column", "resolve"}, "hypercase strip: testdata/hypercase.json can't be read as a registry: it is not a registry: json: unknown field \"nope\". So strip can't tell which of the columns it registers are bytes lifts. Nothing was removed.\nFix the file or delete it, then run hypercase strip -column resolve again.\n")
+	sameTree(t, top, files)
+}
+
 // TestStripProblems: an archive with problems of form, a sheet with a
 // section twice or with variant/cycle/notes, is left byte for byte as it
 // was and listed with the reason, and so is an archive no corpus holds,
@@ -554,10 +680,10 @@ func TestStripProblems(t *testing.T) {
 	top := writeTree(t, files)
 	r := stripIn(t, top, "")
 	want := fmt.Sprintf(`testdata/csv/prices.txtar: removed %d sections
-testdata/sheet/notes.txtar: left as it was: the archive has problems of form, so no update writes it: variant/cycle/notes: notes is not one of a hand-written variant's sections: about, in, delete, properties, gaps, via and out. Fix the archive by hand, and strip it again.
+testdata/sheet/notes.txtar: left as it was: the archive has problems of form, so no update writes it: variant/cycle/notes: notes is not one of a hand-written variant's sections: about, in, delete, properties, gaps, via and out. Fix the archive by hand, then run hypercase strip again.
 testdata/sheet/old/y.txtar: left as it was: an archive belongs directly in a corpus's directory, testdata/<corpus>/, and this one is below testdata/sheet/, so it is no case. Move it into a corpus's directory, or delete it.
 testdata/sheet/twice.txtar: removed %d sections
-testdata/sheet/twin.txtar: left as it was: the archive has problems of form, so no update writes it: out/evaluate/outcome: the section appears twice. Fix the archive by hand, and strip it again.
+testdata/sheet/twin.txtar: left as it was: the archive has problems of form, so no update writes it: out/evaluate/outcome: the section appears twice. Fix the archive by hand, then run hypercase strip again.
 testdata/x.txtar: left as it was: an archive belongs in a corpus's directory, testdata/<corpus>/, and this one is directly in testdata/. Move it into one.
 `, sectionCount(pricesFull)-sectionCount(pricesHand), sectionCount(twiceFull)-sectionCount(twiceHand)) + nextLine
 	if r.code != 1 || r.stderr != "" || r.stdout != want {
@@ -587,11 +713,11 @@ func TestStripRegistries(t *testing.T) {
 	}{
 		{"two variables", map[string]string{"format/testdata/hypercase.json": stripRegistry(".", "FORMAT_UPDATE_GOLDEN")}, []string{
 			"hypercase strip: the registries that record the module-root corpus record different update variables: FORMAT_UPDATE_GOLDEN, in format/testdata/hypercase.json; SHEETS_UPDATE_GOLDEN, in testdata/hypercase.json and a/b/c/testdata/hypercase.json. Nothing was removed.\n",
-			"give every package over the corpus root the same decl.Project, run its update, and run strip again.",
+			"give every package over the corpus root the same decl.Project, run its update, then run hypercase strip again.",
 		}},
 		{"unreadable", map[string]string{"a/b/c/testdata/hypercase.json": "{\n"}, []string{
 			"hypercase strip: a/b/c/testdata/hypercase.json can't be read as a registry: ",
-			"Fix the file or delete it, and run strip again.",
+			"Fix the file or delete it, then run hypercase strip again.",
 		}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -606,9 +732,11 @@ func TestStripRegistries(t *testing.T) {
 
 // TestStripRoot: -root names the corpus root, and strip changes nothing
 // outside it. Without -root, strip finds the root from the package it runs
-// in, by its registry, or else takes the module root's: run from a/b/c,
-// several levels down, it strips the module-root corpus, and from step09,
-// the corpus root step09.
+// in, by its registry, or else, at the module root, takes the module
+// root's: run from a/b/c, several levels down, it strips the module-root
+// corpus, and from step09, the corpus root step09. From a directory with
+// no registry that isn't the module root, a/b, it asks for -root, and so
+// it does when the registry there can't say which root it records.
 func TestStripRoot(t *testing.T) {
 	t.Parallel()
 	files := stripModule()
@@ -638,7 +766,7 @@ func TestStripRoot(t *testing.T) {
 		{"step09", nil, step09Out, step09},
 		{"step09/testdata", []string{"-root", ".."}, step09Out, step09},
 		{"a/b/c", nil, moduleOut, module},
-		{"a/b", nil, moduleOut, module},
+		{"a/b", []string{"-root", "../.."}, moduleOut, module},
 		{"step09", []string{"-root", ".."}, moduleOut, module},
 	} {
 		top := writeTree(t, files)
@@ -647,9 +775,79 @@ func TestStripRoot(t *testing.T) {
 	}
 
 	top := writeTree(t, files)
-	stripFails(t, top, "", 1, []string{"-root", "nope"}, "hypercase strip: -root nope names no directory.\nName the corpus root relative to the current directory.\n")
-	stripFails(t, top, "", 1, []string{"-root", "a"}, "hypercase strip: "+filepath.Join(top, "a")+" holds no testdata/ directory, so it is no corpus root.\n")
+	for _, tt := range []struct {
+		dir  string
+		args []string
+		want string
+	}{
+		{"", []string{"-root", "nope"}, "hypercase strip: -root nope names no directory.\nName the corpus root relative to the current directory.\n"},
+		{"", []string{"-root", "a"}, "hypercase strip: " + filepath.Join(top, "a") + " holds no testdata/ directory, so it is no corpus root.\nName the corpus root with -root, relative to the current directory.\n"},
+		{"a/b", nil, "hypercase strip: the current directory holds no registry, testdata/hypercase.json, to say which corpus root its package's tests read, and it isn't the module root, ../.., where strip finds the module-root corpus.\nName the corpus root with -root, relative to the current directory, or run strip at the module root.\n"},
+		{"step09/testdata", nil, "hypercase strip: the current directory holds no registry, testdata/hypercase.json, to say which corpus root its package's tests read, and it isn't the module root, ../.., where strip finds the module-root corpus.\n"},
+	} {
+		r := stripIn(t, top, tt.dir, tt.args...)
+		if r.code != 1 || r.stdout != "" || !strings.HasPrefix(r.stderr, tt.want) {
+			t.Errorf("strip %s from %q exited %d, printing %q, with stderr (-want +got):\n%s", strings.Join(tt.args, " "), tt.dir, r.code, r.stdout, diff.Lines([]byte(tt.want), []byte(r.stderr)))
+		}
+		if strings.Contains(r.stderr, "usage:") {
+			t.Errorf("strip %s from %q gave the usage, for no usage error:\n%s", strings.Join(tt.args, " "), tt.dir, r.stderr)
+		}
+	}
 	sameTree(t, top, files)
+
+	// The registry of the package strip runs in, when it can't say which
+	// root it records.
+	for _, tt := range []struct{ registry, want string }{
+		{"{\n", "hypercase strip: testdata/hypercase.json can't be read as a registry: it is not a registry: unexpected end of JSON input, so strip can't tell which corpus root it records.\nName the corpus root with -root, relative to the current directory.\n"},
+		{stripRegistry("../x", sheetsVar), "hypercase strip: testdata/hypercase.json records the corpus root \"../x\", which isn't a slash path relative to the module root.\nName the corpus root with -root, relative to the current directory.\n"},
+	} {
+		files := with(stripModule(), map[string]string{"step09/testdata/hypercase.json": tt.registry})
+		top := writeTree(t, files)
+		stripFails(t, top, "step09", 1, nil, tt.want)
+		sameTree(t, top, files)
+	}
+	// One that can't be read at all: a directory in its place.
+	files = with(stripModule(), map[string]string{"step09/testdata/hypercase.json": "", "step09/testdata/hypercase.json/x": "x\n"})
+	top = writeTree(t, files)
+	stripFails(t, top, "step09", 1, nil, "hypercase strip: reading testdata/hypercase.json failed: ", ", so strip can't tell which corpus root it records.\nFix what failed, or name the corpus root with -root, relative to the current directory.\n")
+	sameTree(t, top, files)
+
+	// A directory in no module, run from or named with -root.
+	out := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(out, "testdata", "sheet"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stripFails(t, out, "", 1, nil, "hypercase strip: finding the module root failed: no go.mod in ", ".\nRun strip inside a Go module, or name the corpus root with -root, relative to the current directory.\n")
+	stripFails(t, top, "", 1, []string{"-root", out}, "hypercase strip: finding the module root of "+out+" failed: no go.mod in ", ".\nName a corpus root inside a Go module with -root, relative to the current directory.\n")
+}
+
+// TestStripRerun: run from a package whose registry records its corpus
+// root, strip removes that registry, so its line for a frozen cell gives
+// the command to strip the cell with -root. That command, run from the
+// same directory, strips the same root; without -root, strip finds no
+// registry there, and asks for -root.
+func TestStripRerun(t *testing.T) {
+	t.Parallel()
+	const gaps = "-- gaps --\nevaluate Evaluates A1 to 6. Waits on sheets#4.\n"
+	twice := strings.Replace(twiceFull, "-- out/evaluate/outcome --", gaps+"-- out/evaluate/outcome --", 1)
+	files := with(stripModule(), map[string]string{"step09/testdata/sheet/twice.txtar": twice, "testdata/sheet/twice.txtar": twice})
+	top := writeTree(t, files)
+	r := stripIn(t, top, "step09")
+	want := fmt.Sprintf("testdata/sheet/twice.txtar: removed %d sections\n", sectionCount(twiceFull)-sectionCount(twiceHand)-2) +
+		"testdata/sheet/twice.txtar: left the cell evaluate, frozen by its known gap, gaps line 1; hypercase strip -root . -frozen strips it too\n" + nextLine
+	if r.code != 0 || r.stderr != "" || r.stdout != want {
+		t.Fatalf("strip from step09 exited %d, with stderr %q, and printed (-want +got):\n%s", r.code, r.stderr, diff.Lines([]byte(want), []byte(r.stdout)))
+	}
+	cmd := regexp.MustCompile(`; hypercase strip (.*) strips it too\n`).FindStringSubmatch(r.stdout)[1]
+	stripOK(t, top, "step09", "testdata/sheet/twice.txtar: removed 2 sections\nNext, run the project's update over the whole module, at its root, and again until it changes nothing: no registry records the corpus root step09, so strip can't name its update variable.\n", strings.Fields(cmd)...)
+	done := with(files, map[string]string{
+		"step09/testdata/sheet/twice.txtar": strings.Replace(twiceHand, "-- variant/cycle/about --", gaps+"-- variant/cycle/about --", 1),
+		"step09/testdata/hypercase.json":    "",
+	})
+	sameTree(t, top, done)
+
+	stripFails(t, top, "step09", 1, []string{"-frozen"}, "hypercase strip: the current directory holds no registry, testdata/hypercase.json, to say which corpus root its package's tests read, and it isn't the module root, ..,")
+	sameTree(t, top, done)
 }
 
 // TestStripFailedWrite: a write made to fail once its temp file is
@@ -672,7 +870,7 @@ func TestStripFailedWrite(t *testing.T) {
 	if len(temps) != 2 || !strings.HasPrefix(temps[0], ".hypercase-tmp-prices.txtar-") {
 		t.Errorf("the writes' temp files were %q, not prices's and then twice's", temps)
 	}
-	want := "testdata/csv/prices.txtar: left as it was: stripping it failed, and the archive is as it was: disk full. Fix what failed, and strip it again.\n" +
+	want := "testdata/csv/prices.txtar: left as it was: stripping it failed, and the archive is as it was: disk full. Fix what failed, then run hypercase strip again.\n" +
 		fmt.Sprintf("testdata/sheet/twice.txtar: removed %d sections\n", sectionCount(twiceFull)-sectionCount(twiceHand)) + nextLine
 	if r.code != 1 || r.stderr != "" || r.stdout != want {
 		t.Errorf("strip exited %d, with stderr %q, and printed (-want +got):\n%s", r.code, r.stderr, diff.Lines([]byte(want), []byte(r.stdout)))
@@ -691,8 +889,9 @@ func TestStripFailedWrite(t *testing.T) {
 // TestStripFailedRemoval: a registry whose removal fails is left in place
 // and listed, the others are removed, and strip exits 1. The removal is
 // made to fail by putting a directory with a file in it where the
-// registry was, once strip holds the lock to remove it, so the test sets a
-// hook and doesn't run in parallel.
+// registry was, the first time strip holds the lock, which is for the
+// first archive it strips, testdata/csv/prices.txtar, before it removes
+// any registry. So the test sets a hook, and doesn't run in parallel.
 func TestStripFailedRemoval(t *testing.T) {
 	files := stripModule()
 	top := writeTree(t, files)
@@ -713,7 +912,7 @@ func TestStripFailedRemoval(t *testing.T) {
 	if r.code != 1 || r.stderr != "" {
 		t.Errorf("strip exited %d, with stderr %q", r.code, r.stderr)
 	}
-	line := "format/testdata/hypercase.json: left in place: removing it failed: remove " + reg + ": directory not empty. Fix what failed, and run strip again.\n"
+	line := "format/testdata/hypercase.json: left in place: removing it failed: remove " + reg + ": directory not empty. Fix what failed, then run hypercase strip again.\n"
 	if !strings.Contains(r.stdout, line) || !strings.HasSuffix(r.stdout, nextLine) {
 		t.Errorf("strip printed:\n%s\nwhich lacks the line %q, or doesn't end with the next step", r.stdout, line)
 	}
@@ -723,6 +922,105 @@ func TestStripFailedRemoval(t *testing.T) {
 			t.Errorf("%s is left, and should be removed", p)
 		}
 	}
+}
+
+// strippedModule is the strip fixture as a strip with no flags leaves it.
+func strippedModule() map[string]string {
+	return with(stripModule(), map[string]string{
+		"testdata/sheet/twice.txtar":          twiceHand,
+		"testdata/csv/prices.txtar":           pricesHand,
+		"testdata/hypercase.json":             "",
+		"testdata/checks/located.txt":         "",
+		"format/testdata/hypercase.json":      "",
+		"format/testdata/checks/formulas.txt": "",
+		"a/b/c/testdata/hypercase.json":       "",
+	})
+}
+
+// TestStripFailedFindings: a package's findings file whose removal fails
+// keeps the package's registry, so that strip run again, as its line
+// says, finds the file and removes it, and then the registry. The removal
+// is made to fail by putting a directory with a file in it where the
+// findings file was, once strip holds the lock to remove it. Strip
+// removes the registries' packages' files in the registries' path order,
+// so that is the first time it holds the lock once a/b/c's registry is
+// gone. The test sets a hook, so it doesn't run in parallel.
+func TestStripFailedFindings(t *testing.T) {
+	files := stripModule()
+	top := writeTree(t, files)
+	f := filepath.Join(top, "format", "testdata", "checks", "formulas.txt")
+	abc := filepath.Join(top, "a", "b", "c", "testdata", registry.Name)
+	hooks.Modify = func(step string) {
+		if step != "locked" || isFile(abc) || !isFile(f) {
+			return
+		}
+		if err := os.Remove(f); err != nil {
+			t.Error(err)
+		}
+		if err := os.MkdirAll(filepath.Join(f, "x"), 0o755); err != nil {
+			t.Error(err)
+		}
+	}
+	r := stripIn(t, top, "")
+	hooks.Modify = nil
+	want := "format/testdata/checks/formulas.txt: left in place: removing it failed: remove " + f + ": directory not empty. Fix what failed, then run hypercase strip again.\n" +
+		"format/testdata/hypercase.json: left in place, so that strip run again finds the findings files of its package that this run left.\n" +
+		fmt.Sprintf("testdata/csv/prices.txtar: removed %d sections\ntestdata/sheet/twice.txtar: removed %d sections\n", sectionCount(pricesFull)-sectionCount(pricesHand), sectionCount(twiceFull)-sectionCount(twiceHand)) + nextLine
+	if r.code != 1 || r.stderr != "" || r.stdout != want {
+		t.Fatalf("strip exited %d, with stderr %q, and printed (-want +got):\n%s", r.code, r.stderr, diff.Lines([]byte(want), []byte(r.stdout)))
+	}
+	// tree reads files alone, so formulas.txt, a directory, is no file.
+	sameTree(t, top, with(strippedModule(), map[string]string{
+		"format/testdata/hypercase.json": files["format/testdata/hypercase.json"],
+	}))
+
+	// What failed is fixed, and strip run again.
+	if err := os.RemoveAll(f); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(f, []byte(files["format/testdata/checks/formulas.txt"]), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stripOK(t, top, "", nextLine)
+	sameTree(t, top, strippedModule())
+}
+
+// TestStripUnreadFindings: a package whose testdata/checks/ can't be read,
+// a file in its place, keeps its registry, so that strip run again, once
+// it is a directory, removes the findings files in it, and then the
+// registry.
+func TestStripUnreadFindings(t *testing.T) {
+	t.Parallel()
+	files := with(stripModule(), map[string]string{
+		"format/testdata/checks/formulas.txt": "",
+		"format/testdata/checks/notes.md":     "",
+		"format/testdata/checks":              "not a directory\n",
+	})
+	top := writeTree(t, files)
+	r := stripIn(t, top, "")
+	const line = "format/testdata/checks: left as it was: reading it failed: "
+	const fix = ". Fix what failed, then run hypercase strip again.\nformat/testdata/hypercase.json: left in place, so that strip run again finds the findings files of its package that this run left.\n"
+	if r.code != 1 || r.stderr != "" || !strings.Contains(r.stdout, line) || !strings.Contains(r.stdout, fix) || !strings.HasSuffix(r.stdout, nextLine) {
+		t.Fatalf("strip exited %d, with stderr %q, and printed:\n%s", r.code, r.stderr, r.stdout)
+	}
+	sameTree(t, top, with(strippedModule(), map[string]string{
+		"format/testdata/hypercase.json":  files["format/testdata/hypercase.json"],
+		"format/testdata/checks":          files["format/testdata/checks"],
+		"format/testdata/checks/notes.md": "",
+	}))
+
+	checks := filepath.Join(top, "format", "testdata", "checks")
+	if err := os.Remove(checks); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(checks, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(checks, "formulas.txt"), []byte("sheet/twice A1 =B1*2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stripOK(t, top, "", nextLine)
+	sameTree(t, top, with(strippedModule(), map[string]string{"format/testdata/checks/notes.md": ""}))
 }
 
 // TestStripToys: on a copy of the walkthrough's toy module, stripping each

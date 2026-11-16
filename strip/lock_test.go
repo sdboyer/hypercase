@@ -204,7 +204,7 @@ func TestFailedWrite(t *testing.T) {
 	hooks.AfterTemp = func(tmp string) error { return errors.New("disk full") }
 	_, err := Archive(root, p, Selection{})
 	hooks.Modify, hooks.AfterTemp = nil, nil
-	if err == nil || !strings.Contains(err.Error(), "stripping it failed, and the archive is as it was: ") || !strings.Contains(err.Error(), "disk full. Fix what failed, and strip it again") {
+	if err == nil || !strings.Contains(err.Error(), "stripping it failed, and the archive is as it was: ") || !strings.Contains(err.Error(), "disk full. Fix what failed") {
 		t.Fatalf("Archive = %v, want the failed write", err)
 	}
 	if data, _ := os.ReadFile(p); string(data) != twice {

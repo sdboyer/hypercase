@@ -195,7 +195,7 @@ func TestStripFrozen(t *testing.T) {
 
 	r := s.strip()
 	s.passes(r)
-	s.contains(r, "testdata/export/prices.txtar: left the cell list, frozen by its known gap, gaps line 1; -frozen strips it too\n")
+	s.contains(r, "testdata/export/prices.txtar: left the cell list, frozen by its known gap, gaps line 1; hypercase strip -frozen strips it too\n")
 	s.settle(stripModule...)
 	s.hasSections(prices, map[string]string{"out/list/files.txt": "2 files\n"})
 	s.fails(s.run("b", "strip-b", false), frozen)
