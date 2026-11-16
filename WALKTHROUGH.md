@@ -347,8 +347,10 @@ update takes (step 5).
 - A suite has a name and a description, and its outputs are under
   `out/<suite>/…`. A **column** is something every case runs through, and a
   **cell** is one case run through one column. Cases and columns make a
-  **matrix**. One suite is a matrix with one column: step 5 adds columns, and
-  the archive's own layout doesn't change.
+  **matrix**, and each suite is a column. A package may register several
+  suites over one corpus; step 3's example registers one, so its matrix has
+  one column. Each column's outputs sit under its own `out/<suite>/`, so the
+  archive's layout holds any number of them.
 - An archive carries no parameters. What the suite does is fixed in Go and
   said in its description, and so is anything it could vary (step 6 states
   the rule).
@@ -511,11 +513,10 @@ update takes (step 5).
 
 **When to add an archive** (proposed): when an input makes a point no
 existing archive makes. A further behavior of an existing input is another
-output of the suite (from step 5, perhaps another suite), never a copy of
-the archive. From step 7, an input that is an existing one with a file or
-two changed is a variant of it. Trade-off: the corpus stays small and every
-column sees every input, at the cost of a judgment call about what counts as
-a new point.
+output of the suite, or another suite, never a copy of the archive. From
+step 7, an input that is an existing one with a file or two changed is a
+variant of it. Trade-off: the corpus stays small and every column sees every
+input, at the cost of a judgment call about what counts as a new point.
 
 ## 4. Expected errors and known gaps
 
@@ -723,22 +724,23 @@ columns, at the cost of not saying which column a case is aimed at; only
 
 ### What step 4 leaves
 
-One suite answers every archive, through one function. A project tests more
-than one function or command over the same inputs: a sheet is evaluated,
-printed back, and given to the `calc` command. With one suite per corpus
-root, each of those keeps its own copy of every input.
+Every suite runs on every case, all from one package over the corpus root.
+A project tests more than one function or command over the same inputs: a
+sheet is evaluated, printed back, and given to the `calc` command. Printing
+back has nothing to show for a sheet with no formulas. And each of those is
+tested in a package of its own, while step 4 says nothing of how packages
+share one corpus root.
 
 ### What the author writes
 
-Columns are suites: each function or command under test is a suite of its
-own, and several suites run over one corpus. A suite covers a class of
-outputs, or one command. A **probe** decides whether a case is for the
-suite.
+Each function or command under test is a suite, in a package of its own,
+and the packages share one corpus root. A **probe** decides whether a case
+is for the suite.
 
-Packages over one corpus root share its archives, and each writes its own
-columns' sections. The package that registers `hypercase.RootPackage()` runs
-the **root-package check**, which reads every package's registry and every
-archive, and reports what no column owns.
+Packages over one corpus root share its archives, and each writes only its
+own columns' sections. The package that registers `hypercase.RootPackage()`
+runs the **root-package check**, which reads every package's registry and
+every archive, and reports what no column owns.
 
 Proposed names: the suite's `Probe` field.
 
@@ -979,9 +981,9 @@ check, the properties it registers, and `evaluate`: the type it consumes,
 
 **Suites and cells.**
 
-- Columns are suites, and step 3's one suite is one column of several from
-  here on. A suite covers a class of outputs, or one command. A cell is one
-  case run through one column, and its outputs go under `out/<suite>/…`.
+- Columns are suites. A suite covers a class of outputs, or one command. A
+  cell is one case run through one column, and its outputs go under
+  `out/<suite>/…`.
 - A suite has a name, a description, a probe, its declared outputs,
   `Rejects` and a run. Step 3 says what the run receives.
 - Column names are unique per corpus root, not per package or per corpus
