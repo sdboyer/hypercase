@@ -565,28 +565,37 @@ func TestTransformJennyFrozen(t *testing.T) {
 	s.fails(s.normal("tr-jenny"), frozen("echo", "1"))
 	s.fails(s.run("b", "tr-b-jenny", false), frozen("copy", "2"))
 
-	// A person deletes echo's frozen files. The root package's normal run
-	// fails on the cell, b's update leaves it unwritten, and the root
-	// package's update writes it.
-	s.edit(twice, "delete upper's frozen cell of echo", drop("transform/upper/out/echo/"))
-	s.fails(s.normal("tr-jenny"), "echo: Does what the case's do/ tree says.\n    transform/upper/out/echo/values.txt has no golden.")
-	s.fails(s.run("b", "tr-b-jenny", true), frozen("copy", "2"))
-	s.hasSections(twice, nil, "transform/upper/out/echo/")
+	// A person deletes echo's frozen files, and removes copy's gaps line,
+	// so no package's update fails on a frozen cell. Each package's normal
+	// run fails on its own cell until its update writes it, and the other
+	// package's update, which passes, leaves that cell as it is: first
+	// with the root package's update first, then with b's.
+	s.edit(twice, "delete upper's frozen cell of echo, and close copy's gap", func(a *archive.Archive) {
+		drop("transform/upper/out/echo/")(a)
+		set("gaps", "transform/upper echo Waits on sheets#9.\n")(a)
+	})
+	edited := s.read(twice)
+	echoMissing := "echo: Does what the case's do/ tree says.\n    transform/upper/out/echo/values.txt has no golden."
+	copyDiffers := "transform/upper/out/copy/values.txt differs (-golden +got):"
+	s.fails(s.normal("tr-jenny"), echoMissing)
+	s.fails(s.run("b", "tr-b-jenny", false), copyDiffers)
 	s.passes(s.update("tr-jenny"))
 	s.hasSections(twice, map[string]string{
 		"transform/upper/out/echo/values.txt": "A1 SIX\nA1 SIX\n",
 		"transform/upper/out/copy/values.txt": "A1 SIX\n",
 	})
-	s.passes(s.normal("tr-jenny"))
-
-	// A person removes copy's gaps line. The root package's update leaves
-	// copy's cell to b, whose normal run fails until its update writes it.
-	s.edit(twice, "close copy's gap", set("gaps", "transform/upper echo Waits on sheets#9.\n"))
-	s.passes(s.update("tr-jenny"))
-	s.hasSections(twice, map[string]string{"transform/upper/out/copy/values.txt": "A1 SIX\n"})
-	s.fails(s.run("b", "tr-b-jenny", false), "transform/upper/out/copy/values.txt differs (-golden +got):")
+	s.fails(s.run("b", "tr-b-jenny", false), copyDiffers)
 	s.passes(s.run("b", "tr-b-jenny", true))
 	s.hasSections(twice, map[string]string{"transform/upper/out/copy/values.txt": "A1 SIX\nA1 SIX\n"})
+	s.passes(s.normal("tr-jenny"))
+	s.passes(s.run("b", "tr-b-jenny", false))
+
+	s.write(twice, edited, "restore the edited archive, for b's update first")
+	s.passes(s.run("b", "tr-b-jenny", true))
+	s.hasSections(twice, map[string]string{"transform/upper/out/copy/values.txt": "A1 SIX\nA1 SIX\n"}, "transform/upper/out/echo/")
+	s.fails(s.normal("tr-jenny"), echoMissing)
+	s.passes(s.update("tr-jenny"))
+	s.hasSections(twice, map[string]string{"transform/upper/out/echo/values.txt": "A1 SIX\nA1 SIX\n"})
 	s.passes(s.normal("tr-jenny"))
 	s.passes(s.run("b", "tr-b-jenny", false))
 	s.done()
