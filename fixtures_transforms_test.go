@@ -176,6 +176,10 @@ var transformRegistrations = map[string]func(){
 	"tr-unowned": func() { transforms(transformType, own(echoRejects)) },
 	// tr-owns-looped leaves upper to another package.
 	"tr-owns-looped": func() { transforms(transformType, own(echoRejects, looped)) },
+	// tr-unowned-noroot is tr-unowned without the root-package check.
+	"tr-unowned-noroot": func() {
+		hypercase.Register(append([]any{project, transformType, own(echoRejects)}, sheetsProps...)...)
+	},
 	"tr-b": func() {
 		hypercase.Register(append([]any{project, transformType, own(withName(echoRejects, "copy"))}, sheetsProps...)...)
 	},

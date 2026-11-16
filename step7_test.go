@@ -637,8 +637,9 @@ func TestTransformStaleInputs(t *testing.T) {
 // has no tests (TestTransformOwnerUntested), and when the owner dropped
 // the transform from Own (TestTransformOwnerDropped), once its update
 // runs; until then that package's normal run fails on its registry. With
-// no root-package check registered, every normal run fails for the
-// missing check (TestRootCheckRequired).
+// no root-package check registered, nothing says so, and every normal run
+// fails for the missing check instead, until the check reports the
+// transform (TestTransformUnownedNoRootCheck).
 func TestTransformUnowned(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -660,6 +661,43 @@ func TestTransformUnowned(t *testing.T) {
 	s.write(twice, settled, "restore the archive")
 	s.edit(twice, "give upper an empty delete by hand", insert("transform/upper/delete", "", "transform/upper/out/"))
 	s.fails(s.run("b", "tr-b", false), "script/twice/transform/upper: Uppercases every file under do/out/.\n    The archive's inputs for upper's variant are invalid, and no cell runs on them:\n      transform/upper/delete: the section is empty; a variant that removes nothing has no delete section\n    The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites the inputs.")
+	s.done()
+}
+
+// TestTransformUnownedNoRootCheck: with no root-package check registered,
+// nothing reports a transform no package owns, and every normal run fails
+// for the missing check instead, beside the note that says the check
+// reports it. Once the check is registered, it does. No update rewrites
+// the variant's inputs in either state.
+func TestTransformUnownedNoRootCheck(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "a package b over the corpus")
+	s.passes(s.update("transforms"))
+	s.passes(s.run("b", "tr-b", true))
+	// The root package gives up its transforms and the root-package check.
+	s.passes(s.update("tr-unowned-noroot"))
+	missing := "no registry records a root-package check for the module-root corpus, so nothing reports what no column there owns."
+	unowned := "the transform upper, of testdata/script/, is owned by no package"
+	r := s.normal("tr-unowned-noroot")
+	s.fails(r, missing)
+	s.lacks(r, unowned)
+
+	s.edit(twice, "edit upper's input by hand", set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n"))
+	r = s.run("b", "tr-b", false)
+	s.fails(r, missing, "transform/upper/out/copy/values.txt differs (-golden +got):",
+		"If no package owns upper, the root-package check says so, and no update rewrites the inputs.")
+	s.lacks(r, unowned)
+	s.passes(s.update("tr-unowned-noroot"))
+	s.passes(s.run("b", "tr-b", true))
+	s.hasSections(twice, map[string]string{"transform/upper/in/do/out/values.txt": "A1 SEVEN\n"})
+
+	// The root package registers the check again, and it reports upper.
+	s.passes(s.update("tr-unowned"))
+	r = s.normal("tr-unowned")
+	s.fails(r, unowned)
+	s.lacks(r, missing)
+	s.hasSections(twice, map[string]string{"transform/upper/in/do/out/values.txt": "A1 SEVEN\n"})
 	s.done()
 }
 
