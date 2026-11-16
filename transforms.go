@@ -266,7 +266,13 @@ func (r *runner) makeVariant(v *plannedVariant, base archive.Base, view fs.FS) {
 	files := map[string][]byte{}
 	var held []string
 	for _, f := range made.AsFiles() {
-		data, _ := jenny.BytesOf(f) // AsFiles gives each file rendered
+		// A jenny's FS renders each file it adds, so AsFiles gives them
+		// all as bytes, and nothing a transform does reaches this.
+		data, ok := jenny.BytesOf(f)
+		if !ok {
+			v.problem = fmt.Sprintf("%s made %s, which its FS gave as a %T, not as rendered bytes. An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase.", tr.name, f.Path(), f)
+			return
+		}
 		if err := archive.Holds(data); err != nil {
 			held = append(held, fmt.Sprintf("  %s: %v", f.Path(), err))
 		}
