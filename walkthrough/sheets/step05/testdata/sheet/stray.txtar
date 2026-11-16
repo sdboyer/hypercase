@@ -1,6 +1,10 @@
-A total row whose label sits in a cell of its own.
+D1 holds a word, which is neither a number nor a formula.
 -- in/sheet/A1 --
 4
+-- in/sheet/B1 --
+6
+-- in/sheet/C1 --
+=A1+B1
 -- in/sheet/D1 --
 total
 -- properties --
@@ -8,4 +12,6 @@ malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
 -- out/evaluate/error.txt --
+D1: not a number or a formula: "total"
+-- out/format/error.txt --
 D1: not a number or a formula: "total"
