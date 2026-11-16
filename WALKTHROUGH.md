@@ -319,8 +319,13 @@ their line endings. Its `.gitattributes` holds:
 *.txtar -text
 ```
 
-Its `.gitignore` holds `.hypercase.lock`, the corpus root's lock, which an
-update takes (step 5).
+Its `.gitignore` names the corpus root's lock, which an update takes
+(step 5):
+
+<!-- source: walkthrough/sheets/.gitignore -->
+```
+.hypercase.lock
+```
 
 ### Rules
 
