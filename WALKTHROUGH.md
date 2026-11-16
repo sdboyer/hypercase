@@ -2208,12 +2208,13 @@ step 5's `negative` shows. From step 6 it needs to parse as well, since
 `format` reads `parse`'s product: step 6's `negative` has `blocked parse`
 there.
 
-`Codes` changes the outcome of every rejected cell, frozen ones included.
-In archives that already carry outcomes, as step 7's do, the committed
-outcome of `negative`'s four frozen cells is `rejected`, and their run now
-gives `rejected S101`. So they fail, and no update writes them. A person
-deletes those four `outcome` files, and the next update adds them, as step
-4's upgrade does for a frozen cell whose other files match its run.
+`Codes` changes the outcome of every rejected cell whose error it gives a
+code, frozen ones included; a rejected cell whose error it gives none keeps
+`rejected`. In archives that already carry outcomes, as step 7's do, the
+committed outcome of `negative`'s four frozen cells is `rejected`, and their
+run now gives `rejected S101`. So they fail, and no update writes them. A
+person deletes those four `outcome` files, and the next update adds them, as
+step 4's upgrade does for a frozen cell whose other files match its run.
 
 `hypercase.json` records each suite's classifier, and whether the project
 supplies `Codes`: step 5's shows them unset, and the registry of step 8's
