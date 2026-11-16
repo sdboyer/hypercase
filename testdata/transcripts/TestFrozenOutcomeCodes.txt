@@ -1,0 +1,123 @@
+$ rm testdata/script/other-column.txtar  # remove the case whose gaps line fails every normal run
+$ edit testdata/script/negative.txtar  # give the frozen cell an error that Codes, once supplied, gives the code S1
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/accepted-loop
+            --- PASS: TestCorpus/script/accepted-loop/echo
+        --- PASS: TestCorpus/script/div-zero
+            --- PASS: TestCorpus/script/div-zero/echo
+        --- PASS: TestCorpus/script/negative
+            --- PASS: TestCorpus/script/negative/echo
+        --- PASS: TestCorpus/script/out-of-place
+            --- PASS: TestCorpus/script/out-of-place/echo
+        --- PASS: TestCorpus/script/unwritten
+            --- PASS: TestCorpus/script/unwritten/echo
+PASS
+$ go test  # rejects
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/accepted-loop
+            --- PASS: TestCorpus/script/accepted-loop/echo
+        --- PASS: TestCorpus/script/div-zero
+            --- PASS: TestCorpus/script/div-zero/echo
+        --- PASS: TestCorpus/script/negative
+            --- PASS: TestCorpus/script/negative/echo
+        --- PASS: TestCorpus/script/out-of-place
+            --- PASS: TestCorpus/script/out-of-place/echo
+        --- PASS: TestCorpus/script/unwritten
+            --- PASS: TestCorpus/script/unwritten/echo
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects-codes
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/negative: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A negative number is valid, and evaluates to itself. Waits on sheets#3."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/outcome differs (-committed +got):
+        - rejected
+        + rejected S1
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/accepted-loop
+            --- PASS: TestCorpus/script/accepted-loop/echo
+        --- PASS: TestCorpus/script/div-zero
+            --- PASS: TestCorpus/script/div-zero/echo
+        --- FAIL: TestCorpus/script/negative
+            --- FAIL: TestCorpus/script/negative/echo
+        --- PASS: TestCorpus/script/out-of-place
+            --- PASS: TestCorpus/script/out-of-place/echo
+        --- PASS: TestCorpus/script/unwritten
+            --- PASS: TestCorpus/script/unwritten/echo
+FAIL
+[exit 1]
+$ go test  # rejects-codes
+    script/negative: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A negative number is valid, and evaluates to itself. Waits on sheets#3."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/outcome differs (-committed +got):
+        - rejected
+        + rejected S1
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/accepted-loop
+            --- PASS: TestCorpus/script/accepted-loop/echo
+        --- PASS: TestCorpus/script/div-zero
+            --- PASS: TestCorpus/script/div-zero/echo
+        --- FAIL: TestCorpus/script/negative
+            --- FAIL: TestCorpus/script/negative/echo
+        --- PASS: TestCorpus/script/out-of-place
+            --- PASS: TestCorpus/script/out-of-place/echo
+        --- PASS: TestCorpus/script/unwritten
+            --- PASS: TestCorpus/script/unwritten/echo
+FAIL
+[exit 1]
+$ edit testdata/script/negative.txtar  # drop the frozen cell's outcome
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects-codes
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/accepted-loop
+            --- PASS: TestCorpus/script/accepted-loop/echo
+        --- PASS: TestCorpus/script/div-zero
+            --- PASS: TestCorpus/script/div-zero/echo
+        --- PASS: TestCorpus/script/negative
+            --- PASS: TestCorpus/script/negative/echo
+        --- PASS: TestCorpus/script/out-of-place
+            --- PASS: TestCorpus/script/out-of-place/echo
+        --- PASS: TestCorpus/script/unwritten
+            --- PASS: TestCorpus/script/unwritten/echo
+PASS
+$ go test  # rejects-codes
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/accepted-loop
+            --- PASS: TestCorpus/script/accepted-loop/echo
+        --- PASS: TestCorpus/script/div-zero
+            --- PASS: TestCorpus/script/div-zero/echo
+        --- PASS: TestCorpus/script/negative
+            --- PASS: TestCorpus/script/negative/echo
+        --- PASS: TestCorpus/script/out-of-place
+            --- PASS: TestCorpus/script/out-of-place/echo
+        --- PASS: TestCorpus/script/unwritten
+            --- PASS: TestCorpus/script/unwritten/echo
+PASS
+$ edit testdata/script/negative.txtar  # restore the frozen cell, whose error Codes gives no code
+$ go test  # rejects-codes
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/accepted-loop
+            --- PASS: TestCorpus/script/accepted-loop/echo
+        --- PASS: TestCorpus/script/div-zero
+            --- PASS: TestCorpus/script/div-zero/echo
+        --- PASS: TestCorpus/script/negative
+            --- PASS: TestCorpus/script/negative/echo
+        --- PASS: TestCorpus/script/out-of-place
+            --- PASS: TestCorpus/script/out-of-place/echo
+        --- PASS: TestCorpus/script/unwritten
+            --- PASS: TestCorpus/script/unwritten/echo
+PASS

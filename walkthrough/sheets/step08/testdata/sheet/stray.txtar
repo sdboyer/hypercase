@@ -1,0 +1,27 @@
+D1 holds a word, which is neither a number nor a formula.
+-- in/sheet/A1 --
+4
+-- in/sheet/B1 --
+6
+-- in/sheet/C1 --
+=A1+B1
+-- in/sheet/D1 --
+total
+-- properties --
+malformed
+-- out/calc/error.txt --
+D1: not a number or a formula: "total"
+  sheet/D1:1: total
+-- out/calc/outcome --
+rejected S101
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/parse/error.txt --
+D1: not a number or a formula: "total"
+  sheet/D1:1: total
+-- out/parse/outcome --
+rejected S101
+-- out/resolve/outcome --
+blocked parse
