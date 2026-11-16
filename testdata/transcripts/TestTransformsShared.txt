@@ -99,7 +99,12 @@ $ go test ./b  # tr-b
         - A1 SIX
         + A1 SEVEN
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
-        The archive's inputs for upper's variant differ from what upper makes now: a normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and this cell.
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:
+        transform/upper/in/do/out/values.txt differs (-committed +made):
+        - A1 SEVEN
+        + A1 SIX
+        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs
@@ -151,7 +156,12 @@ $ go test ./b  # tr-b
         - A1 SIX
         + A1 SEVEN
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
-        The archive's inputs for upper's variant differ from what upper makes now: a normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and this cell.
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:
+        transform/upper/in/do/out/values.txt differs (-committed +made):
+        - A1 SEVEN
+        + A1 SIX
+        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs

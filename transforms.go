@@ -305,6 +305,10 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	c := r.newCase(p, pc, v.kind+"/"+v.name+"/", v.about, v.gapsAt, v.properties, v.gaps)
 	c.tr = v.tr
 	owner := v.tr != nil && r.owned[v.tr]
+	// stale is whether a failing cell may be one the module's update
+	// fixes: another package's normal run reads committed inputs that may
+	// differ from what the transform makes.
+	stale := false
 	switch {
 	case v.tr == nil:
 		c.setView(p, pc.base.VariantView(v.committed))
@@ -336,12 +340,17 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if owner {
 			r.judgeInputs(t, c, pc, v, w)
 		}
-		if !owner && !v.inputDiffs(pc.a).empty() {
-			c.stale = fmt.Sprintf("The archive's inputs for %s's variant differ from what %s makes now: a normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and this cell.", v.name, v.name, v.name, r.updateCmd(), v.name)
-		}
+		stale = !owner
 		c.setView(p, view)
 	}
 	r.runCells(t, c, p.cols, w)
+	if !stale || !t.Failed() {
+		return
+	}
+	// However its cells failed, the failures may be the inputs'.
+	if m := v.inputDiffs(pc.a); !m.empty() {
+		t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and the variant's cells.", c.header(), v.name, v.name, m, v.name, r.updateCmd(), v.name)
+	}
 }
 
 // inputDiffs says how the committed inputs of a transform's variant differ

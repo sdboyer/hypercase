@@ -177,6 +177,9 @@ var transformRegistrations = map[string]func(){
 	"tr-b": func() {
 		hypercase.Register(append([]any{project, transformType, own(withName(echoRejects, "copy"))}, sheetsProps...)...)
 	},
+	"tr-b-probe": func() {
+		hypercase.Register(append([]any{project, transformType, own(withName(withProbe(echoRejects), "copy"))}, sheetsProps...)...)
+	},
 	"tr-b-owns": func() {
 		hypercase.Register(append([]any{project, transformType, own(withName(echoRejects, "copy"), upper)}, sheetsProps...)...)
 	},
