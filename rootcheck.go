@@ -60,6 +60,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	// Columns, lifts, types, properties and root-package checks, merged
 	// across packages.
 	columnPkgs := map[string][]string{}             // column → the packages that own it
+	untestedCols := map[string][]string{}           // column → the packages with no _test.go file whose registries own it
 	claimed := map[string]map[string]bool{}         // corpus → the columns over it
 	usedPkgs := map[string][]string{}               // lift → the packages that only use it
 	declared := map[string]bool{}                   // the corpus types' directories, and the suites' Corpus
@@ -69,8 +70,8 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	propOrder := map[string][]string{}              // property → descriptions, in the order of the packages
 	transforms := map[string]map[string][]string{}  // directory → transform → the packages that own it
 	var rootPkgs []string
-	claim := func(name string, corpora []string, pkg string) {
-		columnPkgs[name] = append(columnPkgs[name], pkg)
+	claim := func(owners map[string][]string, name string, corpora []string, pkg string) {
+		owners[name] = append(owners[name], pkg)
 		for _, corpus := range corpora {
 			if claimed[corpus] == nil {
 				claimed[corpus] = map[string]bool{}
@@ -91,11 +92,19 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 	}
 	for _, g := range regs {
+		// A registry in a package with no _test.go file records what no
+		// test runs, so its package owns nothing: no column, lift or
+		// transform. Its sections stay claimed, since the registry's own
+		// error reports them.
+		owners := columnPkgs
+		if !g.tested {
+			owners = untestedCols
+		}
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
 		}
 		for _, s := range g.reg.Suites {
-			claim(s.Name, s.Corpora, g.pkg)
+			claim(owners, s.Name, s.Corpora, g.pkg)
 			if s.Consumes == registry.RawInput {
 				for _, dir := range s.Corpora {
 					declare(dir, rawEntry, g.pkg)
@@ -104,7 +113,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 		for _, l := range g.reg.Lifts {
 			if l.Owned {
-				claim(l.Name, l.Corpora, g.pkg)
+				claim(owners, l.Name, l.Corpora, g.pkg)
 			} else {
 				usedPkgs[l.Name] = append(usedPkgs[l.Name], g.pkg)
 			}
@@ -116,8 +125,6 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 			for _, tr := range ct.Transforms {
 				pkgs := transforms[ct.Dir][tr.Name]
-				// A package no test runs writes no inputs, so it owns
-				// none, whatever its registry records.
 				if tr.Owned && g.tested {
 					pkgs = append(pkgs, g.pkg)
 				}
