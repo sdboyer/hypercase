@@ -1935,10 +1935,11 @@ Elsewhere in the corpus, a sheet with no formulas has `format`'s outcome
 `skipped no formulas`, and a sheet whose `C1` is `=A1/B1`, with `B1` at `0`,
 has `evaluate`'s outcome `accepted div-zero`.
 
-The archives shown in steps 3 to 7 are as their own step leaves them. Their
-examples carry an `outcome` per cell from this step on, and the next update
-writes them (proposed). `hypercase.json` gains each suite's classifier, and
-whether the project supplies `Codes`.
+The archives shown in steps 3 to 6 come from their examples, which carry an
+`outcome` per cell, as every update writes from this step on. Step 7's
+archives, which no example holds yet, are shown without one.
+`hypercase.json` records each suite's classifier, and whether the project
+supplies `Codes`: step 5's shows them unset.
 
 ### Rules
 
