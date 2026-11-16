@@ -509,7 +509,12 @@ func TestLoop(t *testing.T) {
 		{"already a cycle elsewhere", map[string]string{"A1": "=B1", "B1": "=A1"}, "sheet/A1 \"=A1\\n\"\nsheet/B1 \"=A1\"\n"},
 		{"empty", map[string]string{}, "plain: the sheet has no cells"},
 		{"already refers to itself", map[string]string{"A1": "=A1\n", "B1": "1"}, "plain: A1 already refers to itself"},
+		{"refers to itself, spelled otherwise", map[string]string{"A1": " = (A1) "}, "plain: A1 already refers to itself"},
+		{"refers to itself, no newline", map[string]string{"A1": "=A1"}, "plain: A1 already refers to itself"},
+		{"refers to itself and more", map[string]string{"A1": "=A1+1"}, "sheet/A1 \"=A1\\n\"\n"},
+		{"malformed first cell", map[string]string{"A1": "=A1 +"}, "sheet/A1 \"=A1\\n\"\n"},
 		{"not a cell", map[string]string{"A1": "1", "notes": "1"}, "S101 notes: not a cell name @ sheet/notes:0"},
+		{"only not a cell", map[string]string{"notes": "=notes"}, "S101 notes: not a cell name @ sheet/notes:0"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -520,6 +525,37 @@ func TestLoop(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("got:\n%s\nwant:\n%s", got, tt.want)
+			}
+		})
+	}
+}
+
+// Loopable declines exactly the sheets Loop would leave unchanged, and
+// leaves what's wrong with a sheet for Loop to report.
+func TestLoopable(t *testing.T) {
+	tests := []struct {
+		name string
+		fsys fstest.MapFS
+		why  string // "" when loopable
+	}{
+		{"twice", sheetFS(map[string]string{"A1": "=B1*2", "B1": "3"}), ""},
+		{"empty", sheetFS(map[string]string{}), "the sheet has no cells"},
+		{"refers to itself", sheetFS(map[string]string{"A1": "= (A1)\n", "B1": "1"}), "A1 already refers to itself"},
+		{"later cell refers to itself", sheetFS(map[string]string{"A1": "1", "B1": "=B1"}), ""},
+		{"not a cell", sheetFS(map[string]string{"A1": "1", "notes": "1"}), ""},
+		{"a directory", fstest.MapFS{"sheet/A1/x": {}}, ""},
+		{"sheet is a file", fstest.MapFS{"sheet": {}}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			why, ok := sheet.Loopable(tt.fsys)
+			if why != tt.why || ok != (tt.why == "") {
+				t.Errorf("got %q, %v; want %q, %v", why, ok, tt.why, tt.why == "")
+			}
+			if _, err := sheet.Loop(tt.fsys); ok && err == nil {
+				return
+			} else if !ok && err == nil {
+				t.Errorf("Loop changed a sheet Loopable declined")
 			}
 		})
 	}
