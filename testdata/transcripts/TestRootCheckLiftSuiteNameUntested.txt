@@ -1,0 +1,51 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a-useonly
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/resolve
+PASS
+$ edit c/corpus_test.go  # a package c over the corpus
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./c  # ladder-b-owns
+    what ran, in order:
+        parse ran on x
+        outline's probe ran
+        outline ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/outline
+            --- PASS: TestCorpus/script/x/parse
+PASS
+$ rm c/corpus_test.go  # remove c's tests, and leave its registry
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # ladder-b-suite
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+PASS
+$ go test  # ladder-a-useonly
+    c/testdata/hypercase.json is a registry, and c holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+    the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root.
+        Rename the suite or the lift.
+    the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registry of ./c records that its package owns the lift, and ./c holds no _test.go file, so no test runs the lift there.
+        Restore the tests of ./c, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]

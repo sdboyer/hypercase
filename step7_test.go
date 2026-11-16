@@ -566,6 +566,17 @@ func TestTransformJennyFrozen(t *testing.T) {
 	s.fails(s.normal("tr-jenny"), frozen("echo", "1"))
 	s.fails(s.run("b", "tr-b-jenny", false), frozen("copy", "2"))
 
+	// A person deletes echo's frozen files alone. The root package's
+	// normal run fails on the cell, and b's update, which fails on its own
+	// frozen cell, leaves echo's unwritten too.
+	echoMissing := "echo: Does what the case's do/ tree says.\n    transform/upper/out/echo/outcome has no golden.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.\n    transform/upper/out/echo/values.txt has no golden."
+	frozenBoth := s.read(twice)
+	s.edit(twice, "delete upper's frozen cell of echo", drop("transform/upper/out/echo/"))
+	s.fails(s.normal("tr-jenny"), echoMissing)
+	s.fails(s.run("b", "tr-b-jenny", true), frozen("copy", "2"))
+	s.hasSections(twice, nil, "transform/upper/out/echo/")
+	s.write(twice, frozenBoth, "restore echo's frozen cell")
+
 	// A person deletes echo's frozen files, and removes copy's gaps line,
 	// so no package's update fails on a frozen cell. Each package's normal
 	// run fails on its own cell until its update writes it, and the other
@@ -576,7 +587,6 @@ func TestTransformJennyFrozen(t *testing.T) {
 		set("gaps", "transform/upper echo Waits on sheets#9.\n")(a)
 	})
 	edited := s.read(twice)
-	echoMissing := "echo: Does what the case's do/ tree says.\n    transform/upper/out/echo/outcome has no golden.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.\n    transform/upper/out/echo/values.txt has no golden."
 	copyDiffers := "transform/upper/out/copy/values.txt differs (-golden +got):"
 	s.fails(s.normal("tr-jenny"), echoMissing)
 	s.fails(s.run("b", "tr-b-jenny", false), copyDiffers)

@@ -120,6 +120,12 @@ func TestRootCheckLiftUsedUntested(t *testing.T) {
 // suite named like a lift that another package uses collides with it, and
 // is no owner of the lift, which no package then owns. A suite named like
 // a lift another package owns is that column owned twice.
+//
+// Its transcript records today's messages, a known gap that waits on
+// github.com/sdboyer/hypercase/issues/31: beside the collision, the
+// no-owner message still says to own the lift, which makes the column
+// owned twice, and the duplicate-column message doesn't say which owner
+// is a suite, and offers hypercase.Use to both.
 func TestRootCheckLiftSuiteName(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared-ladder")
@@ -138,15 +144,37 @@ func TestRootCheckLiftSuiteName(t *testing.T) {
 	s.done()
 }
 
+// TestRootCheckLiftSuiteNameUntested: a suite named like a used lift, and
+// an owner of the lift with no _test.go file, fail together: the
+// collision, and the lift owned by no package, naming the untested
+// owner. The messages wait on the same issue as TestRootCheckLiftSuiteName.
+func TestRootCheckLiftSuiteNameUntested(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared-ladder")
+	s.passes(s.update("ladder-a-useonly"))
+	s.write("c/corpus_test.go", []byte(packageTestFile), "a package c over the corpus")
+	s.passes(s.run("c", "ladder-b-owns", true))
+	s.remove("c/corpus_test.go", "remove c's tests, and leave its registry")
+	s.passes(s.run("b", "ladder-b-suite", true))
+	s.fails(s.normal("ladder-a-useonly"),
+		"the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root.\nRename the suite or the lift.",
+		"the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registry of ./c records that its package owns the lift, and ./c holds no _test.go file, so no test runs the lift there.\nRestore the tests of ./c, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.")
+	s.done()
+}
+
 // TestRootCheckCorpusTypes: two corpus types of one directory under one
-// corpus root fail the root-package check. Under two roots, neither
-// refuses.
+// corpus root fail the root-package check, even when one is a registry's
+// in a package with no _test.go file. Under two roots, neither refuses.
 func TestRootCheckCorpusTypes(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared-ladder")
 	s.passes(s.update("ladder-a"))
 	s.passes(s.run("b", "ladder-b-grid", true))
-	s.fails(s.normal("ladder-a"), "the corpus directory script has two different corpus types:\n  .: github.com/sdboyer/hypercase_test.Script: \"Trees of instructions, under in/<tree>/, that the fixtures' columns follow.\"\n  ./b: github.com/sdboyer/hypercase_test.Grid: \"A grid, in the script directory.\"\nAn archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration.")
+	twoTypes := "the corpus directory script has two different corpus types:\n  .: github.com/sdboyer/hypercase_test.Script: \"Trees of instructions, under in/<tree>/, that the fixtures' columns follow.\"\n  ./b: github.com/sdboyer/hypercase_test.Grid: \"A grid, in the script directory.\"\nAn archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration."
+	s.fails(s.normal("ladder-a"), twoTypes)
+	s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
+	s.fails(s.normal("ladder-a"), "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.", twoTypes)
+	s.write("b/corpus_test.go", []byte(packageTestFile), "restore b's tests")
 	s.run("b", "ladder-b-grid-other", true)
 	s.lacks(s.normal("ladder-a"), "two different corpus types")
 	s.done()

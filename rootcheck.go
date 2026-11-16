@@ -101,7 +101,11 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		// or transform. Nor does a transform it lists need an owner. Its
 		// sections stay claimed, since the registry's own error reports
 		// them, and the lifts and transforms it owns are kept apart, so a
-		// message that finds no owner names it.
+		// message that finds no owner names it. Its root-package check,
+		// corpus types and properties still count where registries are
+		// compared, the stricter choice: a second root-package check, or a
+		// corpus type or property another package declares differently,
+		// still fails.
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
 		}

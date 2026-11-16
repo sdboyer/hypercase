@@ -1131,13 +1131,22 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 - A package whose directory holds no `_test.go` file owns and uses
   nothing, whatever its registry records. Any file whose name ends in
   `_test.go` counts, whatever it holds, but one whose name starts with `_`
-  or `.`, which Go ignores. The check counts none of the registry's
-  columns, lifts or transforms (steps 6 and 7) as owned, its lifts as
-  used, or the transforms its corpus types list as needing an owner,
-  though their sections stay claimed. A lift needs an owner when a package
-  with tests uses it, and a transform when a package with tests lists it
-  in a corpus type. One that needs an owner, and that only such packages
-  own, fails as owned by no package, and the failure names them.
+  or `.`, which Go ignores. The check reads names, not build constraints,
+  so a package whose only test file a constraint excludes counts as
+  tested, and the result doesn't depend on the environment the check
+  runs in. The check counts none of the registry's columns, lifts or
+  transforms (steps 6 and 7) as owned, its lifts as used, or the
+  transforms its corpus types list as needing an owner. The sections of
+  its suites, its owned lifts and its listed transforms stay claimed, so
+  the registry's own failure is the one that reports them. A lift needs
+  an owner when a package with tests uses it, and a transform when a
+  package with tests lists it in a corpus type. One that needs an owner,
+  and that only such packages own, fails as owned by no package, and the
+  failure names them. The registry's root-package check, corpus
+  types and properties still count where the check compares registries,
+  which is the stricter choice: a second root-package check, or a corpus
+  type or property that another package declares differently, still
+  fails.
 - In a normal run, every package's run over a corpus root fails when no
   registry records a root-package check for that root.
 
@@ -1491,9 +1500,10 @@ package owns every column it registers.
   in process. A package that uses a lift neither writes nor judges the
   lift's sections.
 - The root-package check fails on a column two packages own, in place of
-  step 5's column two packages register, and on a lift that packages use
-  and none owns. A suite named like the lift owns no lift, and fails
-  beside it, since lifts share the suites' column names.
+  step 5's column two packages register, and on a lift that a package
+  with tests uses and none owns (step 5's rule for packages with no
+  tests). A suite named like the lift owns no lift, and the check fails on
+  the two as a collision, since lifts share the suites' column names.
 
 **Blocked cells.**
 
@@ -1737,8 +1747,9 @@ whether each has a probe, and whether the package owns it.
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
   root-package check reports them and names the strip command.
-- The root-package check fails on a transform that no package owns, or
-  that two own.
+- The root-package check fails on a transform that a package with tests
+  lists in a corpus type and no package owns (step 5's rule for packages
+  with no tests), and on one that two own.
 - The package that owns a transform writes its `in/…` and `delete`, and
   judges them against what the transform makes. When the transform makes
   the variant, every package's normal run fails it if its committed `in/…`
