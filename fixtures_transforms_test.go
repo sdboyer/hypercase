@@ -228,6 +228,7 @@ var transformRegistrations = map[string]func(){
 	"col-variant":    func() { transforms(scriptType, own(withName(echo, "variant"))) },
 	"col-transform":  func() { transforms(scriptType, own(withName(echo, "transform"))) },
 	"lift-variant":   func() { l := parse; l.Name = "variant"; transforms(scriptType, own(l)) },
+	"lift-transform": func() { l := parse; l.Name = "transform"; transforms(scriptType, own(l)) },
 
 	// Refusals once initialization is over.
 	"tr-own-unlisted": func() { transforms(typeWith(looped), own(echoRejects, looped, upper)) },

@@ -881,6 +881,7 @@ func TestTransformRefusals(t *testing.T) {
 		{"col-variant", "panic: hypercase: the suite name variant is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the suite."},
 		{"col-transform", "panic: hypercase: the suite name transform is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the suite."},
 		{"lift-variant", "panic: hypercase: the lift name variant is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the lift."},
+		{"lift-transform", "panic: hypercase: the lift name transform is reserved: a case's subtests name its variants variant/<name> and transform/<name>. Rename the lift."},
 	} {
 		r := s.normal(tt.reg)
 		s.fails(r, tt.want)
