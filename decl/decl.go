@@ -140,19 +140,23 @@ type Lift[In, Out any] struct {
 	Run func(archive string, in In, stderr io.Writer) (Out, error)
 	// Jenny makes a bytes lift's product, in place of Run: the files it
 	// generates from the input are the product's input view, by their
-	// paths in it. An error it returns that wraps one [Reject] made is the
-	// lift's rejection. Any other error is a fault of the jenny, jenny's
-	// own included, such as two files at one path: it fails the lift's
-	// cell, and no update writes the cell.
+	// paths in it. An error it returns is the lift's rejection when
+	// [Reject] marks all of it: each error the returned one wraps or joins,
+	// down to those that wrap none, is one Reject made or below one. Any
+	// other error is a fault of the jenny, jenny's own included, such as
+	// two files at one path, and so is a rejection joined with a fault, as
+	// jenny's Pipeline joins its jennies' errors: it fails the lift's cell,
+	// and no update writes the cell.
 	Jenny jenny.Jenny[In]
 }
 
 // Reject marks err as a bytes lift's rejection of its input, for the
 // lift's jenny to return. A jenny's error has two sources, the jenny's
-// generator and jenny itself, and only an error Reject marks is a
-// rejection, so a fault of the jenny is never recorded as one. The
-// rejection's text is err's, and it wraps err, so errors.As reaches err
-// through it. Reject returns nil for a nil err.
+// generator and jenny itself, and only an error Reject marks all of is a
+// rejection, so a fault of the jenny is never recorded as one, alone or
+// joined with a rejection. The rejection's text is err's, and it wraps
+// err, so errors.As reaches err through it. Reject returns nil for a nil
+// err.
 func Reject(err error) error {
 	if err == nil {
 		return nil
