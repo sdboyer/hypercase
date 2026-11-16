@@ -663,6 +663,30 @@ func TestTransformOwnerUntested(t *testing.T) {
 	s.done()
 }
 
+// TestTransformOwnerDropped: a package that drops a transform from Own,
+// with no update, leaves its registry recording that it owns it, so the
+// root-package check, which reads the registries, still counts it as the
+// owner. The state reports itself: the package's own normal run fails on
+// its registry, and names the update, after which the root-package check
+// reports the transform owned by no package.
+func TestTransformOwnerDropped(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "a package b over the corpus")
+	s.passes(s.update("tr-owns-looped"))
+	s.passes(s.run("b", "tr-b-owns", true))
+	s.passes(s.normal("tr-owns-looped"))
+
+	// b drops upper from Own, and runs no update.
+	s.fails(s.run("b", "tr-b", false), "b/testdata/hypercase.json differs from what the package registers (-committed +registered):",
+		"-           \"owned\": true\n+           \"owned\": false",
+		"Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.")
+	s.passes(s.normal("tr-owns-looped"))
+	s.passes(s.run("b", "tr-b", true))
+	s.fails(s.normal("tr-owns-looped"), "the transform upper, of testdata/script/, is owned by no package")
+	s.done()
+}
+
 // TestTransformOwners: the root-package check fails a transform no package
 // owns, or two own, and a corpus type two packages list differently.
 func TestTransformOwners(t *testing.T) {
