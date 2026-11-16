@@ -89,10 +89,6 @@ func (e *TreeError) Unwrap() error { return e.Err }
 // is not empty, holds no newline, and neither starts nor ends with white
 // space.
 func HoldsName(name string) error {
-	a := &Archive{Sections: []Section{{Name: name}}}
-	if _, err := a.ReadBack(); err == nil {
-		return nil
-	}
 	switch {
 	case name == "":
 		return errors.New("it is empty, and a marker line with no name starts no section")
@@ -101,7 +97,7 @@ func HoldsName(name string) error {
 	case strings.TrimSpace(name) != name:
 		return errors.New("it starts or ends with white space, which reading the marker line trims")
 	}
-	return errors.New("it doesn't read back as written")
+	return nil
 }
 
 // kindOf names the kind of a file that isn't regular.

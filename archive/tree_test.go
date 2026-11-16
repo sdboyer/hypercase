@@ -63,6 +63,26 @@ func TestHoldsName(t *testing.T) {
 	}
 }
 
+// TestHoldsNameIsTheReadBack: over every name of up to five runes from
+// an alphabet of a letter, a slash, a dash and white space, HoldsName
+// admits exactly the names that a one-section archive reads back.
+func TestHoldsNameIsTheReadBack(t *testing.T) {
+	alphabet := []rune{'a', '/', '-', ' ', '\t', '\n', '\r', '\u00a0', '\u2028'}
+	var walk func(name string, n int)
+	walk = func(name string, n int) {
+		_, rerr := (&Archive{Sections: []Section{{Name: name}}}).ReadBack()
+		if err := HoldsName(name); (err == nil) != (rerr == nil) {
+			t.Errorf("HoldsName(%q) = %v, and the read-back says %v", name, err, rerr)
+		}
+		if n > 0 {
+			for _, r := range alphabet {
+				walk(name+string(r), n-1)
+			}
+		}
+	}
+	walk("", 5)
+}
+
 // TestTreeSectionsRefuses: a prefix that isn't a slash path ending in a
 // slash is refused, and a file an archive can't hold is a TreeError
 // naming its path in the tree.
