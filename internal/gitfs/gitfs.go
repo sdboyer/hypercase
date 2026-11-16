@@ -220,12 +220,28 @@ func (r *Repo) blob(hash string) ([]byte, error) {
 	if len(fields) == 2 && fields[0] == hash && fields[1] == "missing" {
 		return nil, fmt.Errorf("git cat-file finds no object %s in the repository", hash)
 	}
-	if len(fields) != 3 || fields[0] != hash || fields[1] != "blob" {
-		return nil, fmt.Errorf("git cat-file gave %q for the blob %s", strings.TrimSpace(head), hash)
+	size := -1
+	if len(fields) == 3 && fields[0] == hash {
+		if n, err := strconv.Atoi(fields[2]); err == nil {
+			size = n
+		}
 	}
-	size, err := strconv.Atoi(fields[2])
-	if err != nil || size < 0 {
-		return nil, fmt.Errorf("git cat-file gave %q for the blob %s", strings.TrimSpace(head), hash)
+	if size < 0 {
+		// The header doesn't say how much content follows it, so no later
+		// read can find its own header: each gives this error.
+		r.catErr = fmt.Errorf("git cat-file gave %q for the blob %s", strings.TrimSpace(head), hash)
+		if stop := r.stopCat(); stop != nil {
+			r.catErr = stop
+		}
+		return nil, r.catErr
+	}
+	if fields[1] != "blob" {
+		// Another kind of object, whose content is read past, so that the
+		// next read finds its own header.
+		if _, err := io.CopyN(io.Discard, r.out, int64(size)+1); err != nil {
+			return nil, r.catFailed(err)
+		}
+		return nil, fmt.Errorf("git cat-file gives a %s, not a blob, for %s", fields[1], hash)
 	}
 	data := make([]byte, size+1) // the content, then a newline
 	if _, err := io.ReadFull(r.out, data); err != nil {

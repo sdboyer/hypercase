@@ -172,6 +172,28 @@ func TestMissingBlob(t *testing.T) {
 	}
 }
 
+// TestNotABlob: an object that cat-file gives as another kind than a blob,
+// such as a tree, is an error, and the read goes past its content, so the
+// next read gets its own object.
+func TestNotABlob(t *testing.T) {
+	t.Parallel()
+	g := gittest.New(t)
+	g.Write(map[string]string{"a.txt": "a\n", "dir/b.txt": "b\n"})
+	c := g.Commit("first")
+	r := open(t, g.Dir)
+	treeHash := strings.TrimSpace(g.Git("rev-parse", c+"^{tree}"))
+	blobHash := strings.TrimSpace(g.Git("rev-parse", c+":a.txt"))
+	want := "git cat-file gives a tree, not a blob, for " + treeHash
+	for range 2 {
+		if _, err := r.Blob(treeHash); err == nil || err.Error() != want {
+			t.Errorf("Blob(tree): got %v, want %q", err, want)
+		}
+		if got, err := r.Blob(blobHash); err != nil || string(got) != "a\n" {
+			t.Errorf("Blob(a.txt) after the tree: got %q, %v", got, err)
+		}
+	}
+}
+
 // wrapGit puts a git on PATH that runs script, a shell script given the
 // real git as $GIT, before git's arguments.
 func wrapGit(t *testing.T, script string) {
@@ -264,6 +286,26 @@ exec "$GIT" "$@"
 		r := open(t, g.Dir)
 		if _, err := r.Resolve("HEAD"); err == nil || err.Error() != "git rev-parse: the wrapper fails rev-parse" {
 			t.Errorf("Resolve(HEAD): got %v, want %q", err, "git rev-parse: the wrapper fails rev-parse")
+		}
+	})
+	// A header that says nothing of how much content follows leaves no
+	// later read able to find its own: each gives the first one's error.
+	t.Run("header", func(t *testing.T) {
+		wrapGit(t, `if [ "$1" = cat-file ]; then while read -r line; do echo "nonsense"; done; exit 0; fi
+exec "$GIT" "$@"
+`)
+		r := open(t, g.Dir)
+		tree, err := r.Tree(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = fs.ReadFile(tree, "a.txt")
+		if err == nil || !strings.Contains(err.Error(), `git cat-file gave "nonsense" for the blob `) {
+			t.Fatalf("ReadFile(a.txt): got %v", err)
+		}
+		first := strings.TrimPrefix(err.Error(), "readfile a.txt: ")
+		if _, err := fs.ReadFile(tree, "dir/b.txt"); err == nil || err.Error() != "readfile dir/b.txt: "+first {
+			t.Errorf("ReadFile(dir/b.txt): got %v, want %q", err, "readfile dir/b.txt: "+first)
 		}
 	})
 }
