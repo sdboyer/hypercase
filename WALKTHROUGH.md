@@ -1128,6 +1128,12 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
   - a directory under `testdata/` that holds archives and that no registry
     declares.
 - A declared directory that doesn't exist yet is fine.
+- A package whose directory holds no `_test.go` file owns nothing, whatever
+  its registry records. Any file whose name ends in `_test.go` counts,
+  whatever it holds. The check counts none of the registry's columns,
+  lifts or transforms (steps 6 and 7) as owned, though their sections stay
+  claimed. A lift or transform that only such packages own fails as owned
+  by no package, and the failure names them.
 - In a normal run, every package's run over a corpus root fails when no
   registry records a root-package check for that root.
 
@@ -1705,11 +1711,12 @@ whether each has a probe, and whether the package owns it.
   output, every update of the package that owns its column fails on it,
   and so does each of that package's normal runs once the transform's
   owner has rewritten the inputs. Before then, the cell reads the old
-  inputs and passes: another package's normal run passes, and the
-  owner's fails on the inputs, which differ from what the transform
-  makes. It fails until a person deletes its files or removes its `gaps`
-  line; then the next update of the package that owns its column writes
-  the cell, and no other package's update does.
+  inputs, and that package's run of the frozen cell passes, while the
+  transform owner's normal run fails on the inputs, which differ from
+  what the transform makes. It fails until a person deletes its files or
+  removes its `gaps` line, and then the package that owns its column runs
+  its update, which writes the cell. Until then, that package's normal
+  run still fails on it, since no other package's update writes it.
 - The update of a package that doesn't own the transform, alone, after the
   transform changed, writes the variant's cells on what the transform
   makes, while its normal run reads the sections the owner has yet to
@@ -1725,6 +1732,8 @@ whether each has a probe, and whether the package owns it.
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
   root-package check reports them and names the strip command.
+- The root-package check fails on a transform that no package owns, or
+  that two own.
 - The package that owns a transform writes its `in/…` and `delete`, and
   judges them against what the transform makes. When the transform makes
   the variant, every package's normal run fails it if its committed `in/…`

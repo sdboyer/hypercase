@@ -1,0 +1,88 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # ladder-b-owns
+    what ran, in order:
+        parse ran on x
+        outline's probe ran
+        outline ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/outline
+            --- PASS: TestCorpus/script/x/parse
+PASS
+$ go test  # ladder-a
+    the column parse is owned by . and ./b. Column names are unique per corpus root, and one package owns each column.
+        Rename one of the columns, or remove one. A package that only reads a lift's product gives the lift to hypercase.Use.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]
+$ rm b/corpus_test.go  # remove b's tests, and leave its registry
+$ go test  # ladder-a
+    b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a-useonly
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/resolve
+PASS
+$ go test  # ladder-a-useonly
+    b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+    the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registry of ./b records that its package owns the lift, and ./b holds no _test.go file, so no test runs the lift there.
+        Restore the tests of ./b, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]

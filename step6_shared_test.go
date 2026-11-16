@@ -46,6 +46,31 @@ func TestRootCheckLifts(t *testing.T) {
 	s.done()
 }
 
+// TestRootCheckLiftOwnerUntested: a registry in a package with no _test.go
+// file owns nothing, though it still claims its sections. A column it and
+// another package own is the other's alone, and a lift it alone owns is
+// owned by no package, which the failure says, naming the package.
+func TestRootCheckLiftOwnerUntested(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared-ladder")
+	s.passes(s.update("ladder-a"))
+	s.passes(s.run("b", "ladder-b-owns", true))
+	s.fails(s.normal("ladder-a"), "the column parse is owned by . and ./b.")
+
+	s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
+	untested := "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections."
+	r := s.normal("ladder-a")
+	s.fails(r, untested)
+	s.lacks(r, "the column parse is owned by", "no registry claims")
+
+	// The root package uses parse, which only b's registry owns.
+	s.passes(s.update("ladder-a-useonly"))
+	r = s.normal("ladder-a-useonly")
+	s.fails(r, untested, "the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registry of ./b records that its package owns the lift, and ./b holds no _test.go file, so no test runs the lift there.\nRestore the tests of ./b, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.")
+	s.lacks(r, "no registry claims")
+	s.done()
+}
+
 // TestRootCheckCorpusTypes: two corpus types of one directory under one
 // corpus root fail the root-package check. Under two roots, neither
 // refuses.
