@@ -27,13 +27,42 @@ func IsTemp(name string) bool {
 // directory, synced and renamed over it, so a reader sees the old file or
 // the new one, never part of one. The file keeps its mode; a new one is
 // 0644. A failed write leaves the file as it was and removes the temp file.
-func WriteFile(name string, data []byte) (err error) {
+func WriteFile(name string, data []byte) error {
 	mode := fs.FileMode(0o644)
 	if fi, err := os.Stat(name); err == nil {
 		mode = fi.Mode().Perm()
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
+	return viaTemp(name, data, mode, func(tmp string) error { return os.Rename(tmp, name) })
+}
+
+// CreateFile writes data as the named file, which doesn't exist yet,
+// through a temp file in the same directory, synced and then linked to the
+// name, so a reader sees no file or the whole one, never part of one, and
+// a write cut short leaves only a temp file. The link refuses a name that
+// exists, even one another process creates during the write: then the
+// error is fs.ErrExist, and that file is as it was. The new file's mode is
+// 0644. The temp file is removed, whether the write fails or not.
+func CreateFile(name string, data []byte) error {
+	var tmp string
+	err := viaTemp(name, data, 0o644, func(t string) error {
+		tmp = t
+		return os.Link(t, name)
+	})
+	if err == nil {
+		// The file is created. A temp file this leaves, the root-package
+		// check reports.
+		os.Remove(tmp)
+	}
+	return err
+}
+
+// viaTemp writes data, with the given mode, to a temp file beside the
+// named file, syncs and closes it, and calls finish with the temp file's
+// path, to put it in the file's place. When any step fails, it removes
+// the temp file.
+func viaTemp(name string, data []byte, mode fs.FileMode, finish func(tmp string) error) (err error) {
 	f, err := os.CreateTemp(filepath.Dir(name), tempPrefix+filepath.Base(name)+"-*")
 	if err != nil {
 		return err
@@ -64,7 +93,7 @@ func WriteFile(name string, data []byte) (err error) {
 			return err
 		}
 	}
-	return os.Rename(tmp, name)
+	return finish(tmp)
 }
 
 // Write formats the archive and writes it to the named file with

@@ -25,7 +25,7 @@ func modifyFixture(t *testing.T) (name, lock string) {
 	return name, filepath.Join(dir, LockFile)
 }
 
-func scaled(a *Archive) (*Archive, error) {
+func scaled(a *Archive, _ []byte) (*Archive, error) {
 	a.Sections[1].Data = []byte("serves: 8\n")
 	return a, nil
 }
@@ -71,7 +71,7 @@ func TestModifyHoldsTheLockAcrossTheRename(t *testing.T) {
 	mu.Lock()
 	got := slices.Clone(steps)
 	mu.Unlock()
-	if want := []string{"A locked", "A read", "A renamed", "A unlock", "B locked"}; !slices.Equal(got, want) {
+	if want := []string{"A lock", "A locked", "A read", "A renamed", "A unlock", "B locked"}; !slices.Equal(got, want) {
 		t.Errorf("the steps ran in the order %q, not %q", got, want)
 	}
 	holds, err := f.Stat()
@@ -127,14 +127,14 @@ func TestModifyWritesNothing(t *testing.T) {
 		return nil
 	}
 	defer func() { hooks.AfterTemp = nil }()
-	if err := Modify(lock, name, func(*Archive) (*Archive, error) { return nil, nil }); err != nil {
+	if err := Modify(lock, name, func(*Archive, []byte) (*Archive, error) { return nil, nil }); err != nil {
 		t.Error(err)
 	}
 	refused := errors.New("refused")
-	if err := Modify(lock, name, func(*Archive) (*Archive, error) { return nil, refused }); !errors.Is(err, refused) {
+	if err := Modify(lock, name, func(*Archive, []byte) (*Archive, error) { return nil, refused }); !errors.Is(err, refused) {
 		t.Errorf("Modify returned %v, not fn's error", err)
 	}
-	if err := Modify(lock, name, func(a *Archive) (*Archive, error) { return a, nil }); err != nil {
+	if err := Modify(lock, name, func(a *Archive, _ []byte) (*Archive, error) { return a, nil }); err != nil {
 		t.Error(err)
 	}
 }

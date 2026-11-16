@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -76,7 +77,7 @@ func TestSerializeFinalNewline(t *testing.T) {
 			}
 			continue
 		}
-		path, err := Create(t.TempDir(), sheetType, "nonl", ss)
+		path, err := Create(t.TempDir(), sheetType, "nonl", updateVar, ss)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -146,6 +147,12 @@ func TestSerializeTreeNames(t *testing.T) {
 			fails(t, err, `the tree name "`+name+`" isn't one path element`)
 		}
 	}
+	// A name the section markers can't hold is the tree's to blame, not
+	// its files'.
+	for _, name := range []string{"a\nb", "sheet\n"} {
+		_, err := Serialize(map[string]fs.FS{name: tree})
+		fails(t, err, "the tree name "+strconv.Quote(name)+" can't be held in an archive")
+	}
 	_, err := Serialize(map[string]fs.FS{"sheet": nil})
 	fails(t, err, "the tree sheet is nil")
 	_, err = Serialize(nil)
@@ -157,7 +164,7 @@ func TestSerializeTreeNames(t *testing.T) {
 func TestSerializeLarge(t *testing.T) {
 	data := bytes.Repeat([]byte("0123456789abcde\n"), 1<<16)
 	ss := serialize(t, map[string]fs.FS{"sheet": fstest.MapFS{"A1": {Data: data}}})
-	path, err := Create(t.TempDir(), sheetType, "large", ss)
+	path, err := Create(t.TempDir(), sheetType, "large", updateVar, ss)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -167,6 +167,34 @@ func TestWriteFileKeepsMode(t *testing.T) {
 	}
 }
 
+// TestCreateFile: a create writes a new file of mode 0644, and refuses one
+// that exists with an error that is fs.ErrExist, leaving it as it was.
+// Neither leaves a temp file.
+func TestCreateFile(t *testing.T) {
+	dir := t.TempDir()
+	name := filepath.Join(dir, "new.txtar")
+	if err := CreateFile(name, []byte("A case.\n")); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(name); err != nil {
+		t.Fatal(err)
+	} else if fi.Mode() != 0o644 {
+		t.Errorf("a new file's mode is %v, not %v", fi.Mode(), fs.FileMode(0o644))
+	}
+	if err := CreateFile(name, []byte("Another case.\n")); !errors.Is(err, fs.ErrExist) {
+		t.Errorf("a create over an existing file returned %v, not fs.ErrExist", err)
+	}
+	if data, _ := os.ReadFile(name); string(data) != "A case.\n" {
+		t.Errorf("a refused create changed the file:\n%s", data)
+	}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if IsTemp(e.Name()) {
+			t.Errorf("a create left its temp file, %s", e.Name())
+		}
+	}
+}
+
 func TestView(t *testing.T) {
 	a := Parse([]byte(`A sheet.
 -- in/sheet/A1 --

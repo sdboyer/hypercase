@@ -10,6 +10,7 @@ import (
 
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
+	"github.com/sdboyer/hypercase/internal/hooks"
 )
 
 // files returns every file of a tree, by path.
@@ -40,7 +41,7 @@ func sameFiles(t *testing.T, what string, got, want map[string]string) {
 // TestLoad: Load returns a value whose fs.FS holds exactly the serialized
 // files and bytes, the trees as its top-level directories.
 func TestLoad(t *testing.T) {
-	path, err := Create(t.TempDir(), sheetType, "twice", serialize(t, cells))
+	path, err := Create(t.TempDir(), sheetType, "twice", updateVar, serialize(t, cells))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +151,7 @@ func TestExtractRefuses(t *testing.T) {
 // TestExtractNoVariants: Extract of a variant of an archive with no
 // hand-written variant says so.
 func TestExtractNoVariants(t *testing.T) {
-	path, err := Create(t.TempDir(), sheetType, "twice", serialize(t, cells))
+	path, err := Create(t.TempDir(), sheetType, "twice", updateVar, serialize(t, cells))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +176,7 @@ func TestExtractFailsPartWay(t *testing.T) {
 	_, path := corpus(t)
 	dir := filepath.Join(t.TempDir(), "x")
 	var wrote []string
-	afterExtractFile = func(p string) error {
+	hooks.ExtractFile = func(p string) error {
 		wrote = append(wrote, p)
 		if len(wrote) == 2 {
 			return errors.New("the disk is full")
@@ -183,7 +184,7 @@ func TestExtractFailsPartWay(t *testing.T) {
 		return nil
 	}
 	err := Extract(path, "", dir)
-	afterExtractFile = nil
+	hooks.ExtractFile = nil
 	fails(t, err, "writing "+filepath.Join(dir, "sheet", "B1")+": the disk is full, so "+dir+" is removed.\nFix what stopped the write")
 	absent(t, dir)
 }
@@ -200,14 +201,14 @@ func TestExtractReadsBack(t *testing.T) {
 		{func(p string) error { return os.WriteFile(filepath.Join(filepath.Dir(p), "Z1"), nil, 0o644) }, "the files under"},
 	} {
 		dir := filepath.Join(t.TempDir(), "x")
-		afterExtractFile = func(p string) error {
+		hooks.ExtractFile = func(p string) error {
 			if filepath.Base(p) == "A1" {
 				return c.change(p)
 			}
 			return nil
 		}
 		err := Extract(path, "", dir)
-		afterExtractFile = nil
+		hooks.ExtractFile = nil
 		fails(t, err, "doesn't read back as the case's input view", c.want, dir+" is removed.\nExtract to a filesystem that keeps each name and each byte as written.")
 		absent(t, dir)
 	}

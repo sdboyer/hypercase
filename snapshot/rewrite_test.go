@@ -15,10 +15,6 @@ import (
 	"github.com/sdboyer/hypercase/internal/hooks"
 )
 
-// The tests' update variable, which none of them sets but
-// TestRewriteDuringUpdate.
-const updateVar = "SNAPSHOT_TEST_UPDATE_GOLDEN"
-
 func section(name, data string) []archive.Section {
 	return []archive.Section{{Name: name, Data: []byte(data)}}
 }
@@ -115,6 +111,7 @@ func TestRewriteRefusesUnplaced(t *testing.T) {
 // takes the corpus root's lock before it re-reads the archive, and
 // releases it after the rename: another update that asks for the lock at
 // the re-read gets it only once RewriteInputs has released it.
+// TestRewriteRereadsUnderTheLock shows the re-read is what it writes from.
 func TestRewriteLocks(t *testing.T) {
 	root, path := corpus(t)
 	lock := filepath.Join(root, "testdata", archive.LockFile)
@@ -152,7 +149,7 @@ func TestRewriteLocks(t *testing.T) {
 	mu.Lock()
 	got := slices.Clone(steps)
 	mu.Unlock()
-	if want := []string{"rewrite locked", "rewrite read", "rewrite renamed", "rewrite unlock", "update locked"}; !slices.Equal(got, want) {
+	if want := []string{"rewrite lock", "rewrite locked", "rewrite read", "rewrite renamed", "rewrite unlock", "update locked"}; !slices.Equal(got, want) {
 		t.Errorf("the steps ran in the order %q, not %q", got, want)
 	}
 }
@@ -165,7 +162,19 @@ func TestRewriteRereads(t *testing.T) {
 	if _, err := Load(sheetType, path); err != nil {
 		t.Fatal(err)
 	}
-	err := archive.Modify(filepath.Join(root, "testdata", archive.LockFile), path, func(a *archive.Archive) (*archive.Archive, error) {
+	if err := missingZ9(root, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := RewriteInputs(root, path, "", updateVar, section("in/sheet/B1", "4\n")); err != nil {
+		t.Fatal(err)
+	}
+	same(t, path, rewrittenAndUpdated(t))
+}
+
+// missingZ9 is an update of twice under the corpus root's lock: it
+// rewrites the resolve cell's error.
+func missingZ9(root, path string) error {
+	return archive.Modify(filepath.Join(root, "testdata", archive.LockFile), path, func(a *archive.Archive, _ []byte) (*archive.Archive, error) {
 		for i, s := range a.Sections {
 			if s.Name == "out/resolve/error.txt" {
 				a.Sections[i].Data = []byte("D1: Z9 is missing\n")
@@ -173,15 +182,57 @@ func TestRewriteRereads(t *testing.T) {
 		}
 		return a, nil
 	})
+}
+
+// rewrittenAndUpdated is twice with in/sheet/B1 rewritten to 4, and the
+// error missingZ9 writes.
+func rewrittenAndUpdated(t *testing.T) []byte {
+	t.Helper()
+	want := replaced(t, "in/sheet/B1", "3\n", "4\n")
+	return bytes.Replace(want, []byte("-- out/resolve/error.txt --\nD1: Z9 doesn't exist\n"), []byte("-- out/resolve/error.txt --\nD1: Z9 is missing\n"), 1)
+}
+
+// TestRewriteRereadsUnderTheLock: an update that writes the archive once
+// RewriteInputs has been called, and just before it takes the lock, keeps
+// its sections, since RewriteInputs writes from what it reads under the
+// lock, never from a read before it.
+func TestRewriteRereadsUnderTheLock(t *testing.T) {
+	root, path := corpus(t)
+	var updated bool
+	var uerr error
+	hooks.Modify = func(step string) {
+		if step == "lock" && !updated {
+			updated = true
+			uerr = missingZ9(root, path)
+		}
+	}
+	err := RewriteInputs(root, path, "", updateVar, section("in/sheet/B1", "4\n"))
+	hooks.Modify = nil
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := RewriteInputs(root, path, "", updateVar, section("in/sheet/B1", "4\n")); err != nil {
-		t.Fatal(err)
+	if !updated || uerr != nil {
+		t.Fatalf("the update didn't run before the lock: ran %v, %v", updated, uerr)
 	}
-	want := replaced(t, "in/sheet/B1", "3\n", "4\n")
-	want = bytes.Replace(want, []byte("-- out/resolve/error.txt --\nD1: Z9 doesn't exist\n"), []byte("-- out/resolve/error.txt --\nD1: Z9 is missing\n"), 1)
-	same(t, path, want)
+	same(t, path, rewrittenAndUpdated(t))
+}
+
+// TestRewriteJudgesWhatItRead: RewriteInputs judges the form of the bytes
+// it parsed the archive from. An archive not in the form an update writes
+// when it is read under the lock is refused, though a writer that takes no
+// lock puts the update's form back before the judging.
+func TestRewriteJudgesWhatItRead(t *testing.T) {
+	root, path := corpus(t)
+	writeFile(t, path, bytes.TrimSuffix(twice(t), []byte("\n")))
+	hooks.Modify = func(step string) {
+		if step == "read" {
+			writeFile(t, path, twice(t))
+		}
+	}
+	err := RewriteInputs(root, path, "", updateVar, section("in/sheet/B1", "4\n"))
+	hooks.Modify = nil
+	fails(t, err, path+" isn't in the form an update writes")
+	same(t, path, twice(t))
 }
 
 // TestRewriteDuringUpdate: while the variable updateVar names is set,

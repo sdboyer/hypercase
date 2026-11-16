@@ -13,6 +13,10 @@ import (
 	"github.com/sdboyer/hypercase/decl"
 )
 
+// The tests' update variable, which none of them sets but
+// TestCreateDuringUpdate and TestRewriteDuringUpdate.
+const updateVar = "SNAPSHOT_TEST_UPDATE_GOLDEN"
+
 // Sheet is the walkthrough's corpus type: a spreadsheet, one file per cell
 // under in/sheet/.
 type Sheet struct{ fs.FS }

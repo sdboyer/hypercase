@@ -577,7 +577,7 @@ func (r *runner) write(t *testing.T, pc plannedCase, w *caseWrites) {
 		return
 	}
 	rel := r.rel(pc.path)
-	err := archive.Modify(r.lockPath(), pc.path, func(current *archive.Archive) (*archive.Archive, error) {
+	err := archive.Modify(r.lockPath(), pc.path, func(current *archive.Archive, _ []byte) (*archive.Archive, error) {
 		// The cells ran on the hand-written sections first read. Outputs
 		// written beside other inputs would make an update that passed and
 		// a normal run that fails.

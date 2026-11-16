@@ -7,7 +7,13 @@
 //
 // Which real files make a good case is the project's to say, so the
 // command that takes them is the project's, and so is the update command
-// it prints, which fills a new case's outputs.
+// it prints, which fills a new case's outputs. The command finds the
+// corpus root it passes them with the root package's Corpus, as a run
+// finds it.
+//
+// Create and RewriteInputs write a case's inputs, which no update writes,
+// so each refuses while the project's update variable is set. Serialize,
+// Load and Extract write no archive.
 //
 // The package doesn't import testing, so a project's command can import
 // it.
@@ -26,14 +32,16 @@ import (
 
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
+	"github.com/sdboyer/hypercase/internal/hooks"
 )
 
 // Serialize turns each tree's files into the sections in/<tree>/<path>,
-// with each file's bytes exactly as read, through [archive.TreeSections],
-// the walk that makes a transform's sections too. The sections are sorted
-// by name, so the same trees always serialize to the same bytes.
+// with each file's bytes exactly as read, through the walk
+// [archive.TreeSections]. The sections are sorted by name, so the same
+// trees always serialize to the same bytes.
 //
-// A tree's name is one path element, not params, which is reserved. Each
+// A tree's name is one path element, not params, which is reserved, and
+// one an archive's section names can hold, so no newline. Each
 // tree holds at least one file. What the walk refuses, an empty directory,
 // a file that isn't regular or one that wouldn't read back as written,
 // fails Serialize, and so does an error reading any path. Each failure
@@ -69,7 +77,8 @@ func Serialize(trees map[string]fs.FS) ([]archive.Section, error) {
 	return ss, nil
 }
 
-// checkTree checks a tree's name: one path element, and not params.
+// checkTree checks a tree's name: one path element, not params, and one
+// a section's name holds.
 func checkTree(name string) error {
 	switch {
 	case name == "." || !fs.ValidPath(name) || strings.Contains(name, "/"):
@@ -77,18 +86,33 @@ func checkTree(name string) error {
 	case name == archive.ParamsTree:
 		return errors.New("the tree name params is reserved: a column's parameters are fixed in Go, or derived from the archive's name, and an archive carries none.\nName the tree otherwise.")
 	}
+	a := &archive.Archive{Sections: []archive.Section{{Name: archive.In + "/" + name + "/x"}}}
+	if _, err := a.ReadBack(); err != nil {
+		return fmt.Errorf("the tree name %q can't be held in an archive: the names of its sections, under in/, wouldn't read back as written, as a name holding a newline doesn't.\nName the tree otherwise.", name)
+	}
 	return nil
 }
 
-// afterCreateWrite, when set, runs once Create has written the new case's
-// bytes, before it syncs and closes the file. Tests set it to make the
-// write fail at that point.
-var afterCreateWrite func(path string) error
+// notDuringUpdate refuses to run fn, a primitive that writes a case's
+// inputs, while the update variable updateVar names is set: no update
+// writes a case's inputs. what is what fn does, as "creates a case", and
+// fix how a person does it otherwise.
+func notDuringUpdate(fn, updateVar, what, fix string) error {
+	if updateVar == "" {
+		return fmt.Errorf("%s has no update variable to check, and it refuses during an update.\nPass the name of the project's update variable, its decl.Project's UpdateVar.", fn)
+	}
+	if os.Getenv(updateVar) != "" {
+		return fmt.Errorf("%s is set, so this may be an update, and no update %s.\n%s from the project's command, or from a test run without %s.", updateVar, what, fix, updateVar)
+	}
+	return nil
+}
 
 // Create writes sections, under an empty comment, as the new case
 // <root>/testdata/<typ.Dir>/<name>.txtar, and returns its path. root is
 // the corpus root, a directory that exists, and Create makes
-// testdata/<typ.Dir>/ under it if it is missing.
+// testdata/<typ.Dir>/ under it if it is missing. updateVar is the name of
+// the project's update variable: no update creates a case, so while it
+// is set, Create fails, naming it, and writes nothing.
 //
 // name is the case's name, without .txtar, and follows the naming rule,
 // which no path does. A new case holds only inputs, so every section is
@@ -96,15 +120,22 @@ var afterCreateWrite func(path string) error
 // no problem of form, and they read back as written. When any of these
 // fails, nothing is written, and the error names what failed.
 //
-// The file is created exclusively, so Create never replaces a case, even
-// one another process creates between a check and the write. A write that
-// fails part-way removes the file.
+// The case is written with [archive.CreateFile], by a temp file linked to
+// the case's name, so Create never replaces a case, even one another
+// process creates between a check and the write, and no reader sees part
+// of one. A write cut short leaves only a temp file, which blocks no later
+// Create, and which the root-package check reports. A write that fails
+// leaves no file, and removes the directories Create made for it, when
+// they are empty.
 //
 // The comment is left empty, since the description is for a person to
 // write: until they do, the root-package check fails on the case, and an
 // update still writes its outputs. Nor does the new case state any
 // property: a case states its properties by hand.
-func Create[T ~struct{ fs.FS }](root string, typ decl.Type[T], name string, sections []archive.Section) (string, error) {
+func Create[T ~struct{ fs.FS }](root string, typ decl.Type[T], name, updateVar string, sections []archive.Section) (string, error) {
+	if err := notDuringUpdate("Create", updateVar, "creates a case", "Create the case"); err != nil {
+		return "", err
+	}
 	if !archive.ValidName(name) {
 		return "", fmt.Errorf("the case's name, %q, breaks the naming rule: %s. A case's name is its archive's file name, less .txtar, and never a path.\nName the case by the rule.", name, archive.NameRule)
 	}
@@ -130,41 +161,51 @@ func Create[T ~struct{ fs.FS }](root string, typ decl.Type[T], name string, sect
 	if err != nil {
 		return "", fmt.Errorf("the sections for the case %s can't be written: %v.\nFix the section, or leave it out.", name, err)
 	}
-	dir := filepath.Join(root, "testdata", typ.Dir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("creating %s: %v.\nFix what stopped it, and create the case again.", dir, err)
-	}
-	path := filepath.Join(dir, name+".txtar")
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-	if errors.Is(err, fs.ErrExist) {
-		return "", fmt.Errorf("%s exists, and Create never replaces a case.\nName the new case otherwise, or remove the archive first.", path)
-	}
+	made, err := mkdirs(root, "testdata", typ.Dir)
 	if err != nil {
-		return "", fmt.Errorf("creating %s: %v.\nFix what stopped it, and create the case again.", path, err)
+		return "", err
 	}
-	if err := write(f, data); err != nil {
-		f.Close()
-		if rerr := os.Remove(path); rerr != nil {
-			return "", fmt.Errorf("writing %s: %v, and removing what was written: %v.\nRemove the file, fix what stopped the write, and create the case again.", path, err, rerr)
+	path := filepath.Join(root, "testdata", typ.Dir, name+".txtar")
+	if err := archive.CreateFile(path, data); err != nil {
+		// Each directory Create made is removed only when it is empty: a
+		// concurrent Create may have written into it.
+		for _, d := range slices.Backward(made) {
+			os.Remove(d)
 		}
-		return "", fmt.Errorf("writing %s: %v. The partial file is removed.\nFix what stopped the write, and create the case again.", path, err)
+		if errors.Is(err, fs.ErrExist) {
+			return "", fmt.Errorf("%s exists, and Create never replaces a case.\nName the new case otherwise, or remove the archive first.", path)
+		}
+		return "", fmt.Errorf("creating %s: %v.\nFix what stopped the write, and create the case again.", path, err)
 	}
 	return path, nil
 }
 
-func write(f *os.File, data []byte) error {
-	if _, err := f.Write(data); err != nil {
-		return err
-	}
-	if afterCreateWrite != nil {
-		if err := afterCreateWrite(f.Name()); err != nil {
-			return err
+// mkdirs makes each missing directory of the path that the elements name
+// under root, which exists, one at a time, and returns those it made, in
+// order. A directory that another process makes meanwhile is not one it
+// made.
+func mkdirs(root string, elems ...string) ([]string, error) {
+	var made []string
+	dir := root
+	for _, e := range elems {
+		dir = filepath.Join(dir, e)
+		err := os.Mkdir(dir, 0o755)
+		if err == nil {
+			made = append(made, dir)
+			continue
 		}
+		if errors.Is(err, fs.ErrExist) {
+			if fi, serr := os.Stat(dir); serr == nil && fi.IsDir() {
+				continue
+			}
+			err = errors.New("it exists, and isn't a directory")
+		}
+		for _, d := range slices.Backward(made) {
+			os.Remove(d)
+		}
+		return nil, fmt.Errorf("creating %s: %v.\nFix what stopped it, and create the case again.", dir, err)
 	}
-	if err := f.Sync(); err != nil {
-		return err
-	}
-	return f.Close()
+	return made, nil
 }
 
 // checkDir refuses a corpus type's directory that no corpus type can
@@ -255,11 +296,6 @@ func problemList(ps []archive.Problem) string {
 	}
 	return strings.Join(lines, "\n")
 }
-
-// afterExtractFile, when set, runs once Extract has written each file.
-// Tests set it to make the write fail at that point, or to change what is
-// written.
-var afterExtractFile func(path string) error
 
 // Extract writes the input view of the case at path under dir, which it
 // creates: each file of the view at <dir>/<tree>/<path>, with its bytes
@@ -366,8 +402,8 @@ func writeView(view fs.FS, dir string) error {
 		if err := os.WriteFile(dst, data, 0o644); err != nil {
 			return fmt.Errorf("writing %s: %v", dst, err)
 		}
-		if afterExtractFile != nil {
-			if err := afterExtractFile(dst); err != nil {
+		if hooks.ExtractFile != nil {
+			if err := hooks.ExtractFile(dst); err != nil {
 				return fmt.Errorf("writing %s: %v", dst, err)
 			}
 		}
@@ -419,11 +455,8 @@ func writeView(view fs.FS, dir string) error {
 // update-written; and a section it lacks. A write that fails leaves the
 // archive as it was.
 func RewriteInputs(root, path, variant, updateVar string, sections []archive.Section) error {
-	if updateVar == "" {
-		return errors.New("RewriteInputs has no update variable to check, and it refuses during an update.\nPass the name of the project's update variable, its decl.Project's UpdateVar.")
-	}
-	if os.Getenv(updateVar) != "" {
-		return fmt.Errorf("%s is set, so this may be an update, and no update changes a case's inputs.\nRewrite the inputs from the project's command, or from a test run without %s.", updateVar, updateVar)
+	if err := notDuringUpdate("RewriteInputs", updateVar, "changes a case's inputs", "Rewrite the inputs"); err != nil {
+		return err
 	}
 	if len(sections) == 0 {
 		return fmt.Errorf("there are no sections to rewrite in %s.\nPass the in/ sections to replace.", path)
@@ -455,16 +488,12 @@ func RewriteInputs(root, path, variant, updateVar string, sections []archive.Sec
 		refused = err
 		return nil, err
 	}
-	err := archive.Modify(filepath.Join(root, "testdata", archive.LockFile), path, func(current *archive.Archive) (*archive.Archive, error) {
+	err := archive.Modify(filepath.Join(root, "testdata", archive.LockFile), path, func(current *archive.Archive, read []byte) (*archive.Archive, error) {
 		if ps := current.Check(); len(ps) > 0 {
 			return refuse(formError(path, ps))
 		}
-		// Modify read the archive under the lock, and so does this.
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil, err
-		}
-		if !archive.Placed(data) {
+		// The form judged is that of the bytes current was parsed from.
+		if !archive.Placed(read) {
 			return refuse(fmt.Errorf("%s isn't in the form an update writes, so rewriting its inputs would change other bytes too.\nRun the update, %s=1 go test ./..., then rewrite the inputs.", path, updateVar))
 		}
 		if variant != "" {
