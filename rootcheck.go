@@ -470,26 +470,38 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, tr
 	// Sections no registry claims: a column's outputs and a bytes lift's
 	// product, in any case, and a transform's variant, whole, when no
 	// corpus type lists the transform. A claim's strip is the flag that
-	// limits hypercase strip to its sections.
-	type claim struct{ what, why, strip string }
+	// limits hypercase strip to its sections, and whose names them.
+	type claim struct{ what, why, strip, whose string }
 	unclaimed := map[claim][]string{}
+	// The gaps lines that keep strip from removing a claim's sections.
+	kept := map[claim][]string{}
+	keep := func(c claim, section string) {
+		for _, l := range stripKeeps(a, section, cols, products) {
+			if !slices.Contains(kept[c], l) {
+				kept[c] = append(kept[c], l)
+			}
+		}
+	}
 	for _, s := range a.Sections {
 		kind, name, rest := archive.SplitCase(s.Name)
 		if kind == archive.Transform && !transforms[name] {
-			c := claim{archive.Transform + "/" + name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s.\nIf a transform should make the variant, list it in its corpus type's Transforms", corpus, name), "-transform " + name}
+			c := claim{archive.Transform + "/" + name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s.\nIf a transform should make the variant, list it in its corpus type's Transforms", corpus, name), "-transform " + name, "the sections under transform/" + name + "/"}
 			unclaimed[c] = append(unclaimed[c], s.Name)
+			keep(c, s.Name)
 			continue
 		}
 		if out, ok := strings.CutPrefix(rest, archive.Out+"/"); ok {
 			if col, _, _ := strings.Cut(out, "/"); !cols[col] {
-				c := claim{col, fmt.Sprintf("no column named %s runs over the corpus %s.\nIf a column should write them, register the column", col, corpus), "-column " + col}
+				c := claim{col, fmt.Sprintf("no column named %s runs over the corpus %s.\nIf a column should write them, register the column", col, corpus), "-column " + col, col + "'s sections"}
 				unclaimed[c] = append(unclaimed[c], s.Name)
+				keep(c, s.Name)
 			}
 		}
 		if via, ok := strings.CutPrefix(rest, archive.Via+"/"); ok {
 			if l, _, _ := strings.Cut(via, "/"); !products[l] {
-				c := claim{archive.Via + "/" + l, fmt.Sprintf("no bytes lift named %s runs over the corpus %s.\nIf a bytes lift should write them, register it", l, corpus), "-column " + l}
+				c := claim{archive.Via + "/" + l, fmt.Sprintf("no bytes lift named %s runs over the corpus %s.\nIf a bytes lift should write them, register it", l, corpus), "-column " + l, l + "'s sections"}
 				unclaimed[c] = append(unclaimed[c], s.Name)
+				keep(c, s.Name)
 			}
 		}
 	}
@@ -499,8 +511,53 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, tr
 	}
 	slices.SortFunc(claims, func(a, b claim) int { return strings.Compare(a.what, b.what) })
 	for _, c := range claims {
-		t.Errorf("%s: no registry claims %s: %s. If not, run %s at the module root, then %s until it changes nothing.", rel, andList(unclaimed[c]), c.why, r.stripCmd(c.strip), r.updateCmd())
+		first := ""
+		if ls := kept[c]; len(ls) == 1 {
+			first = fmt.Sprintf("remove %s, which marks a cell of theirs, so that strip removes them; then ", ls[0])
+		} else if len(ls) > 1 {
+			first = fmt.Sprintf("remove %s, which mark cells of theirs, so that strip removes them; then ", andList(ls))
+		}
+		t.Errorf("%s: no registry claims %s: %s. If not, %srun %s at the module root, then %s until it changes nothing. The strip removes %s from every archive under %s, and the update writes back those a registry claims.", rel, andList(unclaimed[c]), c.why, first, r.stripCmd(c.strip), r.updateCmd(), c.whose, r.rootName())
 	}
+}
+
+// stripKeeps returns the gaps lines that keep hypercase strip, run without
+// -frozen, from removing an archive's section, as strip reads them: those
+// that mark the section's cell, which a via/<column>/… is part of unless
+// the column is one over the corpus that is no bytes lift. cols are the
+// columns over the archive's corpus, and products the bytes lifts among
+// them.
+func stripKeeps(a *archive.Archive, section string, cols, products map[string]bool) []string {
+	kind, name, rest := archive.SplitCase(section)
+	top, below, ok := strings.Cut(rest, "/")
+	if !ok || (top != archive.Out && top != archive.Via) {
+		return nil
+	}
+	col, _, _ := strings.Cut(below, "/")
+	if top == archive.Via && cols[col] && !products[col] {
+		return nil
+	}
+	var lines []string
+	switch kind {
+	case "", archive.Transform:
+		for _, g := range a.Gaps() {
+			if g.Column == col && g.Transform == name {
+				lines = append(lines, fmt.Sprintf("%s line %d", archive.Gaps, g.Line))
+			}
+		}
+	case archive.Variant:
+		for _, v := range a.Variants() {
+			if v.Kind != archive.Variant || v.Name != name {
+				continue
+			}
+			for _, g := range v.Gaps {
+				if g.Column == col {
+					lines = append(lines, fmt.Sprintf("%s line %d", v.Prefix()+archive.Gaps, g.Line))
+				}
+			}
+		}
+	}
+	return lines
 }
 
 // pkgName names a package by its directory, as go test does: ., ./format.

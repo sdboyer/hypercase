@@ -242,3 +242,40 @@ func TestStripRootCheck(t *testing.T) {
 	s.passes(s.run("b", "strip-b-plain", false))
 	s.done()
 }
+
+// TestStripRootCheckVia: via/ sections no bytes lift claims, as in
+// TestChainRootCheck: via/nobody/…, of no column, and via/parse/…, of
+// parse, a lift whose product is a stage, whose cell a gaps line marks.
+// The root-package check's messages name hypercase strip -column nobody
+// and -column parse, then the update. Running them leaves the check
+// passing: via/parse/… is part of no cell, so strip removes it, and
+// leaves parse's frozen out/parse/….
+func TestStripRootCheckVia(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	s.settle(stripModule...)
+	s.edit(prices, "products no bytes lift makes, and a known gap in parse's cell", func(a *archive.Archive) {
+		insert("gaps", "parse Parses every quote. Waits on sheets#2.\n", "via/")(a)
+		insert("via/nobody/quote/A1", "3\n", "out/")(a)
+		insert("via/parse/quote/A1", "3\n", "out/")(a)
+		insert("variant/doubled/via/nobody/quote/A1", "3\n", "variant/doubled/out/")(a)
+	})
+	const update = " at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes "
+	s.fails(s.normal("strip-a"),
+		"testdata/export/prices.txtar: no registry claims via/nobody/quote/A1 and variant/doubled/via/nobody/quote/A1: no bytes lift named nobody runs over the corpus export.\nIf a bytes lift should write them, register it. If not, run hypercase strip -column nobody"+update+"nobody's sections",
+		"testdata/export/prices.txtar: no registry claims via/parse/quote/A1: no bytes lift named parse runs over the corpus export.\nIf a bytes lift should write them, register it. If not, run hypercase strip -column parse"+update+"parse's sections")
+	s.passes(s.strip("-column", "nobody"))
+	r := s.strip("-column", "parse")
+	s.passes(r)
+	s.contains(r, "testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it too\n")
+	for _, r := range s.settle(stripModule...) {
+		s.passes(r)
+	}
+	s.hasSections(prices, nil, "via/nobody/", "via/parse/", "variant/doubled/via/nobody/")
+	if _, ok := archive.Parse(s.read(prices)).Section("out/parse/outcome"); !ok {
+		t.Errorf("strip removed parse's frozen cell:\n%s", s.read(prices))
+	}
+	s.passes(s.normal("strip-a"))
+	s.passes(s.run("b", "strip-b", false))
+	s.done()
+}

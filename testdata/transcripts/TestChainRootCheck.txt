@@ -99,9 +99,9 @@ PASS
 $ edit testdata/export/prices.txtar  # products no bytes lift makes
 $ go test  # chain
     testdata/export/prices.txtar: no registry claims via/nobody/quote/A1 and variant/doubled/via/nobody/quote/A1: no bytes lift named nobody runs over the corpus export.
-        If a bytes lift should write them, register it. If not, run hypercase strip -column nobody at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.
+        If a bytes lift should write them, register it. If not, run hypercase strip -column nobody at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes nobody's sections from every archive under the module-root corpus, and the update writes back those a registry claims.
     testdata/export/prices.txtar: no registry claims via/parse/quote/A1: no bytes lift named parse runs over the corpus export.
-        If a bytes lift should write them, register it. If not, run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.
+        If a bytes lift should write them, register it. If not, run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes parse's sections from every archive under the module-root corpus, and the update writes back those a registry claims.
     export/empty/transform/louder: louder declines the base: the export makes no output of evaluate
     export/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/export/looped.txtar, out/resolve/error.txt, records its error.
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps

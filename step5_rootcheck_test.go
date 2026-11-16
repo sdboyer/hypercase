@@ -15,7 +15,7 @@ func TestRootCheckRemovedSuite(t *testing.T) {
 	s := newSandbox(t, "shared")
 	before := s.read(twice)
 	s.passes(s.run("b", "pkg-b-gone", true))
-	want := "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing."
+	want := "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes shout's sections from every archive under the module-root corpus, and the update writes back those a registry claims."
 	s.fails(s.normal("pkg-a"), want)
 	s.passes(s.update("pkg-a"))
 	s.same(twice, before)
@@ -49,6 +49,36 @@ func TestRootCheckRemovedSuiteRoot(t *testing.T) {
 	s.hasSections(corp, nil, "out/shout/")
 	s.same(twice, before)
 	s.passes(s.normal("corp-a"))
+	s.done()
+}
+
+// TestRootCheckRemovedSuiteMarked: a removed suite's sections, in a cell
+// a gaps line marks. Strip leaves a marked cell's sections, so the message
+// says to remove the line before the strip. Strip run with the line still
+// there leaves the sections, and the check still fails on them; once the
+// line is gone, strip and the update leave the check passing.
+func TestRootCheckRemovedSuiteMarked(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.passes(s.run("b", "pkg-b-gone", true))
+	s.edit(twice, "a gaps line marks shout's cell", insert("gaps", "shout Prints A1 as SIX. Waits on sheets#15.\n", "out/"))
+	const line = "testdata/script/twice.txtar: gaps, line 1, names shout, and no registry has a column of that name over the corpus script.\nRegister the column, or remove the line."
+	const want = "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes shout's sections from every archive under the module-root corpus, and the update writes back those a registry claims."
+	s.fails(s.normal("pkg-a"), line, want)
+
+	// Strip, with the line still there, leaves the sections.
+	r := s.strip("-column", "shout")
+	s.passes(r)
+	s.contains(r, "testdata/script/twice.txtar: left the cell shout, frozen by its known gap, gaps line 1; hypercase strip -column shout -frozen strips it too\n")
+	s.fails(s.normal("pkg-a"), line, want)
+
+	s.edit(twice, "remove the line, as the message says", drop("gaps"))
+	s.passes(s.strip("-column", "shout"))
+	for _, r := range s.settle(childRun{"", "pkg-a", true}, childRun{"b", "pkg-b-gone", true}) {
+		s.passes(r)
+	}
+	s.hasSections(twice, nil, "out/shout/")
+	s.passes(s.normal("pkg-a"))
 	s.done()
 }
 

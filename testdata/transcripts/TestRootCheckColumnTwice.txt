@@ -8,7 +8,7 @@ $ go test  # pkg-a
     the column echo is owned by . and ./b, each as a suite. Column names are unique per corpus root, and one package owns each column.
         Rename one of the suites, or remove one.
     testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
-        If a column should write them, register the column. If not, run hypercase strip -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.
+        If a column should write them, register the column. If not, run hypercase strip -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes shout's sections from every archive under the module-root corpus, and the update writes back those a registry claims.
     script/twice: A1 is twice B1. The root package, ., prints it with echo, and ./b with shout.
         echo: Does what the case's do/ tree says.
         out/echo/values.txt differs (-golden +got):
@@ -32,7 +32,7 @@ $ go test  # pkg-a
     the column echo is owned by ., ./b and ./c, each as a suite. Column names are unique per corpus root, and one package owns each column.
         Rename or remove all but one of the suites.
     testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
-        If a column should write them, register the column. If not, run hypercase strip -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.
+        If a column should write them, register the column. If not, run hypercase strip -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes shout's sections from every archive under the module-root corpus, and the update writes back those a registry claims.
     script/twice: A1 is twice B1. The root package, ., prints it with echo, and ./b with shout.
         echo: Does what the case's do/ tree says.
         out/echo/values.txt differs (-golden +got):
