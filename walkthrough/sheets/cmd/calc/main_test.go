@@ -79,13 +79,32 @@ func TestRunArgs(t *testing.T) {
 	}
 }
 
+// A cell calc can't read is named by its path on disk.
+func TestRunUnreadable(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root reads a file of mode 000")
+	}
+	dir := t.TempDir()
+	cell := filepath.Join(dir, "A1")
+	if err := os.WriteFile(cell, []byte("1\n"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr strings.Builder
+	if code := run([]string{dir}, &stdout, &stderr); code != 1 {
+		t.Errorf("exit status: got %d, want 1", code)
+	}
+	if got, want := stderr.String(), "calc: open "+cell+": permission denied\n"; got != want {
+		t.Errorf("stderr: got %q, want %q", got, want)
+	}
+}
+
 // The mount serves the directory at sheet/ and nothing else.
 func TestMount(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "A1"), []byte("1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m := mount{os.DirFS(dir)}
+	m := mount{dir, os.DirFS(dir)}
 	for _, name := range []string{"sheet", "sheet/A1"} {
 		f, err := m.Open(name)
 		if err != nil {

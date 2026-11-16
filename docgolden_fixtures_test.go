@@ -113,8 +113,8 @@ func TestDocGoldenRegion(t *testing.T) {
 		"\t}\n" +
 		"\t// doc:end loop\n" +
 		"}\n" +
-		"# doc:begin empty\n" +
-		"# doc:end empty\n"
+		"// doc:begin empty\n" +
+		"// doc:end empty\n"
 	block := func(src string) string { return "<!-- source: walkthrough/a/x.go" + src + " -->\n```go\nstale\n```\n" }
 	doc := block("#loop") + block("#inner") + block("#empty") + block("")
 	root := docFixture(t, map[string]string{"doc.md": doc, "walkthrough/a/x.go": source})
@@ -231,6 +231,18 @@ func TestDocGoldenBroken(t *testing.T) {
 			"doc.md:1: the marker names walkthrough/../go.mod, which is not a file under walkthrough/"},
 		{"no space", "<!-- source:walkthrough/a/x.go -->\n```go\n```\n", docGoSource,
 			"doc.md:1: malformed marker; want <!-- source: walkthrough/<path> --> or <!-- source: walkthrough/<path>#<region> -->"},
+		{"capitalized", "<!-- Source: walkthrough/a/x.go -->\n```go\n```\n", docGoSource,
+			"doc.md:1: malformed marker; want <!-- source: walkthrough/<path> --> or <!-- source: walkthrough/<path>#<region> -->"},
+		{"no colon", "<!-- source walkthrough/a/x.go -->\n```go\n```\n", docGoSource,
+			"doc.md:1: malformed marker; want <!-- source: walkthrough/<path> --> or <!-- source: walkthrough/<path>#<region> -->"},
+		{"fence indented four spaces", "<!-- source: walkthrough/a/x.go -->\n    ```go\n    ```\n", docGoSource,
+			"doc.md:1: the marker is not directly followed by a code block"},
+		{"header names another file", marked("walkthrough/a/x.go"), "// walkthrough/a/y.go: a test\npackage a\n",
+			"doc.md:1: walkthrough/a/x.go:1 names walkthrough/a/y.go; the file is walkthrough/a/x.go"},
+		{"source has CRLF", marked("walkthrough/a/x.go"), "package a\r\n",
+			"doc.md:1: walkthrough/a/x.go has CRLF line endings, and the doc golden reads LF only; check it out with LF"},
+		{"doc has CRLF", "<!-- source: walkthrough/a/x.go -->\r\n```go\r\n```\r\n", docGoSource,
+			"doc.md has CRLF line endings, and the doc golden reads LF only; check it out with LF"},
 		{"empty region", marked("walkthrough/a/x.go#"), docGoSource,
 			"doc.md:1: malformed marker; want <!-- source: walkthrough/<path> --> or <!-- source: walkthrough/<path>#<region> -->"},
 		{"no path", marked(""), docGoSource,
@@ -268,6 +280,38 @@ func TestDocGoldenBroken(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A line indented four spaces is not a fence, so it can't swallow the marked
+// block after it.
+func TestDocGoldenIndentedNotAFence(t *testing.T) {
+	doc := "Prose.\n\n    ```\n\n<!-- source: walkthrough/a/x.go -->\n```go\nstale\n```\n"
+	root := docFixture(t, map[string]string{"doc.md": doc, "walkthrough/a/x.go": docGoSource})
+	blocks, got := docGolden(root, "doc.md", false)
+	if blocks != 1 || len(got) != 1 || !strings.HasPrefix(got[0], "doc.md:5: the block differs") {
+		t.Errorf("got %d blocks and problems %q, want 1 block that differs", blocks, got)
+	}
+}
+
+// Only a Go file has regions. Any other file is shown whole, delimiter-like
+// lines and all.
+func TestDocGoldenRegionsOnlyInGo(t *testing.T) {
+	source := "# doc:begin notes\n// doc:begin x\n// doc:end x\n# doc:end notes\n"
+	doc := "<!-- source: walkthrough/a/x.md -->\n````md\n" + source + "````\n"
+	root := docFixture(t, map[string]string{"doc.md": doc, "walkthrough/a/x.md": source})
+	checkDoc(t, root, false)
+
+	doc = "<!-- source: walkthrough/a/x.md#x -->\n```md\n```\n"
+	root = docFixture(t, map[string]string{"doc.md": doc, "walkthrough/a/x.md": source})
+	checkDoc(t, root, false, "doc.md:1: walkthrough/a/x.md is not a Go file, so it has no regions")
+}
+
+// A Go file's header comment may name the file, and is shown with it.
+func TestDocGoldenHeader(t *testing.T) {
+	source := "// walkthrough/a/x.go: what it holds\npackage a\n"
+	doc := "<!-- source: walkthrough/a/x.go -->\n```go\n" + source + "```\n"
+	root := docFixture(t, map[string]string{"doc.md": doc, "walkthrough/a/x.go": source})
+	checkDoc(t, root, false)
 }
 
 // A line that doesn't close the block's fence is shown as it is.

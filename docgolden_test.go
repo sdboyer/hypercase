@@ -19,12 +19,15 @@ import (
 //	<!-- source: walkthrough/sheets/step01/evaluate_test.go -->
 //	<!-- source: walkthrough/sheets/step02/evaluate_test.go#loop -->
 //
-// The file is under walkthrough/. The second form names a region of it: the
-// lines between the delimiter lines "// doc:begin loop" and "// doc:end loop"
-// ("#" may stand for "//"). A block never shows a delimiter line, its own or
-// another region's. The block's contents are the file's bytes, ending with a
-// newline, each line indented as the block's opening fence is. A block with
-// no marker is not checked.
+// The file is under walkthrough/. The second form names a region of a Go
+// file: the lines between the delimiter lines "// doc:begin loop" and
+// "// doc:end loop". A block never shows a delimiter line, its own or another
+// region's. Any other file is shown whole, with nothing taken out. The
+// block's contents are the file's bytes, ending with a newline, each line
+// indented as the block's opening fence is. A Go file shown whole that starts
+// with a comment naming a path under walkthrough/ must name itself. The doc
+// and its sources have LF line endings. A block with no marker is not
+// checked.
 
 const (
 	docUpdateVar = "HYPERCASE_UPDATE_GOLDEN"
@@ -32,10 +35,13 @@ const (
 )
 
 var (
-	docMarkerStart = regexp.MustCompile(`^ *<!--\s*source:`)
+	// docMarkerStart is looser than docMarker, so that a near miss, such as
+	// "Source:" or a missing colon, is reported rather than read as prose.
+	docMarkerStart = regexp.MustCompile(`(?i)^ *<!--\s*source\b`)
 	docMarker      = regexp.MustCompile(`^ *<!-- source: ([^\s#]+)(?:#([A-Za-z0-9_.-]+))? -->$`)
-	docDelimStart  = regexp.MustCompile(`^(?://|#)\s*doc:(?:begin|end)\b`)
-	docDelim       = regexp.MustCompile(`^(?://|#) doc:(begin|end) ([A-Za-z0-9_.-]+)$`)
+	docDelimStart  = regexp.MustCompile(`^//\s*doc:(?:begin|end)\b`)
+	docDelim       = regexp.MustCompile(`^// doc:(begin|end) ([A-Za-z0-9_.-]+)$`)
+	docHeader      = regexp.MustCompile(`^// (walkthrough/[^\s:]+)`)
 )
 
 // TestWalkthrough checks that each marked block of WALKTHROUGH.md shows its
@@ -105,6 +111,9 @@ func docGolden(root, name string, update bool) (blocks int, problems []string) {
 // from src, how many marked blocks it has, and its problems in doc order. A
 // block it can't regenerate it leaves as it is.
 func docRegenerate(src fs.FS, name string, doc []byte) (out []byte, blocks int, problems []docProblem) {
+	if bytes.Contains(doc, []byte("\r\n")) {
+		return doc, 0, []docProblem{{msg: name + " has CRLF line endings, and the doc golden reads LF only; check it out with LF"}}
+	}
 	lines := docLines(doc)
 	done := 0 // the bytes of doc already copied to out
 	for i := 0; i < len(lines); i++ {
@@ -188,11 +197,13 @@ func docLines(data []byte) []docLine {
 }
 
 // docOpenFence reports whether line opens a fenced code block, as CommonMark
-// has it: three or more backticks or tildes, after any indentation, where a
-// backtick fence's info string has no backtick.
+// has it outside a container: three or more backticks or tildes, indented by
+// at most three spaces, where a backtick fence's info string has no backtick.
+// The doc golden doesn't follow containers, so a fence a list indents by four
+// or more is not one to it.
 func docOpenFence(line string) (indent, fence string, ok bool) {
 	rest := strings.TrimLeft(line, " ")
-	if rest == "" || rest[0] != '`' && rest[0] != '~' {
+	if len(line)-len(rest) > 3 || rest == "" || rest[0] != '`' && rest[0] != '~' {
 		return "", "", false
 	}
 	n := len(rest) - len(strings.TrimLeft(rest, rest[:1]))
@@ -242,11 +253,23 @@ func docSource(src fs.FS, source, region, indent, fence string) ([]byte, error) 
 	if err != nil {
 		return nil, fmt.Errorf("can't read %s: %v", source, err)
 	}
+	if bytes.Contains(data, []byte("\r\n")) {
+		return nil, fmt.Errorf("%s has CRLF line endings, and the doc golden reads LF only; check it out with LF", source)
+	}
+	isGo := strings.HasSuffix(source, ".go")
+	if region != "" && !isGo {
+		return nil, fmt.Errorf("%s is not a Go file, so it has no regions", source)
+	}
 	if len(data) > 0 && data[len(data)-1] != '\n' {
 		data = append(data, '\n')
 	}
 	lines := docLines(data)
 	lines = lines[:len(lines)-1]
+	if isGo && region == "" && len(lines) > 0 {
+		if m := docHeader.FindStringSubmatch(lines[0].trimmed()); m != nil && m[1] != source {
+			return nil, fmt.Errorf("%s:1 names %s; the file is %s", source, m[1], source)
+		}
+	}
 
 	// Every delimiter line, and the lines each region spans.
 	delim := make([]bool, len(lines))
@@ -255,7 +278,7 @@ func docSource(src fs.FS, source, region, indent, fence string) ([]byte, error) 
 	var open []string
 	for j, l := range lines {
 		text := strings.Trim(l.trimmed(), " \t")
-		if !docDelimStart.MatchString(text) {
+		if !isGo || !docDelimStart.MatchString(text) {
 			continue
 		}
 		at := fmt.Sprintf("%s:%d: ", source, j+1)
