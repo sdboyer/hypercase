@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -282,4 +283,47 @@ func TestOutcomeBoundary(t *testing.T) {
 		`<span class="outcome s-rejected">rejected</span> <span class="arrow">to</span> <span class="outcome s-unknown">unknown</span>`)
 	_, cells := matrixRow(t, page, "sheet", "sheet/blank")
 	holds(t, "blank's format at format 4", cells[2], `class="cell s-unknown"><span class="outcome">unknown</span>`)
+}
+
+// TestPreOutcomeTransforms: before outcome files, a transform's variant
+// runs where the archive holds a section of it and a corpus type lists its
+// transform, and so has a cell under every column, its state unknown. A
+// variant its transform declined holds no section, and has no cells, and
+// one whose transform no corpus type lists has none either.
+func TestPreOutcomeTransforms(t *testing.T) {
+	t.Parallel()
+	const root = "walkthrough/sheets/step06"
+	a := history(t, "20e9646")
+	a[root+"/testdata/hypercase.json"] = strings.Replace(a[root+"/testdata/hypercase.json"], `"transforms": []`,
+		`"transforms": [{"name": "doubled", "description": "Doubles each number.", "gives": [], "keeps": [], "probe": false, "owned": true}]`, 1)
+	a[root+"/testdata/sheet/blank.txtar"] += "-- transform/doubled/in/sheet/A1 --\n2\n-- transform/gone/in/sheet/A1 --\n2\n"
+	g := gittest.New(t)
+	c := revisions(t, g, history(t, "b7e82fe"), a)
+	want := "appeared\n"
+	for _, col := range []string{"calc", "evaluate", "format", "parse", "resolve"} {
+		want += "  sheet/blank/transform/doubled " + col + ": unknown\n"
+	}
+	if got := ok(t, g, root, "report", "-text", c[0], c[1]); got != want {
+		t.Errorf("to format 4, the report is:\n%s\nwant:\n%s", got, want)
+	}
+	page := ok(t, g, root, "report", c[0], c[1])
+	rows := rowNames(t, page, "sheet")
+	if !slices.Contains(rows, "sheet/blank/transform/doubled") || slices.Contains(rows, "sheet/divide/transform/doubled") {
+		t.Errorf("the matrix at format 4 has the rows %q, want blank's doubled variant and not divide's", rows)
+	}
+	_, cells := matrixRow(t, page, "sheet", "sheet/blank/transform/doubled")
+	for i, cell := range cells {
+		holds(t, fmt.Sprintf("blank's doubled variant's cell %d", i), cell, `class="cell s-unknown appeared"><span class="outcome">unknown</span>`)
+	}
+	if len(cells) != 5 {
+		t.Errorf("blank's doubled variant has %d cells, want 5", len(cells))
+	}
+	if slices.Contains(rows, "sheet/blank/transform/gone") {
+		_, cells := matrixRow(t, page, "sheet", "sheet/blank/transform/gone")
+		for i, cell := range cells {
+			lacks(t, fmt.Sprintf("blank's gone variant's cell %d", i), cell, "s-unknown")
+		}
+	}
+	holds(t, "the problems at format 4", section(t, page, `<section id="problems">`, "</section>"),
+		"<li><code>"+root+"/testdata/sheet/blank.txtar, transform/gone/</code>: no corpus type of testdata/sheet/ lists the transform gone, so the report can&#39;t say what its variant states.</li>")
 }
