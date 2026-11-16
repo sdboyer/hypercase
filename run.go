@@ -153,7 +153,7 @@ func (r *runner) checkRelations(t *testing.T, ownedTransforms []*transform) bool
 	t.Helper()
 	ok := true
 	for _, c := range r.columns {
-		ok = checkRegistered(t, fmt.Sprintf("the %s %s", c.kind(), c.name), c.name, "Rejects", c.rejects) && ok
+		ok = checkRegistered(t, fmt.Sprintf("the %s %s", c.kind(), c.name), "rejects", c.name+"'s Rejects", c.rejects) && ok
 	}
 	ok = r.checkTransformRelations(t, ownedTransforms) && ok
 	if !ok {
@@ -164,19 +164,20 @@ func (r *runner) checkRelations(t *testing.T, ownedTransforms []*transform) bool
 
 // checkRegistered checks that each property of one of a registration's
 // lists is one the package registers, as it registers it: what names the
-// registration, as "the suite echo", name is its name, and field the
-// list, as "Rejects".
-func checkRegistered(t *testing.T, what, name, field string, ps []decl.Property) bool {
+// registration, as "the suite echo", verb says what it does with the
+// list's properties, as "rejects", and list names the list, as "echo's
+// Rejects".
+func checkRegistered(t *testing.T, what, verb, list string, ps []decl.Property) bool {
 	t.Helper()
 	ok := true
 	for _, p := range ps {
 		q, found := reg.property(p.Name)
 		switch {
 		case !found:
-			t.Errorf("%s %s %s, and the package registers no property of that name.\nRegister the property, or remove it from %s's %s.", what, strings.ToLower(field), p.Name, name, field)
+			t.Errorf("%s %s %s, and the package registers no property of that name.\nRegister the property, or remove it from %s.", what, verb, p.Name, list)
 			ok = false
 		case q != p:
-			t.Errorf("%s %s a property named %s, which the package registers with another description.\n%s the registered property: declare it once, and use that declaration in both places.", what, strings.ToLower(field), p.Name, strings.TrimSuffix(field, "s"))
+			t.Errorf("%s %s a property named %s, which the package registers with another description.\nKeep one declaration of %s, with one description: register it, and list it in %s.", what, verb, p.Name, p.Name, list)
 			ok = false
 		}
 	}

@@ -128,8 +128,8 @@ func (r *runner) checkTransformRelations(t *testing.T, owned []*transform) bool 
 	for _, ct := range r.types {
 		for _, tr := range ct.transforms {
 			what := fmt.Sprintf("the transform %s, of the corpus type %s,", tr.name, ct.goType)
-			ok = checkRegistered(t, what, tr.name, "Gives", tr.gives) && ok
-			ok = checkRegistered(t, what, tr.name, "Keeps", tr.keeps) && ok
+			ok = checkRegistered(t, what, "gives", tr.name+"'s Gives", tr.gives) && ok
+			ok = checkRegistered(t, what, "keeps", tr.name+"'s Keeps", tr.keeps) && ok
 		}
 	}
 	return ok

@@ -229,6 +229,9 @@ var transformRegistrations = map[string]func(){
 	"tr-other-description": func() {
 		hypercase.Register(project, rootPkg, loop, dangling, typeWith(upper), own(withRejects(echo, loop), upper))
 	},
+	"tr-other-gives": func() {
+		hypercase.Register(project, rootPkg, loop, dangling, typeWith(looped), own(withRejects(echo, loop), looped))
+	},
 	"tr-no-description": func() {
 		tr := looped
 		tr.Description = " "
