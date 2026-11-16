@@ -61,6 +61,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	// Columns, lifts, types, properties and root-package checks, merged
 	// across packages.
 	columnPkgs := map[string][]string{}             // column → the packages that own it
+	liftPkgs := map[string][]string{}               // lift → the packages that own it
 	untestedLifts := map[string][]string{}          // lift → the packages with no _test.go file whose registries own it
 	claimed := map[string]map[string]bool{}         // corpus → the columns over it
 	usedPkgs := map[string][]string{}               // lift → the packages that only use it
@@ -123,6 +124,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			claim(l.Name, l.Corpora)
 			if g.tested {
 				columnPkgs[l.Name] = append(columnPkgs[l.Name], g.pkg)
+				liftPkgs[l.Name] = append(liftPkgs[l.Name], g.pkg)
 			} else {
 				untestedLifts[l.Name] = append(untestedLifts[l.Name], g.pkg)
 			}
@@ -164,8 +166,13 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(usedPkgs)) {
-		if _, owned := columnPkgs[name]; owned {
+		if len(liftPkgs[name]) > 0 {
 			continue
+		}
+		// No package owns the lift, so a column of its name is a suite,
+		// and the duplicate-column check above can't see the two collide.
+		if suites := columnPkgs[name]; len(suites) > 0 {
+			t.Errorf("the column %s is owned by %s as a suite, and used by %s as a lift. Lifts share the suites' column names, which are unique per corpus root.\nRename the suite or the lift.", name, andList(suites), andList(usedPkgs[name]))
 		}
 		msg := fmt.Sprintf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.", name, andList(usedPkgs[name]))
 		fix := "Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use."

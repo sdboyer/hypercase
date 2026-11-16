@@ -1438,7 +1438,8 @@ package owns every column it registers.
   lift's sections.
 - The root-package check fails on a column two packages own, in place of
   step 5's column two packages register, and on a lift that packages use
-  and none owns.
+  and none owns. A suite named like the lift owns no lift, and fails
+  beside it, since lifts share the suites' column names.
 
 **Blocked cells.**
 

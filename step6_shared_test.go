@@ -96,6 +96,28 @@ func TestRootCheckLiftOwnerUntested(t *testing.T) {
 	s.done()
 }
 
+// TestRootCheckLiftSuiteName: lifts share the suites' column names, so a
+// suite named like a lift that another package uses collides with it, and
+// is no owner of the lift, which no package then owns. A suite named like
+// a lift another package owns is that column owned twice.
+func TestRootCheckLiftSuiteName(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared-ladder")
+	s.passes(s.update("ladder-a-useonly"))
+	s.passes(s.run("b", "ladder-b-suite", true))
+	s.fails(s.normal("ladder-a-useonly"),
+		"the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root.\nRename the suite or the lift.",
+		"the lift parse is used by ., and no package owns it, so its error is recorded nowhere.\nOwn the lift in one of them: give it to hypercase.Own in place of hypercase.Use.")
+
+	// The root package owns parse, and its update fails on what b's suite
+	// wrote under the same name.
+	s.fails(s.update("ladder-a"), "out/parse/values.txt is an output the run no longer produces.")
+	r := s.normal("ladder-a")
+	s.fails(r, "the column parse is owned by . and ./b. Column names are unique per corpus root, and one package owns each column.")
+	s.lacks(r, "as a suite", "the lift parse is used by")
+	s.done()
+}
+
 // TestRootCheckCorpusTypes: two corpus types of one directory under one
 // corpus root fail the root-package check. Under two roots, neither
 // refuses.
