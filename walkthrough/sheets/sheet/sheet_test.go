@@ -499,6 +499,7 @@ func TestMovable(t *testing.T) {
 		{"reference to the last row", sheetFS(map[string]string{"A1": "=B1048576"}), "A1: B1048576 is on the last row, so it can't move down", false},
 		{"not a cell", sheetFS(map[string]string{"A1": "1", "notes": "1"}), "", true},
 		{"not a cell, and a cell on the last row", sheetFS(map[string]string{"A1048576": "1", "notes": "1"}), "", true},
+		{"not a cell, and a reference to the last row", sheetFS(map[string]string{"A1": "=B1048576", "notes": "1"}), "", true},
 		{"a directory", fstest.MapFS{"sheet/A1/x": {}}, "", true},
 		{"sheet is a file", fstest.MapFS{"sheet": {}}, "", true},
 	}

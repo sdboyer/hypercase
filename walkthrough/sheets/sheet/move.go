@@ -14,18 +14,8 @@ import (
 // something that is not a cell file, or one that can't be read, is movable:
 // MoveDown reports what is wrong with it.
 func Movable(fsys fs.FS) (why string, ok bool) {
-	files, err := readCells(fsys)
-	if err != nil {
-		return "", true
-	}
-	at, err := checkFiles(files)
-	if err != nil {
-		return "", true
-	}
-	if _, err := moveDown(files, at); err != nil {
-		return err.Error(), false
-	}
-	return "", true
+	_, err := MoveDown(fsys)
+	return probe(err)
 }
 
 // MoveDown returns the sheet in fsys moved one row down: A1 becomes A2, and
@@ -61,17 +51,34 @@ func checkFiles(files []cellFile) ([]pos, error) {
 	return at, nil
 }
 
-// moveDown moves cell files, at their positions, one row down. It fails,
-// saying why, on a sheet with no cells, which it would leave unchanged, and
-// on a cell or reference on the last row.
+// A refusal is why a transform can't apply to a sheet: a fact about the
+// sheet, not something wrong with it.
+type refusal string
+
+func (r refusal) Error() string { return string(r) }
+
+// probe answers a transform's probe from the error the transform gave on the
+// sheet: it declines the sheet, with the reason, on a refusal, and lets the
+// sheet through on any other error, for the transform to report.
+func probe(err error) (why string, ok bool) {
+	var r refusal
+	if errors.As(err, &r) {
+		return string(r), false
+	}
+	return "", true
+}
+
+// moveDown moves cell files, at their positions, one row down. It refuses a
+// sheet with no cells, which it would leave unchanged, and one with a cell or
+// reference on the last row.
 func moveDown(files []cellFile, at []pos) (fs.FS, error) {
 	if len(files) == 0 {
-		return nil, errors.New("the sheet has no cells")
+		return nil, refusal("the sheet has no cells")
 	}
 	out := fstest.MapFS{}
 	for i, f := range files {
 		if at[i].row == lastRow {
-			return nil, fmt.Errorf("%s is on the last row, so it can't move down", f.name)
+			return nil, refusal(fmt.Sprintf("%s is on the last row, so it can't move down", f.name))
 		}
 		data, err := moveRefs(f.name, f.data)
 		if err != nil {
@@ -83,7 +90,7 @@ func moveDown(files []cellFile, at []pos) (fs.FS, error) {
 }
 
 // moveRefs rewrites each reference in the formula on a cell file's first line
-// to the cell one row down.
+// to the cell one row down. It refuses a reference on the last row.
 func moveRefs(name string, data []byte) ([]byte, error) {
 	line, _, _ := bytes.Cut(data, []byte("\n"))
 	eq := len(line) - len(bytes.TrimLeft(line, " \t"))
@@ -99,7 +106,7 @@ func moveRefs(name string, data []byte) ([]byte, error) {
 		}
 		p, _ := parseName(t.text)
 		if p.row == lastRow {
-			return nil, fmt.Errorf("%s: %s is on the last row, so it can't move down", name, t.text)
+			return nil, refusal(fmt.Sprintf("%s: %s is on the last row, so it can't move down", name, t.text))
 		}
 		off := src + t.off
 		out = append(out, data[done:off]...)
