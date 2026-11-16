@@ -156,6 +156,28 @@ func TestVariantOutcomes(t *testing.T) {
 	s.done()
 }
 
+// TestBlockedTransformVariant: a blocked cell of a transform's variant
+// says to fix the lift or the transform's jenny, which makes the
+// variant's inputs, where a case's says to fix the case.
+func TestBlockedTransformVariant(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.remove("testdata/script/errs.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.remove("testdata/script/garbled.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.passes(s.update("tr-ladder-eval"))
+	s.hasSections(twice, map[string]string{"transform/looped/out/evaluate/outcome": "blocked resolve\n"})
+	s.edit(twice, "mark looped's blocked cell, and record a file for it", func(a *archive.Archive) {
+		insert("gaps", "transform/looped evaluate Waits on sheets#9.\n", "out/")(a)
+		insert("transform/looped/out/evaluate/a.txt", "a\n", "transform/looped/out/evaluate/outcome")(a)
+	})
+	r := s.normal("tr-ladder-eval")
+	s.fails(r,
+		"gaps, line 1, marks the cell, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case, so the cell runs nothing.\n    Remove the line, or fix the lift or looped's jenny, which makes the variant.",
+		"transform/looped/out/evaluate/a.txt is recorded, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case.\n    If the cell should run, fix the lift or looped's jenny, which makes the variant. If not, delete the section by hand;")
+	s.lacks(r, "fix the lift or the case", "out of their place")
+	s.done()
+}
+
 // TestChecks: a corpus check reads every cell over the corpus root, from
 // the committed files, whichever package owns the column, and its
 // findings are a golden: sorted, each once, written by an update and

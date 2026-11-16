@@ -392,6 +392,16 @@ type aCase struct {
 	stale string
 }
 
+// inputsAt names what to fix for the case's inputs to change: the case,
+// or, for a transform's variant, which an update rewrites, the jenny that
+// makes it.
+func (c *aCase) inputsAt() string {
+	if c.tr != nil {
+		return c.tr.name + "'s jenny, which makes the variant"
+	}
+	return "the case"
+}
+
 // fail fails a cell with its message, and what may explain it.
 func (c *aCase) fail(t *testing.T, header string, m *msg) {
 	t.Helper()
@@ -820,14 +830,14 @@ func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why
 func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, by *lift, gap archive.Gap, marked bool, goldens map[string][]byte, res *cellResult) {
 	m := &msg{}
 	if marked {
-		m.add("%s marks the cell, and the cell is blocked: the lift %s, on %s's path, failed on the case, so the cell runs nothing.\nRemove the line, or fix the lift or the case.", c.gapAt(gap), by.name, col.name)
+		m.add("%s marks the cell, and the cell is blocked: the lift %s, on %s's path, failed on the case, so the cell runs nothing.\nRemove the line, or fix the lift or %s.", c.gapAt(gap), by.name, col.name, c.inputsAt())
 	}
 	r.ranNothing(m, c, col, archive.Outcome{State: archive.Blocked, Detail: by.name}, goldens, res)
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		if p == outcomeFile {
 			continue
 		}
-		m.add("%s is recorded, and the cell is blocked: the lift %s, on %s's path, failed on the case.\nIf the cell should run, fix the lift or the case. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), by.name, col.name, r.updateCmd())
+		m.add("%s is recorded, and the cell is blocked: the lift %s, on %s's path, failed on the case.\nIf the cell should run, fix the lift or %s. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), by.name, col.name, c.inputsAt(), r.updateCmd())
 	}
 	if !m.empty() {
 		c.fail(t, header, m)
