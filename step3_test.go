@@ -301,7 +301,7 @@ func TestSuiteWithoutDescription(t *testing.T) {
 func TestProblemsOfForm(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "form")
-	names := []string{"duplicate", "paths", "reserved", "shape", "typo"}
+	names := []string{"duplicate", "paths", "products", "shape", "typo"}
 	before := map[string][]byte{}
 	for _, n := range names {
 		before[n] = s.read("testdata/script/" + n + ".txtar")
@@ -309,7 +309,9 @@ func TestProblemsOfForm(t *testing.T) {
 	want := []string{
 		"testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it:\n",
 		"ni/do/out/values.txt: ni is not one of the framework's top-level names",
-		"via/import/sheet/A1: the top-level name via is reserved",
+		"via/A1: a product belongs under its lift, as via/<lift>/<tree>/<file>",
+		"via/import/A1: a product's file belongs in a tree, as via/import/<tree>/<file>",
+		"via/import/params/x: the tree name params is reserved in every input view, a product's included",
 		"in/do/out/values.txt: the section appears twice",
 		"in/../x: the name is not a valid slash path",
 		"in//x: the name is not a valid slash path",

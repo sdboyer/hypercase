@@ -64,6 +64,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	liftPkgs := map[string][]string{}               // lift → the packages that own it
 	untestedLifts := map[string][]string{}          // lift → the packages with no _test.go file whose registries own it
 	claimed := map[string]map[string]bool{}         // corpus → the columns over it
+	products := map[string]map[string]bool{}        // corpus → the bytes lifts whose columns are over it
 	usedPkgs := map[string][]string{}               // lift → the packages that only use it
 	declared := map[string]bool{}                   // the corpus types' directories, and the suites' Corpus
 	typeEntries := map[string]map[string][]string{} // directory → type entry → packages
@@ -128,6 +129,14 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 				continue
 			}
 			claim(l.Name, l.Corpora)
+			if l.Bytes {
+				for _, corpus := range l.Corpora {
+					if products[corpus] == nil {
+						products[corpus] = map[string]bool{}
+					}
+					products[corpus][l.Name] = true
+				}
+			}
 			if g.tested {
 				columnPkgs[l.Name] = append(columnPkgs[l.Name], g.pkg)
 				liftPkgs[l.Name] = append(liftPkgs[l.Name], g.pkg)
@@ -286,7 +295,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	for _, corpus := range slices.Sorted(maps.Keys(archives)) {
 		cols := claimed[corpus]
 		for _, file := range archives[corpus] {
-			r.checkArchive(t, filepath.Join(td, corpus, file), corpus, cols, transforms[corpus], props)
+			r.checkArchive(t, filepath.Join(td, corpus, file), corpus, cols, products[corpus], transforms[corpus], props)
 		}
 	}
 }
@@ -326,8 +335,9 @@ func typeEntry(ct registry.Type) string {
 }
 
 // checkArchive reports the problems of one archive as a whole. cols are
-// the columns over its corpus, and transforms its corpus type's.
-func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bool, transforms map[string]bool, props func(string) bool) {
+// the columns over its corpus, products the bytes lifts among them, and
+// transforms its corpus type's.
+func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, transforms map[string]bool, props func(string) bool) {
 	t.Helper()
 	rel := r.rel(p)
 	if name := strings.TrimSuffix(filepath.Base(p), ".txtar"); !validName(name) {
@@ -376,8 +386,9 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bo
 		marked(v.Prefix()+archive.Gaps, v.Gaps)
 	}
 
-	// Sections no registry claims: a column's outputs, in any case, and a
-	// transform's variant, whole, when no corpus type lists the transform.
+	// Sections no registry claims: a column's outputs and a bytes lift's
+	// product, in any case, and a transform's variant, whole, when no
+	// corpus type lists the transform.
 	type claim struct{ what, why string }
 	unclaimed := map[claim][]string{}
 	for _, s := range a.Sections {
@@ -390,6 +401,12 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bo
 		if out, ok := strings.CutPrefix(rest, archive.Out+"/"); ok {
 			if col, _, _ := strings.Cut(out, "/"); !cols[col] {
 				c := claim{col, fmt.Sprintf("no column named %s runs over the corpus %s.\nIf a column should write them, register the column", col, corpus)}
+				unclaimed[c] = append(unclaimed[c], s.Name)
+			}
+		}
+		if via, ok := strings.CutPrefix(rest, archive.Via+"/"); ok {
+			if l, _, _ := strings.Cut(via, "/"); !products[l] {
+				c := claim{archive.Via + "/" + l, fmt.Sprintf("no bytes lift named %s runs over the corpus %s.\nIf a bytes lift should write them, register it", l, corpus)}
 				unclaimed[c] = append(unclaimed[c], s.Name)
 			}
 		}

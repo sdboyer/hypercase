@@ -69,6 +69,13 @@ func (l Lift[In, Out]) erase() any {
 	for _, o := range l.Outputs {
 		e.Outputs = append(e.Outputs, erase.Output(o))
 	}
+	for _, o := range l.Product {
+		e.Product = append(e.Product, erase.Output(o))
+	}
+	if e.Jenny {
+		j := l.Jenny
+		e.Generate = func(in any) (*jenny.FS, error) { return j.GenerateFS(in.(In)) }
+	}
 	for _, p := range l.Rejects {
 		e.Rejects = append(e.Rejects, erase.Property(p))
 	}

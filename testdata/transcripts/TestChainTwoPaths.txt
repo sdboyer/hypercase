@@ -1,0 +1,9 @@
+$ go test  # chain-two-paths
+    from the corpus type hypercase_test.Export, of testdata/export/, *hypercase_test.Parsed, which the suite format consumes, is reached by 2 paths:
+          hypercase_test.Export → import → hypercase_test.Script → parse → *hypercase_test.Parsed
+          hypercase_test.Export → import-parse → *hypercase_test.Parsed
+        There must be exactly one path to each type a column consumes. Remove a lift, or give the paths distinct product types.
+    No case runs until each type a column consumes is reached by one path.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]

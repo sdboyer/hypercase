@@ -23,7 +23,7 @@ import (
 
 // Format is the version of what a registry holds. It changes on any change
 // to that.
-const Format = 5
+const Format = 6
 
 // Name is a registry's file name, in its package's testdata/ directory.
 const Name = "hypercase.json"
@@ -123,10 +123,17 @@ type Lift struct {
 	Product string `json:"product"`
 	// Owned records that the package owns the lift's column.
 	Owned bool `json:"owned"`
+	// Bytes records a bytes lift: its product is a corpus type's input
+	// view, which each case commits under via/<Name>/, beside the lift's
+	// cell files under out/<Name>/.
+	Bytes bool `json:"bytes"`
 	// Corpora are the directories of the corpus types that reach the
 	// lift's input, under the corpus root's testdata/.
 	Corpora []string `json:"corpora"`
 	Outputs []Output `json:"outputs"`
+	// ProductFiles declares a bytes lift's product's files, by their paths
+	// under via/<Name>/. Any other lift's is empty.
+	ProductFiles []Output `json:"productFiles"`
 	// Rejects names the properties the lift rejects.
 	Rejects []string `json:"rejects"`
 }
@@ -184,6 +191,7 @@ func (r Registry) Marshal() []byte {
 	for i, l := range lifts {
 		l.Corpora = sorted(l.Corpora, func(n string) string { return n })
 		l.Outputs = sorted(l.Outputs, func(o Output) string { return o.Pattern })
+		l.ProductFiles = sorted(l.ProductFiles, func(o Output) string { return o.Pattern })
 		l.Rejects = sorted(l.Rejects, func(n string) string { return n })
 		lifts[i] = l
 	}

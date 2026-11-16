@@ -56,6 +56,9 @@ func init() {
 		register, ok = outcomeRegistrations[name]
 	}
 	if !ok {
+		register, ok = chainRegistrations[name]
+	}
+	if !ok {
 		panic("selftest: no registration named " + name)
 	}
 	register()

@@ -220,7 +220,7 @@ func checkVariant(s Section, kind, name, rest string) []Problem {
 	case top == Out:
 		return checkOut(s.Name, below)
 	case top == Via:
-		return []Problem{{Section: s.Name, Msg: "the name via is reserved for a later step, and this hypercase doesn't read it yet"}}
+		return checkVia(s.Name, below)
 	case rest == Delete:
 		return nil // checked against the base, with the variant's in/
 	case kind == Variant && rest == About:
@@ -234,11 +234,11 @@ func checkVariant(s Section, kind, name, rest string) []Problem {
 	case kind == Variant && (top == About || top == Properties || top == Gaps || top == Delete):
 		return []Problem{{Section: s.Name, Msg: fmt.Sprintf("%s is one section, with nothing below it", top)}}
 	case kind == Variant:
-		return []Problem{{Section: s.Name, Msg: fmt.Sprintf("%s is not one of a hand-written variant's sections: about, in, delete, properties, gaps and out", top)}}
+		return []Problem{{Section: s.Name, Msg: fmt.Sprintf("%s is not one of a hand-written variant's sections: about, in, delete, properties, gaps, via and out", top)}}
 	case top == Delete:
 		return []Problem{{Section: s.Name, Msg: "delete is one section, with nothing below it"}}
 	}
-	return []Problem{{Section: s.Name, Msg: fmt.Sprintf("%s is not one of a transform's sections: in, delete and out, which an update writes", top)}}
+	return []Problem{{Section: s.Name, Msg: fmt.Sprintf("%s is not one of a transform's sections: in, delete, via and out, which an update writes", top)}}
 }
 
 // checkVariants reports the problems of the variants as wholes: a

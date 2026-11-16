@@ -3,10 +3,14 @@ package hypercase
 import (
 	"fmt"
 	"io/fs"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/jenny"
 )
 
 // A plan is how the package's columns reach the types they consume from
@@ -212,50 +216,188 @@ func pathString(ct *corpusType, path []*lift) string {
 
 // A caseState holds a case's values: its corpus type's, and each stage's,
 // memoized, so a lift runs at most once per case however many cells read
-// its product.
+// its product. Past a bytes lift, a normal run reads the product and the
+// outcome that the archive commits for the case, and runs nothing before
+// them; an update reads the product the lift makes.
 type caseState struct {
 	archive string
 	plan    *plan
 	root    any
-	runs    map[*lift]*liftRun
+	view    fs.FS // the case's input view
+	update  bool
+	// a and prefix give the case's committed sections, which a normal run
+	// reads past a bytes lift.
+	a        *archive.Archive
+	prefix   string
+	products map[*lift]*corpusType // each bytes lift's product's corpus type
+	runs     map[*lift]*liftRun
+	reads    map[*lift]*liftRead
 }
 
-// A liftRun is what one call of a lift's function left.
+// A liftRun is what one call of a lift's function left. A bytes lift's
+// also holds its product's files, and why an archive can't hold them, if
+// it can't; only a product it can hold has a view and a value.
 type liftRun struct {
-	value any
-	out   *called
+	value    any
+	out      *called
+	product  map[string][]byte // a bytes lift's product, by path in its view; nil when it made none
+	view     fs.FS
+	problems []string
 }
 
-// stage returns the value of a type the plan reaches, or the lift on its
-// path that failed.
-func (s *caseState) stage(typ reflect.Type) (any, *lift) {
+// A liftRead is what a normal run reads of a bytes lift on a case: the
+// committed product, which the cells past it read, or what blocks them.
+type liftRead struct {
+	value any
+	view  fs.FS
+	block *blockage
+}
+
+// A blockage is what keeps a cell from running: a lift on its path that
+// failed on the case.
+type blockage struct {
+	// lift is the lift that failed, or the bytes lift whose committed
+	// outcome blocks the cell.
+	lift *lift
+	// failed names the lift that failed, which the cell's outcome names.
+	failed string
+	// outcome is, for a block a bytes lift's committed outcome makes, the
+	// section that holds it, and committed its line; missing records that
+	// the archive has no such section. outcome is "" for a lift that
+	// failed in this run.
+	outcome   string
+	committed string
+	missing   bool
+	// broken records that, in an update, the bytes lift's product can't be
+	// committed: the cell runs nothing, and the update writes nothing for
+	// it.
+	broken bool
+}
+
+// stage returns the value of a type the plan reaches, and the input view
+// it comes from: the case's, or, past a bytes lift, the last one's
+// product. It returns what blocks the type instead, when something does.
+func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
 	if typ == s.plan.root.goType {
-		return s.root, nil
+		return s.root, s.view, nil
 	}
 	l := s.plan.producer[typ]
-	in, by := s.stage(l.in)
-	if by != nil {
-		return nil, by
+	if l.bytes && !s.update {
+		rd := s.read(l)
+		return rd.value, rd.view, rd.block
+	}
+	in, view, b := s.stage(l.in)
+	if b != nil {
+		return nil, nil, b
 	}
 	lr := s.runLift(l, in)
-	if lr.out.panicked || lr.out.err != nil || lr.out.noProduct {
-		return nil, l
+	switch {
+	case lr.out.panicked || lr.out.err != nil || lr.out.noProduct:
+		return nil, nil, &blockage{lift: l, failed: l.name}
+	case !l.bytes:
+		return lr.value, view, nil
+	case len(lr.problems) > 0:
+		return nil, nil, &blockage{lift: l, failed: l.name, broken: true}
 	}
-	return lr.value, nil
+	return lr.value, lr.view, nil
+}
+
+// read reads, once, what the archive commits for a bytes lift on the
+// case. Its committed outcome decides: accepted gives the committed
+// product, an empty one included; blocked by another lift blocks the cells
+// past it by that lift; anything else, and no outcome, blocks them by the
+// lift itself.
+func (s *caseState) read(l *lift) *liftRead {
+	if rd, ok := s.reads[l]; ok {
+		return rd
+	}
+	rd := &liftRead{}
+	s.reads[l] = rd
+	section := s.prefix + archive.Out + "/" + l.name + "/" + archive.OutcomeFile
+	data, ok := s.a.Section(section)
+	if !ok {
+		rd.block = &blockage{lift: l, failed: l.name, outcome: section, missing: true}
+		return rd
+	}
+	b := &blockage{lift: l, failed: l.name, outcome: section, committed: strings.TrimSuffix(string(data), "\n")}
+	switch o, err := archive.ParseOutcome(data); {
+	case err != nil:
+		rd.block = b
+	case o.State == archive.Accepted:
+		rd.view = archive.NewFS(committedUnder(s.a, l.viaDir(s.prefix)))
+		rd.value = s.products[l].new(rd.view)
+	case o.State == archive.Blocked:
+		b.failed = o.Detail
+		rd.block = b
+	default:
+		rd.block = b
+	}
+	return rd
 }
 
 // runLift runs a lift on its input, once. A lift whose product type is an
 // interface can return neither a product nor an error, which is the lift's
-// own failure.
+// own failure. A bytes lift's jenny makes its product's files.
 func (s *caseState) runLift(l *lift, in any) *liftRun {
 	if lr, ok := s.runs[l]; ok {
 		return lr
 	}
 	lr := &liftRun{}
-	lr.out = call(func(o *called) {
-		lr.value, o.err = l.run(s.archive, in, &o.stderr)
-	})
-	lr.out.noProduct = !lr.out.panicked && lr.out.err == nil && lr.value == nil
 	s.runs[l] = lr
+	if !l.bytes {
+		lr.out = call(func(o *called) {
+			lr.value, o.err = l.run(s.archive, in, &o.stderr)
+		})
+		lr.out.noProduct = !lr.out.panicked && lr.out.err == nil && lr.value == nil
+		return lr
+	}
+	var made *jenny.FS
+	lr.out = call(func(o *called) { made, o.err = l.generate(in) })
+	if lr.out.panicked || lr.out.err != nil {
+		return lr
+	}
+	lr.product, lr.problems = productOf(l, s.prefix, made)
+	if len(lr.problems) == 0 {
+		lr.view = archive.NewFS(lr.product)
+		lr.value = s.products[l].new(lr.view)
+	}
 	return lr
+}
+
+// productOf reads a bytes lift's product from what its jenny made, for a
+// case whose sections start with prefix, and says why an archive can't
+// hold it, if it can't: a file outside any tree, or in the tree params; a
+// file that is also a directory; a file no declaration matches, or two
+// do; and a file an archive would read back differently.
+func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, []string) {
+	files := map[string][]byte{}
+	var problems []string
+	for _, f := range made.AsFiles() {
+		// A jenny's FS renders each file it adds, and AsFiles gives each
+		// one as Bytes, as for a transform's, so no test reaches this.
+		data, ok := jenny.BytesOf(f)
+		if !ok {
+			problems = append(problems, fmt.Sprintf("%s made %s, which its FS gave as a %T, not as rendered bytes. An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase.", l.name, f.Path(), f))
+			continue
+		}
+		files[f.Path()] = data
+	}
+	dir := l.viaDir(prefix)
+	paths := slices.Sorted(maps.Keys(files))
+	for _, p := range archive.CheckVia(prefix, l.name, paths) {
+		problems = append(problems, fmt.Sprintf("%s.\nFix %s's jenny: what it makes is its product's input view, with the trees as its top-level directories. An update writes nothing for this cell.", p, l.name))
+	}
+	for _, p := range paths {
+		switch hit := l.declaredProduct(p); len(hit) {
+		case 0:
+			problems = append(problems, fmt.Sprintf("%s is not declared.\nDeclare it in %s's Product, with a description, or fix %s's jenny. An update writes nothing for this cell.", dir+p, l.name, l.name))
+		case 1:
+		default:
+			problems = append(problems, fmt.Sprintf("%s matches two of %s's product declarations, %s and %s.\nChange the patterns so that one declaration matches each file. An update writes nothing for this cell.", dir+p, l.name, hit[0], hit[1]))
+		}
+		if err := archive.Holds(files[p]); err != nil {
+			problems = append(problems, fmt.Sprintf("%s can't be held in an archive: %v.\nFix %s's jenny so the file can be held. An update writes nothing for this cell.", dir+p, err, l.name))
+		}
+	}
+	return files, problems
 }

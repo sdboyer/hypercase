@@ -1,5 +1,5 @@
 {
-  "format": 5,
+  "format": 6,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -34,6 +34,7 @@
       "input": "github.com/sdboyer/hypercase_test.Script",
       "product": "*github.com/sdboyer/hypercase_test.Parsed",
       "owned": true,
+      "bytes": false,
       "corpora": [
         "script"
       ],
@@ -47,6 +48,7 @@
           "description": "What the lift writes to stderr."
         }
       ],
+      "productFiles": [],
       "rejects": [
         "malformed"
       ]
@@ -57,6 +59,7 @@
       "input": "*github.com/sdboyer/hypercase_test.Parsed",
       "product": "*github.com/sdboyer/hypercase_test.Graph",
       "owned": true,
+      "bytes": false,
       "corpora": [
         "script"
       ],
@@ -70,6 +73,7 @@
           "description": "What the lift writes to stderr."
         }
       ],
+      "productFiles": [],
       "rejects": [
         "circular",
         "dangling"

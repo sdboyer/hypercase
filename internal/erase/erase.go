@@ -54,12 +54,16 @@ type Lift struct {
 	Name        string
 	Description string
 	Outputs     []Output
+	Product     []Output
 	Rejects     []Property
 	In, Out     reflect.Type
 	// Run calls the lift's Run, or is nil when it has none.
 	Run func(archive string, in any, stderr io.Writer) (any, error)
 	// Jenny reports that the lift gives a jenny.
 	Jenny bool
+	// Generate runs the lift's jenny on its input, or is nil when it gives
+	// none.
+	Generate func(in any) (*jenny.FS, error)
 }
 
 // Of returns the erased form of a decl declaration, a *Type, a *Transform

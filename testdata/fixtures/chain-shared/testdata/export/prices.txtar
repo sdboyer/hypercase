@@ -1,0 +1,7 @@
+One export of prices: import makes a script whose quote/ tree list shows.
+-- in/import/out/evaluate/out/values.txt --
+a1 3
+-- in/import/out/quote/A1 --
+3
+-- in/import/out/quote/B1 --
+=A1*2

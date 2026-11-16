@@ -1,0 +1,354 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+PASS
+$ cat testdata/export/prices.txtar
+One export of prices: import makes a script whose quote/ tree list shows.
+-- in/import/out/evaluate/out/values.txt --
+a1 3
+-- in/import/out/quote/A1 --
+3
+-- in/import/out/quote/B1 --
+=A1*2
+-- via/import/evaluate/out/values.txt --
+a1 3
+-- via/import/quote/A1 --
+3
+-- via/import/quote/B1 --
+=A1*2
+-- out/evaluate/outcome --
+accepted
+-- out/evaluate/values.txt --
+a1 3
+-- out/import/outcome --
+accepted
+-- out/list/files.txt --
+3 files
+evaluate/out/values.txt "a1 3\n"
+quote/A1 "3\n"
+quote/B1 "=A1*2\n"
+-- out/list/outcome --
+accepted
+-- out/parse/outcome --
+accepted
+-- out/resolve/outcome --
+accepted
+-- transform/louder/in/import/out/evaluate/out/values.txt --
+A1 3
+-- transform/louder/via/import/evaluate/out/values.txt --
+A1 3
+-- transform/louder/via/import/quote/A1 --
+3
+-- transform/louder/via/import/quote/B1 --
+=A1*2
+-- transform/louder/out/evaluate/outcome --
+accepted
+-- transform/louder/out/evaluate/values.txt --
+A1 3
+-- transform/louder/out/import/outcome --
+accepted
+-- transform/louder/out/list/files.txt --
+3 files
+evaluate/out/values.txt "A1 3\n"
+quote/A1 "3\n"
+quote/B1 "=A1*2\n"
+-- transform/louder/out/list/outcome --
+accepted
+-- transform/louder/out/parse/outcome --
+accepted
+-- transform/louder/out/resolve/outcome --
+accepted
+$ go test  # chain-a
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+PASS
+$ go test ./b  # chain-b
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+PASS
+$ edit testdata/export/prices.txtar  # the committed product differs
+$ go test  # chain-a
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        import: Imports the export as a script, as its import/ tree says.
+        via/import/quote/B1 differs (-golden +got):
+        - =A1*3
+        + =A1*2
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- FAIL: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ go test ./b  # chain-b
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        list: Lists the files of the script's input view, with their bytes.
+        out/list/files.txt differs (-golden +got):
+          3 files
+          evaluate/out/values.txt "a1 3\n"
+          quote/A1 "3\n"
+        - quote/B1 "=A1*2\n"
+        + quote/B1 "=A1*3\n"
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- FAIL: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ edit testdata/export/prices.txtar  # restore it
+$ edit testdata/export/prices.txtar  # import no longer makes quote/B1
+$ go test  # chain-a
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        import: Imports the export as a script, as its import/ tree says.
+        via/import/quote/B1 is a file of import's product, which import no longer makes.
+        If it should, fix import's jenny. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        import: Imports the export as a script, as its import/ tree says.
+        transform/louder/via/import/quote/B1 is a file of import's product, which import no longer makes.
+        If it should, fix import's jenny. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- FAIL: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- FAIL: TestCorpus/export/prices/transform/louder
+                --- FAIL: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+PASS
+# the update's diff:
+  a1 3
+  -- via/import/quote/A1 --
+  3
+- -- via/import/quote/B1 --
+- =A1*2
+  -- out/evaluate/outcome --
+  accepted
+  -- out/evaluate/values.txt --
+  ...
+  -- out/import/outcome --
+  accepted
+  -- out/list/files.txt --
+- 3 files
++ 2 files
+  evaluate/out/values.txt "a1 3\n"
+  quote/A1 "3\n"
+- quote/B1 "=A1*2\n"
+  -- out/list/outcome --
+  accepted
+  -- out/parse/outcome --
+  ...
+  A1 3
+  -- transform/louder/via/import/quote/A1 --
+  3
+- -- transform/louder/via/import/quote/B1 --
+- =A1*2
+  -- transform/louder/out/evaluate/outcome --
+  accepted
+  -- transform/louder/out/evaluate/values.txt --
+  ...
+  -- transform/louder/out/import/outcome --
+  accepted
+  -- transform/louder/out/list/files.txt --
+- 3 files
++ 2 files
+  evaluate/out/values.txt "A1 3\n"
+  quote/A1 "3\n"
+- quote/B1 "=A1*2\n"
+  -- transform/louder/out/list/outcome --
+  accepted
+  -- transform/louder/out/parse/outcome --
+
+$ go test  # chain-a
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+PASS
+$ go test ./b  # chain-b
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+PASS

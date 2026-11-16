@@ -320,7 +320,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	stale := false
 	switch {
 	case v.tr == nil:
-		c.setView(p, pc.base.VariantView(v.committed))
+		c.setView(r, p, pc.base.VariantView(v.committed))
 	case v.problem != "" && owner:
 		t.Errorf("%s\n%s", c.header(), v.problem)
 		return
@@ -336,7 +336,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if owner {
 			r.judgeInputs(t, c, pc, v, w)
 		}
-		c.setView(p, archive.NewFS(v.made))
+		c.setView(r, p, archive.NewFS(v.made))
 	default:
 		// A normal run reads the inputs the archive holds.
 		view, invalid := pc.base.InputView(v.committed)
@@ -350,7 +350,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 			r.judgeInputs(t, c, pc, v, w)
 		}
 		stale = !owner
-		c.setView(p, view)
+		c.setView(r, p, view)
 	}
 	results := r.runCells(t, c, p.cols, w)
 	if !stale || !t.Failed() {
@@ -369,7 +369,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	frozen := false
 	var differs []string
 	for i, col := range p.cols {
-		if _, marked := c.gap(col.name); marked && len(c.goldens(col.name)) > 0 {
+		if _, marked := c.gap(col.name); c.frozen(col, marked) {
 			frozen = true
 		}
 		if results[i].frozenDiffers {
@@ -439,7 +439,9 @@ func (r *runner) judgeInputs(t *testing.T, c *aCase, pc plannedCase, v *plannedV
 
 // declined finishes a transform's variant that the transform declines:
 // no cell runs. Its owner's update removes the variant's inputs, and what
-// is left under transform/<name>/out/ is each column's orphan.
+// is left under transform/<name>/out/ is each column's orphan. A bytes
+// lift has no product on the variant, so its owner's update removes the
+// committed one, which other cells read, unless a gaps line marks its cell.
 func (r *runner) declined(t *testing.T, c *aCase, p *plan, pc plannedCase, v *plannedVariant, owner bool, w *caseWrites) {
 	t.Helper()
 	m := &msg{}
@@ -455,11 +457,23 @@ func (r *runner) declined(t *testing.T, c *aCase, p *plan, pc plannedCase, v *pl
 		}
 	}
 	for _, col := range p.cols {
-		if g, ok := c.gap(col.name); ok {
+		g, marked := c.gap(col.name)
+		if marked {
 			m.add("%s marks the cell of %s, and %s declines the base: %s\nRemove the line, or fix the transform.", c.gapAt(g), g.Cell(), v.name, v.declined)
 		}
 		for _, f := range slices.Sorted(maps.Keys(c.goldens(col.name))) {
 			m.add("%s is recorded, and %s declines the base: %s\nIf the transform should make the variant, fix it. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, f), v.name, v.declined, r.updateCmd())
+		}
+		if col.lift == nil || !col.lift.bytes || marked {
+			continue
+		}
+		dir := col.lift.viaDir(c.prefix)
+		if r.update {
+			w.replaceProduct(dir, nil)
+			continue
+		}
+		for _, f := range slices.Sorted(maps.Keys(c.product(col.lift))) {
+			m.add("%s is recorded, and %s declines the base: %s\nRun %s, which removes it, and read the diff before committing.", dir+f, v.name, v.declined, r.updateCmd())
 		}
 	}
 	if !m.empty() {

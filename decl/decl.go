@@ -99,31 +99,48 @@ type Transform[T ~struct{ fs.FS }] struct {
 }
 
 // A Lift is a registered function from one type to the next: from a corpus
-// type or a stage to a stage, the type the lift reaches. Each lift is a
-// column, so a case the lift rejects is tested once, at the lift. Its cell
-// files go under out/<Name>/: error.txt when its function returns an error,
-// and stderr.txt when it writes to stderr.
+// type or a stage to the type the lift reaches, a stage or another corpus
+// type. Each lift is a column, so a case the lift rejects is tested once,
+// at the lift. Its cell files go under out/<Name>/: error.txt when its
+// function returns an error, and stderr.txt when it writes to stderr.
+//
+// A lift whose product is a corpus type is a bytes lift. Its product is
+// the files it makes, that type's input view, and they are committed in
+// the case's archive under via/<Name>/, laid out as the type's in/ would
+// be: via/<Name>/sheet/A1 is sheet/A1 in the view its readers get. A
+// normal run gives the columns past it the committed product, and an
+// update the product the lift makes.
 type Lift[In, Out any] struct {
-	// Name is the column's name, and names its directory, out/<Name>/.
-	// Lifts and suites share one name space.
+	// Name is the column's name, and names its directory, out/<Name>/, and
+	// a bytes lift's product's, via/<Name>/. Lifts and suites share one
+	// name space.
 	Name string
 	// Description says what the lift does. It is required.
 	Description string
 	// Outputs declares error.txt and stderr.txt, as a suite declares its
-	// outputs, each with a description.
+	// outputs, each with a description. A bytes lift's cell writes no
+	// stderr.txt, since its jenny has no stderr, so it declares error.txt
+	// alone.
 	Outputs []Output
+	// Product declares a bytes lift's product's files, by their paths in
+	// its input view, as Outputs declares the cell's files: sheet/*. Each
+	// file is in a tree, a top-level directory of the view, and the tree
+	// params is reserved, as in every input view. A file no declaration
+	// matches fails the lift's cell, and so does one that two match. A lift
+	// whose product isn't a corpus type declares none.
+	Product []Output
 	// Rejects lists the properties the lift rejects. Its cell is expected
 	// to err exactly when its case states one of them.
 	Rejects []Property
-	// Run makes the product from the input. It receives the archive's
-	// name, the typed input and a writer for stderr, and the error it
-	// returns is its rejection. It takes no testing.TB, so a command can
-	// call it too. Its product is read-only to the columns that read it.
+	// Run makes the product from the input, for a lift whose product is a
+	// stage. It receives the archive's name, the typed input and a writer
+	// for stderr, and the error it returns is its rejection. It takes no
+	// testing.TB, so a command can call it too. Its product is read-only
+	// to the columns that read it.
 	Run func(archive string, in In, stderr io.Writer) (Out, error)
-	// Jenny makes a product that is a corpus type, a named fs.FS wrapper:
-	// the files it generates from the input are the product's input view.
-	// Such a lift gives Jenny in place of Run. This hypercase refuses a
-	// lift whose product is a corpus type, so no lift gives Jenny yet.
+	// Jenny makes a bytes lift's product, in place of Run: the files it
+	// generates from the input are the product's input view, by their
+	// paths in it. The error it returns is the lift's rejection.
 	Jenny jenny.Jenny[In]
 }
 

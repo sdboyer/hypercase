@@ -6,8 +6,10 @@ $ go test  # echo
           in/../x: the name is not a valid slash path
           in//x: the name is not a valid slash path
         Fix the archive by hand.
-    testdata/script/reserved.txtar has problems of form, so none of its cells run, and no update writes it:
-          via/import/sheet/A1: the top-level name via is reserved for a later step, and this hypercase doesn't read it yet
+    testdata/script/products.txtar has problems of form, so none of its cells run, and no update writes it:
+          via/A1: a product belongs under its lift, as via/<lift>/<tree>/<file>
+          via/import/A1: a product's file belongs in a tree, as via/import/<tree>/<file>
+          via/import/params/x: the tree name params is reserved in every input view, a product's included
         Fix the archive by hand.
     testdata/script/shape.txtar has problems of form, so none of its cells run, and no update writes it:
           in/A1: an input belongs in a tree, as in/<tree>/<file>
@@ -19,7 +21,7 @@ $ go test  # echo
         Fix the archive by hand.
     testdata/script/duplicate.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
     testdata/script/paths.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
-    testdata/script/reserved.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/products.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
     testdata/script/shape.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
     testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
 --- FAIL: TestCorpus
@@ -32,7 +34,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
     testdata/script/duplicate.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
     testdata/script/paths.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
-    testdata/script/reserved.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/products.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
     testdata/script/shape.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
     testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
 --- PASS: TestCorpus

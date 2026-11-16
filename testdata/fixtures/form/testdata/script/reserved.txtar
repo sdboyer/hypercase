@@ -1,7 +1,0 @@
-A section under each top-level name this hypercase reserves but doesn't read.
--- in/do/out/values.txt --
-A1 6
--- via/import/sheet/A1 --
-4
--- out/echo/values.txt --
-stale

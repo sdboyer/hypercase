@@ -118,7 +118,10 @@ func Own(columns ...any) Option {
 // products the package's columns read, and whose columns another package
 // owns. The package computes their products, and neither writes nor judges
 // their sections. A failing lift still blocks the package's cells past it,
-// and what it writes to stderr is dropped.
+// and what it writes to stderr is dropped. A bytes lift's product is the
+// exception in a normal run: the package's cells past it read the product
+// and the outcome the archive commits, as every package's do, and the
+// lift doesn't run.
 func Use(lifts ...any) Option {
 	return Option{apply: func(r *registrations) {
 		for _, item := range lifts {
@@ -260,21 +263,38 @@ func (r *registrations) addLift(l *lift) {
 	if !validName(l.name) {
 		refuse(fmt.Sprintf("the lift name %q breaks the naming rule: %s. Rename the lift.", l.name, nameRule))
 	}
-	switch {
-	case isCorpusShape(l.out):
-		refuse(fmt.Sprintf("the lift %s's product, %s, is a corpus type, and this hypercase doesn't run lifts whose product is a corpus type. Make the product a stage, a type that isn't a named fs.FS wrapper.", l.name, l.out))
-	case l.jenny:
-		refuse(fmt.Sprintf("the lift %s gives a Jenny, which makes a product that is a corpus type, and its product is %s. Give it Run, which makes the product.", l.name, l.out))
-	case l.run == nil:
-		refuse(fmt.Sprintf("the lift %s has no Run. Give it the function that makes its product.", l.name))
+	if l.bytes {
+		switch {
+		case l.jenny && l.run != nil:
+			refuse(fmt.Sprintf("the lift %s gives both Run and Jenny. Its product, %s, is a corpus type, whose files the jenny makes: remove Run.", l.name, l.out))
+		case l.run != nil:
+			refuse(fmt.Sprintf("the lift %s's product, %s, is a corpus type, and the lift gives Run. Give it Jenny in place of Run: the files the jenny generates from the input are the product's input view.", l.name, l.out))
+		case !l.jenny:
+			refuse(fmt.Sprintf("the lift %s's product, %s, is a corpus type, and the lift gives no Jenny. Give it the jenny that makes the product's files.", l.name, l.out))
+		case len(l.product) == 0:
+			refuse(fmt.Sprintf("the lift %s's product, %s, is a corpus type, and the lift declares no Product. Declare the product's files in Product, each with a pattern and a description, as a suite declares its outputs.", l.name, l.out))
+		}
+		checkProductPatterns(l)
+	} else {
+		switch {
+		case l.jenny:
+			refuse(fmt.Sprintf("the lift %s gives a Jenny, which makes a product that is a corpus type, and its product is %s. Give it Run, which makes the product.", l.name, l.out))
+		case l.run == nil:
+			refuse(fmt.Sprintf("the lift %s has no Run. Give it the function that makes its product.", l.name))
+		case len(l.product) > 0:
+			refuse(fmt.Sprintf("the lift %s declares a Product, and its product, %s, isn't a corpus type, so it makes no files. Remove Product.", l.name, l.out))
+		}
 	}
 	checkListed("the lift "+l.name, "Rejects", l.rejects)
 	checkPatterns("lift", l.name, l.outputs)
 	for _, o := range l.outputs {
-		if a, _ := path.Match(o.Pattern, errorFile); !a {
-			if b, _ := path.Match(o.Pattern, stderrFile); !b {
-				refuse(fmt.Sprintf("the lift %s declares an output with the pattern %q, which matches neither %s nor %s, the only files a lift's cell writes. Remove the declaration.", l.name, o.Pattern, errorFile, stderrFile))
-			}
+		a, _ := path.Match(o.Pattern, errorFile)
+		b, _ := path.Match(o.Pattern, stderrFile)
+		switch {
+		case l.bytes && !a:
+			refuse(fmt.Sprintf("the lift %s declares an output with the pattern %q, which doesn't match %s, the only file a bytes lift's cell writes: its jenny has no stderr. Remove the declaration.", l.name, o.Pattern, errorFile))
+		case !a && !b:
+			refuse(fmt.Sprintf("the lift %s declares an output with the pattern %q, which matches neither %s nor %s, the only files a lift's cell writes. Remove the declaration.", l.name, o.Pattern, errorFile, stderrFile))
 		}
 	}
 	for _, o := range r.lifts {
@@ -336,6 +356,29 @@ func checkPatterns(kind, name string, outputs []decl.Output) {
 			refuse(fmt.Sprintf("the %s %s declares an output with the pattern %q, which is not a pattern of slash paths under out/%s/ in the syntax of path.Match. Fix the pattern.", kind, name, o.Pattern, name))
 		}
 	}
+}
+
+// checkProductPatterns refuses a bytes lift's product declaration whose
+// pattern is no pattern of paths in an input view, or matches only files
+// no input view holds: one outside any tree, or in the tree params, which
+// every input view reserves. A pattern that could match a file of params,
+// such as */x, is left to the lift's cell, which fails on such a file.
+func checkProductPatterns(l *lift) {
+	for _, o := range l.product {
+		switch tree, _, _ := strings.Cut(o.Pattern, "/"); {
+		case !validPattern(o.Pattern):
+			refuse(fmt.Sprintf("the lift %s declares a product file with the pattern %q, which is not a pattern of slash paths in its product's input view, in the syntax of path.Match. Fix the pattern.", l.name, o.Pattern))
+		case !strings.Contains(o.Pattern, "/"):
+			refuse(fmt.Sprintf("the lift %s declares a product file with the pattern %q, which matches only files outside any tree. A product's file is in a tree, a top-level directory of its input view, as sheet/A1 is: fix the pattern.", l.name, o.Pattern))
+		case tree == archive.ParamsTree:
+			refuse(fmt.Sprintf("the lift %s declares a product file with the pattern %q, in the tree params, which every input view reserves. Fix the pattern.", l.name, o.Pattern))
+		}
+	}
+}
+
+func validPattern(p string) bool {
+	_, err := path.Match(p, "")
+	return err == nil && fs.ValidPath(p) && p != "."
 }
 
 // checksDir is the directory name that holds corpus check findings, which

@@ -990,7 +990,7 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 <!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 5,
+  "format": 6,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,

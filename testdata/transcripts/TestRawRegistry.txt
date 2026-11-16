@@ -7,7 +7,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # raw-echo
 PASS
 $ cat testdata/hypercase.json
 {
-  "format": 5,
+  "format": 6,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,

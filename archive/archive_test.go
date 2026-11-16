@@ -235,6 +235,74 @@ b
 	}
 }
 
+// TestPlaceVia: a case's via/ sections sit between its inputs and its
+// outputs, sorted by name: in the base and in a hand-written variant after
+// the hand-written sections, and in a transform's variant after its in/
+// and delete.
+func TestPlaceVia(t *testing.T) {
+	a := Parse([]byte(`Products out of place.
+-- via/import/sheet/B1 --
+b
+-- in/csv/x.csv --
+1
+-- out/import/outcome --
+accepted
+-- via/import/sheet/A1 --
+a
+-- variant/v/about --
+A variant.
+-- variant/v/out/import/outcome --
+accepted
+-- variant/v/via/import/sheet/A1 --
+va
+-- variant/v/in/csv/x.csv --
+2
+-- transform/t/via/import/sheet/A1 --
+ta
+-- transform/t/out/import/outcome --
+accepted
+-- transform/t/delete --
+csv/y.csv
+-- transform/t/in/csv/x.csv --
+3
+`))
+	want := `Products out of place.
+-- in/csv/x.csv --
+1
+-- via/import/sheet/A1 --
+a
+-- via/import/sheet/B1 --
+b
+-- out/import/outcome --
+accepted
+-- variant/v/about --
+A variant.
+-- variant/v/in/csv/x.csv --
+2
+-- variant/v/via/import/sheet/A1 --
+va
+-- variant/v/out/import/outcome --
+accepted
+-- transform/t/in/csv/x.csv --
+3
+-- transform/t/delete --
+csv/y.csv
+-- transform/t/via/import/sheet/A1 --
+ta
+-- transform/t/out/import/outcome --
+accepted
+`
+	if got := string(a.Place().Format()); got != want {
+		t.Errorf("Place:\n%s", got)
+	}
+	if Placed(a.Format()) {
+		t.Error("an archive out of place reads as placed")
+	}
+	if !Placed([]byte(want)) {
+		t.Error("the placed archive doesn't read as placed")
+	}
+}
+
 func TestNoTesting(t *testing.T) {
 	for _, pkg := range []string{"github.com/sdboyer/hypercase/archive", "github.com/sdboyer/hypercase/decl"} {
 		out, err := exec.Command("go", "list", "-deps", pkg).Output()

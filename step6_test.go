@@ -118,8 +118,8 @@ func TestCellOrder(t *testing.T) {
 // product it shares makes them differ.
 func TestTwoOrders(t *testing.T) {
 	t.Parallel()
-	for _, fixture := range []string{"ladder", "lift-errors", "render"} {
-		reg := map[string]string{"ladder": "ladder", "lift-errors": "ladder", "render": "ladder-render"}[fixture]
+	for _, fixture := range []string{"ladder", "lift-errors", "render", "chain", "chain-past"} {
+		reg := map[string]string{"ladder": "ladder", "lift-errors": "ladder", "render": "ladder-render", "chain": "chain", "chain-past": "chain-past"}[fixture]
 		forward, reverse := newSandbox(t, fixture), newSandbox(t, fixture)
 		forward.update(reg)
 		reverse.runEnv("", reg, []string{fixtureUpdate + "=1", reverseEnv + "=1"})
@@ -298,7 +298,7 @@ func TestLiftRefusals(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "ladder")
 	for _, tt := range []struct{ reg, want string }{
-		{"fs-product", "panic: hypercase: the lift copy's product, hypercase_test.Other, is a corpus type, and this hypercase doesn't run lifts whose product is a corpus type. Make the product a stage, a type that isn't a named fs.FS wrapper."},
+		{"fs-product", "panic: hypercase: the lift copy's product, hypercase_test.Other, is a corpus type, and the lift gives Run. Give it Jenny in place of Run: the files the jenny generates from the input are the product's input view."},
 		{"jenny-lift", "panic: hypercase: the lift parse gives a Jenny, which makes a product that is a corpus type, and its product is *hypercase_test.Parsed. Give it Run, which makes the product."},
 		{"lift-no-run", "panic: hypercase: the lift parse has no Run. Give it the function that makes its product."},
 		{"lift-bad-output", `panic: hypercase: the lift parse declares an output with the pattern "values.txt", which matches neither error.txt nor stderr.txt, the only files a lift's cell writes. Remove the declaration.`},
