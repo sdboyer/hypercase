@@ -1067,21 +1067,23 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 
 **Registration.**
 
-- Everything a registry lists is registered when its package is
+- Everything a package registers is registered when the package is
   initialized, before any test runs: properties, corpus types, lifts,
-  suites, transforms, corpus checks and the root-package check. A test
-  function runs what was registered, and registers nothing. So the registry
-  and the orphan checks don't depend on `-run`.
+  suites, transforms, the root-package check and corpus checks (step 8).
+  Its registry lists all but the corpus checks. A test function runs what
+  was registered, and registers nothing. So the registry and the orphan
+  checks don't depend on `-run`.
 - A refusal at registration, such as two properties with one name, panics
   during package initialization with the message the framework would
   otherwise print. So it doesn't depend on `-run` either.
 
 **The registry.** It is each package's `testdata/hypercase.json`.
 
-- It lists everything the package registers, each with its description,
-  and for each column the type it consumes, the corpora it runs over, its
-  declared outputs and the properties it rejects. It records the package's
-  corpus root, and whether the package runs the root-package check.
+- It lists everything the package registers but its corpus checks
+  (step 8), each with its description, and for each column the type it
+  consumes, the corpora it runs over, its declared outputs and the
+  properties it rejects. It records the package's corpus root, and whether the package
+  runs the root-package check.
 - It records the name of the project's update variable, so `hypercase strip`
   and `hypercase report` can print the update command.
 - It carries a format version, which changes on any change to what the
@@ -2042,8 +2044,9 @@ S202
 
 - A corpus check has a name, a description and a `Run` over every cell, and
   is registered when its package is initialized, given to `Register` or to
-  `Own`. The package that registers it owns it. A test function runs it:
-  `hypercase.Test` runs each as the subtest `checks/<name>` (proposed).
+  `Own`. The package that registers it owns it, and no registry lists it.
+  A test function runs it: `hypercase.Test` runs each as the subtest
+  `checks/<name>` (proposed).
 - A cell, as a check sees it, exposes its committed outcome, its committed
   sections, its column's registry entry and its case's stated properties.
   `hypercase.Cell` holds (proposed) `Type`, `Archive`, `Case` and `Column`;
