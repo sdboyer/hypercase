@@ -19,22 +19,32 @@ import (
 // set, and these tests call them in this process, so each clears the
 // variable with t.Setenv, and none runs in parallel.
 
+// moduleCorpus returns the sandbox's module-root corpus.
+func (s *sandbox) moduleCorpus() root.Corpus {
+	s.t.Helper()
+	c, err := root.Find(s.dir, ".")
+	if err != nil {
+		s.t.Fatal(err)
+	}
+	return c
+}
+
 // create writes a case into the sandbox's module-root corpus with
 // snapshot.Create, as a project's command would, and notes it.
 func (s *sandbox) create(name string, trees map[string]fs.FS) string {
 	s.t.Helper()
-	return s.createAt(s.dir, name, trees)
+	return s.createAt(s.moduleCorpus(), name, trees)
 }
 
-// createAt writes a case under the corpus root dir, an absolute path in
-// the sandbox, with snapshot.Create, and notes it.
-func (s *sandbox) createAt(dir, name string, trees map[string]fs.FS) string {
+// createAt writes a case under a corpus root of the sandbox with
+// snapshot.Create, and notes it.
+func (s *sandbox) createAt(corpus root.Corpus, name string, trees map[string]fs.FS) string {
 	s.t.Helper()
 	ss, err := snapshot.Serialize(trees)
 	if err != nil {
 		s.t.Fatal(err)
 	}
-	path, err := snapshot.Create(dir, scriptType, name, fixtureUpdate, ss)
+	path, err := snapshot.Create(corpus, project, scriptType, name, ss)
 	if err != nil {
 		s.t.Fatal(err)
 	}
@@ -100,7 +110,7 @@ func TestSnapshotRewriteAfterUpdate(t *testing.T) {
 	}
 	s.note("snapshot.Load read %s", rel)
 	s.passes(s.update("ladder"))
-	err := snapshot.RewriteInputs(s.dir, s.path(rel), "", fixtureUpdate, []archive.Section{{Name: "in/calc/out/values.txt", Data: []byte("7\n")}})
+	err := snapshot.RewriteInputs(s.moduleCorpus(), project, s.path(rel), "", []archive.Section{{Name: "in/calc/out/values.txt", Data: []byte("7\n")}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +149,7 @@ func TestSnapshotCorpusRoot(t *testing.T) {
 				t.Fatal(err)
 			}
 			s.note("root.Find, from cmd/snapshot, found the corpus root %s", filepath.ToSlash(mustRel(t, s.dir, corpus.Dir())))
-			rel := s.createAt(corpus.Dir(), "six", c.trees)
+			rel := s.createAt(corpus, "six", c.trees)
 			s.edit(rel, "a person describes the case", func(a *archive.Archive) {
 				a.Comment = []byte("The script gives 6.\n")
 			})

@@ -41,7 +41,7 @@ func sameFiles(t *testing.T, what string, got, want map[string]string) {
 // TestLoad: Load returns a value whose fs.FS holds exactly the serialized
 // files and bytes, the trees as its top-level directories.
 func TestLoad(t *testing.T) {
-	path, err := Create(t.TempDir(), sheetType, "twice", updateVar, serialize(t, cells))
+	path, err := Create(newCorpus(t), project, sheetType, "twice", serialize(t, cells))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestExtractRefuses(t *testing.T) {
 // TestExtractNoVariants: Extract of a variant of an archive with no
 // hand-written variant says so.
 func TestExtractNoVariants(t *testing.T) {
-	path, err := Create(t.TempDir(), sheetType, "twice", updateVar, serialize(t, cells))
+	path, err := Create(newCorpus(t), project, sheetType, "twice", serialize(t, cells))
 	if err != nil {
 		t.Fatal(err)
 	}

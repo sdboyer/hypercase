@@ -32,6 +32,7 @@ import (
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/internal/hooks"
+	"github.com/sdboyer/hypercase/root"
 )
 
 // Serialize turns each tree's files into the sections in/<tree>/<path>,
@@ -93,12 +94,13 @@ func checkTree(name string) error {
 }
 
 // notDuringUpdate refuses to run fn, a primitive that writes a case's
-// inputs, while the update variable updateVar names is set: no update
-// writes a case's inputs. what is what fn does, as "creates a case", and
-// fix how a person does it otherwise.
-func notDuringUpdate(fn, updateVar, what, fix string) error {
+// inputs, while the variable the project's UpdateVar names is set: no
+// update writes a case's inputs. what is what fn does, as "creates a
+// case", and fix how a person does it otherwise.
+func notDuringUpdate(fn string, project decl.Project, what, fix string) error {
+	updateVar := project.UpdateVar
 	if updateVar == "" {
-		return fmt.Errorf("%s has no update variable to check, and it refuses during an update.\nPass the name of the project's update variable, its decl.Project's UpdateVar.", fn)
+		return fmt.Errorf("%s has no update variable to check: the project's UpdateVar is empty, and %s refuses during an update.\nPass the decl.Project the project registers.", fn, fn)
 	}
 	if os.Getenv(updateVar) != "" {
 		return fmt.Errorf("%s is set, so this may be an update, and no update %s.\n%s from the project's command, or from a test run without %s.", updateVar, what, fix, updateVar)
@@ -106,12 +108,18 @@ func notDuringUpdate(fn, updateVar, what, fix string) error {
 	return nil
 }
 
+// noCorpus refuses the zero root.Corpus, which names no corpus root.
+func noCorpus(fn string) error {
+	return fmt.Errorf("%s was given no corpus root.\nFind it with root.Find, from the command's directory and the path the package passes to hypercase.Root.", fn)
+}
+
 // Create writes sections, under an empty comment, as the new case
-// <root>/testdata/<typ.Dir>/<name>.txtar, and returns its path. root is
-// the corpus root, a directory that exists, and Create makes
-// testdata/<typ.Dir>/ under it if it is missing. updateVar is the name of
-// the project's update variable: no update creates a case, so while it
-// is set, Create fails, naming it, and writes nothing.
+// testdata/<typ.Dir>/<name>.txtar under the corpus root c, and returns its
+// path. c is as root.Find finds it, and its directory exists; Create makes
+// testdata/<typ.Dir>/ under it if it is missing. project is the project's
+// declaration, as the project registers it: no update creates a case, so
+// while the variable its UpdateVar names is set, Create fails, naming it,
+// and writes nothing.
 //
 // name is the case's name, without .txtar, and follows the naming rule,
 // which no path does. A new case holds only inputs, so every section is
@@ -131,9 +139,12 @@ func notDuringUpdate(fn, updateVar, what, fix string) error {
 // write: until they do, the root-package check fails on the case, and an
 // update still writes its outputs. Nor does the new case state any
 // property: a case states its properties by hand.
-func Create[T ~struct{ fs.FS }](root string, typ decl.Type[T], name, updateVar string, sections []archive.Section) (string, error) {
-	if err := notDuringUpdate("Create", updateVar, "creates a case", "Create the case"); err != nil {
+func Create[T ~struct{ fs.FS }](c root.Corpus, project decl.Project, typ decl.Type[T], name string, sections []archive.Section) (string, error) {
+	if err := notDuringUpdate("Create", project, "creates a case", "Create the case"); err != nil {
 		return "", err
+	}
+	if c == (root.Corpus{}) {
+		return "", noCorpus("Create")
 	}
 	if !archive.ValidName(name) {
 		return "", fmt.Errorf("the case's name, %q, breaks the naming rule: %s. A case's name is its archive's file name, less .txtar, and never a path.\nName the case by the rule.", name, archive.NameRule)
@@ -141,8 +152,9 @@ func Create[T ~struct{ fs.FS }](root string, typ decl.Type[T], name, updateVar s
 	if err := checkDir(typ); err != nil {
 		return "", err
 	}
-	if fi, err := os.Stat(root); err != nil || !fi.IsDir() {
-		return "", fmt.Errorf("the corpus root %s isn't a directory.\nPass the corpus root: the module root, or the directory a package passes to hypercase.Root.", root)
+	dir := c.Dir()
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		return "", fmt.Errorf("the corpus root %s isn't a directory.\nPass the corpus root: the module root, or the directory a package passes to hypercase.Root.", dir)
 	}
 	if len(sections) == 0 {
 		return "", fmt.Errorf("there are no sections for the case %s, and a new case holds its inputs.\nPass the sections Serialize makes from the case's trees.", name)
@@ -160,11 +172,11 @@ func Create[T ~struct{ fs.FS }](root string, typ decl.Type[T], name, updateVar s
 	if err != nil {
 		return "", fmt.Errorf("the sections for the case %s can't be written: %v.\nFix the section, or leave it out.", name, err)
 	}
-	made, err := mkdirs(root, "testdata", typ.Dir)
+	made, err := mkdirs(dir, "testdata", typ.Dir)
 	if err != nil {
 		return "", err
 	}
-	path := filepath.Join(root, "testdata", typ.Dir, name+".txtar")
+	path := filepath.Join(dir, "testdata", typ.Dir, name+".txtar")
 	if err := archive.CreateFile(path, data); err != nil {
 		// Each directory Create made is removed only when it is empty: a
 		// concurrent Create may have written into it.
@@ -180,12 +192,12 @@ func Create[T ~struct{ fs.FS }](root string, typ decl.Type[T], name, updateVar s
 }
 
 // mkdirs makes each missing directory of the path that the elements name
-// under root, which exists, one at a time, and returns those it made, in
+// under base, which exists, one at a time, and returns those it made, in
 // order. A directory that another process makes meanwhile is not one it
 // made.
-func mkdirs(root string, elems ...string) ([]string, error) {
+func mkdirs(base string, elems ...string) ([]string, error) {
 	var made []string
-	dir := root
+	dir := base
 	for _, e := range elems {
 		dir = filepath.Join(dir, e)
 		err := os.Mkdir(dir, 0o755)
@@ -429,7 +441,7 @@ func writeView(view fs.FS, dir string) error {
 }
 
 // RewriteInputs replaces named in/ sections of the case at path, under the
-// corpus root, root: the base's in/<tree>/<path>, or, with a non-empty
+// corpus root c: the base's in/<tree>/<path>, or, with a non-empty
 // variant, those of the overlay of variant/<variant>/. Each section is
 // passed by its in/ name either way, and each must be in the archive
 // already. Every other byte of the archive comes back as it was, and a
@@ -437,25 +449,29 @@ func writeView(view fs.FS, dir string) error {
 //
 // No update changes a case's inputs, and RewriteInputs is the explicit way
 // to change them. It refuses during an update, so who writes a section
-// stays readable from its name: updateVar is the name of the project's
-// update variable, and while it is set, RewriteInputs fails, naming it,
-// before it takes any lock, and writes nothing. It reads no registry, so it
-// works before a project's first update.
+// stays readable from its name: project is the project's declaration, and
+// while the variable its UpdateVar names is set, RewriteInputs fails,
+// naming it, before it takes any lock, and writes nothing. It reads no
+// registry, so it works before a project's first update.
 //
 // It writes as an update does: it takes the corpus root's lock,
-// testdata/.hypercase.lock under root, re-reads the archive, replaces the
-// sections, writes the result to a temp file beside the archive, renames
-// it over the archive, and releases the lock. Each refusal writes nothing:
-// an empty updateVar; a section outside in/, named twice, or that an
-// archive can't hold; an archive outside testdata/<dir>/ under root, or
+// testdata/.hypercase.lock under the corpus root, re-reads the archive,
+// replaces the sections, writes the result to a temp file beside the
+// archive, renames it over the archive, and releases the lock. Each
+// refusal writes nothing: a project with no UpdateVar; no corpus root; a
+// section outside in/, named twice, or that an archive can't hold; an
+// archive outside testdata/<dir>/ under the corpus root, or
 // one with a problem of form, before or after the rewrite; one that isn't
 // in the form an update writes, since rewriting it would change other
 // bytes; a variant it lacks, and a transform's variant, whose inputs are
 // update-written; and a section it lacks. A write that fails leaves the
 // archive as it was.
-func RewriteInputs(root, path, variant, updateVar string, sections []archive.Section) error {
-	if err := notDuringUpdate("RewriteInputs", updateVar, "changes a case's inputs", "Rewrite the inputs"); err != nil {
+func RewriteInputs(c root.Corpus, project decl.Project, path, variant string, sections []archive.Section) error {
+	if err := notDuringUpdate("RewriteInputs", project, "changes a case's inputs", "Rewrite the inputs"); err != nil {
 		return err
+	}
+	if c == (root.Corpus{}) {
+		return noCorpus("RewriteInputs")
 	}
 	if len(sections) == 0 {
 		return fmt.Errorf("there are no sections to rewrite in %s.\nPass the in/ sections to replace.", path)
@@ -473,7 +489,8 @@ func RewriteInputs(root, path, variant, updateVar string, sections []archive.Sec
 			return fmt.Errorf("the section %s can't be held in an archive: %v.\nChange its content.", s.Name, err)
 		}
 	}
-	if err := checkUnder(root, path); err != nil {
+	dir := c.Dir()
+	if err := checkUnder(dir, path); err != nil {
 		return err
 	}
 	prefix := ""
@@ -487,13 +504,13 @@ func RewriteInputs(root, path, variant, updateVar string, sections []archive.Sec
 		refused = err
 		return nil, err
 	}
-	err := archive.Modify(filepath.Join(root, "testdata", archive.LockFile), path, func(current *archive.Archive, read []byte) (*archive.Archive, error) {
+	err := archive.Modify(filepath.Join(dir, "testdata", archive.LockFile), path, func(current *archive.Archive, read []byte) (*archive.Archive, error) {
 		if ps := current.Check(); len(ps) > 0 {
 			return refuse(formError(path, ps))
 		}
 		// The form judged is that of the bytes current was parsed from.
 		if !archive.Placed(read) {
-			return refuse(fmt.Errorf("%s isn't in the form an update writes, so rewriting its inputs would change other bytes too.\nRun the update, %s=1 go test ./..., then rewrite the inputs.", path, updateVar))
+			return refuse(fmt.Errorf("%s isn't in the form an update writes, so rewriting its inputs would change other bytes too.\nRun the update, %s=1 go test ./..., then rewrite the inputs.", path, project.UpdateVar))
 		}
 		if variant != "" {
 			if _, err := handWritten(path, current, variant); err != nil {
@@ -521,17 +538,18 @@ func RewriteInputs(root, path, variant, updateVar string, sections []archive.Sec
 }
 
 // checkUnder refuses an archive that isn't in a corpus directory of the
-// corpus root, root/testdata/<dir>/, since root's lock covers no other.
-func checkUnder(root, path string) error {
+// corpus root dir, dir/testdata/<corpus>/, since dir's lock covers no
+// other.
+func checkUnder(dir, path string) error {
 	if err := checkPath(path); err != nil {
 		return err
 	}
-	want, err := os.Stat(filepath.Join(root, "testdata"))
+	want, err := os.Stat(filepath.Join(dir, "testdata"))
 	if err == nil {
 		var got fs.FileInfo
 		if got, err = os.Stat(filepath.Dir(filepath.Dir(path))); err == nil && os.SameFile(want, got) {
 			return nil
 		}
 	}
-	return fmt.Errorf("%s isn't in a corpus's directory under %s, testdata/<dir>/, so the corpus root's lock doesn't cover it.\nPass the corpus root the archive is under.", path, root)
+	return fmt.Errorf("%s isn't in a corpus's directory under %s, testdata/<dir>/, so the corpus root's lock doesn't cover it.\nPass the corpus root the archive is under.", path, dir)
 }

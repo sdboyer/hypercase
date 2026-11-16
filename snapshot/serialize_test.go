@@ -77,7 +77,7 @@ func TestSerializeFinalNewline(t *testing.T) {
 			}
 			continue
 		}
-		path, err := Create(t.TempDir(), sheetType, "nonl", updateVar, ss)
+		path, err := Create(newCorpus(t), project, sheetType, "nonl", ss)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -164,7 +164,7 @@ func TestSerializeTreeNames(t *testing.T) {
 func TestSerializeLarge(t *testing.T) {
 	data := bytes.Repeat([]byte("0123456789abcde\n"), 1<<16)
 	ss := serialize(t, map[string]fs.FS{"sheet": fstest.MapFS{"A1": {Data: data}}})
-	path, err := Create(t.TempDir(), sheetType, "large", updateVar, ss)
+	path, err := Create(newCorpus(t), project, sheetType, "large", ss)
 	if err != nil {
 		t.Fatal(err)
 	}

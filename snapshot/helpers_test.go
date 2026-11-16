@@ -11,11 +11,15 @@ import (
 
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
+	"github.com/sdboyer/hypercase/root"
 )
 
 // The tests' update variable, which none of them sets but
 // TestCreateDuringUpdate and TestRewriteDuringUpdate.
 const updateVar = "SNAPSHOT_TEST_UPDATE_GOLDEN"
+
+// project is the tests' project, whose update variable is updateVar.
+var project = decl.Project{UpdateVar: updateVar}
 
 // Sheet is the walkthrough's corpus type: a spreadsheet, one file per cell
 // under in/sheet/.
@@ -39,14 +43,43 @@ func twice(t *testing.T) []byte {
 	return data
 }
 
+// newModule makes a module, and returns its root.
+func newModule(t *testing.T) string {
+	t.Helper()
+	mod := t.TempDir()
+	writeFile(t, filepath.Join(mod, "go.mod"), []byte("module example.com/m\n"))
+	return mod
+}
+
+// corpusIn returns the corpus root rel of the module mod.
+func corpusIn(t *testing.T, mod, rel string) root.Corpus {
+	t.Helper()
+	c, err := root.Find(mod, rel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+// newCorpus makes a module holding the empty corpus root corp, and
+// returns that root.
+func newCorpus(t *testing.T) root.Corpus {
+	t.Helper()
+	mod := newModule(t)
+	if err := os.Mkdir(filepath.Join(mod, "corp"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return corpusIn(t, mod, "corp")
+}
+
 // corpus makes a corpus root holding twice, and returns the root and the
 // archive's path.
-func corpus(t *testing.T) (root, path string) {
+func corpus(t *testing.T) (root.Corpus, string) {
 	t.Helper()
-	root = t.TempDir()
-	path = filepath.Join(root, "testdata", "sheet", "twice.txtar")
+	c := newCorpus(t)
+	path := filepath.Join(c.Dir(), "testdata", "sheet", "twice.txtar")
 	writeFile(t, path, twice(t))
-	return root, path
+	return c, path
 }
 
 func writeFile(t *testing.T, path string, data []byte) {
