@@ -1448,9 +1448,10 @@ package owns every column it registers.
   in process. A package that uses a lift neither writes nor judges the
   lift's sections.
 - The root-package check fails on a column two packages own, in place of
-  step 5's column two packages register, and on a lift that packages use
-  and none owns. A suite named like the lift owns no lift, and fails
-  beside it, since lifts share the suites' column names.
+  step 5's column two packages register, and on a lift that a package
+  with tests uses and none owns (step 5's rule for packages with no
+  tests). A suite named like the lift owns no lift, and fails beside it,
+  since lifts share the suites' column names.
 
 **Blocked cells.**
 
@@ -1693,8 +1694,9 @@ whether each has a probe, and whether the package owns it.
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
   root-package check reports them and names the strip command.
-- The root-package check fails on a transform that no package owns, or
-  that two own.
+- The root-package check fails on a transform that a package with tests
+  lists in a corpus type and no package owns (step 5's rule for packages
+  with no tests), and on one that two own.
 - The package that owns a transform writes its `in/…` and `delete`, and
   judges them against what the transform makes. When the transform makes
   the variant, every package's normal run fails it if its committed `in/…`
