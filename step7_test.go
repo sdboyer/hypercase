@@ -522,9 +522,9 @@ func TestTransformJennyChanges(t *testing.T) {
 // once the transform's owner has rewritten the inputs. Before that, the
 // cell reads the old inputs and passes: another package's normal run
 // passes, and the owner's fails on the inputs, which differ from what the
-// transform makes. It fails until a person deletes its files, which the
-// next update writes, or removes its gaps line, after which the next
-// update writes the cell.
+// transform makes. It fails until a person deletes its files or removes
+// its gaps line; then the next update of the package that owns its column
+// writes the cell, and no other package's update does.
 func TestTransformJennyFrozen(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -561,18 +561,21 @@ func TestTransformJennyFrozen(t *testing.T) {
 	s.fails(s.normal("tr-jenny"), frozen("echo", "1"))
 	s.fails(s.run("b", "tr-b-jenny", false), frozen("copy", "2"))
 
-	// A person deletes echo's frozen files, and removes copy's gaps line,
-	// and the next updates write both cells.
+	// A person deletes echo's frozen files, and removes copy's gaps line.
+	// The root package's update writes echo's cell, and leaves copy's to
+	// b, whose normal run fails until its update writes it.
 	s.edit(twice, "delete upper's frozen cell of echo, and close copy's gap", func(a *archive.Archive) {
 		drop("transform/upper/out/echo/")(a)
 		set("gaps", "transform/upper echo Waits on sheets#9.\n")(a)
 	})
 	s.passes(s.update("tr-jenny"))
-	s.passes(s.run("b", "tr-b-jenny", true))
 	s.hasSections(twice, map[string]string{
 		"transform/upper/out/echo/values.txt": "A1 SIX\nA1 SIX\n",
-		"transform/upper/out/copy/values.txt": "A1 SIX\nA1 SIX\n",
+		"transform/upper/out/copy/values.txt": "A1 SIX\n",
 	})
+	s.fails(s.run("b", "tr-b-jenny", false), "transform/upper/out/copy/values.txt differs (-golden +got):")
+	s.passes(s.run("b", "tr-b-jenny", true))
+	s.hasSections(twice, map[string]string{"transform/upper/out/copy/values.txt": "A1 SIX\nA1 SIX\n"})
 	s.passes(s.normal("tr-jenny"))
 	s.passes(s.run("b", "tr-b-jenny", false))
 	s.done()
