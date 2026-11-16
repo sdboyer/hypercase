@@ -2133,20 +2133,23 @@ whose verdict changed mixed among those whose bytes did.
 A person runs `hypercase report`. The project supplies the patterns that
 link a known gap's text to the issue it waits on.
 
-Proposed: the flags `-root` and `-text`, and `decl.Project`'s `IssueLinks`
-field, a list of `decl.IssueLink`, each a regular expression and a URL
-template.
+The command takes the flags `-root` and `-text`. The patterns are
+`decl.Project`'s `IssueLinks` field, a list of `decl.IssueLink`, each a
+regular expression and a URL template.
+
+This step's snippets come from no example yet: no directory under
+`walkthrough/` holds them, and the doc golden checks none of them.
 
 ```go
-// walkthrough/sheets/step09/sheetcorpus/project.go: Project gains
+// sheetcorpus/project.go: Project gains
 	IssueLinks: []decl.IssueLink{
 		{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/issues/$1"},
 	},
 ```
 
 ```sh
-hypercase report main HEAD > report.html
-hypercase report -text main HEAD
+hypercase report "$(git merge-base main HEAD)" HEAD > report.html
+hypercase report -text "$(git merge-base main HEAD)" HEAD
 ```
 
 ### How the files change
@@ -2207,32 +2210,84 @@ rejected S201
 ### Rules
 
 - `hypercase report <a> <b>`, from `cmd/hypercase`, takes two git revisions,
-  reads both from the repository's object store, and produces a static HTML
-  file, which it writes on stdout (proposed).
-- It reads registries and archives, never Go source. It reads every
-  registry format version up to its own, and refuses a newer one, saying to
-  run the report from the newer revision's hypercase.
-- It works from outcomes alone. It shows the matrix, and ranks changes:
-  changed outcomes first, then cells appearing or disappearing, then bytes
-  changed under the same outcome.
-- Each case's stated properties are shown beside it, and each `gaps` line on
-  the cell it marks, linked to its issue through the patterns the project
-  supplies, one per issue tracker its `gaps` lines name.
-- hypercase's own CI runs the report over the toy.
+  reads both from the repository's object store, never the working tree,
+  and writes one HTML page on stdout. It exits 0 when it writes the report,
+  2 for a usage error, and 1, with the cause on stderr, when it can't build
+  one.
+- Each argument is one revision, which must resolve to a commit. No range is
+  parsed: `A..B` and `A...B` name no commit, and a caller that wants a merge
+  base computes it and passes it. An argument that starts with `-` is a
+  revision, never a flag of git's.
+- It reads registries and archives, never Go source. At each revision it
+  merges the registries that record the corpus root, so one module can hold
+  several. Only `<a>` may lack them, as a revision from before the project
+  used hypercase does; every cell at `<b>` then appeared. A corpus root that
+  no registry records at `<b>` fails the report: the root is wrong.
+- It reads every registry format from 3 to its own, and refuses any other,
+  naming the revision, the registry and its format, and saying to run the
+  report from that revision's hypercase. A registry of an older format that
+  holds what a later format added is refused too.
+- A cell exists at a revision when its `outcome` file does. A changed cell
+  takes the first of these ranks that applies: outcome changed, at both
+  revisions; appeared, at `<b>` only; disappeared, at `<a>` only; bytes
+  changed, under the same outcome, when another of its files is added,
+  changed or removed. A change to a case's description, inputs, properties
+  or `gaps` lines alone ranks no cell.
+- Cases go by corpus type, then archive, then the base, the hand-written
+  variants by name, and the transforms' variants by transform name; a case's
+  cells by column; names byte by byte. Within a rank, changes go in that
+  order.
+- Each case's stated properties are shown beside it: for a transform's
+  variant, its transform's `Gives`, and each of its `Keeps` that the base
+  states, marked given or kept. Each `gaps` line shows on the cell it marks,
+  linked to its issue through the patterns the project supplies, one per
+  issue tracker its `gaps` lines name.
+- What the report can't show as it is, it lists as a problem at its
+  revision, and doesn't pick: a column two registries claim, whose
+  descriptions it shows neither of; a committed column no registry claims; a
+  stated property no registry lists; a `gaps` line naming a column, or a
+  transform, no registry has; a section it can't place in a case or a cell,
+  such as `via/…` before step 10; a cell with files and no `outcome`, whose
+  files it leaves out; and a transform's variant whose transform no corpus
+  type lists. An `outcome`, `properties` or `gaps` section it can't parse, or
+  a section an archive holds twice, fails the report.
+- hypercase's own CI runs the report over the toy on each pull request, from
+  its merge base to its head, once per corpus root, and keeps the pages.
 - Step 11 adds input lines and corpus-check findings.
 
-**Flags** (proposed).
+**Flags.**
 
 - `-root <dir>` names the corpus root, relative to the current directory.
   Without it, the report finds the root as a test does.
 - `-text` writes the ranked changes as plain text instead of the page.
 
-**Link patterns** (proposed). Each `decl.IssueLink` is a regular expression
-and a URL template, which may use the expression's groups. The report reads
-them from the registries at `<b>`. Text that matches a pattern, in a `gaps`
-line or a description, links to the URL it makes.
+**Link patterns.** Each `decl.IssueLink` is a regular expression and a URL
+template, which may use the expression's groups. The report reads them from
+the registries at `<b>`. Text that matches a pattern, in a `gaps` line or a
+description, links to the URL it makes.
 
-**The plain-text format** (proposed). One heading per rank that has
+**The page.** One HTML file, which runs no script and loads nothing: its
+styles are inline, and every archive's text is escaped. In order:
+
+- the problems, at `<b>`, then at `<a>`;
+- the changes, ranked, each file of a changed cell with how many lines it
+  adds and removes, and its line diff, folded;
+- a matrix per corpus type at `<b>`, a row per case, a column per column that
+  runs on the type's archives. Each cell shows its state and detail, its rank
+  if it changed, and the `gaps` line that marks it; a marked cell that exists
+  is frozen;
+- the descriptions of each corpus type, column, output declaration,
+  classifier, transform and property, from `<b>`, or from `<a>` for what `<b>`
+  lacks, marked as such; and of each archive and hand-written variant only
+  at `<a>`, from its `about`.
+
+An unchanged cell carries only its state, so the page grows with the change.
+The line diff is Myers' O(ND), whose cost grows with the size of the change,
+not with the files' lengths. Past a fixed budget, a change shows as its old
+lines removed, then its new lines added. The same revisions give the same
+bytes.
+
+**The plain-text format.** One heading per rank that has
 changes, in rank order. Under it, one line per cell: its case, its column,
 and its outcome, or the change in it. So `outcome` is never listed as a
 file. Under each cell, one line per other file of the cell that was added,
@@ -2268,6 +2323,10 @@ bytes changed
 - The matrix for each corpus type at `<b>`, each cell with its state and
   frozen cells marked.
 - Each known gap beside its cell, linked to the issue it waits on.
+- The descriptions of everything the change touches, what it removed
+  included.
+- What the registries and archives disagree on, as problems, beside
+  everything the report could place.
 
 ## 10. Chaining
 
