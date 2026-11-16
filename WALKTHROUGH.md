@@ -1099,10 +1099,11 @@ check, the properties it registers, and `evaluate`: the type it consumes,
 - A declared directory that doesn't exist yet is fine.
 - A package whose directory holds no `_test.go` file owns nothing, whatever
   its registry records. Any file whose name ends in `_test.go` counts,
-  whatever it holds. The check counts none of the registry's columns,
-  lifts or transforms (steps 6 and 7) as owned, though their sections stay
-  claimed. A lift or transform that only such packages own fails as owned
-  by no package, and the failure names them.
+  whatever it holds, but one whose name starts with `_` or `.`, which Go
+  ignores. The check counts none of the registry's columns, lifts or
+  transforms (steps 6 and 7) as owned, though their sections stay claimed.
+  A lift or transform that only such packages own fails as owned by no
+  package, and the failure names them.
 - In a normal run, every package's run over a corpus root fails when no
   registry records a root-package check for that root.
 

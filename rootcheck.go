@@ -26,8 +26,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		pkg string
 		reg *registry.Registry
 		// tested records that the package's directory holds a file whose
-		// name ends in _test.go. Any such file counts, even one with no
-		// test that runs what the registry records.
+		// name ends in _test.go, and doesn't start with _ or ., which Go
+		// ignores. Any such file counts, even one with no test that runs
+		// what the registry records.
 		tested bool
 	}
 	var regs []pkgReg
@@ -383,13 +384,17 @@ func (r *runner) pkgName(dir string) string {
 	return "."
 }
 
+// hasTestFile reports whether dir holds a file whose name ends in
+// _test.go, and doesn't start with _ or ., the names Go ignores. It reads
+// no build constraints, so a file they exclude still counts.
 func hasTestFile(dir string) bool {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return false
 	}
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), "_test.go") {
+		name := e.Name()
+		if !e.IsDir() && strings.HasSuffix(name, "_test.go") && !strings.HasPrefix(name, "_") && !strings.HasPrefix(name, ".") {
 			return true
 		}
 	}
