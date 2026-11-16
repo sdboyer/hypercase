@@ -1,5 +1,5 @@
 The output has no final newline.
 -- in/do/nonl/values.txt --
 A1 6
--- in/do/out/other.txt --
+-- in/do/out/b.txt --
 other

@@ -1,0 +1,5 @@
+The probe says no, and the cell is skipped, though the case states a property echo rejects.
+-- in/do/probe --
+already serves 4
+-- properties --
+circular

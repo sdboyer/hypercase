@@ -1,0 +1,115 @@
+$ go test  # pkg-a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ go test ./b  # pkg-b
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ edit testdata/script/twice.txtar  # edit b's section by hand, and change what echo prints
+$ go test ./b  # pkg-b
+    script/twice: A1 is twice B1. The root package, ., prints it with echo, and ./b with shout.
+        shout: Does what the case's shout/ tree says.
+        out/shout/values.txt differs (-golden +got):
+        - A1 SIX?
+        + A1 SIX
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- FAIL: TestCorpus/script/twice/shout
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ edit testdata/script/twice.txtar  # restore b's section
+$ edit testdata/script/twice.txtar  # strip both packages' sections
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # pkg-b
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ edit testdata/script/twice.txtar  # strip both packages' sections
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # pkg-b
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ edit testdata/script/twice.txtar  # strip both packages' sections
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # pkg-b
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ cat testdata/script/twice.txtar
+A1 is twice B1. The root package, ., prints it with echo, and ./b with shout.
+-- in/do/out/values.txt --
+A1 7
+-- in/shout/out/values.txt --
+A1 SIX
+-- out/echo/values.txt --
+A1 7
+-- out/shout/values.txt --
+A1 SIX
+$ edit testdata/script/twice.txtar  # move b's section before a's
+$ go test ./b  # pkg-b
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ go test  # pkg-a
+    testdata/script/twice.txtar has update-written sections out of their place.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to put them in place.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ go test  # pkg-a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS

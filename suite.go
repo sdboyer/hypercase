@@ -3,6 +3,7 @@ package hypercase
 import (
 	"io"
 	"io/fs"
+	"path"
 	"reflect"
 	"slices"
 	"testing"
@@ -17,22 +18,36 @@ type File struct {
 	Data []byte
 }
 
-// A Suite is a column of the matrix: every case runs through it, and its
-// outputs for a case are that cell's files, under out/<Name>/. T is the
-// type the suite consumes.
+// A Suite is a column of the matrix: it covers a class of outputs, or one
+// command. Each case of its corpus runs through it, and its outputs for a
+// case are that cell's files, under out/<Name>/. T is the type the suite
+// consumes.
 type Suite[T any] struct {
 	// Name is the column's name, and names its directory, out/<Name>/.
+	// Column names are unique per corpus root.
 	Name string
 	// Description says what the suite does. It is required.
 	Description string
+	// Corpus names the directory of the archives the suite runs over,
+	// testdata/<Corpus>/ under the corpus root.
+	Corpus string
+	// Probe decides whether a case is for the suite, from the case's input
+	// alone. When it says no, it gives the reason, and the cell is skipped:
+	// it runs nothing. A suite with no probe is for every case.
+	Probe func(in T) (why string, ok bool)
+	// Outputs declares every file the suite's cells may write, stdout.txt,
+	// stderr.txt and error.txt included. A file no declaration matches fails
+	// its cell, and so does one that two declarations match.
+	Outputs []decl.Output
 	// Rejects lists the properties the suite rejects. A cell is expected to
 	// err exactly when its case states one of them.
 	Rejects []decl.Property
 	// Run runs one case. It receives the cell's testing.TB, the archive's
 	// name, the case's input and one writer each for stdout and stderr, and
 	// returns its output files and the error the code under test returned.
-	// It reports its own failures, such as a fixture it can't set up,
-	// through the testing.TB.
+	// What it writes to stdout and stderr is compared as stdout.txt and
+	// stderr.txt. It reports its own failures, such as a fixture it can't
+	// set up, through the testing.TB.
 	Run func(t testing.TB, archive string, in T, stdout, stderr io.Writer) ([]File, error)
 }
 
@@ -40,8 +55,11 @@ type Suite[T any] struct {
 type column struct {
 	name        string
 	description string
+	corpus      string
+	outputs     []decl.Output
 	rejects     []decl.Property
 	consumes    reflect.Type
+	probe       func(in any) (string, bool)
 	run         func(t testing.TB, archive string, in any, stdout, stderr io.Writer) ([]File, error)
 }
 
@@ -59,6 +77,18 @@ func (c *column) rejectsAny(names []string) []string {
 	return hit
 }
 
+// declared returns the patterns of the column's output declarations that
+// match a file's path.
+func (c *column) declared(p string) []string {
+	var hit []string
+	for _, o := range c.outputs {
+		if ok, _ := path.Match(o.Pattern, p); ok {
+			hit = append(hit, o.Pattern)
+		}
+	}
+	return hit
+}
+
 // columnDecl is what Register accepts as a column.
 type columnDecl interface {
 	column() *column
@@ -68,8 +98,14 @@ func (s Suite[T]) column() *column {
 	c := &column{
 		name:        s.Name,
 		description: s.Description,
+		corpus:      s.Corpus,
+		outputs:     slices.Clone(s.Outputs),
 		rejects:     slices.Clone(s.Rejects),
 		consumes:    reflect.TypeFor[T](),
+	}
+	if s.Probe != nil {
+		probe := s.Probe
+		c.probe = func(in any) (string, bool) { return probe(in.(T)) }
 	}
 	if s.Run != nil {
 		run := s.Run

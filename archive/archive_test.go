@@ -35,6 +35,20 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
+// TestParseDoesNotAlias: an append to the comment, or to a section, leaves
+// every other section as it was.
+func TestParseDoesNotAlias(t *testing.T) {
+	a := Parse([]byte(wellFormed))
+	a.Comment = append(a.Comment, "A longer comment, long enough to run over the next section.\n"...)
+	if got, want := string(a.Sections[0].Data), "serves: 2\nflour: 100 g\n"; got != want {
+		t.Errorf("an append to the comment changed the first section to %q", got)
+	}
+	a.Sections[0].Data = append(a.Sections[0].Data, "A longer line, long enough to run over the next section.\n"...)
+	if got, want := string(a.Sections[1].Data), "serves: 4\nflour: 200 g\n"; got != want {
+		t.Errorf("an append to the first section changed the second to %q", got)
+	}
+}
+
 func TestHolds(t *testing.T) {
 	for _, tt := range []struct {
 		data string

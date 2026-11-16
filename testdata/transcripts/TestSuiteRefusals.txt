@@ -1,0 +1,28 @@
+$ go test  # bad-pattern
+panic: hypercase: the suite echo declares an output with the pattern "values[.txt", which is not a pattern of slash paths under out/echo/ in the syntax of path.Match. Fix the pattern.
+[stack]
+[exit 2]
+$ go test  # bad-pattern-path
+panic: hypercase: the suite echo declares an output with the pattern "../values.txt", which is not a pattern of slash paths under out/echo/ in the syntax of path.Match. Fix the pattern.
+[stack]
+[exit 2]
+$ go test  # no-corpus
+panic: hypercase: the suite echo names no Corpus. Name the directory of the archives it runs over, testdata/<corpus>/ under the corpus root.
+[stack]
+[exit 2]
+$ go test  # bad-corpus
+panic: hypercase: the suite echo names the corpus "Script", which breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter. Rename the corpus's directory.
+[stack]
+[exit 2]
+$ go test  # two-roots
+panic: hypercase: Register was given hypercase.Root a second time, with "b". A package has one corpus root; pass it once.
+[stack]
+[exit 2]
+$ go test  # bad-root
+panic: hypercase: hypercase.Root was given "/abs", which is not a slash path relative to the module root, such as walkthrough/step05. Pass the corpus root's path.
+[stack]
+[exit 2]
+$ go test  # two-root-packages
+panic: hypercase: Register was given hypercase.RootPackage a second time. Register the root-package check once.
+[stack]
+[exit 2]

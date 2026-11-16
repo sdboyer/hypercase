@@ -1,11 +1,11 @@
 $ go test  # echo
-    testdata/gone.txtar: out/other/values.txt is under out/other/, and no column of that name is registered.
-        If a column should write it, register the column. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
-    gone: The run no longer writes old.txt, and no column named other is registered.
+    testdata/script/gone.txtar: no registry claims out/other/values.txt: no column named other runs over the corpus script.
+        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+    script/gone: The run no longer writes old.txt, and no column named other is registered.
         echo: Does what the case's do/ tree says.
         out/echo/old.txt is an output the run no longer produces.
         If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
-    quiet: The run once erred and printed, and now does neither.
+    script/quiet: The run once erred and printed, and now does neither.
         echo: Does what the case's do/ tree says.
         out/echo/error.txt records an error, but the run returned none.
         If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
@@ -14,20 +14,20 @@ $ go test  # echo
         out/echo/stdout.txt records output, but the run wrote nothing to stdout.
         If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
 --- FAIL: TestCorpus
-    --- FAIL: TestCorpus/gone
-        --- FAIL: TestCorpus/gone/echo
-    --- FAIL: TestCorpus/quiet
-        --- FAIL: TestCorpus/quiet/echo
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/gone
+            --- FAIL: TestCorpus/script/gone/echo
+        --- FAIL: TestCorpus/script/quiet
+            --- FAIL: TestCorpus/script/quiet/echo
 FAIL
 [exit 1]
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
-    testdata/gone.txtar: out/other/values.txt is under out/other/, and no column of that name is registered.
-        If a column should write it, register the column. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
-    gone: The run no longer writes old.txt, and no column named other is registered.
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/gone: The run no longer writes old.txt, and no column named other is registered.
         echo: Does what the case's do/ tree says.
         out/echo/old.txt is an output the run no longer produces.
         If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
-    quiet: The run once erred and printed, and now does neither.
+    script/quiet: The run once erred and printed, and now does neither.
         echo: Does what the case's do/ tree says.
         out/echo/error.txt records an error, but the run returned none.
         If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
@@ -36,9 +36,10 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
         out/echo/stdout.txt records output, but the run wrote nothing to stdout.
         If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
 --- FAIL: TestCorpus
-    --- FAIL: TestCorpus/gone
-        --- FAIL: TestCorpus/gone/echo
-    --- FAIL: TestCorpus/quiet
-        --- FAIL: TestCorpus/quiet/echo
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/gone
+            --- FAIL: TestCorpus/script/gone/echo
+        --- FAIL: TestCorpus/script/quiet
+            --- FAIL: TestCorpus/script/quiet/echo
 FAIL
 [exit 1]

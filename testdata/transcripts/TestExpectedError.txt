@@ -1,36 +1,42 @@
 $ go test  # rejects
-    reworded: A1 refers to itself, and the error is now worded differently.
+    script/reworded: A1 refers to itself, and the error is now worded differently.
         echo: Does what the case's do/ tree says.
         out/echo/error.txt differs (-golden +got):
         - A1 -> A1: cycle
         + cycle: A1 -> A1
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
 --- FAIL: TestCorpus
-    --- PASS: TestCorpus/loop
-        --- PASS: TestCorpus/loop/echo
-    --- FAIL: TestCorpus/reworded
-        --- FAIL: TestCorpus/reworded/echo
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+        --- FAIL: TestCorpus/script/reworded
+            --- FAIL: TestCorpus/script/reworded/echo
 FAIL
 [exit 1]
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
 --- PASS: TestCorpus
-    --- PASS: TestCorpus/loop
-        --- PASS: TestCorpus/loop/echo
-    --- PASS: TestCorpus/reworded
-        --- PASS: TestCorpus/reworded/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+        --- PASS: TestCorpus/script/reworded
+            --- PASS: TestCorpus/script/reworded/echo
 PASS
 $ go test  # rejects
 --- PASS: TestCorpus
-    --- PASS: TestCorpus/loop
-        --- PASS: TestCorpus/loop/echo
-    --- PASS: TestCorpus/reworded
-        --- PASS: TestCorpus/reworded/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+        --- PASS: TestCorpus/script/reworded
+            --- PASS: TestCorpus/script/reworded/echo
 PASS
-$ edit testdata/loop.txtar  # strip the outputs
+$ edit testdata/script/loop.txtar  # strip the outputs
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
 --- PASS: TestCorpus
-    --- PASS: TestCorpus/loop
-        --- PASS: TestCorpus/loop/echo
-    --- PASS: TestCorpus/reworded
-        --- PASS: TestCorpus/reworded/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+        --- PASS: TestCorpus/script/reworded
+            --- PASS: TestCorpus/script/reworded/echo
 PASS

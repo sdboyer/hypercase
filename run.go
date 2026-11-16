@@ -2,6 +2,7 @@ package hypercase
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -15,16 +16,20 @@ import (
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/internal/diff"
+	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/hypercase/internal/root"
 )
 
 // Test runs every case through every column the package registered, as
-// subtests of t: one per case, named for its archive, and one per cell
-// within it, named for its column, so TestCorpus/pancakes/scale is the cell
-// of the case pancakes in the column scale.
+// subtests of t: one per corpus, one per case within it, named for its
+// archive, and one per cell within that, named for its column. So
+// TestCorpus/recipe/pancakes/scale is the cell of the case recipe/pancakes
+// in the column scale. In the package that registers [RootPackage], Test
+// first runs the root-package check, on t itself.
 //
 // Without the project's update variable, Test only reads: each output is
-// compared with its golden. With it set to 1, Test writes the goldens.
+// compared with its golden, and the package's registry with its own. With
+// it set to 1, Test writes them.
 func Test(t *testing.T) {
 	t.Helper()
 	reg.mu.Lock()
@@ -36,53 +41,69 @@ func Test(t *testing.T) {
 		return
 	}
 	r.checkDescriptions(t)
-
-	dir := filepath.Join(r.pkgDir, "testdata")
-	entries, err := os.ReadDir(dir)
-	if err != nil && !os.IsNotExist(err) {
-		t.Fatalf("reading %s: %v", r.rel(dir), err)
+	r.checkRegistry(t)
+	found, err := registry.Find(r.moduleRoot)
+	if err != nil {
+		t.Errorf("finding the module's registries: %v", err)
 	}
-	var archives []string
-	for _, e := range entries {
-		switch {
-		case archive.IsTemp(e.Name()):
-			t.Errorf("%s is a temp file left by a write that was cut short.\nDelete it.", r.rel(filepath.Join(dir, e.Name())))
-		case !e.IsDir() && strings.HasSuffix(e.Name(), ".txtar"):
-			archives = append(archives, e.Name())
+	if !r.update {
+		r.requireRootCheck(t, found)
+	}
+	if r.rootPackage {
+		if r.update {
+			t.Logf("The root-package check for %s runs in normal runs, so it runs after the update: go test ./...", r.rootName())
+		} else {
+			r.rootCheck(t, found)
 		}
 	}
-	for _, name := range archives {
-		path := filepath.Join(dir, name)
-		caseName := strings.TrimSuffix(name, ".txtar")
-		if !validName(caseName) {
-			t.Errorf("%s: the archive's name, %q, breaks the naming rule: %s.\nRename the archive.", r.rel(path), caseName, nameRule)
-			continue
-		}
-		t.Run(caseName, func(t *testing.T) { r.runCase(t, path, caseName) })
-	}
+	r.runCorpora(t)
+	r.appliesToNoCase(t)
 }
 
 // runner is one call of Test.
 type runner struct {
-	update     bool
-	updateVar  string
-	moduleRoot string
-	pkgDir     string
-	properties []decl.Property
-	columns    []*column // sorted by name
+	update      bool
+	updateVar   string
+	moduleRoot  string
+	pkgDir      string
+	rootRel     string // the corpus root, relative to the module root
+	corpusRoot  string
+	rootPackage bool
+	properties  []decl.Property
+	columns     []*column // sorted by name
+	stats       map[string]*colStats
+}
+
+// colStats counts a column's cells, for the check that it applies to some
+// case.
+type colStats struct {
+	total   int // the cells the column has: its corpus's archives whose cells run
+	ran     int // those that ran, which -run can make fewer
+	applied int // those the column's probe said were for it
 }
 
 func newRunner(t *testing.T) (*runner, bool) {
 	t.Helper()
 	reg.mu.Lock()
 	project, properties, columns := reg.project, slices.Clone(reg.properties), slices.Clone(reg.columns)
+	rootRel, rootPackage := reg.root, reg.rootPackage
 	reg.mu.Unlock()
 	if project == nil {
 		t.Errorf("the package registered no decl.Project.\nRegister the project, with its UpdateVar, from an init function.")
 		return nil, false
 	}
-	r := &runner{updateVar: project.UpdateVar, properties: properties, columns: columns}
+	r := &runner{
+		updateVar:   project.UpdateVar,
+		rootRel:     rootRel,
+		rootPackage: rootPackage,
+		properties:  properties,
+		columns:     columns,
+		stats:       map[string]*colStats{},
+	}
 	slices.SortFunc(r.columns, func(a, b *column) int { return strings.Compare(a.name, b.name) })
+	for _, c := range r.columns {
+		r.stats[c.name] = &colStats{}
+	}
 	switch v := os.Getenv(project.UpdateVar); v {
 	case "":
 	case "1":
@@ -99,6 +120,11 @@ func newRunner(t *testing.T) (*runner, bool) {
 	r.pkgDir = wd
 	if r.moduleRoot, err = root.Module(wd); err != nil {
 		t.Errorf("finding the module root: %v", err)
+		return nil, false
+	}
+	r.corpusRoot = filepath.Join(r.moduleRoot, filepath.FromSlash(rootRel))
+	if rootPackage && rootRel == "." && r.pkgDir != r.moduleRoot {
+		t.Errorf("the package registers the root-package check for the module-root corpus, and is not the module's root package, %s.\nRegister hypercase.RootPackage() in the module's root package, or pass this package's corpus root with hypercase.Root.", r.moduleRoot)
 		return nil, false
 	}
 	return r, r.checkRelations(t)
@@ -137,6 +163,18 @@ func (r *runner) updateCmd() string {
 // message reads the same wherever go test ran.
 func (r *runner) rel(p string) string { return root.Rel(r.moduleRoot, p) }
 
+// rootName names the corpus root in a message.
+func (r *runner) rootName() string {
+	if r.rootRel == "." {
+		return "the module-root corpus"
+	}
+	return "the corpus root " + r.rootRel
+}
+
+func (r *runner) lockPath() string {
+	return filepath.Join(r.corpusRoot, "testdata", archive.LockFile)
+}
+
 func (r *runner) checkDescriptions(t *testing.T) {
 	t.Helper()
 	for _, p := range r.properties {
@@ -148,13 +186,116 @@ func (r *runner) checkDescriptions(t *testing.T) {
 		if strings.TrimSpace(c.description) == "" {
 			t.Errorf("the suite %s has no description.\nAdd one: it says what the suite does, in prose.", c.name)
 		}
+		for _, o := range c.outputs {
+			if strings.TrimSpace(o.Description) == "" {
+				t.Errorf("the suite %s declares the output %s with no description.\nAdd one: it says what the files hold, in prose.", c.name, o.Pattern)
+			}
+		}
 	}
+}
+
+// requireRootCheck fails unless some registry records the root-package
+// check for the package's corpus root, since nothing else reports what no
+// column owns. Updates write registries, so only a normal run checks.
+func (r *runner) requireRootCheck(t *testing.T, found []registry.Found) {
+	t.Helper()
+	for _, f := range found {
+		data, err := os.ReadFile(f.Path)
+		if err != nil {
+			continue
+		}
+		if g, err := registry.Parse(data); err == nil && g.CorpusRoot == r.rootRel && g.RootPackage {
+			return
+		}
+	}
+	t.Errorf("no registry records a root-package check for %s, so nothing reports what no column there owns.\nRegister hypercase.RootPackage() in one package over it, then run %s to record it in the package's registry.", r.rootName(), r.updateCmd())
+}
+
+// A plannedCase is an archive whose cells run.
+type plannedCase struct {
+	name string // the archive's name
+	path string
+	data []byte
+	a    *archive.Archive
+}
+
+// runCorpora runs the cases of each corpus the package's columns run over.
+// It reads every archive first, outside the subtests, so the count of each
+// column's cells doesn't depend on -run.
+func (r *runner) runCorpora(t *testing.T) {
+	t.Helper()
+	var corpora []string
+	for _, c := range r.columns {
+		if !slices.Contains(corpora, c.corpus) {
+			corpora = append(corpora, c.corpus)
+		}
+	}
+	slices.Sort(corpora)
+	for _, corpus := range corpora {
+		cases := r.planCorpus(t, corpus)
+		cols := r.columnsOver(corpus)
+		for _, col := range cols {
+			r.stats[col.name].total += len(cases)
+		}
+		t.Run(corpus, func(t *testing.T) {
+			for _, pc := range cases {
+				t.Run(pc.name, func(t *testing.T) { r.runCase(t, corpus, pc, cols) })
+			}
+		})
+	}
+}
+
+func (r *runner) columnsOver(corpus string) []*column {
+	var cols []*column
+	for _, c := range r.columns {
+		if c.corpus == corpus {
+			cols = append(cols, c)
+		}
+	}
+	return cols
+}
+
+// planCorpus reads a corpus's archives. One the package can't run is left
+// out, with a line in the log: the root-package check reports it.
+func (r *runner) planCorpus(t *testing.T, corpus string) []plannedCase {
+	t.Helper()
+	dir := filepath.Join(r.corpusRoot, "testdata", corpus)
+	entries, err := os.ReadDir(dir)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("reading %s: %v", r.rel(dir), err)
+		return nil
+	}
+	var cases []plannedCase
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".txtar") {
+			continue
+		}
+		p := filepath.Join(dir, e.Name())
+		name := strings.TrimSuffix(e.Name(), ".txtar")
+		if !validName(name) {
+			t.Logf("%s: the archive's name breaks the naming rule, so none of its cells run. The root-package check reports it.", r.rel(p))
+			continue
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			t.Errorf("reading %s: %v", r.rel(p), err)
+			continue
+		}
+		a := archive.Parse(data)
+		if len(a.Check()) > 0 {
+			t.Logf("%s has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.", r.rel(p))
+			continue
+		}
+		cases = append(cases, plannedCase{name: name, path: p, data: data, a: a})
+	}
+	return cases
 }
 
 // aCase is one case: an archive's base.
 type aCase struct {
-	name       string
-	archive    *archive.Archive
+	name       string // <corpus>/<archive>
+	archive    string // the archive's name
+	a          *archive.Archive
 	view       fs.FS
 	properties []string
 	gaps       []archive.Gap
@@ -174,7 +315,7 @@ func (c *aCase) gap(col string) (archive.Gap, bool) {
 func (c *aCase) goldens(col string) map[string][]byte {
 	g := map[string][]byte{}
 	prefix := archive.Out + "/" + col + "/"
-	for _, s := range c.archive.Sections {
+	for _, s := range c.a.Sections {
 		if p, ok := strings.CutPrefix(s.Name, prefix); ok {
 			g[p] = s.Data
 		}
@@ -183,88 +324,75 @@ func (c *aCase) goldens(col string) map[string][]byte {
 }
 
 func (c *aCase) header() string {
-	return c.name + ": " + indent(strings.TrimSpace(string(c.archive.Comment)), "  ")
+	return c.name + ": " + indent(strings.TrimSpace(string(c.a.Comment)), "  ")
 }
 
-func (r *runner) runCase(t *testing.T, path, name string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("reading %s: %v", r.rel(path), err)
+func (r *runner) runCase(t *testing.T, corpus string, pc plannedCase, cols []*column) {
+	c := &aCase{
+		name:       corpus + "/" + pc.name,
+		archive:    pc.name,
+		a:          pc.a,
+		view:       pc.a.View(),
+		properties: pc.a.Properties(),
+		gaps:       pc.a.Gaps(),
 	}
-	a := archive.Parse(data)
-	rel := r.rel(path)
-	if ps := a.Check(); len(ps) > 0 {
-		t.Errorf("%s has problems of form, so none of its cells run, and no update writes it:\n%s\nFix the archive by hand.", rel, problemList(ps))
-		return
-	}
-	if ps := a.Description(); len(ps) > 0 {
-		t.Errorf("%s: %s\nWrite the case's description, in prose, as the archive's comment, the text before its first section.", rel, problemLines(ps))
-	}
-	if !r.update && !archive.Placed(data) {
-		t.Errorf("%s has update-written sections out of their place.\nRun %s to put them in place.", rel, r.updateCmd())
-	}
-	r.unclaimed(t, rel, a)
-
-	c := &aCase{name: name, archive: a, view: a.View(), properties: a.Properties(), gaps: a.Gaps()}
-	r.checkStatements(t, rel, c)
-	results := make([]*cellResult, len(r.columns))
-	for i, col := range r.columns {
+	results := make([]*cellResult, len(cols))
+	for i, col := range cols {
 		res := &cellResult{}
 		results[i] = res
 		t.Run(col.name, func(t *testing.T) { r.runCell(t, c, col, res) })
 	}
-	if !r.update {
-		return
+	if r.update {
+		r.write(t, pc, cols, results)
 	}
-	next := a.Clone()
-	for i, col := range r.columns {
+}
+
+var errChanged = errors.New("the archive's hand-written sections changed")
+
+// write writes the package's own sections of one archive: a
+// read-modify-write under the corpus root's lock. The bytes of every
+// section the package doesn't own come back as they were, though a
+// section may move to its place.
+func (r *runner) write(t *testing.T, pc plannedCase, cols []*column, results []*cellResult) {
+	t.Helper()
+	own := map[string][]byte{}
+	for i, col := range cols {
 		res := results[i]
 		if !res.ran || !res.writable {
 			continue
 		}
-		for _, p := range sortedKeys(res.files) {
-			setSection(next, archive.Out+"/"+col.name+"/"+p, res.files[p])
+		for p, data := range res.files {
+			own[archive.Out+"/"+col.name+"/"+p] = data
 		}
 	}
-	next = next.Place()
-	if bytes.Equal(next.Format(), data) {
+	apply := func(a *archive.Archive) *archive.Archive {
+		next := a.Clone()
+		for _, name := range sortedKeys(own) {
+			setSection(next, name, own[name])
+		}
+		return next.Place()
+	}
+	if bytes.Equal(apply(pc.a).Format(), pc.data) {
 		return
 	}
-	if err := archive.Write(path, next); err != nil {
+	rel := r.rel(pc.path)
+	err := archive.Modify(r.lockPath(), pc.path, func(current *archive.Archive) (*archive.Archive, error) {
+		// The cells ran on the hand-written sections first read. Outputs
+		// written beside other inputs would make an update that passed and
+		// a normal run that fails.
+		if !archive.HandWrittenEqual(pc.a, current) {
+			return nil, errChanged
+		}
+		if ps := current.Check(); len(ps) > 0 {
+			return nil, fmt.Errorf("it gained problems of form while the update ran:\n%s", problemList(ps))
+		}
+		return apply(current), nil
+	})
+	switch {
+	case errors.Is(err, errChanged):
+		t.Errorf("%s changed while the update ran: its comment or hand-written sections differ from those its cells ran on, so the update wrote nothing to it.\nRun %s again.", rel, r.updateCmd())
+	case err != nil:
 		t.Errorf("writing %s: %v", rel, err)
-	}
-}
-
-// checkStatements checks what the case states by hand: each property it
-// states is registered, and each known gap names a column that runs on it.
-func (r *runner) checkStatements(t *testing.T, rel string, c *aCase) {
-	t.Helper()
-	for i, name := range c.properties {
-		if !slices.ContainsFunc(r.properties, func(p decl.Property) bool { return p.Name == name }) {
-			t.Errorf("%s: properties states %s, and no property of that name is registered.\nDeclare the property, or correct the line.", rel, name)
-			_ = i
-		}
-	}
-	for _, g := range c.gaps {
-		if !slices.ContainsFunc(r.columns, func(col *column) bool { return col.name == g.Column }) {
-			t.Errorf("%s: gaps, line %d, names %s, and no column of that name runs on the case.\nRegister the column, or remove the line.", rel, g.Line, g.Column)
-		}
-	}
-}
-
-// unclaimed reports each output section under a column the package doesn't
-// register.
-func (r *runner) unclaimed(t *testing.T, rel string, a *archive.Archive) {
-	t.Helper()
-	for _, s := range a.Sections {
-		rest, ok := strings.CutPrefix(s.Name, archive.Out+"/")
-		if !ok {
-			continue
-		}
-		col, _, _ := strings.Cut(rest, "/")
-		if !slices.ContainsFunc(r.columns, func(c *column) bool { return c.name == col }) {
-			t.Errorf("%s: %s is under out/%s/, and no column of that name is registered.\nIf a column should write it, register the column. If not, delete the section by hand; %s leaves it in place.", rel, s.Name, col, r.updateCmd())
-		}
 	}
 }
 
@@ -304,6 +432,7 @@ type called struct {
 	panicked       bool
 	panicValue     any
 	stack          []byte
+	inProbe        bool // the panic was the probe's
 }
 
 // call runs fn, recovering a panic. A runtime.Goexit, as from t.FailNow,
@@ -325,49 +454,59 @@ func call(fn func(c *called)) (c *called) {
 }
 
 func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
-	res.ran = true
-	finished := false
+	st := r.stats[col.name]
+	st.ran++
 	header := c.header() + "\n" + col.name + ": " + col.description
-	failedTest := func() {
-		what := "The run failed its test, through its testing.TB."
-		if r.update {
-			what += " The update writes nothing for this cell."
+	gap, marked := c.gap(col.name)
+	goldens := c.goldens(col.name)
+
+	var out *called
+	if col.probe != nil {
+		var why string
+		var ok bool
+		p := call(func(*called) { why, ok = col.probe(c.view) })
+		switch {
+		case p.panicked:
+			p.inProbe = true
+			out = p
+		case !ok && strings.TrimSpace(why) == "":
+			st.applied++
+			t.Errorf("%s\n%s's probe said the case isn't for it, and gave no reason.\nFix the probe: when it says no, it says why.", header, col.name)
+			return
+		case !ok:
+			r.skipped(t, c, header, col, why, gap, marked, goldens)
+			return
 		}
-		t.Logf("%s\n%s", header, what)
 	}
-	defer func() {
-		if finished {
+	st.applied++
+	res.ran = true
+
+	if out == nil {
+		finished := false
+		defer func() {
+			if finished {
+				return
+			}
+			// The run called FailNow or SkipNow, through its testing.TB.
+			if t.Skipped() {
+				t.Errorf("%s\nThe run skipped its cell. A run can't skip a case; a probe decides which cases are for a suite.", header)
+				return
+			}
+			r.failedTest(t, header)
+		}()
+		out = call(func(o *called) {
+			o.files, o.err = col.run(t, c.archive, c.view, &o.stdout, &o.stderr)
+		})
+		finished = true
+		if t.Failed() {
+			r.failedTest(t, header)
 			return
 		}
-		// The run called FailNow or SkipNow, through its testing.TB.
-		if t.Skipped() {
-			t.Errorf("%s\nThe run skipped its cell. A run can't skip a case; a probe decides which cases are for a suite.", header)
-			return
-		}
-		failedTest()
-	}()
-	out := call(func(o *called) {
-		o.files, o.err = col.run(t, c.name, c.view, &o.stdout, &o.stderr)
-	})
-	finished = true
-	if t.Failed() {
-		failedTest()
-		return
 	}
 
 	m := &msg{}
-	files, writable := r.outputs(m, col, out)
-	unheld := map[string]bool{}
-	for _, p := range sortedKeys(files) {
-		if err := archive.Holds(files[p]); err != nil {
-			m.add("out/%s/%s can't be held in an archive: %v.\nFix the code so the output can be held. An update writes nothing for this cell.", col.name, p, err)
-			writable = false
-			unheld[p] = true
-		}
-	}
+	files, unjudged, writable := r.outputs(m, col, out)
 
-	gap, marked := c.gap(col.name)
-	goldens := c.goldens(col.name)
 	if !marked {
 		r.expectedError(m, c, col, out)
 	}
@@ -379,7 +518,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		for _, p := range sortedKeys(files) {
 			g, ok := goldens[p]
 			switch {
-			case unheld[p]:
+			case unjudged[p]:
 			case !ok:
 				diffs = append(diffs, fmt.Sprintf("out/%s/%s is new", col.name, p))
 			case !bytes.Equal(g, files[p]):
@@ -395,7 +534,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			m.add("The cell is frozen by its known gap, gaps line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s\nIf the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.", gap.Line, gap.Raw, strings.Join(diffs, "\n"))
 		}
 	} else {
-		r.compare(m, col, files, goldens, unheld)
+		r.compare(m, col, files, goldens, unjudged)
 	}
 	if !m.empty() {
 		t.Errorf("%s\n%s", header, m)
@@ -407,12 +546,38 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	res.files = files
 }
 
+func (r *runner) failedTest(t *testing.T, header string) {
+	what := "The run failed its test, through its testing.TB."
+	if r.update {
+		what += " The update writes nothing for this cell."
+	}
+	t.Logf("%s\n%s", header, what)
+}
+
+// skipped finishes a cell whose probe said the case isn't for its column.
+// The cell runs nothing, so it isn't checked for an expected error; its
+// committed files are orphans.
+func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why string, gap archive.Gap, marked bool, goldens map[string][]byte) {
+	m := &msg{}
+	if marked {
+		m.add("gaps, line %d, marks the cell, and %s's probe says the case isn't for it: %s\nRemove the line, or fix the probe.", gap.Line, col.name, why)
+	}
+	for _, p := range sortedKeys(goldens) {
+		m.add("out/%s/%s is recorded, and %s's probe says the case isn't for it: %s\nIf the suite should run on the case, fix the probe. If not, delete the section by hand; %s leaves it in place.", col.name, p, col.name, why, r.updateCmd())
+	}
+	if !m.empty() {
+		t.Errorf("%s\n%s", header, m)
+		return
+	}
+	t.Skipf("%s: %s's probe says the case isn't for it: %s", c.name, col.name, why)
+}
+
 // outputs collects a cell's files: what its function returned, and what the
-// framework writes for it. It reports outputs whose shape is wrong, and
-// whether an update may write the cell.
-func (r *runner) outputs(m *msg, col *column, out *called) (map[string][]byte, bool) {
-	files := map[string][]byte{}
-	writable := true
+// framework writes for it. It reports outputs whose shape is wrong or that
+// no declaration matches, which are left unjudged, and whether an update
+// may write the cell.
+func (r *runner) outputs(m *msg, col *column, out *called) (files map[string][]byte, unjudged map[string]bool, writable bool) {
+	files, unjudged, writable = map[string][]byte{}, map[string]bool{}, true
 	for _, f := range out.files {
 		switch {
 		case !fs.ValidPath(f.Path) || f.Path == ".":
@@ -447,7 +612,40 @@ func (r *runner) outputs(m *msg, col *column, out *called) (map[string][]byte, b
 	case out.err != nil:
 		files[errorFile] = []byte(out.err.Error() + "\n")
 	}
-	return files, writable
+	for _, p := range sortedKeys(files) {
+		switch hit := col.declared(p); len(hit) {
+		case 0:
+			m.add("out/%s/%s%s is not declared.\nDeclare it in %s's Outputs, with a description, or fix the code. An update writes nothing for this cell.", col.name, p, holds(p), col.name)
+			writable = false
+			unjudged[p] = true
+		case 1:
+		default:
+			m.add("out/%s/%s matches two of %s's output declarations, %s and %s.\nChange the patterns so that one declaration matches each file. An update writes nothing for this cell.", col.name, p, col.name, hit[0], hit[1])
+			writable = false
+			unjudged[p] = true
+		}
+	}
+	for _, p := range sortedKeys(files) {
+		if err := archive.Holds(files[p]); err != nil && !unjudged[p] {
+			m.add("out/%s/%s can't be held in an archive: %v.\nFix the code so the output can be held. An update writes nothing for this cell.", col.name, p, err)
+			writable = false
+			unjudged[p] = true
+		}
+	}
+	return files, unjudged, writable
+}
+
+// holds says what a file the framework writes holds.
+func holds(p string) string {
+	switch p {
+	case errorFile:
+		return ", which holds the error the run returned,"
+	case stdoutFile:
+		return ", which holds what the run wrote to stdout,"
+	case stderrFile:
+		return ", which holds what the run wrote to stderr,"
+	}
+	return ""
 }
 
 // expectedError is the expected-error check: a cell is expected to err
@@ -456,6 +654,8 @@ func (r *runner) outputs(m *msg, col *column, out *called) (map[string][]byte, b
 func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 	hit := col.rejectsAny(c.properties)
 	switch {
+	case out.panicked && out.inProbe:
+		m.add("%s's probe panicked: %v\nFix the probe. A panic is never an expected error.", col.name, out.panicValue)
 	case out.panicked:
 		m.add("%s panicked: %v\nFix the code. A panic is never an expected error.", col.name, out.panicValue)
 	case out.err != nil && len(hit) == 0:
@@ -466,12 +666,12 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 }
 
 // compare compares a cell's files with its goldens, and reports orphans.
-func (r *runner) compare(m *msg, col *column, files, goldens map[string][]byte, unheld map[string]bool) {
+func (r *runner) compare(m *msg, col *column, files, goldens map[string][]byte, unjudged map[string]bool) {
 	if !r.update {
 		for _, p := range sortedKeys(files) {
 			g, ok := goldens[p]
 			switch {
-			case unheld[p]:
+			case unjudged[p]:
 			case !ok:
 				m.add("out/%s/%s has no golden.\nRun %s to write it, and read it before committing.", col.name, p, r.updateCmd())
 			case !bytes.Equal(g, files[p]):
@@ -495,6 +695,24 @@ func (r *runner) compare(m *msg, col *column, files, goldens map[string][]byte, 
 			what = "is an output the run no longer produces"
 		}
 		m.add("out/%s/%s %s.\nIf the run should still write it, fix the code. If not, delete the section by hand; %s leaves it in place.", col.name, p, what, r.updateCmd())
+	}
+}
+
+// appliesToNoCase fails each column that applies to no case: one whose
+// corpus holds no archive whose cells run, or whose probe said no to every
+// case. The verdict needs every one of the column's cells to have run, so
+// under a -run that leaves some out, it isn't given.
+func (r *runner) appliesToNoCase(t *testing.T) {
+	t.Helper()
+	for _, c := range r.columns {
+		st := r.stats[c.name]
+		switch {
+		case st.ran < st.total || st.applied > 0:
+		case st.total == 0:
+			t.Errorf("the suite %s applies to no case: its corpus, %s, holds no archive whose cells run.\nA suite that applies to no case checks nothing. Add a case to the corpus, or name another corpus.", c.name, r.rel(filepath.Join(r.corpusRoot, "testdata", c.corpus)))
+		default:
+			t.Errorf("the suite %s applies to no case: its probe says no to every case of %s.\nA suite that applies to no case checks nothing. Add a case it applies to, or fix the probe.", c.name, c.corpus)
+		}
 	}
 }
 

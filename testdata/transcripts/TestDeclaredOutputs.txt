@@ -1,0 +1,65 @@
+$ go test  # narrow
+    script/matched-twice: The run returns a file two declarations match.
+        echo: Does what the case's do/ tree says.
+        out/echo/a.txt matches two of echo's output declarations, ?.txt and a.txt.
+        Change the patterns so that one declaration matches each file. An update writes nothing for this cell.
+    script/streams: The run writes to stdout and stderr and errs, and declares none of the three.
+        echo: Does what the case's do/ tree says.
+        out/echo/error.txt, which holds the error the run returned, is not declared.
+        Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell.
+        out/echo/stderr.txt, which holds what the run wrote to stderr, is not declared.
+        Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell.
+        out/echo/stdout.txt, which holds what the run wrote to stdout, is not declared.
+        Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell.
+        echo returned an error, but the case states no property echo rejects:
+          A1: bad
+        Fix the code, or state the property on the case and in echo's Rejects.
+    script/undeclared: The run returns a file no declaration matches.
+        echo: Does what the case's do/ tree says.
+        out/echo/notes.txt is not declared.
+        Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/declared
+            --- PASS: TestCorpus/script/declared/echo
+        --- FAIL: TestCorpus/script/matched-twice
+            --- FAIL: TestCorpus/script/matched-twice/echo
+        --- FAIL: TestCorpus/script/streams
+            --- FAIL: TestCorpus/script/streams/echo
+        --- FAIL: TestCorpus/script/undeclared
+            --- FAIL: TestCorpus/script/undeclared/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # narrow
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/matched-twice: The run returns a file two declarations match.
+        echo: Does what the case's do/ tree says.
+        out/echo/a.txt matches two of echo's output declarations, ?.txt and a.txt.
+        Change the patterns so that one declaration matches each file. An update writes nothing for this cell.
+    script/streams: The run writes to stdout and stderr and errs, and declares none of the three.
+        echo: Does what the case's do/ tree says.
+        out/echo/error.txt, which holds the error the run returned, is not declared.
+        Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell.
+        out/echo/stderr.txt, which holds what the run wrote to stderr, is not declared.
+        Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell.
+        out/echo/stdout.txt, which holds what the run wrote to stdout, is not declared.
+        Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell.
+        echo returned an error, but the case states no property echo rejects:
+          A1: bad
+        Fix the code, or state the property on the case and in echo's Rejects.
+    script/undeclared: The run returns a file no declaration matches.
+        echo: Does what the case's do/ tree says.
+        out/echo/notes.txt is not declared.
+        Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/declared
+            --- PASS: TestCorpus/script/declared/echo
+        --- FAIL: TestCorpus/script/matched-twice
+            --- FAIL: TestCorpus/script/matched-twice/echo
+        --- FAIL: TestCorpus/script/streams
+            --- FAIL: TestCorpus/script/streams/echo
+        --- FAIL: TestCorpus/script/undeclared
+            --- FAIL: TestCorpus/script/undeclared/echo
+FAIL
+[exit 1]

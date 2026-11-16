@@ -25,3 +25,16 @@ type Property struct {
 	// Description says what the fact is. It is required.
 	Description string
 }
+
+// An Output declares a class of files a column writes under its directory,
+// out/<column>/. Every file a cell produces matches exactly one of its
+// column's declarations: each file the run returns, and stdout.txt,
+// stderr.txt and error.txt, which the framework writes for it.
+type Output struct {
+	// Pattern matches the files' slash paths under the column's directory,
+	// in the syntax of path.Match: values.txt, or tables/*.csv. A * doesn't
+	// match a slash.
+	Pattern string
+	// Description says what the files hold. It is required.
+	Description string
+}

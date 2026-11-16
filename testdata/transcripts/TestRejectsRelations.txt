@@ -13,16 +13,43 @@ $ go test  # rejects-other-description
 FAIL
 [exit 1]
 $ go test  # rejects-registered-later
-    reworded: A1 refers to itself, and the error is now worded differently.
+    testdata/hypercase.json differs from what the package registers (-committed +registered):
+              {
+                "name": "circular",
+                "description": "Some cell's formula refers back to itself, directly or through other cells."
+        -     },
+        -     {
+        -       "name": "dangling",
+        -       "description": "Some formula refers to a cell the sheet doesn't have."
+        -     },
+        -     {
+        -       "name": "malformed",
+        -       "description": "Some cell holds neither a number nor a formula."
+              }
+            ],
+            "suites": [
+          ...
+                  }
+                ],
+                "rejects": [
+        -         "circular",
+        -         "dangling"
+        +         "circular"
+                ]
+              }
+            ]
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
+    script/reworded: A1 refers to itself, and the error is now worded differently.
         echo: Does what the case's do/ tree says.
         out/echo/error.txt differs (-golden +got):
         - A1 -> A1: cycle
         + cycle: A1 -> A1
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
 --- FAIL: TestCorpus
-    --- PASS: TestCorpus/loop
-        --- PASS: TestCorpus/loop/echo
-    --- FAIL: TestCorpus/reworded
-        --- FAIL: TestCorpus/reworded/echo
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+        --- FAIL: TestCorpus/script/reworded
+            --- FAIL: TestCorpus/script/reworded/echo
 FAIL
 [exit 1]

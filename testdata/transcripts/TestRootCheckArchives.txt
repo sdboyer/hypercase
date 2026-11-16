@@ -1,0 +1,55 @@
+$ edit testdata/script/nameless.txtar  # an archive with no description
+$ edit testdata/script/loopy.txtar  # a case with a property and a gaps line nothing declares
+$ edit testdata/script/typo.txtar  # an archive with a problem of form
+$ edit testdata/script/old/x.txtar  # an archive in no corpus's directory
+$ edit testdata/renamed/x.txtar  # an archive in a directory no registry declares
+$ edit testdata/x.txtar  # an archive directly in testdata/
+$ go test ./b  # pkg-b
+    testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loopy
+            --- PASS: TestCorpus/script/loopy/shout
+        --- PASS: TestCorpus/script/nameless
+            --- PASS: TestCorpus/script/nameless/shout
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ go test  # pkg-a
+    testdata/ holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.
+        Move the archives into one.
+    testdata/renamed/ holds archives, and no registry declares it as a corpus.
+        Declare the directory as a suite's corpus, or move or delete the archives.
+    testdata/script/old/ holds archives, and no registry declares it as a corpus.
+        Declare the directory as a suite's corpus, or move or delete the archives.
+    testdata/script/loopy.txtar: properties states loopy, and no registry under the module-root corpus lists a property of that name.
+        Declare the property, or correct the line.
+    testdata/script/loopy.txtar: gaps, line 1, names format, and no registry has a column of that name over the corpus script.
+        Register the column, or remove the line.
+    testdata/script/nameless.txtar: the archive has no description: its comment, the text before the first section, is empty
+        Write the case's description, in prose, as the archive's comment, the text before its first section.
+    testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it:
+          ni/do/out/values.txt: ni is not one of the framework's top-level names (gaps, in, out, properties, transform, variant, via)
+        Fix the archive by hand.
+    testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loopy
+            --- PASS: TestCorpus/script/loopy/echo
+        --- PASS: TestCorpus/script/nameless
+            --- PASS: TestCorpus/script/nameless/echo
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # pkg-b
+    testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loopy
+            --- PASS: TestCorpus/script/loopy/shout
+        --- PASS: TestCorpus/script/nameless
+            --- PASS: TestCorpus/script/nameless/shout
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+PASS

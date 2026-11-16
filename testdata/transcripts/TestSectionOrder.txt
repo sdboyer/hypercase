@@ -1,23 +1,26 @@
 $ go test  # echo
-    testdata/between.txtar has update-written sections out of their place.
+    testdata/script/between.txtar has update-written sections out of their place.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to put them in place.
-    testdata/unsorted.txtar has update-written sections out of their place.
+    testdata/script/unsorted.txtar has update-written sections out of their place.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to put them in place.
 --- FAIL: TestCorpus
-    --- FAIL: TestCorpus/between
-        --- PASS: TestCorpus/between/echo
-    --- FAIL: TestCorpus/unsorted
-        --- PASS: TestCorpus/unsorted/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/between
+            --- PASS: TestCorpus/script/between/echo
+        --- PASS: TestCorpus/script/unsorted
+            --- PASS: TestCorpus/script/unsorted/echo
 FAIL
 [exit 1]
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
 --- PASS: TestCorpus
-    --- PASS: TestCorpus/between
-        --- PASS: TestCorpus/between/echo
-    --- PASS: TestCorpus/unsorted
-        --- PASS: TestCorpus/unsorted/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/between
+            --- PASS: TestCorpus/script/between/echo
+        --- PASS: TestCorpus/script/unsorted
+            --- PASS: TestCorpus/script/unsorted/echo
 PASS
-$ cat testdata/unsorted.txtar
+$ cat testdata/script/unsorted.txtar
 The goldens are out of name order.
 -- in/do/out/a.txt --
 a
@@ -27,7 +30,7 @@ b
 a
 -- out/echo/b.txt --
 b
-$ cat testdata/between.txtar
+$ cat testdata/script/between.txtar
 A golden sits between two inputs.
 -- in/do/out/a.txt --
 a
@@ -38,16 +41,19 @@ a
 -- out/echo/b.txt --
 b
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
 --- PASS: TestCorpus
-    --- PASS: TestCorpus/between
-        --- PASS: TestCorpus/between/echo
-    --- PASS: TestCorpus/unsorted
-        --- PASS: TestCorpus/unsorted/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/between
+            --- PASS: TestCorpus/script/between/echo
+        --- PASS: TestCorpus/script/unsorted
+            --- PASS: TestCorpus/script/unsorted/echo
 PASS
 $ go test  # echo
 --- PASS: TestCorpus
-    --- PASS: TestCorpus/between
-        --- PASS: TestCorpus/between/echo
-    --- PASS: TestCorpus/unsorted
-        --- PASS: TestCorpus/unsorted/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/between
+            --- PASS: TestCorpus/script/between/echo
+        --- PASS: TestCorpus/script/unsorted
+            --- PASS: TestCorpus/script/unsorted/echo
 PASS

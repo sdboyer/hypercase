@@ -1,19 +1,22 @@
 $ go test  # echo
-    twice: A1 is twice B1, with no golden yet.
+    script/twice: A1 is twice B1, with no golden yet.
         echo: Does what the case's do/ tree says.
         out/echo/values.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
 --- FAIL: TestCorpus
-    --- FAIL: TestCorpus/twice
-        --- FAIL: TestCorpus/twice/echo
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- FAIL: TestCorpus/script/twice/echo
 FAIL
 [exit 1]
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
 --- PASS: TestCorpus
-    --- PASS: TestCorpus/twice
-        --- PASS: TestCorpus/twice/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
 PASS
-$ cat testdata/twice.txtar
+$ cat testdata/script/twice.txtar
 A1 is twice B1, with no golden yet.
 -- in/do/out/values.txt --
 A1 6
@@ -23,6 +26,7 @@ A1 6
 B1 3
 $ go test  # echo
 --- PASS: TestCorpus
-    --- PASS: TestCorpus/twice
-        --- PASS: TestCorpus/twice/echo
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
 PASS

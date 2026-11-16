@@ -1,36 +1,30 @@
 $ go test  # rejects
-    testdata/lines.txtar has problems of form, so none of its cells run, and no update writes it:
+    testdata/script/lines.txtar has problems of form, so none of its cells run, and no update writes it:
           properties, line 2: the line is blank
           properties, line 3: circular is stated twice, on lines 1 and 3
           properties, line 4: "Circular" is not one property's name, which is lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter
           properties, line 5: "circular dangling" is not one property's name, which is lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter
         Fix the archive by hand.
-    testdata/sections.txtar has problems of form, so none of its cells run, and no update writes it:
+    testdata/script/sections.txtar has problems of form, so none of its cells run, and no update writes it:
           properties: the section is empty; a case with no properties has no properties section
           properties/x: properties is one section, with nothing below it
           gaps/x: gaps is one section, with nothing below it
           properties: the section is also the directory of properties/x
         Fix the archive by hand.
+    testdata/script/lines.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/sections.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
 --- FAIL: TestCorpus
-    --- FAIL: TestCorpus/lines
-    --- FAIL: TestCorpus/sections
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/echo
 FAIL
 [exit 1]
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
-    testdata/lines.txtar has problems of form, so none of its cells run, and no update writes it:
-          properties, line 2: the line is blank
-          properties, line 3: circular is stated twice, on lines 1 and 3
-          properties, line 4: "Circular" is not one property's name, which is lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter
-          properties, line 5: "circular dangling" is not one property's name, which is lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter
-        Fix the archive by hand.
-    testdata/sections.txtar has problems of form, so none of its cells run, and no update writes it:
-          properties: the section is empty; a case with no properties has no properties section
-          properties/x: properties is one section, with nothing below it
-          gaps/x: gaps is one section, with nothing below it
-          properties: the section is also the directory of properties/x
-        Fix the archive by hand.
---- FAIL: TestCorpus
-    --- FAIL: TestCorpus/lines
-    --- FAIL: TestCorpus/sections
-FAIL
-[exit 1]
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    testdata/script/lines.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/sections.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/echo
+PASS

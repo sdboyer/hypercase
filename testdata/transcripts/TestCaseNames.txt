@@ -1,0 +1,9 @@
+$ go test  # two-corpora
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/other
+        --- PASS: TestCorpus/other/twice
+            --- PASS: TestCorpus/other/twice/shout
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS

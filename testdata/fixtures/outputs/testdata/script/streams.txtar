@@ -1,0 +1,7 @@
+The run writes to stdout and stderr and errs, and declares none of the three.
+-- in/do/stdout --
+6
+-- in/do/stderr --
+warning: A1
+-- in/do/error --
+A1: bad
