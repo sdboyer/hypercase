@@ -1901,8 +1901,8 @@ transform. Its format (proposed) is `transform/<name>`, one space, the
 column's name, one space, then the text. In `negative`, whose `renamed`
 variant moves the negative number to A2 and errs the same wrong way as the
 base, the last two lines freeze that variant's `parse` and `calc` cells.
-Its `looped` variant replaces the number with a cycle, which `resolve`
-rejects rightly, so no line marks it:
+Its `looped` variant replaces the number with a cycle, which `resolve` and
+`calc` are expected to reject, so no line marks it:
 
 <!-- source: walkthrough/sheets/step07/testdata/sheet/negative.txtar -->
 ```
