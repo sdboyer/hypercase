@@ -46,7 +46,6 @@ func Test(t *testing.T) {
 	if err != nil {
 		t.Errorf("finding the module's registries: %v", err)
 	}
-	r.found = found
 	if !r.update {
 		r.requireRootCheck(t, found)
 	}
@@ -83,10 +82,6 @@ type runner struct {
 	stats       map[string]*colStats
 	owned       map[*transform]bool // the types' transforms the package owns
 	checks      []Check             // sorted by name
-	found       []registry.Found    // the module's registries
-	// trOwners holds <dir>/<name> for each transform some registry over
-	// the corpus root records as owned. It is read when first needed.
-	trOwners map[string]bool
 }
 
 // colStats counts a suite's cells, for the check that it applies to some

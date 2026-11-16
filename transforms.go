@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
-	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -172,7 +171,8 @@ func (v *plannedVariant) runs() bool {
 // order written, then one per transform of its corpus type, by name. Each
 // transform runs here, on the base's input view, since whether its variant
 // has cells sets the count of each suite's cells, which doesn't depend on
-// -run. The view is made once, if a transform runs, and dropped after.
+// -run. It makes the view if a transform runs, and drops it once the
+// archive is planned; runCase makes it again for the base's cells.
 func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []*plannedVariant {
 	var vs []*plannedVariant
 	committed := map[string]archive.VariantCase{}
@@ -343,7 +343,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if len(invalid) > 0 {
 			// An update reads what the transform makes instead, and its
 			// owner's rewrites them.
-			t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\n%s.", c.header(), v.name, problemList(invalid), r.rewritesInputs(p, v))
+			t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\nThe module's update, %s, rewrites them, in the package that owns %s.%s", c.header(), v.name, problemList(invalid), r.updateCmd(), v.name, r.ifUnowned(v))
 			return
 		}
 		if owner {
@@ -364,62 +364,34 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	// An update writes no frozen cell, so it rewrites none of those, and
 	// one whose files differ from its run's is checked on the new inputs.
 	cells := "the variant's cells."
-	var frozen, differs []string
+	frozen := false
+	var differs []string
 	for i, col := range p.cols {
 		if _, marked := c.gap(col.name); marked && len(c.goldens(col.name)) > 0 {
-			frozen = append(frozen, col.name)
+			frozen = true
 		}
 		if results[i].frozenDiffers {
 			differs = append(differs, col.name+"'s")
 		}
 	}
-	if len(frozen) > 0 {
+	if frozen {
 		cells = "the variant's cells but the frozen ones, which no update writes."
 	}
 	if len(differs) > 0 {
-		cells += fmt.Sprintf(" A normal run checks each frozen cell that failed, here %s, again on the rewritten inputs, against its committed files.", andList(differs))
+		cells += fmt.Sprintf(" A normal run checks each frozen cell whose files differ, here %s, again on the rewritten inputs, against its committed files.", andList(differs))
 	}
-	t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. %s, and %s", c.header(), v.name, v.name, m, v.name, r.rewritesInputs(p, v), cells)
+	t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and %s%s", c.header(), v.name, v.name, m, v.name, r.updateCmd(), v.name, cells, r.ifUnowned(v))
 }
 
-// ownedByAny reports whether some package's registry over the corpus root
-// records that it owns the transform name, of the corpus directory dir.
-// The registries are read when a message first needs to know.
-func (r *runner) ownedByAny(dir, name string) bool {
-	if r.trOwners == nil {
-		r.trOwners = map[string]bool{}
-		for _, f := range r.found {
-			data, err := os.ReadFile(f.Path)
-			if err != nil {
-				continue
-			}
-			if h, err := registry.Peek(data); err != nil || h.CorpusRoot != r.rootRel {
-				continue
-			}
-			g, err := registry.Parse(data)
-			if err != nil {
-				continue
-			}
-			for _, ct := range g.Types {
-				for _, tr := range ct.Transforms {
-					if tr.Owned {
-						r.trOwners[ct.Dir+"/"+tr.Name] = true
-					}
-				}
-			}
-		}
+// ifUnowned is what a message that names the update in the package that
+// owns a transform adds, in a package that doesn't own it: that package
+// can't know some package does, and the root-package check reports a
+// transform no package owns.
+func (r *runner) ifUnowned(v *plannedVariant) string {
+	if r.owned[v.tr] {
+		return ""
 	}
-	return r.trOwners[dir+"/"+name]
-}
-
-// rewritesInputs says which update rewrites the committed inputs of a
-// transform's variant: the module's, in the package that owns the
-// transform, if a package does.
-func (r *runner) rewritesInputs(p *plan, v *plannedVariant) string {
-	if r.owned[v.tr] || r.ownedByAny(p.root.dir, v.name) {
-		return fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s", r.updateCmd(), v.name)
-	}
-	return fmt.Sprintf("%s is owned by no package, so no update rewrites them. Give it to hypercase.Own in one package that registers its corpus type, and the module's update, %s, rewrites them there", v.name, r.updateCmd())
+	return fmt.Sprintf(" If no package owns %s, the root-package check says so, and no update rewrites them.", v.name)
 }
 
 // inputDiffs says how the committed inputs of a transform's variant differ
