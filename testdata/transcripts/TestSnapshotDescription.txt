@@ -1,0 +1,51 @@
+# snapshot.Create wrote testdata/script/six.txtar
+$ cat testdata/script/six.txtar
+-- in/calc/out/values.txt --
+6
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        calc ran on six
+        parse ran on six
+        resolve ran on six
+        evaluate's probe ran
+        evaluate ran on six
+        format's probe ran
+        format ran on six
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/six
+            --- PASS: TestCorpus/script/six/calc
+            --- PASS: TestCorpus/script/six/evaluate
+            --- PASS: TestCorpus/script/six/format
+            --- PASS: TestCorpus/script/six/parse
+            --- PASS: TestCorpus/script/six/resolve
+PASS
+$ cat testdata/script/six.txtar
+-- in/calc/out/values.txt --
+6
+-- out/calc/values.txt --
+6
+-- out/format/trail.txt --
+parse
+$ go test  # ladder
+    testdata/script/six.txtar: the archive has no description: its comment, the text before the first section, is empty
+        Write the case's description, in prose, as the archive's comment, the text before its first section.
+    what ran, in order:
+        calc ran on six
+        parse ran on six
+        resolve ran on six
+        evaluate's probe ran
+        evaluate ran on six
+        format's probe ran
+        format ran on six
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/six
+            --- PASS: TestCorpus/script/six/calc
+            --- PASS: TestCorpus/script/six/evaluate
+            --- PASS: TestCorpus/script/six/format
+            --- PASS: TestCorpus/script/six/parse
+            --- PASS: TestCorpus/script/six/resolve
+FAIL
+[exit 1]
