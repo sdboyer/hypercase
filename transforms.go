@@ -145,8 +145,6 @@ type plannedVariant struct {
 	properties []string
 	gaps       []archive.Gap
 	committed  archive.VariantCase
-	// invalid is what leaves a transform's committed inputs no input view.
-	invalid []archive.Problem
 
 	// A transform's variant.
 	tr       *transform
@@ -201,9 +199,6 @@ func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base, vi
 			gapsAt:    archive.Gaps,
 			committed: committed[tr.name],
 			tr:        tr,
-		}
-		if v.committed.Inputs {
-			v.invalid = base.InputProblems(v.committed)
 		}
 		for _, g := range gaps {
 			if g.Transform == tr.name {
@@ -321,27 +316,30 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	case v.declined != "":
 		r.declined(t, c, p, pc, v, owner, w)
 		return
-	case !r.update && len(v.invalid) > 0:
-		// A normal run would read them. An update reads what the
-		// transform makes, and its owner's rewrites them.
-		t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\nThe module's update, %s, rewrites them, in the package that owns %s.", c.header(), v.name, problemList(v.invalid), r.updateCmd(), v.name)
-		return
-	default:
+	case r.update || !v.committed.Inputs:
+		// An update runs the cells on what the transform makes, in every
+		// package: what it writes depends on the inputs and the code
+		// alone, never on sections an update wrote.
 		if owner {
 			r.judgeInputs(t, c, pc, v, w)
 		}
-		// An update runs the cells on what the transform makes, in every
-		// package: what it writes depends on the inputs and the code
-		// alone, never on sections an update wrote. A normal run reads the
-		// inputs the archive holds.
-		if r.update || !v.committed.Inputs {
-			c.setView(p, archive.NewFS(v.made))
-			break
+		c.setView(p, archive.NewFS(v.made))
+	default:
+		// A normal run reads the inputs the archive holds.
+		view, invalid := pc.base.InputView(v.committed)
+		if len(invalid) > 0 {
+			// An update reads what the transform makes instead, and its
+			// owner's rewrites them.
+			t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\nThe module's update, %s, rewrites them, in the package that owns %s.", c.header(), v.name, problemList(invalid), r.updateCmd(), v.name)
+			return
+		}
+		if owner {
+			r.judgeInputs(t, c, pc, v, w)
 		}
 		if !owner && !v.inputDiffs(pc.a).empty() {
 			c.stale = fmt.Sprintf("The archive's inputs for %s's variant differ from what %s makes now: a normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and this cell.", v.name, v.name, v.name, r.updateCmd(), v.name)
 		}
-		c.setView(p, pc.base.VariantView(v.committed))
+		c.setView(p, view)
 	}
 	r.runCells(t, c, p.cols, w)
 }

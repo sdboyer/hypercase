@@ -247,7 +247,7 @@ func checkVariant(s Section, kind, name, rest string) []Problem {
 // update-written: how they differ from what the base now gives, and
 // whether they make an input view at all, is for the runs to judge and the
 // update of the package that owns the transform to rewrite, never a
-// problem of form, which no update repairs. See [Base.InputProblems].
+// problem of form, which no update repairs. See [Base.InputView].
 func (a *Archive) checkVariants() []Problem {
 	var ps []Problem
 	base := a.baseFiles()
@@ -291,18 +291,23 @@ func (a *Archive) checkVariants() []Problem {
 	return ps
 }
 
-// InputProblems reports what leaves the committed inputs of a
-// transform's variant, v, no input view: a delete section that is empty,
-// or that holds a line that is no path of the view or a path twice, and a
-// view, the base's with the inputs laid over it and the deleted paths
-// removed, that no file tree holds. A delete line naming a path the base
-// lacks, or one the inputs lay over, still leaves a view, which the
-// package that owns the transform judges against what the transform makes.
-func (b Base) InputProblems(v VariantCase) []Problem {
+// InputView returns the input view the committed inputs of a transform's
+// variant, v, make: the base's, with the inputs laid over it and the
+// deleted paths removed. If they make none, it returns what leaves them
+// none instead: a delete section that is empty, or that holds a line that
+// is no path of the view or a path twice, and a view that no file tree
+// holds. A delete line naming a path the base lacks, or one the inputs lay
+// over, still leaves a view, which the package that owns the transform
+// judges against what the transform makes.
+func (b Base) InputView(v VariantCase) (fs.FS, []Problem) {
 	if ps := checkDelete(v, b.files); len(ps) > 0 {
-		return ps
+		return nil, ps
 	}
-	return checkNested(v, variantFiles(b.files, v))
+	files := variantFiles(b.files, v)
+	if ps := checkNested(v, files); len(ps) > 0 {
+		return nil, ps
+	}
+	return NewFS(files), nil
 }
 
 // checkDelete reports the problems of a variant's delete section, if it
