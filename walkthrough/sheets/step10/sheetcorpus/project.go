@@ -11,7 +11,6 @@ import (
 	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
 )
 
-// doc:begin project
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
@@ -26,8 +25,6 @@ var Project = decl.Project{
 		{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/issues/$1"},
 	},
 }
-
-// doc:end project
 
 // renderError writes the error's text, then quotes each line it points at. A
 // position about a file as a whole names only the file.

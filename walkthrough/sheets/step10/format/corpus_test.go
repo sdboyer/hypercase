@@ -11,16 +11,19 @@ import (
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus"
 )
 
+// doc:begin register
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
 		hypercase.Root("step10"),
 		sheetcorpus.Circular, sheetcorpus.Dangling,
-		sheetcorpus.SheetType,
-		hypercase.Use(sheetcorpus.Parse), // computed here; parse's sections are left alone
+		sheetcorpus.SheetType, sheetcorpus.CSVType,
+		hypercase.Use(sheetcorpus.Import, sheetcorpus.Parse), // computed here; their sections are left alone
 		hypercase.Own(format),
 	)
 }
+
+// doc:end register
 
 var format = hypercase.Suite[*sheet.Parsed]{
 	Name:        "format",

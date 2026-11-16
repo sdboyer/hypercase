@@ -14,19 +14,21 @@ import (
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus"
 )
 
-// doc:begin evaluate
+// doc:begin register
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
 		hypercase.Root("step10"),
 		hypercase.RootPackage(),
-		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
-		sheetcorpus.SheetType,
-		hypercase.Own(sheetcorpus.Parse, sheetcorpus.Resolve, evaluate),
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling, sheetcorpus.Unterminated,
+		sheetcorpus.SheetType, sheetcorpus.CSVType,
+		hypercase.Own(sheetcorpus.Import, sheetcorpus.Parse, sheetcorpus.Resolve, evaluate),
 		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
 		hypercase.Own(codes),
 	)
 }
+
+// doc:end register
 
 var evaluate = hypercase.Suite[*sheet.Graph]{
 	Name:        "evaluate",
@@ -49,9 +51,6 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 	},
 }
 
-// doc:end evaluate
-
-// doc:begin codes
 var codes = hypercase.Check{
 	Name:        "codes",
 	Description: "Every code the formula evaluator defines is the code of some rejected cell.",
@@ -76,7 +75,5 @@ var codes = hypercase.Check{
 		return found, nil
 	},
 }
-
-// doc:end codes
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }

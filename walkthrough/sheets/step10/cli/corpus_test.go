@@ -16,7 +16,8 @@ func init() {
 		sheetcorpus.Project,
 		hypercase.Root("step10"),
 		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
-		sheetcorpus.SheetType,
+		sheetcorpus.SheetType, sheetcorpus.CSVType,
+		hypercase.Use(sheetcorpus.Import), // computed here; import's sections are left alone
 		hypercase.Own(calc),
 	)
 }

@@ -2,6 +2,7 @@
 package sheetcorpus
 
 import (
+	"fmt"
 	"io"
 	"io/fs"
 
@@ -38,8 +39,8 @@ var SheetType = decl.Type[Sheet]{
 	Transforms:  []decl.Transform[Sheet]{Looped, Renamed},
 }
 
-// view gives a sheet's every file as a transform's jenny returns them, by its
-// path in the sheet's input view.
+// view gives a sheet's every file as a jenny returns them, by its path in the
+// sheet's input view.
 func view(fsys fs.FS, err error) (jenny.Files, error) {
 	if err != nil {
 		return nil, err
@@ -82,3 +83,41 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 		return sheet.Resolve(p)
 	},
 }
+
+// doc:begin import
+type CSV struct{ fs.FS } // in/csv/<name>.csv
+
+var CSVType = decl.Type[CSV]{
+	Dir:         "csv",
+	Description: "A CSV export: one file under in/csv/, one row of the sheet per line.",
+}
+
+var Unterminated = decl.Property{
+	Name:        "unterminated",
+	Description: "Some quoted field is never closed.",
+}
+
+var Import = decl.Lift[CSV, Sheet]{
+	Name:        "import",
+	Description: "Turns each CSV field into a cell: row 1, field 2 is B1.",
+	Outputs: []decl.Output{
+		{Pattern: "error.txt", Description: "The line the importer can't read, and why."},
+	},
+	Product: []decl.Output{
+		{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them."},
+	},
+	Rejects: []decl.Property{Unterminated},
+	Jenny: jenny.For[CSV]().New("import", func(in CSV) (jenny.Files, error) {
+		paths, _ := fs.Glob(in, "csv/*.csv")
+		if len(paths) != 1 {
+			return nil, fmt.Errorf("%d files under csv/, not one", len(paths))
+		}
+		s, err := sheet.ImportCSV(in, paths[0])
+		if err != nil {
+			return nil, decl.Reject(err)
+		}
+		return view(s, nil)
+	}),
+}
+
+// doc:end import

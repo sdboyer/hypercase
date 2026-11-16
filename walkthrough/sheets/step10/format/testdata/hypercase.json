@@ -22,6 +22,12 @@
   ],
   "types": [
     {
+      "dir": "csv",
+      "description": "A CSV export: one file under in/csv/, one row of the sheet per line.",
+      "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.CSV",
+      "transforms": []
+    },
+    {
       "dir": "sheet",
       "description": "A spreadsheet: one file per cell under in/sheet/, holding a number or a formula.",
       "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.Sheet",
@@ -52,6 +58,32 @@
   ],
   "lifts": [
     {
+      "name": "import",
+      "description": "Turns each CSV field into a cell: row 1, field 2 is B1.",
+      "input": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.CSV",
+      "product": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.Sheet",
+      "owned": false,
+      "bytes": true,
+      "corpora": [
+        "csv"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "The line the importer can't read, and why."
+        }
+      ],
+      "productFiles": [
+        {
+          "pattern": "sheet/*",
+          "description": "One file per cell, as a sheet's in/sheet/ holds them."
+        }
+      ],
+      "rejects": [
+        "unterminated"
+      ]
+    },
+    {
       "name": "parse",
       "description": "Parses every cell.",
       "input": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.Sheet",
@@ -59,6 +91,7 @@
       "owned": false,
       "bytes": false,
       "corpora": [
+        "csv",
         "sheet"
       ],
       "outputs": [
@@ -79,6 +112,7 @@
       "description": "Prints each formula back in canonical form.",
       "consumes": "*github.com/sdboyer/hypercase/walkthrough/sheets/sheet.Parsed",
       "corpora": [
+        "csv",
         "sheet"
       ],
       "outputs": [
