@@ -25,6 +25,11 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	type pkgReg struct {
 		pkg string
 		reg *registry.Registry
+		// tested records that the package's directory holds a file whose
+		// name ends in _test.go, and doesn't start with _ or ., which Go
+		// ignores. Any such file counts, even one with no test that runs
+		// what the registry records.
+		tested bool
 	}
 	var regs []pkgReg
 	otherRoots := map[string]bool{}
@@ -46,8 +51,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			t.Errorf("%s can't be read: %v.\nRun %s to write it.", rel, err, r.updateCmd())
 			continue
 		}
-		regs = append(regs, pkgReg{pkg: r.pkgName(f.Pkg), reg: g})
-		if !hasTestFile(f.Pkg) {
+		tested := hasTestFile(f.Pkg)
+		regs = append(regs, pkgReg{pkg: r.pkgName(f.Pkg), reg: g, tested: tested})
+		if !tested {
 			t.Errorf("%s is a registry, and %s holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests.", rel, r.rel(f.Pkg))
 		}
 	}
@@ -55,6 +61,8 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	// Columns, lifts, types, properties and root-package checks, merged
 	// across packages.
 	columnPkgs := map[string][]string{}             // column → the packages that own it
+	liftPkgs := map[string][]string{}               // lift → the packages that own it
+	untestedLifts := map[string][]string{}          // lift → the packages with no _test.go file whose registries own it
 	claimed := map[string]map[string]bool{}         // corpus → the columns over it
 	usedPkgs := map[string][]string{}               // lift → the packages that only use it
 	declared := map[string]bool{}                   // the corpus types' directories, and the suites' Corpus
@@ -62,10 +70,12 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	typeOrder := map[string][]string{}              // directory → type entries, in the order of the packages
 	propEntries := map[string]map[string][]string{} // property → description → packages
 	propOrder := map[string][]string{}              // property → descriptions, in the order of the packages
-	transforms := map[string]map[string][]string{}  // directory → transform → the packages that own it
+	transforms := map[string]map[string]bool{}      // directory → the transforms its corpus types list
+	needOwner := map[string]map[string]bool{}       // directory → the transforms its corpus types list in packages with tests
+	trPkgs := map[trKey][]string{}                  // transform → the packages that own it
+	untestedTrs := map[trKey][]string{}             // transform → the packages with no _test.go file whose registries own it
 	var rootPkgs []string
-	claim := func(name string, corpora []string, pkg string) {
-		columnPkgs[name] = append(columnPkgs[name], pkg)
+	claim := func(name string, corpora []string) {
 		for _, corpus := range corpora {
 			if claimed[corpus] == nil {
 				claimed[corpus] = map[string]bool{}
@@ -86,11 +96,24 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 	}
 	for _, g := range regs {
+		// A registry in a package with no _test.go file records what no
+		// test runs, so its package owns and uses nothing: no column, lift
+		// or transform. Nor does a transform it lists need an owner. Its
+		// sections stay claimed, since the registry's own error reports
+		// them, and the lifts and transforms it owns are kept apart, so a
+		// message that finds no owner names it. Its root-package check,
+		// corpus types and properties still count where registries are
+		// compared, the stricter choice: a second root-package check, or a
+		// corpus type or property another package declares differently,
+		// still fails.
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
 		}
 		for _, s := range g.reg.Suites {
-			claim(s.Name, s.Corpora, g.pkg)
+			claim(s.Name, s.Corpora)
+			if g.tested {
+				columnPkgs[s.Name] = append(columnPkgs[s.Name], g.pkg)
+			}
 			if s.Consumes == registry.RawInput {
 				for _, dir := range s.Corpora {
 					declare(dir, rawEntry, g.pkg)
@@ -98,23 +121,42 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 		}
 		for _, l := range g.reg.Lifts {
-			if l.Owned {
-				claim(l.Name, l.Corpora, g.pkg)
+			if !l.Owned {
+				if g.tested {
+					usedPkgs[l.Name] = append(usedPkgs[l.Name], g.pkg)
+				}
+				continue
+			}
+			claim(l.Name, l.Corpora)
+			if g.tested {
+				columnPkgs[l.Name] = append(columnPkgs[l.Name], g.pkg)
+				liftPkgs[l.Name] = append(liftPkgs[l.Name], g.pkg)
 			} else {
-				usedPkgs[l.Name] = append(usedPkgs[l.Name], g.pkg)
+				untestedLifts[l.Name] = append(untestedLifts[l.Name], g.pkg)
 			}
 		}
 		for _, ct := range g.reg.Types {
 			declare(ct.Dir, typeEntry(ct), g.pkg)
 			if transforms[ct.Dir] == nil {
-				transforms[ct.Dir] = map[string][]string{}
+				transforms[ct.Dir] = map[string]bool{}
+			}
+			if g.tested && needOwner[ct.Dir] == nil {
+				needOwner[ct.Dir] = map[string]bool{}
 			}
 			for _, tr := range ct.Transforms {
-				pkgs := transforms[ct.Dir][tr.Name]
-				if tr.Owned {
-					pkgs = append(pkgs, g.pkg)
+				transforms[ct.Dir][tr.Name] = true
+				if g.tested {
+					needOwner[ct.Dir][tr.Name] = true
 				}
-				transforms[ct.Dir][tr.Name] = pkgs
+				if !tr.Owned {
+					continue
+				}
+				k := trKey{ct.Dir, tr.Name}
+				if g.tested {
+					trPkgs[k] = append(trPkgs[k], g.pkg)
+				} else {
+					untestedTrs[k] = append(untestedTrs[k], g.pkg)
+				}
 			}
 		}
 		for _, p := range g.reg.Properties {
@@ -136,9 +178,22 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(usedPkgs)) {
-		if _, owned := columnPkgs[name]; !owned {
-			t.Errorf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.\nOwn the lift in one of them: give it to hypercase.Own in place of hypercase.Use.", name, andList(usedPkgs[name]))
+		if len(liftPkgs[name]) > 0 {
+			continue
 		}
+		// No package owns the lift, so a column of its name is a suite,
+		// and the duplicate-column check above can't see the two collide.
+		if suites := columnPkgs[name]; len(suites) > 0 {
+			t.Errorf("the column %s is owned by %s as a suite, and used by %s as a lift. Lifts share the suites' column names, which are unique per corpus root.\nRename the suite or the lift.", name, andList(suites), andList(usedPkgs[name]))
+		}
+		msg := fmt.Sprintf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.", name, andList(usedPkgs[name]))
+		fix := "Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use."
+		if pkgs := untestedLifts[name]; len(pkgs) > 0 {
+			why, restore := untestedOwners("lift", pkgs)
+			msg += " " + why
+			fix = restore + " own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use."
+		}
+		t.Errorf("%s\n%s", msg, fix)
 	}
 	for _, dir := range slices.Sorted(maps.Keys(typeEntries)) {
 		entries := typeEntries[dir]
@@ -157,11 +212,18 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 		t.Errorf("the corpus directory %s has two different corpus types:\n%s\nAn archive's directory gives its type. %s", dir, strings.Join(lines, "\n"), fix)
 	}
-	for _, dir := range slices.Sorted(maps.Keys(transforms)) {
-		for _, name := range slices.Sorted(maps.Keys(transforms[dir])) {
-			switch pkgs := transforms[dir][name]; {
+	for _, dir := range slices.Sorted(maps.Keys(needOwner)) {
+		for _, name := range slices.Sorted(maps.Keys(needOwner[dir])) {
+			switch pkgs := trPkgs[trKey{dir, name}]; {
 			case len(pkgs) == 0:
-				t.Errorf("the transform %s, of testdata/%s/, is owned by no package, so nothing writes or judges its variants' inputs.\nGive it to hypercase.Own in one package that registers its corpus type.", name, dir)
+				msg := fmt.Sprintf("the transform %s, of testdata/%s/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.", name, dir)
+				fix := "Give it to hypercase.Own in one package that registers its corpus type."
+				if u := untestedTrs[trKey{dir, name}]; len(u) > 0 {
+					why, restore := untestedOwners("transform", u)
+					msg += " " + why
+					fix = restore + " give the transform to hypercase.Own in another package that registers its corpus type."
+				}
+				t.Errorf("%s\n%s", msg, fix)
 			case len(pkgs) > 1:
 				t.Errorf("the transform %s, of testdata/%s/, is owned by %s. One package owns each transform.\nOwn it in one of them.", name, dir, andList(pkgs))
 			}
@@ -229,6 +291,22 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	}
 }
 
+// trKey names a transform by its corpus directory and its name.
+type trKey struct{ dir, name string }
+
+// untestedOwners words what the root-package check knows of a lift or
+// transform that no package owns, and that the registries of pkgs, which
+// hold no _test.go file, record their packages own: why no test runs it,
+// and the first half of the fix, which the caller ends.
+func untestedOwners(what string, pkgs []string) (why, restore string) {
+	if len(pkgs) == 1 {
+		return fmt.Sprintf("The registry of %s records that its package owns the %s, and %s holds no _test.go file, so no test runs the %s there.", pkgs[0], what, pkgs[0], what),
+			fmt.Sprintf("Restore the tests of %s, or delete its registry and", pkgs[0])
+	}
+	return fmt.Sprintf("The registries of %s record that their packages own the %s, and they hold no _test.go file, so no test runs the %s there.", andList(pkgs), what, what),
+		"Restore the tests of one of them and delete the others' registries, or delete all their registries and"
+}
+
 // rawEntry is how the root-package check names the raw input view, which
 // a suite that names a Corpus consumes, as a directory's type.
 const rawEntry = "the raw input view, fs.FS, which a suite's Corpus names"
@@ -249,7 +327,7 @@ func typeEntry(ct registry.Type) string {
 
 // checkArchive reports the problems of one archive as a whole. cols are
 // the columns over its corpus, and transforms its corpus type's.
-func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bool, transforms map[string][]string, props func(string) bool) {
+func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bool, transforms map[string]bool, props func(string) bool) {
 	t.Helper()
 	rel := r.rel(p)
 	if name := strings.TrimSuffix(filepath.Base(p), ".txtar"); !validName(name) {
@@ -283,9 +361,8 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bo
 	}
 	marked := func(section string, gaps []archive.Gap) {
 		for _, g := range gaps {
-			_, listed := transforms[g.Transform]
 			switch {
-			case g.Transform != "" && !listed:
+			case g.Transform != "" && !transforms[g.Transform]:
 				t.Errorf("%s: %s, line %d, names transform/%s, and no corpus type of testdata/%s/ lists a transform of that name.\nList the transform, or remove the line.", rel, section, g.Line, g.Transform, corpus)
 			case !cols[g.Column]:
 				t.Errorf("%s: %s, line %d, names %s, and no registry has a column of that name over the corpus %s.\nRegister the column, or remove the line.", rel, section, g.Line, g.Column, corpus)
@@ -305,7 +382,7 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bo
 	unclaimed := map[claim][]string{}
 	for _, s := range a.Sections {
 		kind, name, rest := archive.SplitCase(s.Name)
-		if _, listed := transforms[name]; kind == archive.Transform && !listed {
+		if kind == archive.Transform && !transforms[name] {
 			c := claim{archive.Transform + "/" + name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s.\nIf a transform should make the variant, list it in its corpus type's Transforms", corpus, name)}
 			unclaimed[c] = append(unclaimed[c], s.Name)
 			continue
@@ -335,13 +412,17 @@ func (r *runner) pkgName(dir string) string {
 	return "."
 }
 
+// hasTestFile reports whether dir holds a file whose name ends in
+// _test.go, and doesn't start with _ or ., the names Go ignores. It reads
+// no build constraints, so a file they exclude still counts.
 func hasTestFile(dir string) bool {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return false
 	}
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), "_test.go") {
+		name := e.Name()
+		if !e.IsDir() && strings.HasSuffix(name, "_test.go") && !strings.HasPrefix(name, "_") && !strings.HasPrefix(name, ".") {
 			return true
 		}
 	}

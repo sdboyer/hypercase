@@ -15,7 +15,7 @@ func TestRootCheckRemovedSuite(t *testing.T) {
 	s := newSandbox(t, "shared")
 	before := s.read(twice)
 	s.passes(s.run("b", "pkg-b-gone", true))
-	want := "testdata/script/twice.txtar: no registry claims out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place."
+	want := "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place."
 	s.fails(s.normal("pkg-a"), want)
 	s.passes(s.update("pkg-a"))
 	s.same(twice, before)
@@ -49,8 +49,8 @@ func TestRootCheckPropertyEntries(t *testing.T) {
 func TestStatementsOfAnotherPackage(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared")
-	s.write("testdata/script/loop.txtar", []byte("A1 refers to itself, which only b's shout rejects.\n-- in/do/out/values.txt --\nA1 0\n-- in/shout/error --\nA1 -> A1: cycle\n-- properties --\ncircular\n-- out/echo/values.txt --\nA1 0\n-- out/shout/error.txt --\nA1 -> A1: cycle\n"), "a case that states a property only b registers")
-	s.write("testdata/script/gapped.txtar", []byte("shout prints A1 wrongly, a known gap in b's cell.\n-- in/do/out/values.txt --\nA1 6\n-- in/shout/out/values.txt --\nA1 SEVEN\n-- gaps --\nshout A1 is SIX. Waits on sheets#15.\n-- out/echo/values.txt --\nA1 6\n-- out/shout/values.txt --\nA1 SIX\n"), "a gaps line naming b's column, whose cell now differs")
+	s.write("testdata/script/loop.txtar", []byte("A1 refers to itself, which only b's shout rejects.\n-- in/do/out/values.txt --\nA1 0\n-- in/shout/error --\nA1 -> A1: cycle\n-- properties --\ncircular\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 0\n-- out/shout/error.txt --\nA1 -> A1: cycle\n-- out/shout/outcome --\nrejected\n"), "a case that states a property only b registers")
+	s.write("testdata/script/gapped.txtar", []byte("shout prints A1 wrongly, a known gap in b's cell.\n-- in/do/out/values.txt --\nA1 6\n-- in/shout/out/values.txt --\nA1 SEVEN\n-- gaps --\nshout A1 is SIX. Waits on sheets#15.\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 6\n-- out/shout/outcome --\naccepted\n-- out/shout/values.txt --\nA1 SIX\n"), "a gaps line naming b's column, whose cell now differs")
 	// b's update writes loop's cell, and fails on its frozen one, as committed.
 	s.fails(s.run("b", "pkg-b-circular", true), "The cell is frozen by its known gap")
 	s.cat("testdata/script/gapped.txtar")
@@ -66,7 +66,7 @@ func TestRootCheckArchives(t *testing.T) {
 	s := newSandbox(t, "shared")
 	data := string(s.read(twice))
 	s.write("testdata/script/nameless.txtar", []byte(data[strings.Index(data, "-- "):]), "an archive with no description")
-	s.write("testdata/script/loopy.txtar", []byte("A case that states a property nothing declares.\n-- in/do/out/values.txt --\nA1 6\n-- properties --\nloopy\n-- gaps --\nformat A1 prints as =6. Waits on sheets#8.\n-- out/echo/values.txt --\nA1 6\n"), "a case with a property and a gaps line nothing declares")
+	s.write("testdata/script/loopy.txtar", []byte("A case that states a property nothing declares.\n-- in/do/out/values.txt --\nA1 6\n-- properties --\nloopy\n-- gaps --\nformat A1 prints as =6. Waits on sheets#8.\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 6\n-- out/shout/outcome --\naccepted\n"), "a case with a property and a gaps line nothing declares")
 	s.write("testdata/script/typo.txtar", []byte("A section outside the closed set.\n-- ni/do/out/values.txt --\nA1 6\n"), "an archive with a problem of form")
 	s.write("testdata/script/old/x.txtar", []byte("An archive in a directory below a corpus's.\n"), "an archive in no corpus's directory")
 	s.write("testdata/renamed/x.txtar", []byte("An archive of a corpus whose directory was renamed in Go.\n"), "an archive in a directory no registry declares")
@@ -97,7 +97,7 @@ func TestRootCheckDeclaredDirectory(t *testing.T) {
 	s := newSandbox(t, "shared")
 	s.run("b", "pkg-b-later", true)
 	s.remove("testdata/script/twice.txtar", "")
-	s.write(twice, []byte("A1 is twice B1, and only echo prints it.\n-- in/do/out/values.txt --\nA1 6\n-- out/echo/values.txt --\nA1 6\n"), "")
+	s.write(twice, []byte("A1 is twice B1, and only echo prints it.\n-- in/do/out/values.txt --\nA1 6\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 6\n"), "")
 	r := s.normal("pkg-a")
 	s.passes(r)
 	s.done()
@@ -107,7 +107,19 @@ func TestRootCheckRegistries(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared")
 	s.remove("b/corpus_test.go", "b's tests are deleted, and its registry left behind")
-	s.fails(s.normal("pkg-a"), "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests.")
+	untested := "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests."
+	s.fails(s.normal("pkg-a"), untested)
+	// Go ignores a file whose name starts with _ or ., so neither counts.
+	s.write("b/_corpus_test.go", []byte(packageTestFile), "a test file Go ignores, by its leading _")
+	s.write("b/.corpus_test.go", []byte(packageTestFile), "a test file Go ignores, by its leading .")
+	s.fails(s.normal("pkg-a"), untested)
+	s.remove("b/_corpus_test.go", "remove the file Go ignores")
+	s.remove("b/.corpus_test.go", "remove the file Go ignores")
+	// The check reads no build constraints, so a test file they exclude
+	// still counts.
+	s.write("b/x_test.go", []byte("//go:build ignore\n\npackage fixture\n"), "a test file a build constraint excludes")
+	s.passes(s.normal("pkg-a"))
+	s.remove("b/x_test.go", "remove the excluded file")
 	s.write("b/corpus_test.go", []byte(packageTestFile), "restore b's tests")
 	s.write("b/testdata/hypercase.json", []byte("{\n  \"format\": 9\n}\n"), "a registry from a later hypercase")
 	s.fails(s.normal("pkg-a"), fmt.Sprintf("b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format %d.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.", registry.Format))
@@ -153,7 +165,7 @@ func TestRootCheckRequired(t *testing.T) {
 	s.fails(s.run("b", "pkg-b-other", false), "no registry records a root-package check for the corpus root other")
 	// a's root has its check. What it reports is b's sections, which no column over it claims now.
 	r := s.normal("pkg-a")
-	s.fails(r, "no registry claims out/shout/values.txt")
+	s.fails(r, "no registry claims out/shout/outcome and out/shout/values.txt")
 	s.lacks(r, "no registry records a root-package check")
 	s.done()
 }

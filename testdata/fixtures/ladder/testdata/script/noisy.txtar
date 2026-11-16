@@ -1,3 +1,9 @@
 parse warns on stderr, and goes on.
 -- in/parse/stderr --
 parse: a warning
+-- out/calc/outcome --
+accepted
+-- out/evaluate/outcome --
+accepted
+-- out/resolve/outcome --
+accepted

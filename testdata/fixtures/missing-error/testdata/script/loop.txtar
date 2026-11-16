@@ -5,6 +5,8 @@ B1 0
 -- properties --
 circular
 dangling
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 A1 0
 B1 0

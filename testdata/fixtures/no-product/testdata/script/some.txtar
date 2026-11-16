@@ -3,9 +3,17 @@ pick picks the script.
 A1 6
 -- in/walk/out/values.txt --
 A1 6
+-- out/format/outcome --
+accepted
 -- out/format/trail.txt --
 unpick
 -- out/format/values.txt --
 A1 6
+-- out/pick/outcome --
+accepted
+-- out/unpick/outcome --
+accepted
+-- out/walk/outcome --
+accepted
 -- out/walk/values.txt --
 A1 6

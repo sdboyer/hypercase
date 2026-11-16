@@ -1,12 +1,20 @@
 $ go test  # picked
+    script/marked: format is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/marked: pick returns no product, and a gaps line marks its cell.
+        pick: Picks the script's view, as its pick/ tree says.
+        pick returned no product and no error, so the cell has no outcome.
+        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.
+    script/marked: unpick is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/marked: walk is blocked: the lift pick failed on the case: it returned no product and no error.
     script/none: format is blocked: the lift pick failed on the case: it returned no product and no error.
     script/none: pick returns no product.
         pick: Picks the script's view, as its pick/ tree says.
-        pick returned no product and no error.
-        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error.
+        pick returned no product and no error, so the cell has no outcome.
+        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.
     script/none: unpick is blocked: the lift pick failed on the case: it returned no product and no error.
     script/none: walk is blocked: the lift pick failed on the case: it returned no product and no error.
     what ran, in order:
+        pick ran on marked
         pick ran on none
         pick ran on some
         format's probe ran
@@ -15,6 +23,11 @@ $ go test  # picked
         walk ran on some
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/marked
+            --- SKIP: TestCorpus/script/marked/format
+            --- FAIL: TestCorpus/script/marked/pick
+            --- SKIP: TestCorpus/script/marked/unpick
+            --- SKIP: TestCorpus/script/marked/walk
         --- FAIL: TestCorpus/script/none
             --- SKIP: TestCorpus/script/none/format
             --- FAIL: TestCorpus/script/none/pick
@@ -29,14 +42,22 @@ FAIL
 [exit 1]
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # picked
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/marked: format is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/marked: pick returns no product, and a gaps line marks its cell.
+        pick: Picks the script's view, as its pick/ tree says.
+        pick returned no product and no error, so the cell has no outcome.
+        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.
+    script/marked: unpick is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/marked: walk is blocked: the lift pick failed on the case: it returned no product and no error.
     script/none: format is blocked: the lift pick failed on the case: it returned no product and no error.
     script/none: pick returns no product.
         pick: Picks the script's view, as its pick/ tree says.
-        pick returned no product and no error.
-        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error.
+        pick returned no product and no error, so the cell has no outcome.
+        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.
     script/none: unpick is blocked: the lift pick failed on the case: it returned no product and no error.
     script/none: walk is blocked: the lift pick failed on the case: it returned no product and no error.
     what ran, in order:
+        pick ran on marked
         pick ran on none
         pick ran on some
         format's probe ran
@@ -45,6 +66,97 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # picked
         walk ran on some
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/marked
+            --- SKIP: TestCorpus/script/marked/format
+            --- FAIL: TestCorpus/script/marked/pick
+            --- SKIP: TestCorpus/script/marked/unpick
+            --- SKIP: TestCorpus/script/marked/walk
+        --- FAIL: TestCorpus/script/none
+            --- SKIP: TestCorpus/script/none/format
+            --- FAIL: TestCorpus/script/none/pick
+            --- SKIP: TestCorpus/script/none/unpick
+            --- SKIP: TestCorpus/script/none/walk
+        --- PASS: TestCorpus/script/some
+            --- PASS: TestCorpus/script/some/format
+            --- PASS: TestCorpus/script/some/pick
+            --- PASS: TestCorpus/script/some/unpick
+            --- PASS: TestCorpus/script/some/walk
+FAIL
+[exit 1]
+$ edit testdata/script/marked.txtar  # commit an outcome for the marked cell
+$ go test  # picked
+    script/marked: format is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/marked: pick returns no product, and a gaps line marks its cell.
+        pick: Picks the script's view, as its pick/ tree says.
+        pick returned no product and no error, so the cell has no outcome.
+        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.
+    script/marked: unpick is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/marked: walk is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/none: format is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/none: pick returns no product.
+        pick: Picks the script's view, as its pick/ tree says.
+        pick returned no product and no error, so the cell has no outcome.
+        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.
+    script/none: unpick is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/none: walk is blocked: the lift pick failed on the case: it returned no product and no error.
+    what ran, in order:
+        pick ran on marked
+        pick ran on none
+        pick ran on some
+        format's probe ran
+        format ran on some
+        walk's probe ran
+        walk ran on some
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/marked
+            --- SKIP: TestCorpus/script/marked/format
+            --- FAIL: TestCorpus/script/marked/pick
+            --- SKIP: TestCorpus/script/marked/unpick
+            --- SKIP: TestCorpus/script/marked/walk
+        --- FAIL: TestCorpus/script/none
+            --- SKIP: TestCorpus/script/none/format
+            --- FAIL: TestCorpus/script/none/pick
+            --- SKIP: TestCorpus/script/none/unpick
+            --- SKIP: TestCorpus/script/none/walk
+        --- PASS: TestCorpus/script/some
+            --- PASS: TestCorpus/script/some/format
+            --- PASS: TestCorpus/script/some/pick
+            --- PASS: TestCorpus/script/some/unpick
+            --- PASS: TestCorpus/script/some/walk
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # picked
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/marked: format is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/marked: pick returns no product, and a gaps line marks its cell.
+        pick: Picks the script's view, as its pick/ tree says.
+        pick returned no product and no error, so the cell has no outcome.
+        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.
+    script/marked: unpick is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/marked: walk is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/none: format is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/none: pick returns no product.
+        pick: Picks the script's view, as its pick/ tree says.
+        pick returned no product and no error, so the cell has no outcome.
+        Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.
+    script/none: unpick is blocked: the lift pick failed on the case: it returned no product and no error.
+    script/none: walk is blocked: the lift pick failed on the case: it returned no product and no error.
+    what ran, in order:
+        pick ran on marked
+        pick ran on none
+        pick ran on some
+        format's probe ran
+        format ran on some
+        walk's probe ran
+        walk ran on some
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/marked
+            --- SKIP: TestCorpus/script/marked/format
+            --- FAIL: TestCorpus/script/marked/pick
+            --- SKIP: TestCorpus/script/marked/unpick
+            --- SKIP: TestCorpus/script/marked/walk
         --- FAIL: TestCorpus/script/none
             --- SKIP: TestCorpus/script/none/format
             --- FAIL: TestCorpus/script/none/pick

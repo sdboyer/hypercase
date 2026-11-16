@@ -53,6 +53,9 @@ func init() {
 		register, ok = transformRegistrations[name]
 	}
 	if !ok {
+		register, ok = outcomeRegistrations[name]
+	}
+	if !ok {
 		panic("selftest: no registration named " + name)
 	}
 	register()

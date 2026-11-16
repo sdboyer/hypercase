@@ -1,7 +1,6 @@
 package report
 
 import (
-	"bytes"
 	"cmp"
 	"errors"
 	"fmt"
@@ -23,10 +22,12 @@ type snapshot struct {
 	// columns holds each corpus's columns, by name.
 	columns map[string]map[string]string // corpus → column → description
 	props   map[string]string            // property → description
-	cases   map[caseKey]*caseAt
-	cells   map[cellKey]*cellAt
-	gaps    map[cellKey]string // the text of the gaps line that marks a cell
-	regs    int                // the registries over the corpus root
+	// transforms holds each corpus's transforms, by name.
+	transforms map[string]map[string]registry.Transform // corpus → transform → its declaration
+	cases      map[caseKey]*caseAt
+	cells      map[cellKey]*cellAt
+	gaps       map[cellKey]string // the text of the gaps line that marks a cell
+	regs       int                // the registries over the corpus root
 }
 
 // The kinds of case: the base, which an archive's in/ holds, and its
@@ -102,12 +103,9 @@ func (c *cellAt) state() string {
 	if c.outcome == nil {
 		return ""
 	}
-	state, _, _ := strings.Cut(c.outcomeLine(), " ")
-	return state
+	o, _ := archive.ParseOutcome(c.outcome) // addCellFile read it
+	return o.State
 }
-
-// outcomeFile is a cell's outcome, in its column's directory.
-const outcomeFile = "outcome"
 
 // load reads the corpus root at a revision: every registry under its
 // module root that records it, and every archive in the corpora they
@@ -116,12 +114,13 @@ const outcomeFile = "outcome"
 // module there, and holds nothing.
 func load(rev Rev, tree fs.FS, mod, root string) (*snapshot, error) {
 	s := &snapshot{
-		rev:     rev,
-		columns: map[string]map[string]string{},
-		props:   map[string]string{},
-		cases:   map[caseKey]*caseAt{},
-		cells:   map[cellKey]*cellAt{},
-		gaps:    map[cellKey]string{},
+		rev:        rev,
+		columns:    map[string]map[string]string{},
+		props:      map[string]string{},
+		transforms: map[string]map[string]registry.Transform{},
+		cases:      map[caseKey]*caseAt{},
+		cells:      map[cellKey]*cellAt{},
+		gaps:       map[cellKey]string{},
 	}
 	if mod == "" {
 		return s, nil
@@ -149,6 +148,16 @@ func load(rev Rev, tree fs.FS, mod, root string) (*snapshot, error) {
 		for _, p := range g.Properties {
 			if _, ok := s.props[p.Name]; !ok {
 				s.props[p.Name] = p.Description
+			}
+		}
+		for _, ty := range g.Types {
+			if s.transforms[ty.Dir] == nil {
+				s.transforms[ty.Dir] = map[string]registry.Transform{}
+			}
+			for _, tr := range ty.Transforms {
+				if _, ok := s.transforms[ty.Dir][tr.Name]; !ok {
+					s.transforms[ty.Dir][tr.Name] = tr
+				}
 			}
 		}
 		addColumn := func(name, description string, corpora []string) {
@@ -235,6 +244,7 @@ func (s *snapshot) addArchive(corpus, name string, data []byte) error {
 	a := archive.Parse(data)
 	baseKey := caseKey{corpus: corpus, archive: name, kind: base}
 	s.cases[baseKey] = &caseAt{description: strings.TrimSpace(string(a.Comment))}
+	var transforms []caseKey // the archive's transforms' variants
 	seen := map[string]bool{}
 	for _, sec := range a.Sections {
 		if seen[sec.Name] {
@@ -253,6 +263,9 @@ func (s *snapshot) addArchive(corpus, name string, data []byte) error {
 			}
 			if s.cases[k] == nil {
 				s.cases[k] = &caseAt{}
+				if k.kind == transform {
+					transforms = append(transforms, k)
+				}
 			}
 		}
 		top, file, _ := strings.Cut(rest, "/")
@@ -285,13 +298,30 @@ func (s *snapshot) addArchive(corpus, name string, data []byte) error {
 					ck.c = caseKey{corpus: corpus, archive: name, kind: transform, name: g.Transform}
 					if s.cases[ck.c] == nil {
 						s.cases[ck.c] = &caseAt{}
+						transforms = append(transforms, ck.c)
 					}
 				}
 				s.gaps[ck] = g.Text
 			}
 		}
 	}
+	for _, k := range transforms {
+		s.cases[k].properties = s.transformProperties(corpus, k.name, s.cases[baseKey].properties)
+	}
 	return nil
+}
+
+// transformProperties returns what a transform's variant states, as the
+// registries declare the transform, by [registry.VariantProperties]. A
+// transform no registry declares gives its variant none, as does one that
+// declines the base.
+func (s *snapshot) transformProperties(corpus, name string, base []string) []string {
+	tr, ok := s.transforms[corpus][name]
+	if !ok {
+		return nil
+	}
+	props, _ := registry.VariantProperties(tr.Gives, tr.Keeps, base)
+	return props
 }
 
 // addCellFile reads one file of a cell: rest is its path under out/, as
@@ -307,39 +337,14 @@ func (s *snapshot) addCellFile(k caseKey, section, rest string, data []byte) err
 		c = &cellAt{files: map[string][]byte{}}
 		s.cells[ck] = c
 	}
-	if file == outcomeFile {
-		if err := checkOutcome(data); err != nil {
+	if file == archive.OutcomeFile {
+		if _, err := archive.ParseOutcome(data); err != nil {
 			return problem(section, 0, err.Error())
 		}
 		c.outcome = data
 		return nil
 	}
 	c.files[file] = data
-	return nil
-}
-
-// states are an outcome's states, its first word.
-var states = []string{"accepted", "rejected", "panicked", "blocked", "skipped"}
-
-// checkOutcome checks an outcome file is one the report can show: one
-// line, ending with a newline, whose first word is a state. panicked
-// stands alone, and blocked and skipped say what blocked or why.
-func checkOutcome(data []byte) error {
-	line, ok := bytes.CutSuffix(data, []byte("\n"))
-	if !ok || bytes.IndexByte(line, '\n') >= 0 {
-		return errors.New("an outcome is one line, ending with a newline")
-	}
-	state, detail, _ := strings.Cut(string(line), " ")
-	switch {
-	case !slices.Contains(states, state):
-		return fmt.Errorf("an outcome starts with its state, one of %s, not %q", strings.Join(states, ", "), state)
-	case state == "panicked" && detail != "":
-		return errors.New("panicked stands alone")
-	case state == "blocked" && detail == "":
-		return errors.New("blocked is followed by the lift that failed")
-	case state == "skipped" && detail == "":
-		return errors.New("skipped is followed by the probe's reason")
-	}
 	return nil
 }
 

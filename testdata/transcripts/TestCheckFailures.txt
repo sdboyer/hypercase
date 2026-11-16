@@ -1,0 +1,109 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # check-error
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    the corpus check fails fails: no cell is rejected
+        The cells violate what the check requires. Fix the code or the corpus, or the check. An update writes no findings.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/fails
+FAIL
+[exit 1]
+$ go test  # check-error
+    the corpus check fails fails: no cell is rejected
+        The cells violate what the check requires. Fix the code or the corpus, or the check. An update writes no findings.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/fails
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # check-panic
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    the corpus check boom panicked: check boom
+        Fix the check. An update writes no findings.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/boom
+FAIL
+[exit 1]
+$ go test  # check-panic
+    the corpus check boom panicked: check boom
+        Fix the check. An update writes no findings.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/boom
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # check-newline
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    the corpus check lines gave a finding that holds a newline: "one\ntwo".
+        Fix the check: a finding is one line. An update writes no findings.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/lines
+FAIL
+[exit 1]
+$ go test  # check-newline
+    the corpus check lines gave a finding that holds a newline: "one\ntwo".
+        Fix the check: a finding is one line. An update writes no findings.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/lines
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # check-empty
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    the corpus check empty gave an empty finding.
+        Fix the check: a finding says something, on one line. An update writes no findings.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/empty
+FAIL
+[exit 1]
+$ go test  # check-empty
+    the corpus check empty gave an empty finding.
+        Fix the check: a finding says something, on one line. An update writes no findings.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/empty
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # check-none
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/none
+PASS
+$ go test  # check-none
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/none
+PASS

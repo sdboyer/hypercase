@@ -1,0 +1,66 @@
+$ rm testdata/script/errs.txtar  # leave twice, whose cases the lifts run on as they should
+$ rm testdata/script/garbled.txtar  # leave twice, whose cases the lifts run on as they should
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-ladder-eval
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/twice/transform/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/script/twice.txtar, transform/looped/out/resolve/error.txt, records its error.
+    what ran, in order:
+        parse ran on twice
+        resolve ran on twice
+        evaluate's probe ran
+        evaluate ran on twice
+        parse ran on twice
+        resolve ran on twice
+        parse ran on twice
+        resolve ran on twice
+        evaluate's probe ran
+        evaluate ran on twice
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/evaluate
+            --- PASS: TestCorpus/script/twice/parse
+            --- PASS: TestCorpus/script/twice/resolve
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- SKIP: TestCorpus/script/twice/transform/looped/evaluate
+                --- PASS: TestCorpus/script/twice/transform/looped/parse
+                --- PASS: TestCorpus/script/twice/transform/looped/resolve
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/evaluate
+                --- PASS: TestCorpus/script/twice/transform/upper/parse
+                --- PASS: TestCorpus/script/twice/transform/upper/resolve
+PASS
+$ edit testdata/script/twice.txtar  # mark looped's blocked cell, and record a file for it
+$ go test  # tr-ladder-eval
+    script/twice/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        gaps, line 1, marks the cell, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case, so the cell runs nothing.
+        Remove the line, or fix the lift or looped's jenny, which makes the variant.
+        transform/looped/out/evaluate/a.txt is recorded, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case.
+        If the cell should run, fix the lift or looped's jenny, which makes the variant. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    what ran, in order:
+        parse ran on twice
+        resolve ran on twice
+        evaluate's probe ran
+        evaluate ran on twice
+        parse ran on twice
+        resolve ran on twice
+        parse ran on twice
+        resolve ran on twice
+        evaluate's probe ran
+        evaluate ran on twice
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/evaluate
+            --- PASS: TestCorpus/script/twice/parse
+            --- PASS: TestCorpus/script/twice/resolve
+            --- FAIL: TestCorpus/script/twice/transform/looped
+                --- FAIL: TestCorpus/script/twice/transform/looped/evaluate
+                --- PASS: TestCorpus/script/twice/transform/looped/parse
+                --- PASS: TestCorpus/script/twice/transform/looped/resolve
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/evaluate
+                --- PASS: TestCorpus/script/twice/transform/upper/parse
+                --- PASS: TestCorpus/script/twice/transform/upper/resolve
+FAIL
+[exit 1]

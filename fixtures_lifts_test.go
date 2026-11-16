@@ -265,6 +265,9 @@ var liftRegistrations = map[string]func(){
 	},
 	"ladder-b":      func() { hypercase.Register(project, scriptType, hypercase.Use(parse), own(outline)) },
 	"ladder-b-owns": func() { hypercase.Register(project, malformed, scriptType, own(parse, outline)) },
+	// ladder-b-suite owns a suite named parse, which follows the outline/
+	// tree.
+	"ladder-b-suite": func() { hypercase.Register(project, scriptType, own(steered[Script]("parse", "outline"))) },
 	"ladder-b-grid": func() {
 		hypercase.Register(project, decl.Type[Grid]{Dir: "script", Description: "A grid, in the script directory."}, own(steered[Grid]("outline", "outline")))
 	},

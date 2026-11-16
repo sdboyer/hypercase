@@ -2,7 +2,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # pkg-b-gone
 --- PASS: TestCorpus
 PASS
 $ go test  # pkg-a
-    testdata/script/twice.txtar: no registry claims out/shout/values.txt: no column named shout runs over the corpus script.
+    testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
         If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/script
@@ -18,7 +18,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a
             --- PASS: TestCorpus/script/twice/echo
 PASS
 $ go test  # pkg-a
-    testdata/script/twice.txtar: no registry claims out/shout/values.txt: no column named shout runs over the corpus script.
+    testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
         If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/script

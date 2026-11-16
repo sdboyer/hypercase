@@ -2,3 +2,9 @@ pick returns no product.
 -- in/pick/none --
 -- in/walk/out/values.txt --
 A1 6
+-- out/format/outcome --
+blocked pick
+-- out/unpick/outcome --
+blocked pick
+-- out/walk/outcome --
+blocked pick

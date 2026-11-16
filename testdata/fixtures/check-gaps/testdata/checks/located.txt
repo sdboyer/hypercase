@@ -1,0 +1,3 @@
+script/loop/transform/looped echo is a known gap: A cycle's error starts with the cell where it starts. Waits on sheets#4.
+script/loop/variant/neg echo is a known gap: A negative number is valid, and evaluates to itself. Waits on sheets#3.
+script/negative echo is a known gap: A negative number is valid, and evaluates to itself. Waits on sheets#3.

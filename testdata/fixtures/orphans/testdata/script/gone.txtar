@@ -3,6 +3,8 @@ The run no longer writes old.txt, and no column named other is registered.
 A1 6
 -- out/echo/old.txt --
 A1 6
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 A1 6
 -- out/other/values.txt --

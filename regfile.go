@@ -22,6 +22,7 @@ func (r *runner) ownRegistry() registry.Registry {
 		UpdateVar:   r.updateVar,
 		CorpusRoot:  r.rootRel,
 		RootPackage: r.rootPackage,
+		Codes:       r.codes != nil,
 	}
 	for _, l := range r.issueLinks {
 		g.IssueLinks = append(g.IssueLinks, registry.IssueLink{Pattern: l.Pattern, URL: l.URL})
@@ -63,14 +64,18 @@ func (r *runner) ownRegistry() registry.Registry {
 		if c.corpus != "" {
 			consumes = registry.RawInput
 		}
-		g.Suites = append(g.Suites, registry.Suite{
+		s := registry.Suite{
 			Name:        c.name,
 			Description: c.description,
 			Consumes:    consumes,
 			Corpora:     r.corpora[c.name],
 			Outputs:     registryOutputs(c.outputs),
 			Rejects:     propertyNames(c.rejects),
-		})
+		}
+		if cl := c.classifier; cl != nil {
+			s.Classifier = &registry.Classifier{Name: cl.name, Description: cl.description}
+		}
+		g.Suites = append(g.Suites, s)
 	}
 	return g
 }

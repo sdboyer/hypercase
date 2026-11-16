@@ -14,6 +14,7 @@ import (
 	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/internal/diff"
 	"github.com/sdboyer/hypercase/internal/erase"
+	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/jenny"
 )
 
@@ -68,18 +69,8 @@ func checkTransforms(t *corpusType) {
 		if tr.generate == nil {
 			refuse(fmt.Sprintf("the transform %s, of the corpus type %s, has no Jenny. Give it the jenny that makes its variant's input view from the base's.", tr.name, t.goType))
 		}
-		for _, list := range []struct {
-			verb string
-			ps   []decl.Property
-		}{{"gives", tr.gives}, {"keeps", tr.keeps}} {
-			for j, p := range list.ps {
-				for _, q := range list.ps[:j] {
-					if p.Name == q.Name {
-						refuse(fmt.Sprintf("the transform %s %s %s twice. List each property once.", tr.name, list.verb, p.Name))
-					}
-				}
-			}
-		}
+		checkListed("the transform "+tr.name, "Gives", tr.gives)
+		checkListed("the transform "+tr.name, "Keeps", tr.keeps)
 		for _, p := range tr.gives {
 			for _, q := range tr.keeps {
 				if p.Name == q.Name {
@@ -136,22 +127,9 @@ func (r *runner) checkTransformRelations(t *testing.T, owned []*transform) bool 
 	}
 	for _, ct := range r.types {
 		for _, tr := range ct.transforms {
-			for _, list := range []struct {
-				verb, field string
-				ps          []decl.Property
-			}{{"gives", "Gives", tr.gives}, {"keeps", "Keeps", tr.keeps}} {
-				for _, p := range list.ps {
-					q, found := reg.property(p.Name)
-					switch {
-					case !found:
-						t.Errorf("the transform %s, of the corpus type %s, %s %s, and the package registers no property of that name.\nRegister the property, or remove it from %s's %s.", tr.name, ct.goType, list.verb, p.Name, tr.name, list.field)
-						ok = false
-					case q != p:
-						t.Errorf("the transform %s %s a property named %s, which the package registers with another description.\nList the registered property: declare it once, and use that declaration in both places.", tr.name, list.verb, p.Name)
-						ok = false
-					}
-				}
-			}
+			what := fmt.Sprintf("the transform %s, of the corpus type %s,", tr.name, ct.goType)
+			ok = checkRegistered(t, what, "gives", tr.name+"'s Gives", tr.gives) && ok
+			ok = checkRegistered(t, what, "keeps", tr.name+"'s Keeps", tr.keeps) && ok
 		}
 	}
 	return ok
@@ -167,16 +145,22 @@ type plannedVariant struct {
 	properties []string
 	gaps       []archive.Gap
 	committed  archive.VariantCase
-	view       fs.FS // a hand-written variant's
 
 	// A transform's variant.
 	tr       *transform
 	declined string            // why the transform declines the base
 	problem  string            // what went wrong making the variant
 	made     map[string][]byte // the input view the transform made
+	sections []archive.Section // the sections that record it
 }
 
 func (v *plannedVariant) caseName() string { return v.kind + "/" + v.name }
+
+// states says what the transform's variants state, for a message about
+// what one of them states.
+func (tr *transform) states() string {
+	return fmt.Sprintf("The variant states what %s gives, and each property it keeps that the base states.", tr.name)
+}
 
 // runs reports whether the variant's cells run.
 func (v *plannedVariant) runs() bool {
@@ -184,8 +168,12 @@ func (v *plannedVariant) runs() bool {
 }
 
 // planVariants plans an archive's variants: its hand-written ones, in the
-// order written, then one per transform of its corpus type, by name.
-func (r *runner) planVariants(p *plan, a *archive.Archive) []*plannedVariant {
+// order written, then one per transform of its corpus type, by name. Each
+// transform runs here, on the base's input view, since whether its variant
+// has cells sets the count of each suite's cells, which doesn't depend on
+// -run. It makes the view if a transform runs, and drops it once the
+// archive is planned; runCase makes it again for the base's cells.
+func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []*plannedVariant {
 	var vs []*plannedVariant
 	committed := map[string]archive.VariantCase{}
 	for _, v := range a.Variants() {
@@ -201,12 +189,12 @@ func (r *runner) planVariants(p *plan, a *archive.Archive) []*plannedVariant {
 			properties: v.Properties,
 			gaps:       v.Gaps,
 			committed:  v,
-			view:       a.VariantView(v),
 		})
 	}
 	trs := slices.Clone(p.root.transforms)
 	slices.SortFunc(trs, func(a, b *transform) int { return strings.Compare(a.name, b.name) })
-	base := a.Properties()
+	stated, gaps := a.Properties(), a.Gaps()
+	var view fs.FS
 	for _, tr := range trs {
 		v := &plannedVariant{
 			kind:      archive.Transform,
@@ -216,39 +204,30 @@ func (r *runner) planVariants(p *plan, a *archive.Archive) []*plannedVariant {
 			committed: committed[tr.name],
 			tr:        tr,
 		}
-		for _, g := range a.Gaps() {
+		for _, g := range gaps {
 			if g.Transform == tr.name {
 				v.gaps = append(v.gaps, g)
 			}
 		}
-		for _, p := range tr.gives {
-			v.properties = append(v.properties, p.Name)
-		}
 		var neither []string
-		for _, name := range base {
-			switch {
-			case slices.ContainsFunc(tr.keeps, func(p decl.Property) bool { return p.Name == name }):
-				if !slices.Contains(v.properties, name) {
-					v.properties = append(v.properties, name)
-				}
-			case !slices.ContainsFunc(tr.gives, func(p decl.Property) bool { return p.Name == name }):
-				neither = append(neither, name)
-			}
-		}
+		v.properties, neither = registry.VariantProperties(propertyNames(tr.gives), propertyNames(tr.keeps), stated)
 		if len(neither) > 0 {
 			v.declined = fmt.Sprintf("the base states %s, which %s neither gives nor keeps", andList(neither), tr.name)
 		} else {
-			r.makeVariant(v, a)
+			if view == nil {
+				view = base.View()
+			}
+			r.makeVariant(v, base, view)
 		}
 		vs = append(vs, v)
 	}
 	return vs
 }
 
-// makeVariant runs a transform on a base: its probe, then its jenny.
-func (r *runner) makeVariant(v *plannedVariant, a *archive.Archive) {
+// makeVariant runs a transform on a base, whose input view is view: its
+// probe, then its jenny.
+func (r *runner) makeVariant(v *plannedVariant, base archive.Base, view fs.FS) {
 	tr := v.tr
-	view := a.View()
 	if tr.probe != nil {
 		var why string
 		var ok bool
@@ -279,9 +258,13 @@ func (r *runner) makeVariant(v *plannedVariant, a *archive.Archive) {
 	files := map[string][]byte{}
 	var held []string
 	for _, f := range made.AsFiles() {
-		data, err := f.Render()
-		if err != nil {
-			v.problem = fmt.Sprintf("%s made %s, which doesn't render: %v\nFix its jenny.", tr.name, f.Path(), err)
+		// A jenny's FS renders each file it adds, and AsFiles gives each
+		// one as Bytes, so no transform reaches this, and no test does: it
+		// guards against a change to jenny, which would otherwise record
+		// an unrendered file as empty bytes.
+		data, ok := jenny.BytesOf(f)
+		if !ok {
+			v.problem = fmt.Sprintf("%s made %s, which its FS gave as a %T, not as rendered bytes. An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase.", tr.name, f.Path(), f)
 			return
 		}
 		if err := archive.Holds(data); err != nil {
@@ -293,30 +276,23 @@ func (r *runner) makeVariant(v *plannedVariant, a *archive.Archive) {
 		v.problem = fmt.Sprintf("%s made files an archive can't hold:\n%s\nFix its jenny.", tr.name, strings.Join(held, "\n"))
 		return
 	}
-	sections := a.VariantSections(archive.Transform, tr.name, files)
+	if ns := archive.Nested(files); len(ns) > 0 {
+		v.problem = fmt.Sprintf("%s made an input view no file tree holds: it holds %s.\nFix its jenny.", tr.name, strings.Join(ns, "; "))
+		return
+	}
+	sections := base.VariantSections(archive.Transform, tr.name, files)
 	if len(sections) == 0 {
 		v.problem = fmt.Sprintf("%s made an input view equal to the base's. A variant changes the base.\nMake its probe decline such a base.", tr.name)
 		return
 	}
-	// The variant's sections, beside the base's, are an archive of their
-	// own, with no problem of form.
-	scratch := &archive.Archive{}
-	for _, s := range a.Sections {
-		if kind, _, _ := archive.SplitCase(s.Name); kind == "" {
-			scratch.Sections = append(scratch.Sections, s)
-		}
-	}
-	scratch.Sections = append(scratch.Sections, sections...)
-	if ps := scratch.Check(); len(ps) > 0 {
+	// The variant's sections, as an archive of their own, have no problem
+	// of form. The base's are left out: the archive's check passed them,
+	// and it reads a transform's variant apart from the base.
+	if ps := (&archive.Archive{Sections: sections}).Check(); len(ps) > 0 {
 		v.problem = fmt.Sprintf("%s made a variant an archive can't hold:\n%s\nFix its jenny: what it makes is the variant's whole input view, with the trees as its top-level directories.", tr.name, problemList(ps))
 		return
 	}
-	v.made = files
-}
-
-// madeSections are the sections that record the transform's variant.
-func (v *plannedVariant) madeSections(a *archive.Archive) []archive.Section {
-	return a.VariantSections(archive.Transform, v.name, v.made)
+	v.made, v.sections = files, sections
 }
 
 // inputs returns the committed sections that record a transform's
@@ -336,10 +312,15 @@ func (v *plannedVariant) inputs(a *archive.Archive) []archive.Section {
 // transform, judges the variant's inputs.
 func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVariant, w *caseWrites) {
 	c := r.newCase(p, pc, v.kind+"/"+v.name+"/", v.about, v.gapsAt, v.properties, v.gaps)
+	c.tr = v.tr
 	owner := v.tr != nil && r.owned[v.tr]
+	// stale is whether a failing cell may be one the module's update
+	// fixes: another package's normal run reads committed inputs that may
+	// differ from what the transform makes.
+	stale := false
 	switch {
 	case v.tr == nil:
-		c.setView(p, v.view)
+		c.setView(p, pc.base.VariantView(v.committed))
 	case v.problem != "" && owner:
 		t.Errorf("%s\n%s", c.header(), v.problem)
 		return
@@ -348,42 +329,82 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	case v.declined != "":
 		r.declined(t, c, p, pc, v, owner, w)
 		return
-	default:
+	case r.update || !v.committed.Inputs:
+		// An update runs the cells on what the transform makes, in every
+		// package: what it writes depends on the inputs and the code
+		// alone, never on sections an update wrote.
 		if owner {
 			r.judgeInputs(t, c, pc, v, w)
 		}
-		view := v.made
-		if !r.update && v.committed.Inputs {
-			view = nil
+		c.setView(p, archive.NewFS(v.made))
+	default:
+		// A normal run reads the inputs the archive holds.
+		view, invalid := pc.base.InputView(v.committed)
+		if len(invalid) > 0 {
+			// An update reads what the transform makes instead, and its
+			// owner's rewrites them.
+			t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\nThe module's update, %s, rewrites them, in the package that owns %s.%s", c.header(), v.name, problemList(invalid), r.updateCmd(), v.name, r.ifUnowned(v))
+			return
 		}
-		if view != nil {
-			c.setView(p, archive.NewFS(view))
-		} else {
-			c.setView(p, pc.a.VariantView(v.committed))
+		if owner {
+			r.judgeInputs(t, c, pc, v, w)
+		}
+		stale = !owner
+		c.setView(p, view)
+	}
+	results := r.runCells(t, c, p.cols, w)
+	if !stale || !t.Failed() {
+		return
+	}
+	// However its cells failed, the failures may be the inputs'.
+	m := v.inputDiffs(pc.a)
+	if m.empty() {
+		return
+	}
+	// An update writes a frozen cell only to add an outcome it lacks, when
+	// its other files match the run and nothing keeps the update from
+	// writing it, so it rewrites none of those, and one whose files differ
+	// from its run's is checked on the new inputs.
+	cells := "the variant's cells."
+	frozen := false
+	var differs []string
+	for i, col := range p.cols {
+		if _, marked := c.gap(col.name); marked && len(c.goldens(col.name)) > 0 {
+			frozen = true
+		}
+		if results[i].frozenDiffers {
+			differs = append(differs, col.name+"'s")
 		}
 	}
-	r.runCells(t, c, p.cols, w)
+	if frozen {
+		cells = "the variant's cells but the frozen ones, to which an update only adds an outcome they lack, when their other files match the run and nothing keeps the update from writing them."
+	}
+	if len(differs) > 0 {
+		cells += fmt.Sprintf(" A normal run checks each frozen cell whose files differ, here %s, again on the rewritten inputs, against its committed files.", andList(differs))
+	}
+	t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and %s%s", c.header(), v.name, v.name, m, v.name, r.updateCmd(), v.name, cells, r.ifUnowned(v))
 }
 
-// judgeInputs compares a transform's committed inputs with those it made,
-// as goldens, in the package that owns it. An update writes them whole.
-func (r *runner) judgeInputs(t *testing.T, c *aCase, pc plannedCase, v *plannedVariant, w *caseWrites) {
-	t.Helper()
-	made := v.madeSections(pc.a)
-	if r.update {
-		w.replaceInputs(v.name, made)
-		return
+// ifUnowned is what a message that names the update in the package that
+// owns a transform adds, in a package that doesn't own it: that package
+// can't know some package does, and the root-package check reports a
+// transform no package owns.
+func (r *runner) ifUnowned(v *plannedVariant) string {
+	if r.owned[v.tr] {
+		return ""
 	}
-	if !v.committed.Inputs {
-		t.Errorf("%s\n%s's variant of the base isn't written: the archive holds none of its inputs.\nRun %s to write them, and read them before committing.", c.header(), v.name, r.updateCmd())
-		return
-	}
+	return fmt.Sprintf(" If no package owns %s, the root-package check says so, and no update rewrites the inputs.", v.name)
+}
+
+// inputDiffs says how the committed inputs of a transform's variant differ
+// from those it made.
+func (v *plannedVariant) inputDiffs(a *archive.Archive) *msg {
 	committed := map[string][]byte{}
-	for _, s := range v.inputs(pc.a) {
+	for _, s := range v.inputs(a) {
 		committed[s.Name] = s.Data
 	}
 	m := &msg{}
-	for _, s := range made {
+	for _, s := range v.sections {
 		g, ok := committed[s.Name]
 		switch {
 		case !ok:
@@ -396,7 +417,22 @@ func (r *runner) judgeInputs(t *testing.T, c *aCase, pc plannedCase, v *plannedV
 	for _, name := range slices.Sorted(maps.Keys(committed)) {
 		m.add("%s is no longer made", name)
 	}
-	if !m.empty() {
+	return m
+}
+
+// judgeInputs compares a transform's committed inputs with those it made,
+// as goldens, in the package that owns it. An update writes them whole.
+func (r *runner) judgeInputs(t *testing.T, c *aCase, pc plannedCase, v *plannedVariant, w *caseWrites) {
+	t.Helper()
+	if r.update {
+		w.replaceInputs(v.name, v.sections)
+		return
+	}
+	if !v.committed.Inputs {
+		t.Errorf("%s\n%s's variant of the base isn't written: the archive holds none of its inputs.\nRun %s to write them, and read them before committing.", c.header(), v.name, r.updateCmd())
+		return
+	}
+	if m := v.inputDiffs(pc.a); !m.empty() {
 		t.Errorf("%s\n%s's variant of the base differs from its committed inputs:\n%s\nIf the change is intended, run %s and read the diff before committing.", c.header(), v.name, m, r.updateCmd())
 	}
 }

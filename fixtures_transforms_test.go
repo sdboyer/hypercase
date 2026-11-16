@@ -29,6 +29,7 @@ import (
 //	tr/flat         the jenny adds a file outside any tree
 //	tr/marker       the jenny adds do/out/m.txt, with a line shaped like a
 //	                section marker
+//	tr/nest         the jenny adds tr/nest/x, below the file tr/nest
 func steeredTransform(name, description string, change func(files map[string][]byte), decline func(in fs.FS) (string, bool)) decl.Transform[Script] {
 	return decl.Transform[Script]{
 		Name:        name,
@@ -67,6 +68,9 @@ func steeredTransform(name, description string, change func(files map[string][]b
 			}
 			if _, ok := files["tr/marker"]; ok {
 				files["do/out/m.txt"] = []byte("a\n-- x --\n")
+			}
+			if _, ok := files["tr/nest"]; ok {
+				files["tr/nest/x"] = []byte("x\n")
 			}
 			var out jenny.Files
 			for _, p := range slices.Sorted(maps.Keys(files)) {
@@ -113,8 +117,33 @@ var (
 		tr.Keeps = []decl.Property{circular, dangling}
 		return tr
 	}()
+	// upperTwice is upper with its jenny's code changed: it uppercases
+	// every file under do/out/, and doubles it. Its declaration is upper's.
+	upperTwice = func() decl.Transform[Script] {
+		tr := steeredTransform("upper", upper.Description,
+			func(files map[string][]byte) {
+				for p, data := range files {
+					if strings.HasPrefix(p, "do/out/") {
+						files[p] = bytes.Repeat(bytes.ToUpper(data), 2)
+					}
+				}
+			}, nil)
+		tr.Probe, tr.Keeps = upper.Probe, upper.Keeps
+		return tr
+	}()
 	// poke adds a file, for the ways a transform goes wrong.
 	poke = steeredTransform("poke", "Adds do/out/p.txt.", func(files map[string][]byte) { files["do/out/p.txt"] = []byte("poked\n") }, nil)
+	// trim removes a file, so its variants have a delete section, and adds
+	// one, so it makes a variant of any base.
+	trim = func() decl.Transform[Script] {
+		tr := steeredTransform("trim", "Removes do/out/values.txt, and adds do/out/k.txt.",
+			func(files map[string][]byte) {
+				delete(files, "do/out/values.txt")
+				files["do/out/k.txt"] = []byte("kept\n")
+			}, nil)
+		tr.Keeps = []decl.Property{circular}
+		return tr
+	}()
 
 	transformType = decl.Type[Script]{Dir: "script", Description: scriptType.Description, Transforms: []decl.Transform[Script]{upper, looped}}
 	pokeType      = decl.Type[Script]{Dir: "script", Description: scriptType.Description, Transforms: []decl.Transform[Script]{poke}}
@@ -144,9 +173,23 @@ var transformRegistrations = map[string]func(){
 	"variants-b": func() { hypercase.Register(append([]any{project, scriptType, own(shout)}, sheetsProps...)...) },
 	"transforms": func() { transforms(transformType, own(echoRejects, looped, upper)) },
 	"tr-ladder":  func() { transforms(transformType, own(parse, resolve, looped, upper)) },
-	"tr-unowned": func() { transforms(transformType, own(echoRejects)) },
+	// evaluate's cell of looped's variant is blocked: resolve errs on it.
+	"tr-ladder-eval": func() { transforms(transformType, own(parse, resolve, evaluate, looped, upper)) },
+	"tr-unowned":     func() { transforms(transformType, own(echoRejects)) },
+	// tr-owns-looped leaves upper to another package.
+	"tr-owns-looped": func() { transforms(transformType, own(echoRejects, looped)) },
+	// tr-unowned-noroot is tr-unowned without the root-package check.
+	"tr-unowned-noroot": func() {
+		hypercase.Register(append([]any{project, transformType, own(echoRejects)}, sheetsProps...)...)
+	},
 	"tr-b": func() {
 		hypercase.Register(append([]any{project, transformType, own(withName(echoRejects, "copy"))}, sheetsProps...)...)
+	},
+	"tr-b-probe": func() {
+		hypercase.Register(append([]any{project, transformType, own(withName(withProbe(echoRejects), "copy"))}, sheetsProps...)...)
+	},
+	"tr-b-keep": func() {
+		hypercase.Register(append([]any{project, transformType, own(withName(withProbe(echoRejects), "copy"), withName(echoRejects, "keep"))}, sheetsProps...)...)
 	},
 	"tr-b-owns": func() {
 		hypercase.Register(append([]any{project, transformType, own(withName(echoRejects, "copy"), upper)}, sheetsProps...)...)
@@ -154,7 +197,20 @@ var transformRegistrations = map[string]func(){
 	"tr-b-differs": func() {
 		hypercase.Register(append([]any{project, typeWith(looped), own(withName(echoRejects, "copy"))}, sheetsProps...)...)
 	},
+	"tr-props": func() {
+		// looped gives nothing, so its variant's error is unexpected, and
+		// upper gives circular, which echo rejects and still passes.
+		lp, up := looped, upper
+		lp.Gives = nil
+		up.Gives, up.Keeps = []decl.Property{circular}, []decl.Property{dangling}
+		transforms(typeWith(up, lp), own(echoRejects, lp, up))
+	},
+	"tr-jenny": func() { transforms(typeWith(upperTwice, looped), own(echoRejects, looped, upperTwice)) },
+	"tr-b-jenny": func() {
+		hypercase.Register(append([]any{project, typeWith(upperTwice, looped), own(withName(echoRejects, "copy"))}, sheetsProps...)...)
+	},
 	"poke": func() { transforms(pokeType, own(echoRejects, poke)) },
+	"trim": func() { transforms(typeWith(trim), own(echoRejects, trim)) },
 	"poke-b": func() {
 		hypercase.Register(append([]any{project, pokeType, own(withName(echoRejects, "copy"))}, sheetsProps...)...)
 	},
@@ -186,6 +242,9 @@ var transformRegistrations = map[string]func(){
 	},
 	"tr-other-description": func() {
 		hypercase.Register(project, rootPkg, loop, dangling, typeWith(upper), own(withRejects(echo, loop), upper))
+	},
+	"tr-other-gives": func() {
+		hypercase.Register(project, rootPkg, loop, dangling, typeWith(looped), own(withRejects(echo, loop), looped))
 	},
 	"tr-no-description": func() {
 		tr := looped

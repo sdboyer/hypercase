@@ -12,6 +12,9 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # poke
         poke made files an archive can't hold:
           do/out/m.txt: its line 2 is shaped like a section marker, which starts another section when the archive is read
         Fix its jenny.
+    script/nest/transform/poke: Adds do/out/p.txt.
+        poke made an input view no file tree holds: it holds tr/nest, and tr/nest/x below it.
+        Fix its jenny.
     script/panic/transform/poke: Adds do/out/p.txt.
         poke panicked on the base: boom
         Fix its jenny.
@@ -36,6 +39,9 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # poke
         --- FAIL: TestCorpus/script/marker
             --- PASS: TestCorpus/script/marker/echo
             --- FAIL: TestCorpus/script/marker/transform/poke
+        --- FAIL: TestCorpus/script/nest
+            --- PASS: TestCorpus/script/nest/echo
+            --- FAIL: TestCorpus/script/nest/transform/poke
         --- FAIL: TestCorpus/script/panic
             --- PASS: TestCorpus/script/panic/echo
             --- FAIL: TestCorpus/script/panic/transform/poke
@@ -65,6 +71,9 @@ $ go test  # poke
         poke made files an archive can't hold:
           do/out/m.txt: its line 2 is shaped like a section marker, which starts another section when the archive is read
         Fix its jenny.
+    script/nest/transform/poke: Adds do/out/p.txt.
+        poke made an input view no file tree holds: it holds tr/nest, and tr/nest/x below it.
+        Fix its jenny.
     script/panic/transform/poke: Adds do/out/p.txt.
         poke panicked on the base: boom
         Fix its jenny.
@@ -89,6 +98,9 @@ $ go test  # poke
         --- FAIL: TestCorpus/script/marker
             --- PASS: TestCorpus/script/marker/echo
             --- FAIL: TestCorpus/script/marker/transform/poke
+        --- FAIL: TestCorpus/script/nest
+            --- PASS: TestCorpus/script/nest/echo
+            --- FAIL: TestCorpus/script/nest/transform/poke
         --- FAIL: TestCorpus/script/panic
             --- PASS: TestCorpus/script/panic/echo
             --- FAIL: TestCorpus/script/panic/transform/poke
@@ -112,6 +124,8 @@ poke fails on the base.
 x
 -- in/tr/error --
 the base is too big
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 x
 $ cat testdata/script/same.txtar
@@ -119,6 +133,8 @@ poke makes the base, unchanged.
 -- in/do/out/values.txt --
 x
 -- in/tr/same --
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 x
 $ cat testdata/script/probe-no.txtar
@@ -127,12 +143,15 @@ poke's probe says no, with a reason.
 x
 -- in/tr/probe --
 the base is too small
+-- out/echo/outcome --
+accepted
 -- out/echo/values.txt --
 x
 $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # poke-b
     script/error/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
     script/flat/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
     script/marker/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
+    script/nest/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
     script/panic/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
     script/probe-no/transform/poke: poke declines the base: the base is too small
     script/probe-none/transform/poke: the transform poke failed on the base, and the package that owns it reports why.
@@ -149,6 +168,9 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # poke-b
         --- PASS: TestCorpus/script/marker
             --- PASS: TestCorpus/script/marker/copy
             --- SKIP: TestCorpus/script/marker/transform/poke
+        --- PASS: TestCorpus/script/nest
+            --- PASS: TestCorpus/script/nest/copy
+            --- SKIP: TestCorpus/script/nest/transform/poke
         --- PASS: TestCorpus/script/panic
             --- PASS: TestCorpus/script/panic/copy
             --- SKIP: TestCorpus/script/panic/transform/poke

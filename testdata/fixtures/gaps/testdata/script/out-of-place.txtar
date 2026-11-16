@@ -9,3 +9,5 @@ a
 echo b.txt should say a. Waits on sheets#7.
 -- out/echo/a.txt --
 a
+-- out/echo/outcome --
+accepted

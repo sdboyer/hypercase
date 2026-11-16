@@ -25,6 +25,12 @@ type Project struct {
 	// newline. Without it, error.txt holds the error's text and a newline.
 	// A panic's error.txt is never rendered: it holds the panic value.
 	RenderError func(in fs.FS, err error) []byte
+	// Codes gives the codes of an error that a column's function returned,
+	// for the cell's outcome: rejected, then the codes, sorted, each once.
+	// A code is not empty, and holds no space, semicolon, carriage return
+	// or newline.
+	// Without Codes, a rejected cell carries no codes.
+	Codes func(err error) []string
 	// IssueLinks link the text that names an issue, in a gaps line or a
 	// description, to the issue: one per issue tracker the project's gaps
 	// lines name. The registry records them, and hypercase report reads

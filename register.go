@@ -44,6 +44,8 @@ func Register(items ...any) {
 			v.apply(&reg)
 		case columnDecl:
 			reg.addColumn(v.column())
+		case Check:
+			reg.addCheck(v)
 		default:
 			e, _ := erase.Of(item)
 			switch e := e.(type) {
@@ -54,7 +56,7 @@ func Register(items ...any) {
 			case *erase.Transform:
 				refuse(fmt.Sprintf("Register was given the transform %s. List it in its corpus type's Transforms, and pass it to hypercase.Own in the package that owns it.", e.Name))
 			default:
-				refuse(fmt.Sprintf("Register was given a %T, which is nothing hypercase registers. Pass a decl.Project, a decl.Property, a decl.Type, a hypercase.Suite or an option, such as hypercase.Own or hypercase.Root.", item))
+				refuse(fmt.Sprintf("Register was given a %T, which is nothing hypercase registers. Pass a decl.Project, a decl.Property, a decl.Type, a hypercase.Suite, a hypercase.Check or an option, such as hypercase.Own or hypercase.Root.", item))
 			}
 		}
 	}
@@ -71,14 +73,30 @@ type Option struct {
 // and lifts, [decl.Lift] values. The package runs their cells, and writes
 // and judges their sections. One package owns each column.
 //
+// Own also takes the corpus checks the package owns, [Check] values, as
+// Register does: it runs them, and writes and judges their findings.
+//
 // Own also takes the transforms the package owns, [decl.Transform] values:
-// it writes and judges their variants' inputs. A corpus type the package
+// it writes their variants' inputs, and judges them against what the
+// transforms make. Every package's normal run fails a variant the
+// transform makes whose inputs make no input view; for a base the
+// transform declines, the owner's normal run fails on any inputs the
+// archive holds. Every package's update runs the variants' cells on
+// what the transforms make, and every normal run on the inputs the archive
+// holds. So after a transform changed, the update of a package that
+// doesn't own it, alone, leaves that package's normal run failing on each
+// cell whose output on those inputs differs from what the update wrote,
+// until the module's update rewrites them. A corpus type the package
 // registers lists each, and one package owns each transform.
 func Own(columns ...any) Option {
 	return Option{apply: func(r *registrations) {
 		for _, item := range columns {
 			if c, ok := item.(columnDecl); ok {
 				r.addColumn(c.column())
+				continue
+			}
+			if c, ok := item.(Check); ok {
+				r.addCheck(c)
 				continue
 			}
 			if e, _ := erase.Of(item); e != nil {
@@ -91,7 +109,7 @@ func Own(columns ...any) Option {
 					continue
 				}
 			}
-			refuse(fmt.Sprintf("hypercase.Own was given a %T. It takes the columns the package owns, hypercase.Suite and decl.Lift values, and the transforms it owns, decl.Transform values.", item))
+			refuse(fmt.Sprintf("hypercase.Own was given a %T. It takes the columns the package owns, hypercase.Suite and decl.Lift values, the transforms it owns, decl.Transform values, and the corpus checks it owns, hypercase.Check values.", item))
 		}
 	}}
 }
@@ -166,6 +184,7 @@ type registrations struct {
 	columns    []*column // the owned suites and lifts
 	// ownedTransforms are the transforms given to Own.
 	ownedTransforms []*transform
+	checks          []Check
 	root            string // the corpus root, relative to the module root
 	rootSet         bool
 	rootPackage     bool
@@ -223,7 +242,15 @@ func (r *registrations) addColumn(c *column) {
 			refuseCorpusOfType(c, t)
 		}
 	}
-	checkRejects("suite", c.name, c.rejects)
+	if cl := c.classifier; cl != nil {
+		switch {
+		case !validName(cl.name):
+			refuse(fmt.Sprintf("the suite %s's classifier name %q breaks the naming rule: %s. Rename the classifier.", c.name, cl.name, nameRule))
+		case cl.classify == nil:
+			refuse(fmt.Sprintf("the suite %s's classifier %s has no Classify. Give it the function that gives a cell's detail.", c.name, cl.name))
+		}
+	}
+	checkListed("the suite "+c.name, "Rejects", c.rejects)
 	checkPatterns("suite", c.name, c.outputs)
 	r.checkColumnName("suite", c.name, c.describe())
 	r.columns = append(r.columns, c)
@@ -241,7 +268,7 @@ func (r *registrations) addLift(l *lift) {
 	case l.run == nil:
 		refuse(fmt.Sprintf("the lift %s has no Run. Give it the function that makes its product.", l.name))
 	}
-	checkRejects("lift", l.name, l.rejects)
+	checkListed("the lift "+l.name, "Rejects", l.rejects)
 	checkPatterns("lift", l.name, l.outputs)
 	for _, o := range l.outputs {
 		if a, _ := path.Match(o.Pattern, errorFile); !a {
@@ -290,11 +317,14 @@ func (r *registrations) checkColumnName(kind, name, what string) {
 	}
 }
 
-func checkRejects(kind, name string, rejects []decl.Property) {
-	for i, p := range rejects {
-		for _, q := range rejects[:i] {
+// checkListed refuses a property one of a registration's lists of
+// properties holds twice: what names the registration, as "the suite
+// echo", and field the list, as "Rejects".
+func checkListed(what, field string, ps []decl.Property) {
+	for i, p := range ps {
+		for _, q := range ps[:i] {
 			if p.Name == q.Name {
-				refuse(fmt.Sprintf("the %s %s rejects %s twice. List each property once.", kind, name, p.Name))
+				refuse(fmt.Sprintf("%s %s %s twice. List each property once.", what, strings.ToLower(field), p.Name))
 			}
 		}
 	}

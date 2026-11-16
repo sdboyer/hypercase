@@ -1,0 +1,12 @@
+pick returns no product, and a gaps line marks its cell.
+-- in/pick/none --
+-- in/walk/out/values.txt --
+A1 6
+-- gaps --
+pick The lift picks the script. Waits on sheets#14.
+-- out/format/outcome --
+blocked pick
+-- out/unpick/outcome --
+blocked pick
+-- out/walk/outcome --
+blocked pick

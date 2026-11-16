@@ -11,7 +11,13 @@ total
 malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
+-- out/calc/outcome --
+rejected
 -- out/evaluate/error.txt --
 D1: not a number or a formula: "total"
+-- out/evaluate/outcome --
+rejected
 -- out/format/error.txt --
 D1: not a number or a formula: "total"
+-- out/format/outcome --
+rejected

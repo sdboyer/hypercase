@@ -7,7 +7,7 @@ FAIL
 [exit 1]
 $ go test  # rejects-other-description
     the suite echo rejects a property named circular, which the package registers with another description.
-        Reject the registered property: declare it once, and use that declaration in both places.
+        Keep one declaration of circular, with one description: register it, and list it in echo's Rejects.
     No case runs until the registrations agree.
 --- FAIL: TestCorpus
 FAIL
@@ -35,9 +35,9 @@ $ go test  # rejects-registered-later
         -         "circular",
         -         "dangling"
         +         "circular"
-                ]
+                ],
+                "classifier": null
               }
-            ]
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
     script/reworded: A1 refers to itself, and the error is now worded differently.
         echo: Does what the case's do/ tree says.

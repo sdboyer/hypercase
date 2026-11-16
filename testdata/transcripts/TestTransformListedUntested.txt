@@ -1,0 +1,42 @@
+$ edit b/corpus_test.go  # a package b over the corpus
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # root-only
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # tr-b
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/copy
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/copy
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/copy
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/copy
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/copy
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/copy
+PASS
+$ go test  # root-only
+    the transform looped, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
+        Give it to hypercase.Own in one package that registers its corpus type.
+    the transform upper, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
+        Give it to hypercase.Own in one package that registers its corpus type.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ rm b/corpus_test.go  # remove b's tests, and leave its registry
+$ go test  # root-only
+    b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]

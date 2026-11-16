@@ -6,5 +6,11 @@ evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
 calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/calc/error.txt --
 A1: unexpected "-"
+-- out/calc/outcome --
+rejected
 -- out/evaluate/error.txt --
 A1: unexpected "-"
+-- out/evaluate/outcome --
+rejected
+-- out/format/outcome --
+skipped no formulas

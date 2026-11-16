@@ -1,0 +1,103 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # transforms
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+PASS
+$ edit testdata/script/twice.txtar  # freeze upper's echo cell as before outcomes were written, with the values the changed jenny's variant gives
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-jenny
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+PASS
+$ go test  # tr-jenny
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+PASS
+$ edit testdata/script/twice.txtar  # restore the settled archive
+$ edit testdata/script/twice.txtar  # freeze upper's echo cell as before outcomes were written, with the values the old inputs give
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-jenny
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "transform/upper echo The values are printed once. Waits on sheets#9."
+        Its committed files record today's behavior, and the run now produces different ones:
+        transform/upper/out/echo/values.txt differs (-committed +got):
+          A1 SIX
+        + A1 SIX
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- FAIL: TestCorpus/script/twice/transform/upper
+                --- FAIL: TestCorpus/script/twice/transform/upper/echo
+FAIL
+[exit 1]

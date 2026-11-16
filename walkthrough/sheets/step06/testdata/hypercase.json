@@ -1,8 +1,9 @@
 {
-  "format": 3,
+  "format": 5,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step06",
   "rootPackage": true,
+  "codes": false,
   "issueLinks": [],
   "properties": [
     {
@@ -22,7 +23,8 @@
     {
       "dir": "sheet",
       "description": "A spreadsheet: one file per cell under in/sheet/, holding a number or a formula.",
-      "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step06/sheetcorpus.Sheet"
+      "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step06/sheetcorpus.Sheet",
+      "transforms": []
     }
   ],
   "lifts": [
@@ -80,7 +82,8 @@
           "description": "Each cell's value, one per line, in cell order."
         }
       ],
-      "rejects": []
+      "rejects": [],
+      "classifier": null
     }
   ]
 }

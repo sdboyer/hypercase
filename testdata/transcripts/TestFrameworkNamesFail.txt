@@ -11,8 +11,6 @@ $ go test  # echo
         Rename the output. An update writes nothing for this cell.
         The run returned an output at stdout.txt, a name the framework owns under out/echo/.
         Rename the output. An update writes nothing for this cell.
-        out/echo/values.txt has no golden.
-        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/names

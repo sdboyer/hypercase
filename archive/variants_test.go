@@ -90,9 +90,10 @@ func TestVariantsWellFormed(t *testing.T) {
 		"transform/looped":  {"sheet/A1": "=A1\n", "sheet/B1": "3\n"},
 		"transform/renamed": {"sheet/A2": "=B2*2\n", "sheet/B2": "3\n"},
 	}
+	base := a.Base()
 	for _, v := range vs {
 		want := views[v.Case()]
-		view := a.VariantView(v)
+		view := base.VariantView(v)
 		var paths []string
 		for p := range want {
 			paths = append(paths, p)
@@ -117,7 +118,7 @@ func TestVariantsWellFormed(t *testing.T) {
 			files[p] = []byte(d)
 		}
 		var names, held []string
-		for _, s := range a.VariantSections(v.Kind, v.Name, files) {
+		for _, s := range base.VariantSections(v.Kind, v.Name, files) {
 			names = append(names, s.Name)
 			if d, ok := a.Section(s.Name); !ok || string(d) != string(s.Data) {
 				t.Errorf("%s: VariantSections gives %s as %q, and the archive holds %q", v.Case(), s.Name, s.Data, d)
@@ -132,7 +133,7 @@ func TestVariantsWellFormed(t *testing.T) {
 			t.Errorf("%s: VariantSections names %q, and the archive's inputs are %q", v.Case(), names, held)
 		}
 	}
-	if got := a.VariantSections(Transform, "same", map[string][]byte{"sheet/A1": []byte("=B1*2\n"), "sheet/B1": []byte("3\n")}); len(got) != 0 {
+	if got := base.VariantSections(Transform, "same", map[string][]byte{"sheet/A1": []byte("=B1*2\n"), "sheet/B1": []byte("3\n")}); len(got) != 0 {
 		t.Errorf("a view equal to the base's gives sections %v", got)
 	}
 }
@@ -221,7 +222,15 @@ func TestVariantProblems(t *testing.T) {
 		{"overlay and delete", "-- variant/cycle/in/sheet/B1 --\n=A1\n-- variant/cycle/delete --\nsheet/B1\n", []string{"variant/cycle/delete, line 1: the variant both lays sheet/B1 over the base and removes it"}},
 		{"equal view", "-- variant/same/about --\nThe same.\n-- variant/same/in/sheet/B1 --\n3\n", []string{"variant/same: the variant's input view equals the base's"}},
 		{"no inputs", "-- variant/bare/about --\nNothing changed.\n", []string{"variant/bare: the variant's input view equals the base's"}},
-		{"transform equal view", "-- transform/same/in/sheet/B1 --\n3\n", []string{"transform/same: the variant's input view equals the base's"}},
+		// A transform's in/ and delete are update-written, and how they
+		// differ from the base is its owner's to judge: a base edited by
+		// hand leaves none of these a problem of form.
+		{"transform equal view", "-- transform/same/in/sheet/B1 --\n3\n", nil},
+		{"transform delete a missing path", "-- transform/trim/in/sheet/A1 --\n1\n-- transform/trim/delete --\nsheet/C1\n", nil},
+		{"transform delete twice", "-- transform/trim/delete --\nsheet/B1\nsheet/B1\n", nil},
+		{"transform delete empty", "-- transform/trim/in/sheet/A1 --\n1\n-- transform/trim/delete --\n", nil},
+		{"transform overlay and delete", "-- transform/trim/in/sheet/B1 --\n=A1\n-- transform/trim/delete --\nsheet/B1\n", nil},
+		{"transform file below a base file", "-- transform/deep/in/sheet/B1/x --\n1\n", nil},
 		{"file below a base file", "-- variant/deep/in/sheet/B1/x --\n1\n", []string{"variant/deep: the variant's input view holds sheet/B1, and sheet/B1/x below it"}},
 		{"base after a variant", "-- variant/cycle/in/sheet/B1 --\n=A1\n-- properties --\ncircular\n", []string{"properties: the base's hand-written section sits after a variant's"}},
 		{"variant split", "-- variant/cycle/in/sheet/B1 --\n=A1\n-- variant/missing/delete --\nsheet/B1\n-- variant/cycle/properties --\ncircular\n", []string{"variant/cycle/properties: the section sits apart from variant/cycle's other hand-written sections"}},

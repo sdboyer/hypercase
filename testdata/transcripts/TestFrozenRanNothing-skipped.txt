@@ -1,0 +1,33 @@
+$ rm testdata/script/marked.txtar  # leave yes, which echo runs on
+$ rm testdata/script/no.txtar  # leave yes, which echo runs on
+$ rm testdata/script/noreason.txtar  # leave yes, which echo runs on
+$ rm testdata/script/panics.txtar  # leave yes, which echo runs on
+$ rm testdata/script/stale.txtar  # leave yes, which echo runs on
+$ edit testdata/script/frozen.txtar  # a frozen cell the probe now skips
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # probe
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/frozen: The probe now says no to a cell a gaps line freezes.
+        echo: Does what the case's do/ tree says.
+        gaps, line 1, marks the cell, and echo's probe says the case isn't for it: no formulas
+        Remove the line, or fix the probe.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/frozen
+            --- FAIL: TestCorpus/script/frozen/echo
+        --- PASS: TestCorpus/script/yes
+            --- PASS: TestCorpus/script/yes/echo
+FAIL
+[exit 1]
+$ go test  # probe
+    script/frozen: The probe now says no to a cell a gaps line freezes.
+        echo: Does what the case's do/ tree says.
+        gaps, line 1, marks the cell, and echo's probe says the case isn't for it: no formulas
+        Remove the line, or fix the probe.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/frozen
+            --- FAIL: TestCorpus/script/frozen/echo
+        --- PASS: TestCorpus/script/yes
+            --- PASS: TestCorpus/script/yes/echo
+FAIL
+[exit 1]

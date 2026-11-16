@@ -12,6 +12,7 @@ import (
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step05/sheetcorpus"
 )
 
+// doc:begin calc
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
@@ -21,7 +22,6 @@ func init() {
 	)
 }
 
-// doc:begin calc
 var calc = hypercase.Suite[fs.FS]{
 	Name:        "calc",
 	Description: "Runs the calc command on the sheet.",

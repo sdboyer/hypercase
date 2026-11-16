@@ -23,7 +23,7 @@ import (
 
 // Format is the version of what a registry holds. It changes on any change
 // to that.
-const Format = 4
+const Format = 5
 
 // Name is a registry's file name, in its package's testdata/ directory.
 const Name = "hypercase.json"
@@ -40,6 +40,9 @@ type Registry struct {
 	// RootPackage records that the package runs the root-package check for
 	// its corpus root.
 	RootPackage bool `json:"rootPackage"`
+	// Codes records that the project supplies Codes, which gives a
+	// rejected cell's outcome its codes.
+	Codes bool `json:"codes"`
 	// IssueLinks are the project's link patterns, which link text naming an
 	// issue to the issue.
 	IssueLinks []IssueLink `json:"issueLinks"`
@@ -88,6 +91,29 @@ type Transform struct {
 	Owned bool `json:"owned"`
 }
 
+// VariantProperties returns what a transform's variant of a base that
+// states base states: what the transform gives, then each property it
+// keeps that the base states, in the base's order. A transform declines a
+// base that states a property it neither gives nor keeps: neither lists
+// those, and the variant, which isn't made, states nothing.
+func VariantProperties(gives, keeps, base []string) (props, neither []string) {
+	props = slices.Clone(gives)
+	for _, p := range base {
+		switch {
+		case slices.Contains(keeps, p):
+			if !slices.Contains(props, p) {
+				props = append(props, p)
+			}
+		case !slices.Contains(gives, p):
+			neither = append(neither, p)
+		}
+	}
+	if len(neither) > 0 {
+		return nil, neither
+	}
+	return props, nil
+}
+
 // A Lift is a registered lift, which the package owns or only uses.
 type Lift struct {
 	Name        string `json:"name"`
@@ -118,6 +144,15 @@ type Suite struct {
 	Outputs []Output `json:"outputs"`
 	// Rejects names the properties the suite rejects.
 	Rejects []string `json:"rejects"`
+	// Classifier is the suite's classifier, which refines its cells'
+	// outcomes, or nil.
+	Classifier *Classifier `json:"classifier"`
+}
+
+// A Classifier is a suite's classifier.
+type Classifier struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // An Output is one of a column's output declarations.
