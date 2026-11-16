@@ -1879,7 +1879,8 @@ var Project = decl.Project{
 
 ### How the files change
 
-Every cell gains an `outcome` file, skipped and blocked cells included.
+Every cell gains an `outcome` file, skipped and blocked cells included, but
+for the failing cell of a lift that returns neither a product nor an error.
 
 `testdata/sheet/twice.txtar`, with its `missing` variant and its transforms'
 variants left out:
@@ -1954,7 +1955,8 @@ supplies `Codes`: step 5's shows them unset.
 
 - Each cell has an `outcome` file in its column's directory:
   `out/<column>/outcome`, and the same under a variant's prefix. The
-  framework writes it and compares it byte for byte.
+  framework writes it and compares it byte for byte. A cell that can't
+  have one fails, as below.
 - It holds the code's verdict, not the test's: `accepted`,
   `rejected <codes>`, `panicked`, `blocked <lift>` or `skipped <why>`. The
   first word is the state, and the rest is detail.
@@ -1967,6 +1969,15 @@ supplies `Codes`: step 5's shows them unset.
 - Skipped and blocked cells write an outcome, and their other committed
   files are orphans. A frozen one keeps the files it has, outcome
   included: its `gaps` line fails it already.
+- A lift whose function returns neither a product nor an error gives its
+  cell no outcome, since the code gave no verdict. The cell fails, an
+  update writes nothing for it, and the cells on the lift's product are
+  `blocked`.
+- A cell with no outcome fails whether or not a `gaps` line marks it: the
+  line freezes a cell's files, its outcome among them, and such a cell has
+  none. That holds for the lift's cell above, and for a cell whose
+  classifier or `Codes` fails, or whose code, reason or detail an outcome
+  can't hold (below).
 - The expected-error check reads what the run did, never the committed
   outcome. A cell that erred has the outcome `rejected`, so the two agree. A
   `panicked` cell fails unless a `gaps` line marks it.
