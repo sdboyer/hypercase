@@ -1,0 +1,26 @@
+outcome changed
+  sheet/div calc: accepted -> rejected S202
+    error.txt added
+    stdout.txt removed
+  sheet/div evaluate: accepted -> accepted div-zero
+appeared
+  sheet/ratio calc: accepted
+    stdout.txt added
+  sheet/ratio evaluate: accepted
+    values.txt added
+  sheet/ratio format: accepted
+    formulas.txt added
+  sheet/ratio parse: accepted
+  sheet/ratio resolve: accepted
+disappeared
+  sheet/blank format: skipped no formulas
+  sheet/blank parse: accepted
+bytes changed
+  sheet/loop calc: rejected S201
+    error.txt changed
+  sheet/loop resolve: rejected S201
+    error.txt changed
+  sheet/twice/variant/cycle calc: rejected S201
+    error.txt changed
+  sheet/twice/variant/cycle resolve: rejected S201
+    error.txt changed
