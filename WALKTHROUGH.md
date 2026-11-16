@@ -1654,17 +1654,19 @@ whether each has a probe, and whether the package owns it.
   makes, and names the module's update.
 - An update replaces a transform's `in/…` and `delete` whole: a file the
   transform no longer produces is removed, and the removal shows in the diff.
-- When a transform no longer applies to a base, its owner's update removes
-  its `in/…` and `delete`, and what remains under `transform/<name>/out/` is
+- When a transform no longer applies to a base, no cell runs on its
+  variant. Its owner's normal run fails on any `in/…` and `delete` the
+  archive still holds for it, whether or not they make an input view, and
+  its update removes them. What remains under `transform/<name>/out/` is
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
   root-package check reports them and names the strip command.
 - The package that owns a transform writes its `in/…` and `delete`, and
-  judges them against what the transform makes. Every package's normal run
-  fails a variant whose committed `in/…` and `delete` make no input view,
-  such as an empty `delete` or one that lists a path twice, and runs none
-  of its cells. Each column's owner writes and judges that column's cells
-  on the variant.
+  judges them against what the transform makes. When the transform makes
+  the variant, every package's normal run fails it if its committed `in/…`
+  and `delete` make no input view, such as an empty `delete` or one that
+  lists a path twice, and runs none of its cells. Each column's owner
+  writes and judges that column's cells on the variant.
 
 **Known gaps in a transform's variant.** A known gap in a cell of a
 transform's variant is a line in the base's `gaps` section that names the

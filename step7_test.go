@@ -283,7 +283,9 @@ func TestTransformBaseEdited(t *testing.T) {
 // TestTransformInvalidInputs: a transform's committed inputs edited by
 // hand into ones that make no input view are judged as inputs, never as
 // problems of form: a normal run, in any package, would read them, so it
-// fails the variant's cells, and the owner's update rewrites them.
+// fails the variant's cells, and the owner's update rewrites them. When
+// the transform declines the base, no run reads them, and only the
+// owner's fails, on their being there at all.
 func TestTransformInvalidInputs(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -320,6 +322,22 @@ func TestTransformInvalidInputs(t *testing.T) {
 		s.passes(s.normal("transforms"))
 		s.passes(s.run("b", "tr-b", false))
 	}
+
+	// Inputs for a base the transform declines are read by no cell. The
+	// owner's normal run fails on them, valid or not, and its update
+	// removes them; another package's run passes the variant by.
+	errs := "testdata/script/errs.txtar"
+	before := s.read(errs)
+	s.edit(errs, "give looped, which declines errs, an empty delete", insert("transform/looped/delete", "", "transform/upper/"))
+	r := s.normal("transforms")
+	s.fails(r, "script/errs/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.\n    transform/looped/delete is written, and looped declines the base: the base's do/ tree already errs\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to remove them.")
+	s.lacks(r, "are invalid")
+	b := s.run("b", "tr-b", false)
+	s.passes(b)
+	s.contains(b, "script/errs/transform/looped: looped declines the base: the base's do/ tree already errs")
+	s.passes(s.update("transforms"))
+	s.same(errs, before)
+	s.passes(s.normal("transforms"))
 	s.done()
 }
 
