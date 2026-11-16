@@ -213,7 +213,7 @@ func TestPaths(t *testing.T) {
 	s.fails(r, "*hypercase_test.Graph, which the lift back and the suite evaluate consume, is reached through the cycle resolve, back, so by more than one path:\n  hypercase_test.Script → parse → *hypercase_test.Parsed → resolve → *hypercase_test.Graph")
 	s.lacks(r, "--- PASS: TestCorpus/")
 	s.fails(s.normal("unreached"), "the suite evaluate consumes *hypercase_test.Graph, which no registered corpus type reaches.\nRegister the lift that produces it, or the corpus type.")
-	s.fails(s.normal("fs-suite"), "the suite raw consumes fs.FS, which no corpus type is. A column consumes a corpus type, for the raw trees, or a stage a lift reaches.\nDeclare a decl.Type for the archives' directory, and consume it.")
+	s.fails(s.normal("fs-lift"), "the lift parse-raw consumes fs.FS, which no corpus type is. A lift consumes a corpus type, for the raw trees, or a stage another lift reaches; only a suite runs over the raw input view, by naming a Corpus.\nDeclare a decl.Type for the archives' directory, and consume it.")
 	s.done()
 }
 
@@ -250,9 +250,8 @@ func TestLiftRefusals(t *testing.T) {
 		{"two-lifts-name", "panic: hypercase: two columns are named parse: the lift parse, from hypercase_test.Script to *hypercase_test.Parsed, and the lift parse, from hypercase_test.Grid to *hypercase_test.Parsed. Column names are unique; rename one."},
 		{"own-and-use", "panic: hypercase: the lift parse is given to both hypercase.Own and hypercase.Use. A package owns a lift, or only uses it: pass it to one."},
 		{"own-and-use-calls", "panic: hypercase: the lift parse is given to both hypercase.Own and hypercase.Use."},
-		{"bare-suite", "panic: hypercase: Register was given the suite calc. A package owns the suites it runs: pass it to hypercase.Own."},
 		{"bare-lift", "panic: hypercase: Register was given the lift parse. Pass it to hypercase.Own, in the package that owns its column, or to hypercase.Use, in a package that only reads its product."},
-		{"use-suite", "panic: hypercase: hypercase.Use was given the suite calc. It takes lifts only: a package runs only its own suites. Own the suite in the package that runs it."},
+		{"use-suite", "panic: hypercase: hypercase.Use was given the suite calc. It takes lifts only: a package runs only its own suites. Register the suite, or give it to hypercase.Own, in the package that runs it."},
 		{"own-other", "panic: hypercase: hypercase.Own was given a decl.Property. It takes the columns the package owns: hypercase.Suite and decl.Lift values."},
 	} {
 		r := s.normal(tt.reg)

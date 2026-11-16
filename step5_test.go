@@ -158,7 +158,7 @@ func TestSuiteRefusals(t *testing.T) {
 	for _, tt := range []struct{ reg, want string }{
 		{"bad-pattern", `panic: hypercase: the suite echo declares an output with the pattern "values[.txt", which is not a pattern of slash paths under out/echo/ in the syntax of path.Match.`},
 		{"bad-pattern-path", `panic: hypercase: the suite echo declares an output with the pattern "../values.txt", which is not a pattern`},
-		{"corpus-set", `panic: hypercase: the suite echo names the Corpus "script". A suite runs over the archives whose corpus type reaches the type it consumes. Declare a decl.Type with Dir "script", make the suite consume it or a stage it reaches, and remove Corpus.`},
+		{"corpus-set", `panic: hypercase: the suite echo consumes hypercase_test.Script and names the Corpus "script". Only a suite over the raw input view, fs.FS, names a Corpus: the type a suite consumes says which archives it runs over. Remove Corpus.`},
 		{"bad-dir", `panic: hypercase: the corpus type hypercase_test.Script declares the directory "Script", which breaks the naming rule`},
 		{"two-roots", `panic: hypercase: Register was given hypercase.Root a second time, with "b".`},
 		{"bad-root", `panic: hypercase: hypercase.Root was given "/abs", which is not a slash path relative to the module root`},

@@ -244,10 +244,10 @@ var liftRegistrations = map[string]func(){
 	"split-second": func() { ladder(project, direct, evaluate) },
 	"cycle":        func() { ladder(project, parse, resolve, back, evaluate) },
 	"unreached":    func() { ladder(project, evaluate) },
-	"fs-suite": func() {
-		hypercase.Register(project, rootPkg, scriptType, own(hypercase.Suite[fs.FS]{
-			Name: "raw", Description: "Reads the raw view.",
-			Run: func(testing.TB, string, fs.FS, io.Writer, io.Writer) ([]hypercase.File, error) { return nil, nil },
+	"fs-lift": func() {
+		hypercase.Register(project, rootPkg, scriptType, own(decl.Lift[fs.FS, *Parsed]{
+			Name: "parse-raw", Description: "Parses the raw view.",
+			Run: func(_ string, in fs.FS, _ io.Writer) (*Parsed, error) { return &Parsed{view: in}, nil },
 		}))
 	},
 	"two-types": func() {
@@ -307,10 +307,9 @@ var liftRegistrations = map[string]func(){
 		hypercase.Register(project, scriptType, hypercase.Use(parse))
 		hypercase.Register(own(parse))
 	},
-	"bare-suite": func() { hypercase.Register(project, scriptType, calc) },
-	"bare-lift":  func() { hypercase.Register(project, scriptType, parse) },
-	"use-suite":  func() { hypercase.Register(project, scriptType, hypercase.Use(calc)) },
-	"own-other":  func() { hypercase.Register(project, scriptType, own(malformed)) },
+	"bare-lift": func() { hypercase.Register(project, scriptType, parse) },
+	"use-suite": func() { hypercase.Register(project, scriptType, hypercase.Use(calc)) },
+	"own-other": func() { hypercase.Register(project, scriptType, own(malformed)) },
 
 	// Relations and descriptions.
 	"lift-rejects-unregistered": func() { hypercase.Register(project, rootPkg, scriptType, own(parse)) },

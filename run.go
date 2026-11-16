@@ -65,6 +65,7 @@ type runner struct {
 	update      bool
 	updateVar   string
 	renderError func(in fs.FS, err error) []byte
+	issueLinks  []decl.IssueLink
 	moduleRoot  string
 	pkgDir      string
 	rootRel     string // the corpus root, relative to the module root
@@ -74,7 +75,7 @@ type runner struct {
 	types       []*corpusType
 	lifts       []*lift             // owned and used
 	columns     []*column           // sorted by name
-	plans       []*plan             // one per corpus type, by directory
+	plans       []*plan             // one per corpus type and per suite's Corpus, by directory
 	corpora     map[string][]string // each lift's and suite's corpus directories, sorted
 	stats       map[string]*colStats
 }
@@ -101,6 +102,7 @@ func newRunner(t *testing.T) (*runner, bool) {
 	r := &runner{
 		updateVar:   project.UpdateVar,
 		renderError: project.RenderError,
+		issueLinks:  slices.Clone(project.IssueLinks),
 		rootRel:     rootRel,
 		rootPackage: rootPackage,
 		properties:  properties,
@@ -230,7 +232,7 @@ func (r *runner) requireRootCheck(t *testing.T, found []registry.Found) {
 		if err != nil {
 			continue
 		}
-		if g, err := registry.Parse(data); err == nil && g.CorpusRoot == r.rootRel && g.RootPackage {
+		if h, err := registry.Peek(data); err == nil && h.CorpusRoot == r.rootRel && h.RootPackage {
 			return
 		}
 	}

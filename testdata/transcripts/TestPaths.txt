@@ -136,8 +136,8 @@ $ go test  # unreached
 --- FAIL: TestCorpus
 FAIL
 [exit 1]
-$ go test  # fs-suite
-    the suite raw consumes fs.FS, which no corpus type is. A column consumes a corpus type, for the raw trees, or a stage a lift reaches.
+$ go test  # fs-lift
+    the lift parse-raw consumes fs.FS, which no corpus type is. A lift consumes a corpus type, for the raw trees, or a stage another lift reaches; only a suite runs over the raw input view, by naming a Corpus.
         Declare a decl.Type for the archives' directory, and consume it.
     No case runs until each type a column consumes is reached by one path.
 --- FAIL: TestCorpus

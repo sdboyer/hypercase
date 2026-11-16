@@ -15,10 +15,12 @@ import (
 )
 
 // Register registers what a package declares to hypercase: its project,
-// its properties, its corpus types, and its options, among them the
-// columns it owns and the lifts it uses. It is called when the package is
-// initialized, from an init function, before any test runs. A test
-// function runs what was registered with [Test], and registers nothing.
+// its properties, its corpus types, its suites, and its options, among
+// them the columns it owns and the lifts it uses. A suite given to
+// Register is one the package owns, as one given to [Own] is. It is called
+// when the package is initialized, from an init function, before any test
+// runs. A test function runs what was registered with [Test], and
+// registers nothing.
 //
 // A refusal, such as two columns with one name, panics with the message
 // the framework would otherwise print, so no test in the package runs. A
@@ -41,7 +43,7 @@ func Register(items ...any) {
 		case Option:
 			v.apply(&reg)
 		case columnDecl:
-			refuse(fmt.Sprintf("Register was given the suite %s. A package owns the suites it runs: pass it to hypercase.Own.", v.column().name))
+			reg.addColumn(v.column())
 		default:
 			e, _ := erase.Of(item)
 			switch e := e.(type) {
@@ -50,7 +52,7 @@ func Register(items ...any) {
 			case *erase.Lift:
 				refuse(fmt.Sprintf("Register was given the lift %s. Pass it to hypercase.Own, in the package that owns its column, or to hypercase.Use, in a package that only reads its product.", e.Name))
 			default:
-				refuse(fmt.Sprintf("Register was given a %T, which is nothing hypercase registers. Pass a decl.Project, a decl.Property, a decl.Type or an option, such as hypercase.Own or hypercase.Root.", item))
+				refuse(fmt.Sprintf("Register was given a %T, which is nothing hypercase registers. Pass a decl.Project, a decl.Property, a decl.Type, a hypercase.Suite or an option, such as hypercase.Own or hypercase.Root.", item))
 			}
 		}
 	}
@@ -99,7 +101,7 @@ func Use(lifts ...any) Option {
 				}
 			}
 			if c, ok := item.(columnDecl); ok {
-				refuse(fmt.Sprintf("hypercase.Use was given the suite %s. It takes lifts only: a package runs only its own suites. Own the suite in the package that runs it.", c.column().name))
+				refuse(fmt.Sprintf("hypercase.Use was given the suite %s. It takes lifts only: a package runs only its own suites. Register the suite, or give it to hypercase.Own, in the package that runs it.", c.column().name))
 			}
 			refuse(fmt.Sprintf("hypercase.Use was given a %T. It takes lifts, decl.Lift values.", item))
 		}
@@ -161,6 +163,14 @@ func (r *registrations) addProject(p decl.Project) {
 	if !updateVarRE.MatchString(p.UpdateVar) {
 		refuse(fmt.Sprintf("the project's UpdateVar, %q, is not an environment variable's name: uppercase ASCII letters, digits and underscores, starting with a letter. Name the variable that runs an update, such as RECIPES_UPDATE_GOLDEN.", p.UpdateVar))
 	}
+	for _, l := range p.IssueLinks {
+		if _, err := regexp.Compile(l.Pattern); err != nil {
+			refuse(fmt.Sprintf("the project's issue link pattern %q is not a regular expression: %v. Fix the pattern.", l.Pattern, err))
+		}
+		if strings.TrimSpace(l.URL) == "" {
+			refuse(fmt.Sprintf("the project's issue link pattern %q has no URL. Give the template of the issue's URL, such as https://example.com/sheets/issues/$1.", l.Pattern))
+		}
+	}
 	r.project = &p
 }
 
@@ -183,8 +193,20 @@ func (r *registrations) addColumn(c *column) {
 	if c.run == nil {
 		refuse(fmt.Sprintf("the suite %s has no Run. Give it the function that runs a case.", c.name))
 	}
-	if c.corpus != "" {
-		refuse(fmt.Sprintf("the suite %s names the Corpus %q. A suite runs over the archives whose corpus type reaches the type it consumes. Declare a decl.Type with Dir %q, make the suite consume it or a stage it reaches, and remove Corpus.", c.name, c.corpus, c.corpus))
+	switch {
+	case c.corpus != "" && c.consumes != fsType:
+		refuse(fmt.Sprintf("the suite %s consumes %s and names the Corpus %q. Only a suite over the raw input view, fs.FS, names a Corpus: the type a suite consumes says which archives it runs over. Remove Corpus.", c.name, c.consumes, c.corpus))
+	case c.consumes == fsType && c.corpus == "":
+		refuse(fmt.Sprintf("the suite %s consumes fs.FS and names no Corpus. Name the directory of the archives it runs over, testdata/<corpus>/ under the corpus root, or consume a corpus type.", c.name))
+	case c.corpus != "" && !validName(c.corpus):
+		refuse(fmt.Sprintf("the suite %s names the corpus %q, which breaks the naming rule: %s. Rename the corpus's directory.", c.name, c.corpus, nameRule))
+	case c.corpus == checksDir:
+		refuse(fmt.Sprintf("the suite %s names the corpus %s, a name reserved for the findings of corpus checks. Name another directory.", c.name, c.corpus))
+	}
+	for _, t := range r.types {
+		if c.corpus != "" && t.dir == c.corpus {
+			refuseCorpusOfType(c, t)
+		}
 	}
 	checkRejects("suite", c.name, c.rejects)
 	checkPatterns("suite", c.name, c.outputs)
@@ -289,7 +311,18 @@ func (r *registrations) addType(e *erase.Type) {
 			refuse(fmt.Sprintf("the corpus type %s is declared twice, with the directories %s and %s. A corpus type has one directory; register one declaration.", t.goType, o.dir, t.dir))
 		}
 	}
+	for _, c := range r.columns {
+		if c.corpus == t.dir {
+			refuseCorpusOfType(c, t)
+		}
+	}
 	r.types = append(r.types, t)
+}
+
+// refuseCorpusOfType refuses a suite's Corpus that a corpus type declares:
+// the suite would run over the type's archives on their raw input views.
+func refuseCorpusOfType(c *column, t *corpusType) {
+	refuse(fmt.Sprintf("the suite %s names the Corpus %s, and the corpus type %s declares that directory. An archive's directory gives its type: make the suite consume %s, or a stage it reaches, and remove Corpus.", c.name, t.dir, t.goType, t.goType))
 }
 
 // property returns the registered property of a name.

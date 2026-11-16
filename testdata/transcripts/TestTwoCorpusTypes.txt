@@ -37,10 +37,11 @@ $ go test  # two-types
 PASS
 $ cat testdata/hypercase.json
 {
-  "format": 2,
+  "format": 3,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
+  "issueLinks": [],
   "properties": [
     {
       "name": "malformed",
