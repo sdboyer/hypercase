@@ -98,9 +98,10 @@ func TestNestedModule(t *testing.T) {
 	fails(t, g, "", 1, []string{"report", c[0], c[1]}, "no registry records the corpus root .,")
 }
 
-// TestFormats: the report reads every registry format up to its own, and
-// refuses a newer one, saying to run the report from that revision's
-// hypercase.
+// TestFormats: the report reads its own registry format, and refuses
+// another, older or newer, saying to run the report from that revision's
+// hypercase. A registry of another corpus root is left unread, whatever
+// its format.
 func TestFormats(t *testing.T) {
 	t.Parallel()
 	arch := map[string]string{"x": "A case about sheets#4.\n-- out/calc/outcome --\naccepted\n"}
@@ -110,41 +111,32 @@ func TestFormats(t *testing.T) {
 		files["testdata/hypercase.json"] = data
 		return files
 	}
-
-	g := gittest.New(t)
-	c := revisions(t, g, withRegistry(module(nil), v1), module(arch))
-	if got, want := ok(t, g, "", "report", "-text", c[0], c[1]), "appeared\n  sheet/x calc: accepted\n"; got != want {
-		t.Errorf("from format 1 to %d, the report is:\n%s\nwant:\n%s", registry.Format, got, want)
-	}
-	page := ok(t, g, "", "report", c[0], c[1])
-	holds(t, "the page at today's format", page, `<a href="https://example.com/sheets/issues/4">sheets#4</a>`)
-	// Format 1 records no links.
-	page = ok(t, g, "", "report", c[1], c[0])
-	lacks(t, "the page at format 1", page, "<a ")
-
-	// A registry of another corpus root is left unread, whatever its
-	// format: format 1, or one newer than this hypercase reads.
 	later := registry.Format + 1
+
 	sibling := func(files map[string]string, data string) map[string]string {
 		files["sib/testdata/hypercase.json"] = data
 		return files
 	}
-	g = gittest.New(t)
-	c = revisions(t, g,
+	g := gittest.New(t)
+	c := revisions(t, g,
 		sibling(module(nil), strings.Replace(v1, `"corpusRoot": "."`, `"corpusRoot": "sib"`, 1)),
 		sibling(module(arch), fmt.Sprintf(`{"format": %d, "corpusRoot": "sib", "a field of a later hypercase": {}}`+"\n", later)))
 	if got, want := ok(t, g, "", "report", "-text", c[0], c[1]), "appeared\n  sheet/x calc: accepted\n"; got != want {
 		t.Errorf("beside another corpus root's registries, the report is:\n%s\nwant:\n%s", got, want)
 	}
 
-	for _, newer := range []string{
-		fmt.Sprintf(`{"format": %d, "issueLinks": "a field this hypercase doesn't know"}`+"\n", later),
-		fmt.Sprintf(`{"format": %d, "corpusRoot": ".", "issueLinks": "a field this hypercase doesn't know"}`+"\n", later),
+	for _, other := range []struct {
+		format int
+		data   string
+	}{
+		{1, v1},
+		{later, fmt.Sprintf(`{"format": %d, "issueLinks": "a field this hypercase doesn't know"}`+"\n", later)},
+		{later, fmt.Sprintf(`{"format": %d, "corpusRoot": ".", "issueLinks": "a field this hypercase doesn't know"}`+"\n", later)},
 	} {
 		g = gittest.New(t)
-		c = revisions(t, g, module(nil), withRegistry(module(arch), newer))
+		c = revisions(t, g, module(nil), withRegistry(module(arch), other.data))
 		want := []string{
-			fmt.Sprintf("hypercase report: testdata/hypercase.json at %s holds registry format %d, and this hypercase reads formats 1 to %d.\n", c[1], later, registry.Format) +
+			fmt.Sprintf("hypercase report: testdata/hypercase.json at %s holds registry format %d, and this hypercase reads format %d.\n", c[1], other.format, registry.Format) +
 				"Run the report from " + c[1] + "'s hypercase, which reads it: in a checkout of " + c[1] + ", run the same command as go run github.com/sdboyer/hypercase/cmd/hypercase.\n",
 		}
 		fails(t, g, "", 1, []string{"report", c[0], c[1]}, want...)

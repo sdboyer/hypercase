@@ -197,10 +197,9 @@ func load(rev Rev, tree fs.FS, mod, root string) (*snapshot, error) {
 	return s, nil
 }
 
-// readRegistry reads a registry of the corpus root rel, of any format up to
-// this hypercase's, and refuses a newer one, saying which hypercase reads
-// it. Another corpus root's registry it leaves unread, whatever its
-// format, and returns nil.
+// readRegistry reads a registry of the corpus root rel, and refuses one of
+// another format, saying which hypercase reads it. Another corpus root's
+// registry it leaves unread, whatever its format, and returns nil.
 func readRegistry(tree fs.FS, p, rel string, rev Rev) (*registry.Registry, error) {
 	data, err := fs.ReadFile(tree, p)
 	if err != nil {
@@ -209,19 +208,19 @@ func readRegistry(tree fs.FS, p, rel string, rev Rev) (*registry.Registry, error
 	if h, err := registry.Peek(data); err == nil && h.CorpusRoot != rel {
 		return nil, nil
 	}
-	g, err := registry.ParseAny(data)
+	g, err := registry.Parse(data)
 	if err != nil {
 		return nil, unreadable(p, rev, err)
 	}
 	return g, nil
 }
 
-// unreadable is the error of a registry that can't be read: one of a
-// newer format says which hypercase reads it.
+// unreadable is the error of a registry that can't be read: one of
+// another format says which hypercase reads it.
 func unreadable(p string, rev Rev, err error) error {
 	var fe *registry.FormatError
 	if errors.As(err, &fe) {
-		return fmt.Errorf("%s at %s holds registry format %d, and this hypercase reads formats 1 to %d.\n"+
+		return fmt.Errorf("%s at %s holds registry format %d, and this hypercase reads format %d.\n"+
 			"Run the report from %s's hypercase, which reads it: in a checkout of %s, run the same command as go run github.com/sdboyer/hypercase/cmd/hypercase.",
 			p, rev.Name, fe.Format, registry.Format, rev.Name, rev.Name)
 	}

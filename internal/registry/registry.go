@@ -169,7 +169,10 @@ func Parse(data []byte) (*Registry, error) {
 	if err := json.Unmarshal(data, &head); err != nil {
 		return nil, fmt.Errorf("it is not a registry: %w", err)
 	}
-	if head.Format != Format {
+	switch {
+	case head.Format < 1:
+		return nil, errors.New("it is not a registry: it holds no format version")
+	case head.Format != Format:
 		return nil, &FormatError{Format: head.Format}
 	}
 	var r Registry
@@ -181,134 +184,10 @@ func Parse(data []byte) (*Registry, error) {
 	return &r, nil
 }
 
-// ParseAny parses a registry of any format version this package reads,
-// from 1 to [Format], as a tool reads registries that other revisions
-// committed. An older format is given in today's form, with its own
-// Format. A newer one is a [*FormatError].
-//
-// Formats 1 and 2 had no corpus types and no lifts: a suite named its
-// corpus, a directory, and ran over its archives' raw input views. Such a
-// suite is given as today's suite over the raw input view, which consumes
-// [RawInput] over that one directory. Two lines of development each wrote
-// a format 2, one adding the issue links to format 1 and one the corpus
-// types and lifts; ParseAny reads both.
-func ParseAny(data []byte) (*Registry, error) {
-	var head map[string]json.RawMessage
-	if err := json.Unmarshal(data, &head); err != nil {
-		return nil, fmt.Errorf("it is not a registry: %w", err)
-	}
-	var format int
-	if err := json.Unmarshal(head["format"], &format); err != nil {
-		return nil, fmt.Errorf("it is not a registry: its format is no version number")
-	}
-	switch {
-	case format > Format:
-		return nil, &FormatError{Format: format}
-	case format == Format:
-		return Parse(data)
-	case format == 1:
-		var r v1
-		if err := decodeStrict(data, &r); err != nil {
-			return nil, err
-		}
-		return v2Links{Format: r.Format, UpdateVar: r.UpdateVar, CorpusRoot: r.CorpusRoot, RootPackage: r.RootPackage, Properties: r.Properties, Suites: r.Suites}.registry(), nil
-	case format == 2 && head["issueLinks"] != nil:
-		var r v2Links
-		if err := decodeStrict(data, &r); err != nil {
-			return nil, err
-		}
-		return r.registry(), nil
-	case format == 2:
-		var r v2Types
-		if err := decodeStrict(data, &r); err != nil {
-			return nil, err
-		}
-		g := Registry(r)
-		return &g, nil
-	}
-	return nil, fmt.Errorf("it is not a registry: format %d is no version of the registry's format", format)
-}
-
 // RawInput is the type a suite over the raw input view consumes, as
 // [Suite.Consumes] names it: the archives of the one directory in its
 // Corpora, with no corpus type.
 const RawInput = "io/fs.FS"
-
-// v1 is format 1: no issue links, no corpus types and no lifts.
-type v1 struct {
-	Format      int        `json:"format"`
-	UpdateVar   string     `json:"updateVar"`
-	CorpusRoot  string     `json:"corpusRoot"`
-	RootPackage bool       `json:"rootPackage"`
-	Properties  []Property `json:"properties"`
-	Suites      []v1Suite  `json:"suites"`
-}
-
-// v2Links is the format 2 that added the issue links to format 1.
-type v2Links struct {
-	Format      int         `json:"format"`
-	UpdateVar   string      `json:"updateVar"`
-	CorpusRoot  string      `json:"corpusRoot"`
-	RootPackage bool        `json:"rootPackage"`
-	IssueLinks  []IssueLink `json:"issueLinks"`
-	Properties  []Property  `json:"properties"`
-	Suites      []v1Suite   `json:"suites"`
-}
-
-// v2Types is the format 2 that added the corpus types and lifts to format
-// 1: format 3 without the issue links.
-type v2Types struct {
-	Format      int         `json:"format"`
-	UpdateVar   string      `json:"updateVar"`
-	CorpusRoot  string      `json:"corpusRoot"`
-	RootPackage bool        `json:"rootPackage"`
-	IssueLinks  []IssueLink `json:"-"`
-	Properties  []Property  `json:"properties"`
-	Types       []Type      `json:"types"`
-	Lifts       []Lift      `json:"lifts"`
-	Suites      []Suite     `json:"suites"`
-}
-
-// v1Suite is a suite of formats 1 and 2, which named its corpus.
-type v1Suite struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Corpus      string   `json:"corpus"`
-	Outputs     []Output `json:"outputs"`
-	Rejects     []string `json:"rejects"`
-}
-
-// registry gives the registry in today's form.
-func (r v2Links) registry() *Registry {
-	g := &Registry{
-		Format:      r.Format,
-		UpdateVar:   r.UpdateVar,
-		CorpusRoot:  r.CorpusRoot,
-		RootPackage: r.RootPackage,
-		IssueLinks:  r.IssueLinks,
-		Properties:  r.Properties,
-	}
-	for _, s := range r.Suites {
-		g.Suites = append(g.Suites, Suite{
-			Name:        s.Name,
-			Description: s.Description,
-			Consumes:    RawInput,
-			Corpora:     []string{s.Corpus},
-			Outputs:     s.Outputs,
-			Rejects:     s.Rejects,
-		})
-	}
-	return g
-}
-
-func decodeStrict(data []byte, v any) error {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
-		return fmt.Errorf("it is not a registry: %w", err)
-	}
-	return nil
-}
 
 // A Head is what every format of a registry holds, read without its
 // format's version.
