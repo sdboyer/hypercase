@@ -220,18 +220,13 @@ func pathString(ct *corpusType, path []*lift) string {
 // outcome that the archive commits for the case, and runs nothing before
 // them; an update reads the product the lift makes.
 type caseState struct {
-	archive string
-	plan    *plan
-	root    any
-	view    fs.FS // the case's input view
-	update  bool
-	// a and prefix give the case's committed sections, which a normal run
-	// reads past a bytes lift.
-	a        *archive.Archive
-	prefix   string
-	products map[*lift]*corpusType // each bytes lift's product's corpus type
-	runs     map[*lift]*liftRun
-	reads    map[*lift]*liftRead
+	r     *runner
+	c     *aCase
+	plan  *plan
+	root  any
+	view  fs.FS // the case's input view
+	runs  map[*lift]*liftRun
+	reads map[*lift]*liftRead
 }
 
 // A liftRun is what one call of a lift's function left. A bytes lift's
@@ -282,7 +277,7 @@ func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
 		return s.root, s.view, nil
 	}
 	l := s.plan.producer[typ]
-	if l.bytes && !s.update {
+	if l.bytes && !s.r.update {
 		rd := s.read(l)
 		return rd.value, rd.view, rd.block
 	}
@@ -313,8 +308,8 @@ func (s *caseState) read(l *lift) *liftRead {
 	}
 	rd := &liftRead{}
 	s.reads[l] = rd
-	section := s.prefix + archive.Out + "/" + l.name + "/" + archive.OutcomeFile
-	data, ok := s.a.Section(section)
+	section := s.c.out(l.name, archive.OutcomeFile)
+	data, ok := s.c.a.Section(section)
 	if !ok {
 		rd.block = &blockage{lift: l, failed: l.name, outcome: section, missing: true}
 		return rd
@@ -324,8 +319,8 @@ func (s *caseState) read(l *lift) *liftRead {
 	case err != nil:
 		rd.block = b
 	case o.State == archive.Accepted:
-		rd.view = archive.NewFS(committedUnder(s.a, l.viaDir(s.prefix)))
-		rd.value = s.products[l].new(rd.view)
+		rd.view = archive.NewFS(s.c.product(l))
+		rd.value = s.r.products[l].new(rd.view)
 	case o.State == archive.Blocked:
 		b.failed = o.Detail
 		rd.block = b
@@ -346,7 +341,7 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 	s.runs[l] = lr
 	if !l.bytes {
 		lr.out = call(func(o *called) {
-			lr.value, o.err = l.run(s.archive, in, &o.stderr)
+			lr.value, o.err = l.run(s.c.archive, in, &o.stderr)
 		})
 		lr.out.noProduct = !lr.out.panicked && lr.out.err == nil && lr.value == nil
 		return lr
@@ -356,10 +351,10 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 	if lr.out.panicked || lr.out.err != nil {
 		return lr
 	}
-	lr.product, lr.problems = productOf(l, s.prefix, made)
+	lr.product, lr.problems = productOf(l, s.c.prefix, made)
 	if len(lr.problems) == 0 {
 		lr.view = archive.NewFS(lr.product)
-		lr.value = s.products[l].new(lr.view)
+		lr.value = s.r.products[l].new(lr.view)
 	}
 	return lr
 }
