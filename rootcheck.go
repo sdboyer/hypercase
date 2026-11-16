@@ -71,6 +71,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	propEntries := map[string]map[string][]string{} // property → description → packages
 	propOrder := map[string][]string{}              // property → descriptions, in the order of the packages
 	transforms := map[string]map[string]bool{}      // directory → the transforms its corpus types list
+	needOwner := map[string]map[string]bool{}       // directory → the transforms its corpus types list in packages with tests
 	trPkgs := map[trKey][]string{}                  // transform → the packages that own it
 	untestedTrs := map[trKey][]string{}             // transform → the packages with no _test.go file whose registries own it
 	var rootPkgs []string
@@ -97,9 +98,10 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	for _, g := range regs {
 		// A registry in a package with no _test.go file records what no
 		// test runs, so its package owns and uses nothing: no column, lift
-		// or transform. Its sections stay claimed, since the registry's own
-		// error reports them, and the lifts and transforms it owns are kept
-		// apart, so a message that finds no owner names it.
+		// or transform. Nor does a transform it lists need an owner. Its
+		// sections stay claimed, since the registry's own error reports
+		// them, and the lifts and transforms it owns are kept apart, so a
+		// message that finds no owner names it.
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
 		}
@@ -134,8 +136,14 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			if transforms[ct.Dir] == nil {
 				transforms[ct.Dir] = map[string]bool{}
 			}
+			if g.tested && needOwner[ct.Dir] == nil {
+				needOwner[ct.Dir] = map[string]bool{}
+			}
 			for _, tr := range ct.Transforms {
 				transforms[ct.Dir][tr.Name] = true
+				if g.tested {
+					needOwner[ct.Dir][tr.Name] = true
+				}
 				if !tr.Owned {
 					continue
 				}
@@ -200,8 +208,8 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 		t.Errorf("the corpus directory %s has two different corpus types:\n%s\nAn archive's directory gives its type. %s", dir, strings.Join(lines, "\n"), fix)
 	}
-	for _, dir := range slices.Sorted(maps.Keys(transforms)) {
-		for _, name := range slices.Sorted(maps.Keys(transforms[dir])) {
+	for _, dir := range slices.Sorted(maps.Keys(needOwner)) {
+		for _, name := range slices.Sorted(maps.Keys(needOwner[dir])) {
 			switch pkgs := trPkgs[trKey{dir, name}]; {
 			case len(pkgs) == 0:
 				msg := fmt.Sprintf("the transform %s, of testdata/%s/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.", name, dir)

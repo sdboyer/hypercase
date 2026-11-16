@@ -746,6 +746,28 @@ func TestTransformOwnerUntested(t *testing.T) {
 	s.done()
 }
 
+// TestTransformListedUntested: a transform that only packages with no
+// _test.go file list, in their corpus types, needs no owner, as a lift
+// that only they use doesn't: nothing beyond their registries' failures
+// is reported.
+func TestTransformListedUntested(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "a package b over the corpus")
+	// The root package registers no corpus type, and b lists upper and
+	// looped, and owns neither.
+	s.passes(s.update("root-only"))
+	s.passes(s.run("b", "tr-b", true))
+	unowned := "the transform upper, of testdata/script/, is owned by no package"
+	s.fails(s.normal("root-only"), unowned)
+
+	s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
+	r := s.normal("root-only")
+	s.fails(r, "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.")
+	s.lacks(r, "is owned by no package", "no registry claims", "lists a transform")
+	s.done()
+}
+
 // TestTransformOwnerDropped: a package that drops a transform from Own,
 // with no update, leaves its registry recording that it owns it, so the
 // root-package check, which reads the registries, still counts it as the
