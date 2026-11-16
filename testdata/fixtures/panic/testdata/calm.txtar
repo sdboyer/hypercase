@@ -1,0 +1,5 @@
+A sheet the code handles, beside one it panics on.
+-- in/do/out/values.txt --
+A1 6
+-- out/echo/values.txt --
+A1 6

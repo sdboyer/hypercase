@@ -1,0 +1,20 @@
+$ go test  # echo
+    the fixture's database won't start
+    fatal: The run can't set up its fixture, and fails its test.
+        echo: Does what the case's do/ tree says.
+        The run failed its test, through its testing.TB.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/fatal
+        --- FAIL: TestCorpus/fatal/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    the fixture's database won't start
+    fatal: The run can't set up its fixture, and fails its test.
+        echo: Does what the case's do/ tree says.
+        The run failed its test, through its testing.TB. The update writes nothing for this cell.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/fatal
+        --- FAIL: TestCorpus/fatal/echo
+FAIL
+[exit 1]

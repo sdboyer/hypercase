@@ -1,0 +1,21 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/stale
+        --- PASS: TestCorpus/stale/echo
+    --- PASS: TestCorpus/stripped
+        --- PASS: TestCorpus/stripped/echo
+PASS
+$ cat testdata/stale.txtar
+One sheet, twice.
+-- in/do/out/a.txt --
+a
+-- in/do/out/b.txt --
+b
+-- in/do/stdout --
+printed
+-- out/echo/a.txt --
+a
+-- out/echo/b.txt --
+b
+-- out/echo/stdout.txt --
+printed

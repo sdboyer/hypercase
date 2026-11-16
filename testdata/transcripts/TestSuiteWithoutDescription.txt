@@ -1,0 +1,24 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo-nodesc
+    the suite echo has no description.
+        Add one: it says what the suite does, in prose.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/twice
+        --- PASS: TestCorpus/twice/echo
+FAIL
+[exit 1]
+$ cat testdata/twice.txtar
+A1 is twice B1, with no golden yet.
+-- in/do/out/values.txt --
+A1 6
+B1 3
+-- out/echo/values.txt --
+A1 6
+B1 3
+$ go test  # echo-nodesc
+    the suite echo has no description.
+        Add one: it says what the suite does, in prose.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/twice
+        --- PASS: TestCorpus/twice/echo
+FAIL
+[exit 1]

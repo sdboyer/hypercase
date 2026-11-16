@@ -1,0 +1,13 @@
+The run returns an output at each name the framework owns.
+-- in/do/out/error.txt --
+x
+-- in/do/out/inputs --
+x
+-- in/do/out/outcome --
+x
+-- in/do/out/stderr.txt --
+x
+-- in/do/out/stdout.txt --
+x
+-- in/do/out/values.txt --
+A1 6

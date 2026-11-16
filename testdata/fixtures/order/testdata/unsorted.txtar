@@ -1,0 +1,9 @@
+The goldens are out of name order.
+-- in/do/out/a.txt --
+a
+-- in/do/out/b.txt --
+b
+-- out/echo/b.txt --
+b
+-- out/echo/a.txt --
+a

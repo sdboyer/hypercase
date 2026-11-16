@@ -1,0 +1,7 @@
+A1 is twice B1.
+-- in/do/out/values.txt --
+A1 6
+B1 3
+-- out/echo/values.txt --
+A1 6
+B1 3

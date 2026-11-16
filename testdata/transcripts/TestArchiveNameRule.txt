@@ -1,0 +1,6 @@
+$ go test  # echo
+    testdata/Twice.txtar: the archive's name, "Twice", breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter.
+        Rename the archive.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]

@@ -29,9 +29,20 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
 
+      - name: Archives are not text
+        run: |
+          # No checkout may rewrite an archive's line endings.
+          git check-attr text -- testdata/x.txtar | grep -q 'text: unset'
+
+      - name: Vet
+        run: go vet ./...
+
       - name: Test
         run: go test ./...
 
       - name: Test the sheets toy
         working-directory: walkthrough/sheets
         run: go test ./...
+
+      - name: Tests change no tracked file
+        run: git diff --exit-code && test -z "$(git status --porcelain)"

@@ -1,0 +1,4 @@
+A sheet whose comment sets a parameter.
+cells: 1
+-- in/do/out/values.txt --
+A1 6

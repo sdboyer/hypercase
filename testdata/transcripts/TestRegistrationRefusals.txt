@@ -1,0 +1,51 @@
+$ go test  # bad-name
+panic: hypercase: the suite name "Echo" breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter. Rename the suite.
+[stack]
+[exit 2]
+$ go test -run=^$  # bad-name
+panic: hypercase: the suite name "Echo" breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter. Rename the suite.
+[stack]
+[exit 2]
+$ go test  # two-names
+panic: hypercase: two suites are named echo. Column names are unique; rename one.
+[stack]
+[exit 2]
+$ go test -run=^$  # two-names
+panic: hypercase: two suites are named echo. Column names are unique; rename one.
+[stack]
+[exit 2]
+$ go test  # no-run
+panic: hypercase: the suite echo has no Run. Give it the function that runs a case.
+[stack]
+[exit 2]
+$ go test -run=^$  # no-run
+panic: hypercase: the suite echo has no Run. Give it the function that runs a case.
+[stack]
+[exit 2]
+$ go test  # two-projects
+panic: hypercase: Register was given a decl.Project a second time. Register the project once per package.
+[stack]
+[exit 2]
+$ go test -run=^$  # two-projects
+panic: hypercase: Register was given a decl.Project a second time. Register the project once per package.
+[stack]
+[exit 2]
+$ go test  # unknown
+panic: hypercase: Register was given a int, which is nothing hypercase registers. Pass a decl.Project or a hypercase.Suite.
+[stack]
+[exit 2]
+$ go test -run=^$  # unknown
+panic: hypercase: Register was given a int, which is nothing hypercase registers. Pass a decl.Project or a hypercase.Suite.
+[stack]
+[exit 2]
+$ go test  # late
+--- FAIL: TestCorpus
+panic: hypercase: Register was called after a test started. Register what the package declares from an init function, before any test runs. [recovered, repanicked]
+[stack]
+[exit 2]
+$ go test  # no-project
+    the package registered no decl.Project.
+        Register the project, with its UpdateVar, from an init function.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]

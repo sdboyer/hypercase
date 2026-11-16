@@ -1,0 +1,9 @@
+Sections outside a tree or a column, and a file that is also a directory.
+-- in/A1 --
+6
+-- in/do/out/values.txt --
+A1 6
+-- in/do/out/values.txt/x --
+x
+-- out/values.txt --
+stale

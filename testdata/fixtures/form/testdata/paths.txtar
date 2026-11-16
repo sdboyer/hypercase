@@ -1,0 +1,9 @@
+Section names that aren't valid slash paths.
+-- in/../x --
+x
+-- in//x --
+x
+-- in/do/out/values.txt --
+A1 6
+-- out/echo/values.txt --
+stale
