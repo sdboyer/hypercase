@@ -823,8 +823,16 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			if !couldWrite {
 				closing = "The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell."
 			}
-			if len(productDiffs) > 0 {
-				closing = fmt.Sprintf("The cells past %s fail in normal runs until the frozen cell is resolved: an update writes them from the product %s makes now, and leaves its committed product in place, which a normal run reads.\n", col.name, col.name) + closing
+			// A normal run gives the cells past a bytes lift what its cell
+			// commits, and an update, which writes them unless it writes
+			// nothing for the lift's cell, what the lift makes now. They
+			// part when one outcome accepts and the other doesn't, or when
+			// both accept and the products differ.
+			if bytesLift && couldWrite {
+				was, is := accepts(goldens[outcomeFile]), accepts(files[outcomeFile])
+				if was != is || is && len(productDiffs) > 0 {
+					closing = fmt.Sprintf("The cells past %s fail in normal runs until the frozen cell is resolved: an update writes them from what %s makes now, and leaves the cell's committed outcome and product in place, which a normal run reads.\n", col.name, col.name) + closing
+				}
 			}
 			m.add("The cell is frozen by its known gap, %s line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s\n%s", c.gapsAt, gap.Line, gap.Raw, strings.Join(diffs, "\n"), closing)
 		case hasOutcome || !made || !couldWrite:
@@ -935,6 +943,13 @@ func committedUnder(a *archive.Archive, dir string) map[string][]byte {
 		}
 	}
 	return files
+}
+
+// accepts reports whether an outcome file's data says its cell accepted
+// the case. No data, or data that isn't an outcome, doesn't.
+func accepts(data []byte) bool {
+	o, err := archive.ParseOutcome(data)
+	return err == nil && o.State == archive.Accepted
 }
 
 // frozenDiffs says how the files a frozen cell's run made, got, differ from

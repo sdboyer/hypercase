@@ -312,7 +312,7 @@ func TestChainFrozen(t *testing.T) {
 	s.same(prices, frozen)
 
 	s.edit(prices, "import makes other values", set("in/import/out/evaluate/out/values.txt", "a1 4\nb1 8\n"))
-	changed := "The cell is frozen by its known gap, gaps line 1: \"import The importer reads quoted fields. Waits on sheets#9.\"\nIts committed files record today's behavior, and the run now produces different ones:\nvia/import/evaluate/out/values.txt differs (-committed +got):\n- a1 3\n- b1 6\n+ a1 4\n+ b1 8\nThe cells past import fail in normal runs until the frozen cell is resolved: an update writes them from the product import makes now, and leaves its committed product in place, which a normal run reads.\nIf the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/, and the next update writes them."
+	changed := "The cell is frozen by its known gap, gaps line 1: \"import The importer reads quoted fields. Waits on sheets#9.\"\nIts committed files record today's behavior, and the run now produces different ones:\nvia/import/evaluate/out/values.txt differs (-committed +got):\n- a1 3\n- b1 6\n+ a1 4\n+ b1 8\nThe cells past import fail in normal runs until the frozen cell is resolved: an update writes them from what import makes now, and leaves the cell's committed outcome and product in place, which a normal run reads.\nIf the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/, and the next update writes them."
 	n := s.normal("chain")
 	s.fails(n, changed)
 	s.contains(n, "--- PASS: TestCorpus/export/prices/evaluate")
@@ -331,6 +331,55 @@ func TestChainFrozen(t *testing.T) {
 	})
 	s.passes(s.normal("chain"))
 	s.done()
+}
+
+// TestChainFrozenOutcome: the cells past a frozen bytes lift's cell part
+// from normal runs whenever the cell's outcome accepts differently, as
+// they do when its product changes: an update writes them from what the
+// lift does now, and a normal run reads what the cell commits. empty's
+// product is empty, so only the outcome tells the two apart, in either
+// direction.
+func TestChainFrozenOutcome(t *testing.T) {
+	t.Parallel()
+	const empty = "testdata/export/empty.txtar"
+	const gapsLine = "import The importer reads quoted fields. Waits on sheets#9.\n"
+	const note = "The cells past import fail in normal runs until the frozen cell is resolved: an update writes them from what import makes now, and leaves the cell's committed outcome and product in place, which a normal run reads."
+	rejects := func(a *archive.Archive) {
+		insert("properties", "unterminated\n", "in/")(a)
+		insert("in/import/error", "line 1: unclosed quote\n", "in/import/note")(a)
+	}
+
+	t.Run("accepted to rejected", func(t *testing.T) {
+		t.Parallel()
+		s := newSandbox(t, "chain")
+		s.passes(s.update("chain"))
+		s.edit(empty, "a gaps line marks import's cell", insert("gaps", gapsLine, "in/"))
+		s.passes(s.normal("chain"))
+		s.edit(empty, "import now rejects empty", rejects)
+		s.fails(s.normal("chain"), "out/import/outcome differs (-committed +got):\n- accepted\n+ rejected", note)
+		s.fails(s.update("chain"), note)
+		s.hasSections(empty, map[string]string{"out/import/outcome": "accepted\n", "out/list/outcome": "blocked import\n"})
+		s.fails(s.normal("chain"), note, "--- FAIL: TestCorpus/export/empty/list")
+		s.done()
+	})
+
+	t.Run("rejected to accepted", func(t *testing.T) {
+		t.Parallel()
+		s := newSandbox(t, "chain")
+		s.edit(empty, "import rejects empty", rejects)
+		s.passes(s.update("chain"))
+		s.edit(empty, "a gaps line marks import's cell", insert("gaps", gapsLine, "in/"))
+		s.passes(s.normal("chain"))
+		s.edit(empty, "import accepts empty again, with an empty product", func(a *archive.Archive) {
+			drop("properties")(a)
+			drop("in/import/error")(a)
+		})
+		s.fails(s.normal("chain"), "out/import/outcome differs (-committed +got):\n- rejected\n+ accepted", note)
+		s.fails(s.update("chain"), note)
+		s.hasSections(empty, map[string]string{"out/import/outcome": "rejected\n", "out/list/outcome": "accepted\n"})
+		s.fails(s.normal("chain"), note, "--- FAIL: TestCorpus/export/empty/list")
+		s.done()
+	})
 }
 
 // TestChainSectionOrder: a case's via/ sections sit between its inputs and
@@ -391,6 +440,28 @@ func TestChainHeldBack(t *testing.T) {
 	for _, col := range []string{"evaluate", "parse", "resolve"} {
 		s.fails(u, "The update writes nothing for the cell of the lift import, on "+col+"'s path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.\nFix what import's cell reports.")
 	}
+	s.unchanged(before)
+	s.done()
+}
+
+// TestChainFrozenHeldBack: a frozen bytes lift's cell whose run differs,
+// and that an update couldn't write even unfrozen, holds the cells past
+// it back, so it doesn't say an update writes them.
+func TestChainFrozenHeldBack(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "chain-render")
+	quoted := "testdata/export/quoted.txtar"
+	s.passes(s.update("chain-render"))
+	s.edit(quoted, "a gaps line marks import's cell, import now rejects quoted, and the renderer panics on its error", func(a *archive.Archive) {
+		insert("gaps", "import The importer reads quoted fields. Waits on sheets#9.\n", "in/")(a)
+		insert("in/import/error", "line 1: unclosed quote\n", "in/quote/")(a)
+		insert("in/render/panic", "the renderer panicked\n", "via/")(a)
+	})
+	before := s.snapshot()
+	u := s.update("chain-render")
+	s.fails(u, "via/import/resolve/error is no longer produced\nThe problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.",
+		"The update writes nothing for the cell of the lift import, on parse's path")
+	s.lacks(u, "The cells past import fail in normal runs")
 	s.unchanged(before)
 	s.done()
 }
