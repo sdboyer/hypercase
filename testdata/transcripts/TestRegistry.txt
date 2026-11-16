@@ -6,10 +6,11 @@ $ go test  # echo
 PASS
 $ cat testdata/hypercase.json
 {
-  "format": 1,
+  "format": 2,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
+  "issueLinks": [],
   "properties": [],
   "suites": [
     {

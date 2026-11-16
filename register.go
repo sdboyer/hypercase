@@ -106,6 +106,14 @@ func (r *registrations) addProject(p decl.Project) {
 	if !updateVarRE.MatchString(p.UpdateVar) {
 		refuse(fmt.Sprintf("the project's UpdateVar, %q, is not an environment variable's name: uppercase ASCII letters, digits and underscores, starting with a letter. Name the variable that runs an update, such as RECIPES_UPDATE_GOLDEN.", p.UpdateVar))
 	}
+	for _, l := range p.IssueLinks {
+		if _, err := regexp.Compile(l.Pattern); err != nil {
+			refuse(fmt.Sprintf("the project's issue link pattern %q is not a regular expression: %v. Fix the pattern.", l.Pattern, err))
+		}
+		if strings.TrimSpace(l.URL) == "" {
+			refuse(fmt.Sprintf("the project's issue link pattern %q has no URL. Give the template of the issue's URL, such as https://example.com/sheets/issues/$1.", l.Pattern))
+		}
+	}
 	r.project = &p
 }
 

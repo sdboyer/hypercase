@@ -21,6 +21,9 @@ func (r *runner) ownRegistry() registry.Registry {
 		CorpusRoot:  r.rootRel,
 		RootPackage: r.rootPackage,
 	}
+	for _, l := range r.issueLinks {
+		g.IssueLinks = append(g.IssueLinks, registry.IssueLink{Pattern: l.Pattern, URL: l.URL})
+	}
 	for _, p := range r.properties {
 		g.Properties = append(g.Properties, registry.Property{Name: p.Name, Description: p.Description})
 	}

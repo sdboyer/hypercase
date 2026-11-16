@@ -12,6 +12,24 @@ type Project struct {
 	// variable covers every corpus in the project, and an update is the
 	// whole module's: UpdateVar=1 go test ./..., at the module root.
 	UpdateVar string
+	// IssueLinks link the text that names an issue, in a gaps line or a
+	// description, to the issue: one per issue tracker the project's gaps
+	// lines name. The registry records them, and hypercase report reads
+	// them from there.
+	IssueLinks []IssueLink
+}
+
+// An IssueLink links text that names an issue to the issue. Each match of
+// Pattern, in a gaps line or a description, links to the URL that the
+// template URL makes from it.
+type IssueLink struct {
+	// Pattern is a regular expression, in the syntax of package regexp,
+	// that matches text naming an issue: sheets#(\d+).
+	Pattern string
+	// URL is the template of the issue's URL. It may use the expression's
+	// groups, as regexp.Regexp.Expand does:
+	// https://example.com/sheets/issues/$1.
+	URL string
 }
 
 // A Property is a named fact about a case, such as circular: a sheet in

@@ -22,7 +22,7 @@ import (
 
 // Format is the version of what a registry holds. It changes on any change
 // to that.
-const Format = 1
+const Format = 2
 
 // Name is a registry's file name, in its package's testdata/ directory.
 const Name = "hypercase.json"
@@ -38,9 +38,19 @@ type Registry struct {
 	CorpusRoot string `json:"corpusRoot"`
 	// RootPackage records that the package runs the root-package check for
 	// its corpus root.
-	RootPackage bool       `json:"rootPackage"`
-	Properties  []Property `json:"properties"`
-	Suites      []Suite    `json:"suites"`
+	RootPackage bool `json:"rootPackage"`
+	// IssueLinks are the project's link patterns, which link text naming an
+	// issue to the issue.
+	IssueLinks []IssueLink `json:"issueLinks"`
+	Properties []Property  `json:"properties"`
+	Suites     []Suite     `json:"suites"`
+}
+
+// An IssueLink is one of the project's link patterns: a regular expression,
+// and the template of the URL that each match links to.
+type IssueLink struct {
+	Pattern string `json:"pattern"`
+	URL     string `json:"url"`
 }
 
 // A Property is a registered property.
@@ -72,6 +82,7 @@ type Output struct {
 // registered.
 func (r Registry) Marshal() []byte {
 	r.Format = Format
+	r.IssueLinks = sorted(r.IssueLinks, func(l IssueLink) string { return l.Pattern + "\x00" + l.URL })
 	r.Properties = sorted(r.Properties, func(p Property) string { return p.Name })
 	suites := sorted(r.Suites, func(s Suite) string { return s.Name })
 	for i, s := range suites {

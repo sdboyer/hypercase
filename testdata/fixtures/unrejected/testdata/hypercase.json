@@ -1,8 +1,9 @@
 {
-  "format": 1,
+  "format": 2,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
+  "issueLinks": [],
   "properties": [
     {
       "name": "circular",

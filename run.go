@@ -64,6 +64,7 @@ func Test(t *testing.T) {
 type runner struct {
 	update      bool
 	updateVar   string
+	issueLinks  []decl.IssueLink
 	moduleRoot  string
 	pkgDir      string
 	rootRel     string // the corpus root, relative to the module root
@@ -94,6 +95,7 @@ func newRunner(t *testing.T) (*runner, bool) {
 	}
 	r := &runner{
 		updateVar:   project.UpdateVar,
+		issueLinks:  slices.Clone(project.IssueLinks),
 		rootRel:     rootRel,
 		rootPackage: rootPackage,
 		properties:  properties,
