@@ -2289,7 +2289,18 @@ files, and its `Jenny` field, which a bytes lift gives in place of `Run`. The
 generator function, which here generates the product's files from the lift's
 input. It receives the input alone, so `import` finds its CSV by its tree,
 not by the archive's name. `view` gives each file of the sheet that
-`sheet.ImportCSV` returns as one of the jenny's files.
+`sheet.ImportCSV` returns as one of the jenny's files. `decl.Reject` marks
+the jenny's error as the lift's rejection of the case: the importer's error
+is one, and a CSV archive without exactly one CSV is no rejection, so it
+fails the cell.
+
+This step's snippets come from no example yet: no directory under
+`walkthrough/` holds them, and the doc golden checks none of them. The
+framework's self-tests check what the framework does with the error: it
+starts with the jenny's name, and `Codes` reaches the importer's error
+through the jenny and `decl.Reject`, so the outcome carries its code. The
+rest, such as what `RenderError` quotes, is the sheets code's, and
+untested.
 
 ```go
 // walkthrough/sheets/step10/sheetcorpus/types.go gains
@@ -2320,7 +2331,11 @@ var Import = decl.Lift[CSV, Sheet]{
 		if len(paths) != 1 {
 			return nil, fmt.Errorf("%d files under csv/, not one", len(paths))
 		}
-		return view(sheet.ImportCSV(in, paths[0]))
+		s, err := sheet.ImportCSV(in, paths[0])
+		if err != nil {
+			return nil, decl.Reject(err)
+		}
+		return view(s), nil
 	}),
 }
 ```
@@ -2419,10 +2434,20 @@ lift.
   input view. A pattern of `Product` that can match no such file fails the
   run.
 - A product file outside a tree or under `params/`, one that no declaration
-  or two declarations match, and one an archive can't hold, such as a file
-  with no final newline, fails the lift's cell. An update writes nothing for
-  that cell, and every cell past the lift fails, runs nothing, and is not
-  written either.
+  or two declarations match, and one an archive can't hold fail the lift's
+  cell, and an update writes nothing for that cell. An archive can't hold a
+  file with no final newline, or one whose name doesn't read back as
+  written, such as a name with a newline in it or a space at its end.
+- A bytes lift rejects a case only with an error that `decl.Reject` marks.
+  Any other error its jenny returns is a fault of the jenny, jenny's own
+  errors among them: two files at one path, two whose paths differ only in
+  case, a file that fails to render. A fault fails the lift's cell, and an
+  update writes nothing for that cell.
+- In an update, when anything but a `gaps` line keeps a bytes lift's cell
+  from being written, such as a fault of the jenny, a product an archive
+  can't hold or a `RenderError` that panics, every cell past the lift
+  fails, runs nothing, and is not written either: a normal run reads what
+  the lift's cell commits.
 - The lift's own cell files sit in `out/<lift>/`, like any column's. A
   lift's name covers both directories.
 - A variant's product goes under `variant/<name>/via/<lift>/` or
@@ -2442,13 +2467,19 @@ lift.
   lift's own cell. A downstream column takes `blocked` from the lift's
   committed `outcome`: any outcome but `accepted`, or none, blocks it. A
   lift that is `accepted` with no product files gives its readers an empty
-  view.
+  view. When the lift accepts the case now, the committed files of a cell
+  so blocked, a bytes lift's product among them, are no orphans: the
+  update reruns the lift and runs the cell. A normal run of the package
+  that owns the lift says so. Another package's doesn't run the lift, so
+  it says to run the update before deleting any of them.
 - A bytes lift's frozen cell includes its `via/` product: no update writes
   it, and a product that differs from what the lift makes fails the cell,
-  in every run. The cells past it are written by an update from what the
-  lift makes, so they fail normal runs, which read the committed product,
-  until a person resolves the frozen cell. Deleting the cell's files
-  includes deleting its product.
+  in every run. An update writes the cells past it from what the lift makes
+  now. So when the lift's outcome now accepts the case where the committed
+  one doesn't, or the other way round, or both accept and the products
+  differ, the cells past it fail normal runs, which read the committed
+  outcome and product, until a person resolves the frozen cell. Deleting
+  the cell's files includes deleting its product.
 - The properties a case states hold for every column the case reaches,
   through the lift too. A CSV with a quote that never closes states
   `unterminated`, which `import` rejects, and a CSV whose imported sheet has
