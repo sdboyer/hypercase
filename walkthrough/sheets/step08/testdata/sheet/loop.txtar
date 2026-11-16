@@ -1,0 +1,77 @@
+A1 and B1 refer to each other.
+-- in/sheet/A1 --
+=B1
+-- in/sheet/B1 --
+=A1
+-- properties --
+circular
+-- out/calc/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1
+  sheet/B1:1: =A1
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked resolve
+-- out/format/formulas.txt --
+A1 =B1
+B1 =A1
+-- out/format/outcome --
+accepted
+-- out/parse/outcome --
+accepted
+-- out/resolve/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1
+  sheet/B1:1: =A1
+-- out/resolve/outcome --
+rejected
+-- transform/looped/in/sheet/A1 --
+=A1
+-- transform/looped/out/calc/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/calc/outcome --
+rejected
+-- transform/looped/out/evaluate/outcome --
+blocked resolve
+-- transform/looped/out/format/formulas.txt --
+A1 =A1
+B1 =A1
+-- transform/looped/out/format/outcome --
+accepted
+-- transform/looped/out/parse/outcome --
+accepted
+-- transform/looped/out/resolve/error.txt --
+A1 -> A1: cycle
+  sheet/A1:1: =A1
+-- transform/looped/out/resolve/outcome --
+rejected
+-- transform/renamed/in/sheet/A2 --
+=B2
+-- transform/renamed/in/sheet/B2 --
+=A2
+-- transform/renamed/delete --
+sheet/A1
+sheet/B1
+-- transform/renamed/out/calc/error.txt --
+A2 -> B2 -> A2: cycle
+  sheet/A2:1: =B2
+  sheet/B2:1: =A2
+-- transform/renamed/out/calc/outcome --
+rejected
+-- transform/renamed/out/evaluate/outcome --
+blocked resolve
+-- transform/renamed/out/format/formulas.txt --
+A2 =B2
+B2 =A2
+-- transform/renamed/out/format/outcome --
+accepted
+-- transform/renamed/out/parse/outcome --
+accepted
+-- transform/renamed/out/resolve/error.txt --
+A2 -> B2 -> A2: cycle
+  sheet/A2:1: =B2
+  sheet/B2:1: =A2
+-- transform/renamed/out/resolve/outcome --
+rejected
