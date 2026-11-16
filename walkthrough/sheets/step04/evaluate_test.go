@@ -34,7 +34,6 @@ var evaluate = hypercase.Suite[fs.FS]{
 		return []hypercase.File{{Path: "values.txt", Data: values.Format()}}, nil
 	},
 }
-
 // doc:end suite
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }

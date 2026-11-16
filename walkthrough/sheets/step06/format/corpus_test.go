@@ -38,7 +38,6 @@ var format = hypercase.Suite[*sheet.Parsed]{
 		return []hypercase.File{{Path: "formulas.txt", Data: sheet.Format(p)}}, nil
 	},
 }
-
 // doc:end format
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }

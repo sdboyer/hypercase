@@ -12,7 +12,6 @@ import (
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step03/sheetcorpus"
 )
 
-// doc:begin suite
 func init() {
 	hypercase.Register(sheetcorpus.Project, hypercase.Root("step03"), hypercase.RootPackage(), evaluate)
 }
@@ -34,5 +33,3 @@ var evaluate = hypercase.Suite[fs.FS]{
 }
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }
-
-// doc:end suite

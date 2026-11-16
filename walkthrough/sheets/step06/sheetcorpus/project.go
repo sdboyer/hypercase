@@ -32,7 +32,6 @@ func renderError(in fs.FS, err error) []byte {
 	}
 	return out
 }
-
 // doc:end project
 
 // lineAt is line n, counted from 1, of the file at path in in, or "" when

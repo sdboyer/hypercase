@@ -227,39 +227,46 @@ project's ordinary packages can hold what they declare. Trade-off: a
 project's commands can use its declarations, at the cost of a second import
 in every test file.
 
+<!-- source: walkthrough/sheets/step03/sheetcorpus/project.go -->
 ```go
 // walkthrough/sheets/step03/sheetcorpus/project.go
 package sheetcorpus
 
 import "github.com/sdboyer/hypercase/decl"
 
-// Project is what the sheets project supplies to hypercase.
 var Project = decl.Project{
 	UpdateVar: "SHEETS_UPDATE_GOLDEN",
 }
 ```
 
+<!-- source: walkthrough/sheets/step03/evaluate_test.go -->
 ```go
 // walkthrough/sheets/step03/evaluate_test.go
 package step03
 
 import (
+	"io"
 	"io/fs"
 	"testing"
 
 	"github.com/sdboyer/hypercase"
+	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step03/sheetcorpus"
 )
 
 func init() {
-	hypercase.Register(sheetcorpus.Project, evaluate)
+	hypercase.Register(sheetcorpus.Project, hypercase.Root("step03"), hypercase.RootPackage(), evaluate)
 }
 
-var evaluate = hypercase.Run{
+var evaluate = hypercase.Suite[fs.FS]{
 	Name:        "evaluate",
 	Description: "Evaluates every cell of the sheet.",
-	Run: func(t testing.TB, in fs.FS) ([]hypercase.File, error) {
+	Corpus:      "sheet",
+	Outputs: []decl.Output{
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+	},
+	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		values, err := sheet.Eval(in) // the cells under sheet/
 		if err != nil {
 			return nil, err
@@ -275,6 +282,7 @@ func TestCorpus(t *testing.T) { hypercase.Test(t) }
 
 Each table row and its golden become one archive. `testdata/twice.txtar`:
 
+<!-- source: walkthrough/sheets/step03/testdata/sheet/twice.txtar -->
 ```
 A1 is twice B1.
 -- in/sheet/A1 --
@@ -492,26 +500,35 @@ properties it rejects.
 
 Proposed names: `decl.Property`, and the run's `Rejects` field.
 
+<!-- source: walkthrough/sheets/step04/sheetcorpus/project.go#properties -->
 ```go
-// walkthrough/sheets/step04/sheetcorpus/properties.go
 var Circular = decl.Property{
 	Name:        "circular",
 	Description: "Some cell's formula refers back to itself, directly or through other cells.",
 }
 ```
 
+<!-- source: walkthrough/sheets/step04/evaluate_test.go#suite -->
 ```go
-// walkthrough/sheets/step04/evaluate_test.go
 func init() {
-	hypercase.Register(sheetcorpus.Project, sheetcorpus.Circular, evaluate)
+	hypercase.Register(sheetcorpus.Project, hypercase.Root("step04"), hypercase.RootPackage(), sheetcorpus.Circular, evaluate)
 }
 
-var evaluate = hypercase.Run{
+var evaluate = hypercase.Suite[fs.FS]{
 	Name:        "evaluate",
 	Description: "Evaluates every cell of the sheet.",
-	Rejects:     []decl.Property{sheetcorpus.Circular},
-	Run: func(t testing.TB, in fs.FS) ([]hypercase.File, error) {
-		// as in step 3
+	Corpus:      "sheet",
+	Outputs: []decl.Output{
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated."},
+	},
+	Rejects: []decl.Property{sheetcorpus.Circular},
+	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
+		values, err := sheet.Eval(in) // as in step 3
+		if err != nil {
+			return nil, err
+		}
+		return []hypercase.File{{Path: "values.txt", Data: values.Format()}}, nil
 	},
 }
 ```
@@ -521,6 +538,7 @@ var evaluate = hypercase.Run{
 An archive gains a `properties` section, a `gaps` section, or both. Both are
 hand-written. `testdata/loop.txtar` is meant to be rejected:
 
+<!-- source: walkthrough/sheets/step04/testdata/sheet/loop.txtar -->
 ```
 A1 and B1 refer to each other.
 -- in/sheet/A1 --
@@ -536,6 +554,7 @@ A1 -> B1 -> A1: cycle
 `testdata/negative.txtar` records a known gap, a cell that errs when it
 shouldn't:
 
+<!-- source: walkthrough/sheets/step04/testdata/sheet/negative.txtar -->
 ```
 A1 is a negative number.
 -- in/sheet/A1 --
@@ -688,8 +707,8 @@ root passes nothing.
 The example has three packages over one corpus root: the root package owns
 `evaluate`, `format/` owns `format`, and `cli/` owns `calc`.
 
+<!-- source: walkthrough/sheets/step05/sheetcorpus/project.go#properties -->
 ```go
-// walkthrough/sheets/step05/sheetcorpus/properties.go gains:
 var Malformed = decl.Property{
 	Name:        "malformed",
 	Description: "Some cell holds neither a number nor a formula.",
@@ -701,8 +720,8 @@ var Dangling = decl.Property{
 }
 ```
 
+<!-- source: walkthrough/sheets/step05/corpus_test.go#evaluate -->
 ```go
-// walkthrough/sheets/step05/corpus_test.go: the corpus root's package, with evaluate
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
@@ -713,7 +732,7 @@ func init() {
 	)
 }
 
-var evaluate = hypercase.Suite{
+var evaluate = hypercase.Suite[fs.FS]{
 	Name:        "evaluate",
 	Description: "Evaluates every cell of the sheet.",
 	Corpus:      "sheet",
@@ -722,18 +741,21 @@ var evaluate = hypercase.Suite{
 		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated."},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling},
-	Run: func(t testing.TB, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
-		// as in step 3
+	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
+		values, err := sheet.Eval(in)
+		if err != nil {
+			return nil, err
+		}
+		return []hypercase.File{{Path: "values.txt", Data: values.Format()}}, nil
 	},
 }
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }
 ```
 
+<!-- source: walkthrough/sheets/step05/format/corpus_test.go#format -->
 ```go
-// walkthrough/sheets/step05/format/corpus_test.go registers sheetcorpus.Project,
-// hypercase.Root("step05"), sheetcorpus.Malformed and format.
-var format = hypercase.Suite{
+var format = hypercase.Suite[fs.FS]{
 	Name:        "format",
 	Description: "Prints each formula back in canonical form.",
 	Corpus:      "sheet",
@@ -748,7 +770,7 @@ var format = hypercase.Suite{
 		{Pattern: "error.txt", Description: "Why the sheet doesn't parse."},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed},
-	Run: func(t testing.TB, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
+	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		p, err := sheet.Parse(in)
 		if err != nil {
 			return nil, err
@@ -758,10 +780,9 @@ var format = hypercase.Suite{
 }
 ```
 
+<!-- source: walkthrough/sheets/step05/cli/corpus_test.go#calc -->
 ```go
-// walkthrough/sheets/step05/cli/corpus_test.go registers sheetcorpus.Project,
-// hypercase.Root("step05"), the three properties and calc.
-var calc = hypercase.Suite{
+var calc = hypercase.Suite[fs.FS]{
 	Name:        "calc",
 	Description: "Runs the calc command on the sheet.",
 	Corpus:      "sheet",
@@ -771,7 +792,7 @@ var calc = hypercase.Suite{
 		{Pattern: "error.txt", Description: "Why calc failed."},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling},
-	Run: func(t testing.TB, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
+	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		return nil, sheet.Calc(in, stdout, stderr)
 	},
 }
@@ -792,6 +813,7 @@ var calc = hypercase.Suite{
 
 `testdata/sheet/twice.txtar`:
 
+<!-- source: walkthrough/sheets/step05/testdata/sheet/twice.txtar -->
 ```
 A1 is twice B1.
 -- in/sheet/A1 --
@@ -810,6 +832,7 @@ A1 =B1 * 2
 `testdata/sheet/stray.txtar`. Every column reads the raw cells, so each one
 meets the malformed cell and records the same error:
 
+<!-- source: walkthrough/sheets/step05/testdata/sheet/stray.txtar -->
 ```
 D1 holds a word, which is neither a number nor a formula.
 -- in/sheet/A1 --
@@ -835,6 +858,7 @@ on `-3` the same wrong way as `evaluate`, so a person adds a `calc` line to
 its `gaps`; without it, `calc`'s cell fails as an error nothing expects.
 `format` skips the sheet, which has no formulas:
 
+<!-- source: walkthrough/sheets/step05/testdata/sheet/negative.txtar -->
 ```
 A1 is a negative number.
 -- in/sheet/A1 --
@@ -851,27 +875,53 @@ A1: unexpected "-"
 The root package's registry, `step05/testdata/hypercase.json`, sketched
 (proposed):
 
+<!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 1,
+  "format": 3,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
+  "issueLinks": [],
   "properties": [
-    {"name": "circular", "description": "Some cell's formula refers back to itself, directly or through other cells."},
-    {"name": "dangling", "description": "Some formula refers to a cell the sheet doesn't have."},
-    {"name": "malformed", "description": "Some cell holds neither a number nor a formula."}
+    {
+      "name": "circular",
+      "description": "Some cell's formula refers back to itself, directly or through other cells."
+    },
+    {
+      "name": "dangling",
+      "description": "Some formula refers to a cell the sheet doesn't have."
+    },
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    }
   ],
+  "types": [],
+  "lifts": [],
   "suites": [
     {
       "name": "evaluate",
       "description": "Evaluates every cell of the sheet.",
-      "corpus": "sheet",
-      "outputs": [
-        {"pattern": "error.txt", "description": "Why the sheet can't be evaluated."},
-        {"pattern": "values.txt", "description": "Each cell's value, one per line, in cell order."}
+      "consumes": "io/fs.FS",
+      "corpora": [
+        "sheet"
       ],
-      "rejects": ["circular", "dangling", "malformed"]
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why the sheet can't be evaluated."
+        },
+        {
+          "pattern": "values.txt",
+          "description": "Each cell's value, one per line, in cell order."
+        }
+      ],
+      "rejects": [
+        "circular",
+        "dangling",
+        "malformed"
+      ]
     }
   ]
 }
@@ -1052,8 +1102,8 @@ argument is the type the suite consumes, `hypercase.Own`, `hypercase.Use`,
 and `decl.Project`'s `RenderError` field. A suite's run receives the
 archive's name from this step. Its probe receives the input only.
 
+<!-- source: walkthrough/sheets/step06/sheetcorpus/types.go#types -->
 ```go
-// walkthrough/sheets/step06/sheetcorpus/types.go
 type Sheet struct{ fs.FS } // in/sheet/A1, in/sheet/B1, …
 
 var SheetType = decl.Type[Sheet]{
@@ -1086,25 +1136,33 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 }
 ```
 
+<!-- source: walkthrough/sheets/step06/sheetcorpus/project.go#project -->
 ```go
-// walkthrough/sheets/step06/sheetcorpus/project.go
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
 }
 
-// renderError writes the error's text, then quotes each line it points at.
+// renderError writes the error's text, then quotes each line it points at. A
+// position about a file as a whole names only the file.
 func renderError(in fs.FS, err error) []byte {
 	out := []byte(err.Error() + "\n")
 	for _, p := range sheet.Positions(err) {
-		out = fmt.Appendf(out, "  %s:%d: %s\n", p.Path, p.Line, lineAt(in, p.Path, p.Line))
+		switch line := lineAt(in, p.Path, p.Line); {
+		case p.Line == 0:
+			out = fmt.Appendf(out, "  %s\n", p.Path)
+		case line == "":
+			out = fmt.Appendf(out, "  %s:%d\n", p.Path, p.Line)
+		default:
+			out = fmt.Appendf(out, "  %s:%d: %s\n", p.Path, p.Line, line)
+		}
 	}
 	return out
 }
 ```
 
+<!-- source: walkthrough/sheets/step06/corpus_test.go#evaluate -->
 ```go
-// walkthrough/sheets/step06/corpus_test.go: owns both lifts and evaluate
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
@@ -1130,8 +1188,8 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 func TestCorpus(t *testing.T) { hypercase.Test(t) }
 ```
 
+<!-- source: walkthrough/sheets/step06/format/corpus_test.go#format -->
 ```go
-// walkthrough/sheets/step06/format/corpus_test.go: uses parse, owns format
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
@@ -1187,6 +1245,7 @@ on raw input: `hypercase.Suite[sheetcorpus.Sheet]`, with its outputs and
 `testdata/sheet/stray.txtar`. `parse` rejects the sheet once; `calc` still
 reads the raw cells:
 
+<!-- source: walkthrough/sheets/step06/testdata/sheet/stray.txtar -->
 ```
 D1 holds a word, which is neither a number nor a formula.
 -- in/sheet/A1 --
@@ -1209,6 +1268,7 @@ D1: not a number or a formula: "total"
 
 `testdata/sheet/negative.txtar`:
 
+<!-- source: walkthrough/sheets/step06/testdata/sheet/negative.txtar -->
 ```
 A1 is a negative number.
 -- in/sheet/A1 --

@@ -22,5 +22,4 @@ var Dangling = decl.Property{
 	Name:        "dangling",
 	Description: "Some formula refers to a cell the sheet doesn't have.",
 }
-
 // doc:end properties
