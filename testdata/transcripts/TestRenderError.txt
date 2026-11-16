@@ -1,0 +1,165 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-render
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/quoted-other: evaluate is blocked: the lift parse failed on the case, and testdata/script/quoted-other.txtar, out/parse/error.txt, records its error.
+    script/quoted-other: format is blocked: the lift parse failed on the case, and testdata/script/quoted-other.txtar, out/parse/error.txt, records its error.
+    script/quoted-other: resolve is blocked: the lift parse failed on the case, and testdata/script/quoted-other.txtar, out/parse/error.txt, records its error.
+    script/quoted: evaluate is blocked: the lift parse failed on the case, and testdata/script/quoted.txtar, out/parse/error.txt, records its error.
+    script/quoted: format is blocked: the lift parse failed on the case, and testdata/script/quoted.txtar, out/parse/error.txt, records its error.
+    script/quoted: resolve is blocked: the lift parse failed on the case, and testdata/script/quoted.txtar, out/parse/error.txt, records its error.
+    script/render-nonl: parse rejects the script, and RenderError leaves off the final newline.
+        calc: Does what the case's calc/ tree says.
+        The project's RenderError returned "rendered: D1: not a number" for calc's error, which doesn't end with a newline.
+        Its output must end with a newline: fix RenderError. An update writes nothing for this cell.
+    script/render-nonl: evaluate is blocked: the lift parse failed on the case, and testdata/script/render-nonl.txtar, out/parse/error.txt, records its error.
+    script/render-nonl: format is blocked: the lift parse failed on the case, and testdata/script/render-nonl.txtar, out/parse/error.txt, records its error.
+    script/render-nonl: parse rejects the script, and RenderError leaves off the final newline.
+        parse: Parses the script, as its parse/ tree says.
+        The project's RenderError returned "rendered: A1: not a number" for parse's error, which doesn't end with a newline.
+        Its output must end with a newline: fix RenderError. An update writes nothing for this cell.
+    script/render-nonl: resolve is blocked: the lift parse failed on the case, and testdata/script/render-nonl.txtar, out/parse/error.txt, records its error.
+    script/render-panic: parse rejects the script, and RenderError panics on it.
+        calc: Does what the case's calc/ tree says.
+        The project's RenderError panicked on calc's error: render: boom
+        Fix RenderError. An update writes nothing for this cell.
+    script/render-panic: evaluate is blocked: the lift parse failed on the case, and testdata/script/render-panic.txtar, out/parse/error.txt, records its error.
+    script/render-panic: format is blocked: the lift parse failed on the case, and testdata/script/render-panic.txtar, out/parse/error.txt, records its error.
+    script/render-panic: parse rejects the script, and RenderError panics on it.
+        parse: Parses the script, as its parse/ tree says.
+        The project's RenderError panicked on parse's error: render: boom
+        Fix RenderError. An update writes nothing for this cell.
+    script/render-panic: resolve is blocked: the lift parse failed on the case, and testdata/script/render-panic.txtar, out/parse/error.txt, records its error.
+    script/suite-error: evaluate is blocked: the lift parse failed on the case, and testdata/script/suite-error.txtar, out/parse/error.txt, records its error.
+    script/suite-error: format is blocked: the lift parse failed on the case, and testdata/script/suite-error.txtar, out/parse/error.txt, records its error.
+    script/suite-error: calc, a suite over the raw trees, rejects the script, and its error goes through RenderError too. parse panics, and a panic is never rendered.
+        parse: Parses the script, as its parse/ tree says.
+        parse panicked: parse: boom
+        Fix the code. A panic is never an expected error.
+    stack of the panic: [stack]
+    script/suite-error: resolve is blocked: the lift parse failed on the case, and testdata/script/suite-error.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on quoted-other
+        parse ran on quoted-other
+        calc ran on quoted
+        parse ran on quoted
+        calc ran on render-nonl
+        parse ran on render-nonl
+        calc ran on render-panic
+        parse ran on render-panic
+        calc ran on suite-error
+        parse ran on suite-error
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/quoted-other
+            --- PASS: TestCorpus/script/quoted-other/calc
+            --- SKIP: TestCorpus/script/quoted-other/evaluate
+            --- SKIP: TestCorpus/script/quoted-other/format
+            --- PASS: TestCorpus/script/quoted-other/parse
+            --- SKIP: TestCorpus/script/quoted-other/resolve
+        --- PASS: TestCorpus/script/quoted
+            --- PASS: TestCorpus/script/quoted/calc
+            --- SKIP: TestCorpus/script/quoted/evaluate
+            --- SKIP: TestCorpus/script/quoted/format
+            --- PASS: TestCorpus/script/quoted/parse
+            --- SKIP: TestCorpus/script/quoted/resolve
+        --- FAIL: TestCorpus/script/render-nonl
+            --- FAIL: TestCorpus/script/render-nonl/calc
+            --- SKIP: TestCorpus/script/render-nonl/evaluate
+            --- SKIP: TestCorpus/script/render-nonl/format
+            --- FAIL: TestCorpus/script/render-nonl/parse
+            --- SKIP: TestCorpus/script/render-nonl/resolve
+        --- FAIL: TestCorpus/script/render-panic
+            --- FAIL: TestCorpus/script/render-panic/calc
+            --- SKIP: TestCorpus/script/render-panic/evaluate
+            --- SKIP: TestCorpus/script/render-panic/format
+            --- FAIL: TestCorpus/script/render-panic/parse
+            --- SKIP: TestCorpus/script/render-panic/resolve
+        --- FAIL: TestCorpus/script/suite-error
+            --- PASS: TestCorpus/script/suite-error/calc
+            --- SKIP: TestCorpus/script/suite-error/evaluate
+            --- SKIP: TestCorpus/script/suite-error/format
+            --- FAIL: TestCorpus/script/suite-error/parse
+            --- SKIP: TestCorpus/script/suite-error/resolve
+FAIL
+[exit 1]
+$ go test  # ladder-render
+    script/quoted-other: evaluate is blocked: the lift parse failed on the case, and testdata/script/quoted-other.txtar, out/parse/error.txt, records its error.
+    script/quoted-other: format is blocked: the lift parse failed on the case, and testdata/script/quoted-other.txtar, out/parse/error.txt, records its error.
+    script/quoted-other: resolve is blocked: the lift parse failed on the case, and testdata/script/quoted-other.txtar, out/parse/error.txt, records its error.
+    script/quoted: evaluate is blocked: the lift parse failed on the case, and testdata/script/quoted.txtar, out/parse/error.txt, records its error.
+    script/quoted: format is blocked: the lift parse failed on the case, and testdata/script/quoted.txtar, out/parse/error.txt, records its error.
+    script/quoted: resolve is blocked: the lift parse failed on the case, and testdata/script/quoted.txtar, out/parse/error.txt, records its error.
+    script/render-nonl: parse rejects the script, and RenderError leaves off the final newline.
+        calc: Does what the case's calc/ tree says.
+        The project's RenderError returned "rendered: D1: not a number" for calc's error, which doesn't end with a newline.
+        Its output must end with a newline: fix RenderError. An update writes nothing for this cell.
+    script/render-nonl: evaluate is blocked: the lift parse failed on the case, and testdata/script/render-nonl.txtar, out/parse/error.txt, records its error.
+    script/render-nonl: format is blocked: the lift parse failed on the case, and testdata/script/render-nonl.txtar, out/parse/error.txt, records its error.
+    script/render-nonl: parse rejects the script, and RenderError leaves off the final newline.
+        parse: Parses the script, as its parse/ tree says.
+        The project's RenderError returned "rendered: A1: not a number" for parse's error, which doesn't end with a newline.
+        Its output must end with a newline: fix RenderError. An update writes nothing for this cell.
+    script/render-nonl: resolve is blocked: the lift parse failed on the case, and testdata/script/render-nonl.txtar, out/parse/error.txt, records its error.
+    script/render-panic: parse rejects the script, and RenderError panics on it.
+        calc: Does what the case's calc/ tree says.
+        The project's RenderError panicked on calc's error: render: boom
+        Fix RenderError. An update writes nothing for this cell.
+    script/render-panic: evaluate is blocked: the lift parse failed on the case, and testdata/script/render-panic.txtar, out/parse/error.txt, records its error.
+    script/render-panic: format is blocked: the lift parse failed on the case, and testdata/script/render-panic.txtar, out/parse/error.txt, records its error.
+    script/render-panic: parse rejects the script, and RenderError panics on it.
+        parse: Parses the script, as its parse/ tree says.
+        The project's RenderError panicked on parse's error: render: boom
+        Fix RenderError. An update writes nothing for this cell.
+    script/render-panic: resolve is blocked: the lift parse failed on the case, and testdata/script/render-panic.txtar, out/parse/error.txt, records its error.
+    script/suite-error: evaluate is blocked: the lift parse failed on the case, and testdata/script/suite-error.txtar, out/parse/error.txt, records its error.
+    script/suite-error: format is blocked: the lift parse failed on the case, and testdata/script/suite-error.txtar, out/parse/error.txt, records its error.
+    script/suite-error: calc, a suite over the raw trees, rejects the script, and its error goes through RenderError too. parse panics, and a panic is never rendered.
+        parse: Parses the script, as its parse/ tree says.
+        parse panicked: parse: boom
+        Fix the code. A panic is never an expected error.
+    stack of the panic: [stack]
+    script/suite-error: resolve is blocked: the lift parse failed on the case, and testdata/script/suite-error.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on quoted-other
+        parse ran on quoted-other
+        calc ran on quoted
+        parse ran on quoted
+        calc ran on render-nonl
+        parse ran on render-nonl
+        calc ran on render-panic
+        parse ran on render-panic
+        calc ran on suite-error
+        parse ran on suite-error
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/quoted-other
+            --- PASS: TestCorpus/script/quoted-other/calc
+            --- SKIP: TestCorpus/script/quoted-other/evaluate
+            --- SKIP: TestCorpus/script/quoted-other/format
+            --- PASS: TestCorpus/script/quoted-other/parse
+            --- SKIP: TestCorpus/script/quoted-other/resolve
+        --- PASS: TestCorpus/script/quoted
+            --- PASS: TestCorpus/script/quoted/calc
+            --- SKIP: TestCorpus/script/quoted/evaluate
+            --- SKIP: TestCorpus/script/quoted/format
+            --- PASS: TestCorpus/script/quoted/parse
+            --- SKIP: TestCorpus/script/quoted/resolve
+        --- FAIL: TestCorpus/script/render-nonl
+            --- FAIL: TestCorpus/script/render-nonl/calc
+            --- SKIP: TestCorpus/script/render-nonl/evaluate
+            --- SKIP: TestCorpus/script/render-nonl/format
+            --- FAIL: TestCorpus/script/render-nonl/parse
+            --- SKIP: TestCorpus/script/render-nonl/resolve
+        --- FAIL: TestCorpus/script/render-panic
+            --- FAIL: TestCorpus/script/render-panic/calc
+            --- SKIP: TestCorpus/script/render-panic/evaluate
+            --- SKIP: TestCorpus/script/render-panic/format
+            --- FAIL: TestCorpus/script/render-panic/parse
+            --- SKIP: TestCorpus/script/render-panic/resolve
+        --- FAIL: TestCorpus/script/suite-error
+            --- PASS: TestCorpus/script/suite-error/calc
+            --- SKIP: TestCorpus/script/suite-error/evaluate
+            --- SKIP: TestCorpus/script/suite-error/format
+            --- FAIL: TestCorpus/script/suite-error/parse
+            --- SKIP: TestCorpus/script/suite-error/resolve
+FAIL
+[exit 1]

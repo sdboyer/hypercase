@@ -1,0 +1,21 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # property-nodesc
+    the property circular has no description.
+        Add one: it says what the fact about a case is, in prose.
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loopy
+            --- PASS: TestCorpus/script/loopy/echo
+FAIL
+[exit 1]
+$ go test  # property-nodesc
+    the property circular has no description.
+        Add one: it says what the fact about a case is, in prose.
+    testdata/script/loopy.txtar: properties states loopy, and no registry under the module-root corpus lists a property of that name.
+        Declare the property, or correct the line.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loopy
+            --- PASS: TestCorpus/script/loopy/echo
+FAIL
+[exit 1]

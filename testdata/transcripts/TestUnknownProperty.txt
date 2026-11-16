@@ -1,0 +1,28 @@
+$ go test  # rejects
+    testdata/script/loopy.txtar: properties states loopy, and no registry under the module-root corpus lists a property of that name.
+        Declare the property, or correct the line.
+    script/loopy: The case states a property nothing declares.
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/loopy
+            --- FAIL: TestCorpus/script/loopy/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/loopy
+            --- PASS: TestCorpus/script/loopy/echo
+PASS
+$ cat testdata/script/loopy.txtar
+The case states a property nothing declares.
+-- in/do/out/values.txt --
+A1 6
+-- properties --
+loopy
+-- out/echo/values.txt --
+A1 6

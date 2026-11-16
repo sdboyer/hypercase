@@ -1,0 +1,7 @@
+A1 is a negative number, which the code wrongly rejects.
+-- in/do/error --
+A1: unexpected "-"
+-- gaps --
+echo A negative number is valid, and evaluates to itself. Waits on sheets#3.
+-- out/echo/error.txt --
+A1: unexpected "-"

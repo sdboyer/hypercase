@@ -1,0 +1,39 @@
+$ go test  # echo
+    script/boom: The code panics on this sheet.
+        echo: Does what the case's do/ tree says.
+        echo panicked: index out of range
+        Fix the code. A panic is never an expected error.
+        out/echo/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    stack of the panic: [stack]
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/boom
+            --- FAIL: TestCorpus/script/boom/echo
+        --- PASS: TestCorpus/script/calm
+            --- PASS: TestCorpus/script/calm/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/boom: The code panics on this sheet.
+        echo: Does what the case's do/ tree says.
+        echo panicked: index out of range
+        Fix the code. A panic is never an expected error.
+    stack of the panic: [stack]
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/boom
+            --- FAIL: TestCorpus/script/boom/echo
+        --- PASS: TestCorpus/script/calm
+            --- PASS: TestCorpus/script/calm/echo
+FAIL
+[exit 1]
+$ cat testdata/script/boom.txtar
+The code panics on this sheet.
+-- in/do/out/values.txt --
+A1 6
+-- in/do/panic --
+index out of range
+-- out/echo/error.txt --
+index out of range

@@ -1,0 +1,77 @@
+$ edit testdata/script/frozen.txtar  # both columns now print something else
+$ go test  # echo-shout
+    script/frozen: shout prints A1 wrongly, a known gap in its cell alone.
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt differs (-golden +got):
+        - A1 6
+        + A1 7
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    script/frozen: shout prints A1 wrongly, a known gap in its cell alone.
+        shout: Does what the case's shout/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "shout A1 is SIX, not SIX!. Waits on sheets#11."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/shout/values.txt differs (-committed +got):
+        - A1 SIX!
+        + A1 SEVEN!
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/frozen
+            --- FAIL: TestCorpus/script/frozen/echo
+            --- FAIL: TestCorpus/script/frozen/shout
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/shout
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo-shout
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/frozen: shout prints A1 wrongly, a known gap in its cell alone.
+        shout: Does what the case's shout/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "shout A1 is SIX, not SIX!. Waits on sheets#11."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/shout/values.txt differs (-committed +got):
+        - A1 SIX!
+        + A1 SEVEN!
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/frozen
+            --- PASS: TestCorpus/script/frozen/echo
+            --- FAIL: TestCorpus/script/frozen/shout
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/shout
+FAIL
+[exit 1]
+$ cat testdata/script/frozen.txtar
+shout prints A1 wrongly, a known gap in its cell alone.
+-- in/do/out/values.txt --
+A1 7
+-- in/shout/out/values.txt --
+A1 SEVEN!
+-- gaps --
+shout A1 is SIX, not SIX!. Waits on sheets#11.
+-- out/echo/values.txt --
+A1 7
+-- out/shout/values.txt --
+A1 SIX!
+$ go test  # echo-shout
+    script/frozen: shout prints A1 wrongly, a known gap in its cell alone.
+        shout: Does what the case's shout/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "shout A1 is SIX, not SIX!. Waits on sheets#11."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/shout/values.txt differs (-committed +got):
+        - A1 SIX!
+        + A1 SEVEN!
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/frozen
+            --- PASS: TestCorpus/script/frozen/echo
+            --- FAIL: TestCorpus/script/frozen/shout
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/shout
+FAIL
+[exit 1]

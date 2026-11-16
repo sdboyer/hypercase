@@ -1,0 +1,41 @@
+$ go test  # echo
+    script/names: The run returns an output at each name the framework owns.
+        echo: Does what the case's do/ tree says.
+        The run returned an output at error.txt, a name the framework owns under out/echo/.
+        Rename the output. An update writes nothing for this cell.
+        The run returned an output at inputs, a name the framework owns under out/echo/.
+        Rename the output. An update writes nothing for this cell.
+        The run returned an output at outcome, a name the framework owns under out/echo/.
+        Rename the output. An update writes nothing for this cell.
+        The run returned an output at stderr.txt, a name the framework owns under out/echo/.
+        Rename the output. An update writes nothing for this cell.
+        The run returned an output at stdout.txt, a name the framework owns under out/echo/.
+        Rename the output. An update writes nothing for this cell.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/names
+            --- FAIL: TestCorpus/script/names/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/names: The run returns an output at each name the framework owns.
+        echo: Does what the case's do/ tree says.
+        The run returned an output at error.txt, a name the framework owns under out/echo/.
+        Rename the output. An update writes nothing for this cell.
+        The run returned an output at inputs, a name the framework owns under out/echo/.
+        Rename the output. An update writes nothing for this cell.
+        The run returned an output at outcome, a name the framework owns under out/echo/.
+        Rename the output. An update writes nothing for this cell.
+        The run returned an output at stderr.txt, a name the framework owns under out/echo/.
+        Rename the output. An update writes nothing for this cell.
+        The run returned an output at stdout.txt, a name the framework owns under out/echo/.
+        Rename the output. An update writes nothing for this cell.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/names
+            --- FAIL: TestCorpus/script/names/echo
+FAIL
+[exit 1]

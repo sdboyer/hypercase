@@ -1,0 +1,53 @@
+$ go test  # rejects
+    script/negative: A1 is a negative number, which the code rejects though nothing says it should.
+        echo: Does what the case's do/ tree says.
+        echo returned an error, but the case states no property echo rejects:
+          A1: unexpected "-"
+        Fix the code, or state the property on the case and in echo's Rejects.
+        out/echo/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/echo/values.txt differs (-golden +got):
+        - A1 3
+        + A1 -3
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/negative
+            --- FAIL: TestCorpus/script/negative/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/negative: A1 is a negative number, which the code rejects though nothing says it should.
+        echo: Does what the case's do/ tree says.
+        echo returned an error, but the case states no property echo rejects:
+          A1: unexpected "-"
+        Fix the code, or state the property on the case and in echo's Rejects.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/negative
+            --- FAIL: TestCorpus/script/negative/echo
+FAIL
+[exit 1]
+$ cat testdata/script/negative.txtar
+A1 is a negative number, which the code rejects though nothing says it should.
+-- in/do/error --
+A1: unexpected "-"
+-- in/do/out/values.txt --
+A1 -3
+-- out/echo/error.txt --
+A1: unexpected "-"
+-- out/echo/values.txt --
+A1 -3
+$ go test  # rejects
+    script/negative: A1 is a negative number, which the code rejects though nothing says it should.
+        echo: Does what the case's do/ tree says.
+        echo returned an error, but the case states no property echo rejects:
+          A1: unexpected "-"
+        Fix the code, or state the property on the case and in echo's Rejects.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/negative
+            --- FAIL: TestCorpus/script/negative/echo
+FAIL
+[exit 1]

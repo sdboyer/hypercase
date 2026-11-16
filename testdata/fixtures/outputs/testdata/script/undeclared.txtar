@@ -1,0 +1,7 @@
+The run returns a file no declaration matches.
+-- in/do/out/values.txt --
+A1 6
+-- in/do/out/notes.txt --
+A1 is a number.
+-- out/echo/values.txt --
+A1 6

@@ -1,0 +1,206 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/both: evaluate is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: format is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: resolve is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/loop: evaluate is blocked: the lift resolve failed on the case, and testdata/script/loop.txtar, out/resolve/error.txt, records its error.
+    script/stray: evaluate is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: format is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: resolve is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on both
+        parse ran on both
+        calc ran on fine
+        parse ran on fine
+        resolve ran on fine
+        evaluate's probe ran
+        evaluate ran on fine
+        format's probe ran
+        format ran on fine
+        calc ran on loop
+        parse ran on loop
+        resolve ran on loop
+        format's probe ran
+        format ran on loop
+        calc ran on noisy
+        parse ran on noisy
+        resolve ran on noisy
+        evaluate's probe ran
+        evaluate ran on noisy
+        format's probe ran
+        format ran on noisy
+        calc ran on stray
+        parse ran on stray
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/both
+            --- PASS: TestCorpus/script/both/calc
+            --- SKIP: TestCorpus/script/both/evaluate
+            --- SKIP: TestCorpus/script/both/format
+            --- PASS: TestCorpus/script/both/parse
+            --- SKIP: TestCorpus/script/both/resolve
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/calc
+            --- PASS: TestCorpus/script/fine/evaluate
+            --- PASS: TestCorpus/script/fine/format
+            --- PASS: TestCorpus/script/fine/parse
+            --- PASS: TestCorpus/script/fine/resolve
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/calc
+            --- SKIP: TestCorpus/script/loop/evaluate
+            --- PASS: TestCorpus/script/loop/format
+            --- PASS: TestCorpus/script/loop/parse
+            --- PASS: TestCorpus/script/loop/resolve
+        --- PASS: TestCorpus/script/noisy
+            --- PASS: TestCorpus/script/noisy/calc
+            --- PASS: TestCorpus/script/noisy/evaluate
+            --- PASS: TestCorpus/script/noisy/format
+            --- PASS: TestCorpus/script/noisy/parse
+            --- PASS: TestCorpus/script/noisy/resolve
+        --- PASS: TestCorpus/script/stray
+            --- PASS: TestCorpus/script/stray/calc
+            --- SKIP: TestCorpus/script/stray/evaluate
+            --- SKIP: TestCorpus/script/stray/format
+            --- PASS: TestCorpus/script/stray/parse
+            --- SKIP: TestCorpus/script/stray/resolve
+PASS
+$ cat testdata/script/fine.txtar
+A script every column reads, and no lift rejects.
+-- in/calc/out/values.txt --
+calc 1
+-- in/evaluate/archive --
+yes
+-- in/evaluate/out/values.txt --
+evaluate 1
+-- in/format/out/values.txt --
+format 1
+-- in/parse/archive --
+yes
+-- out/calc/values.txt --
+calc 1
+-- out/evaluate/archive.txt --
+fine
+-- out/evaluate/values.txt --
+evaluate 1
+-- out/format/trail.txt --
+parse
+-- out/format/values.txt --
+format 1
+-- out/parse/stderr.txt --
+archive: fine
+$ cat testdata/script/stray.txtar
+parse rejects the script, which states malformed. calc reads the raw trees, and rejects it too.
+-- in/parse/error --
+D1: not a number or a formula: "total"
+-- in/calc/error --
+D1: not a number or a formula: "total"
+-- in/evaluate/probe --
+evaluate's probe says no, if it is called.
+-- properties --
+malformed
+-- out/calc/error.txt --
+D1: not a number or a formula: "total"
+-- out/parse/error.txt --
+D1: not a number or a formula: "total"
+$ cat testdata/script/loop.txtar
+resolve rejects the script, which states circular. format reads the parsed script, and runs.
+-- in/resolve/error --
+A1 -> A1: cycle
+-- in/format/out/values.txt --
+format 2
+-- properties --
+circular
+-- out/format/trail.txt --
+parse
+-- out/format/values.txt --
+format 2
+-- out/resolve/error.txt --
+A1 -> A1: cycle
+$ cat testdata/script/both.txtar
+The script is malformed and circular. parse rejects it, so resolve's cell is blocked, and nothing expects it to err.
+-- in/parse/error --
+D1: not a number
+-- in/resolve/error --
+A1 -> A1: cycle
+-- in/calc/error --
+D1: not a number
+-- properties --
+malformed
+circular
+-- out/calc/error.txt --
+D1: not a number
+-- out/parse/error.txt --
+D1: not a number
+$ cat testdata/script/noisy.txtar
+parse warns on stderr, and goes on.
+-- in/parse/stderr --
+parse: a warning
+-- out/format/trail.txt --
+parse
+-- out/parse/stderr.txt --
+parse: a warning
+$ go test  # ladder
+    script/both: evaluate is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: format is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: resolve is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/loop: evaluate is blocked: the lift resolve failed on the case, and testdata/script/loop.txtar, out/resolve/error.txt, records its error.
+    script/stray: evaluate is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: format is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: resolve is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on both
+        parse ran on both
+        calc ran on fine
+        parse ran on fine
+        resolve ran on fine
+        evaluate's probe ran
+        evaluate ran on fine
+        format's probe ran
+        format ran on fine
+        calc ran on loop
+        parse ran on loop
+        resolve ran on loop
+        format's probe ran
+        format ran on loop
+        calc ran on noisy
+        parse ran on noisy
+        resolve ran on noisy
+        evaluate's probe ran
+        evaluate ran on noisy
+        format's probe ran
+        format ran on noisy
+        calc ran on stray
+        parse ran on stray
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/both
+            --- PASS: TestCorpus/script/both/calc
+            --- SKIP: TestCorpus/script/both/evaluate
+            --- SKIP: TestCorpus/script/both/format
+            --- PASS: TestCorpus/script/both/parse
+            --- SKIP: TestCorpus/script/both/resolve
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/calc
+            --- PASS: TestCorpus/script/fine/evaluate
+            --- PASS: TestCorpus/script/fine/format
+            --- PASS: TestCorpus/script/fine/parse
+            --- PASS: TestCorpus/script/fine/resolve
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/calc
+            --- SKIP: TestCorpus/script/loop/evaluate
+            --- PASS: TestCorpus/script/loop/format
+            --- PASS: TestCorpus/script/loop/parse
+            --- PASS: TestCorpus/script/loop/resolve
+        --- PASS: TestCorpus/script/noisy
+            --- PASS: TestCorpus/script/noisy/calc
+            --- PASS: TestCorpus/script/noisy/evaluate
+            --- PASS: TestCorpus/script/noisy/format
+            --- PASS: TestCorpus/script/noisy/parse
+            --- PASS: TestCorpus/script/noisy/resolve
+        --- PASS: TestCorpus/script/stray
+            --- PASS: TestCorpus/script/stray/calc
+            --- SKIP: TestCorpus/script/stray/evaluate
+            --- SKIP: TestCorpus/script/stray/format
+            --- PASS: TestCorpus/script/stray/parse
+            --- SKIP: TestCorpus/script/stray/resolve
+PASS

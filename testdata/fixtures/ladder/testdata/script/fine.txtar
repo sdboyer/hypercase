@@ -1,0 +1,11 @@
+A script every column reads, and no lift rejects.
+-- in/calc/out/values.txt --
+calc 1
+-- in/evaluate/archive --
+yes
+-- in/evaluate/out/values.txt --
+evaluate 1
+-- in/format/out/values.txt --
+format 1
+-- in/parse/archive --
+yes

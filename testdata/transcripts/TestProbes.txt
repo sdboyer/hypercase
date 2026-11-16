@@ -1,0 +1,112 @@
+$ go test  # probe
+    script/marked: The probe says no to a cell a gaps line marks.
+        echo: Does what the case's do/ tree says.
+        gaps, line 1, marks the cell, and echo's probe says the case isn't for it: no formulas
+        Remove the line, or fix the probe.
+    script/no: echo's probe says the case isn't for it: already serves 4
+    script/noreason: The probe says no, and gives no reason.
+        echo: Does what the case's do/ tree says.
+        echo's probe said the case isn't for it, and gave no reason.
+        Fix the probe: when it says no, it says why.
+    script/panics: The probe panics.
+        echo: Does what the case's do/ tree says.
+        echo's probe panicked: probe overflow
+        Fix the probe. A panic is never an expected error.
+        out/echo/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    stack of the panic: [stack]
+    script/stale: The probe now says no, and the cell has files from when it said yes.
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt is recorded, and echo's probe says the case isn't for it: no formulas
+        If the suite should run on the case, fix the probe. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/marked
+            --- FAIL: TestCorpus/script/marked/echo
+        --- PASS: TestCorpus/script/no
+            --- SKIP: TestCorpus/script/no/echo
+        --- FAIL: TestCorpus/script/noreason
+            --- FAIL: TestCorpus/script/noreason/echo
+        --- FAIL: TestCorpus/script/panics
+            --- FAIL: TestCorpus/script/panics/echo
+        --- FAIL: TestCorpus/script/stale
+            --- FAIL: TestCorpus/script/stale/echo
+        --- PASS: TestCorpus/script/yes
+            --- PASS: TestCorpus/script/yes/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # probe
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/marked: The probe says no to a cell a gaps line marks.
+        echo: Does what the case's do/ tree says.
+        gaps, line 1, marks the cell, and echo's probe says the case isn't for it: no formulas
+        Remove the line, or fix the probe.
+    script/no: echo's probe says the case isn't for it: already serves 4
+    script/noreason: The probe says no, and gives no reason.
+        echo: Does what the case's do/ tree says.
+        echo's probe said the case isn't for it, and gave no reason.
+        Fix the probe: when it says no, it says why.
+    script/panics: The probe panics.
+        echo: Does what the case's do/ tree says.
+        echo's probe panicked: probe overflow
+        Fix the probe. A panic is never an expected error.
+    stack of the panic: [stack]
+    script/stale: The probe now says no, and the cell has files from when it said yes.
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt is recorded, and echo's probe says the case isn't for it: no formulas
+        If the suite should run on the case, fix the probe. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/marked
+            --- FAIL: TestCorpus/script/marked/echo
+        --- PASS: TestCorpus/script/no
+            --- SKIP: TestCorpus/script/no/echo
+        --- FAIL: TestCorpus/script/noreason
+            --- FAIL: TestCorpus/script/noreason/echo
+        --- FAIL: TestCorpus/script/panics
+            --- FAIL: TestCorpus/script/panics/echo
+        --- FAIL: TestCorpus/script/stale
+            --- FAIL: TestCorpus/script/stale/echo
+        --- PASS: TestCorpus/script/yes
+            --- PASS: TestCorpus/script/yes/echo
+FAIL
+[exit 1]
+$ cat testdata/script/panics.txtar
+The probe panics.
+-- in/do/probe-panic --
+probe overflow
+-- in/do/out/values.txt --
+A1 6
+-- out/echo/error.txt --
+probe overflow
+$ edit testdata/script/panics.txtar  # mark the cell as a known gap
+$ go test  # probe
+    script/marked: The probe says no to a cell a gaps line marks.
+        echo: Does what the case's do/ tree says.
+        gaps, line 1, marks the cell, and echo's probe says the case isn't for it: no formulas
+        Remove the line, or fix the probe.
+    script/no: echo's probe says the case isn't for it: already serves 4
+    script/noreason: The probe says no, and gives no reason.
+        echo: Does what the case's do/ tree says.
+        echo's probe said the case isn't for it, and gave no reason.
+        Fix the probe: when it says no, it says why.
+    script/stale: The probe now says no, and the cell has files from when it said yes.
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt is recorded, and echo's probe says the case isn't for it: no formulas
+        If the suite should run on the case, fix the probe. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/marked
+            --- FAIL: TestCorpus/script/marked/echo
+        --- PASS: TestCorpus/script/no
+            --- SKIP: TestCorpus/script/no/echo
+        --- FAIL: TestCorpus/script/noreason
+            --- FAIL: TestCorpus/script/noreason/echo
+        --- PASS: TestCorpus/script/panics
+            --- PASS: TestCorpus/script/panics/echo
+        --- FAIL: TestCorpus/script/stale
+            --- FAIL: TestCorpus/script/stale/echo
+        --- PASS: TestCorpus/script/yes
+            --- PASS: TestCorpus/script/yes/echo
+FAIL
+[exit 1]

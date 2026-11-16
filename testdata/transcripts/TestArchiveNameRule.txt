@@ -1,0 +1,10 @@
+$ go test  # echo
+    testdata/script/Twice.txtar: the archive's name, "Twice", breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter.
+        Rename the archive.
+    testdata/script/Twice.txtar: the archive's name breaks the naming rule, so none of its cells run. The root-package check reports it.
+    the suite echo applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]

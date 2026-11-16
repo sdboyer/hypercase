@@ -1,0 +1,7 @@
+One sheet, twice.
+-- in/do/out/a.txt --
+a
+-- in/do/out/b.txt --
+b
+-- in/do/stdout --
+printed

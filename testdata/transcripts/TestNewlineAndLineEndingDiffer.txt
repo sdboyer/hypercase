@@ -1,0 +1,21 @@
+$ go test  # echo
+    script/extra-newline: The output gains a newline its golden lacks.
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt differs (-golden +got):
+          A1 6
+        + 
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    script/line-ending: The output ends its lines with CRLF, and its golden with LF.
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt differs (-golden +got):
+        - A1 6
+        + "A1 6\r"
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/extra-newline
+            --- FAIL: TestCorpus/script/extra-newline/echo
+        --- FAIL: TestCorpus/script/line-ending
+            --- FAIL: TestCorpus/script/line-ending/echo
+FAIL
+[exit 1]

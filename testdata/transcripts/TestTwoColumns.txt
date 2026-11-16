@@ -1,0 +1,28 @@
+$ go test  # echo-shout
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/frozen
+            --- PASS: TestCorpus/script/frozen/echo
+            --- PASS: TestCorpus/script/frozen/shout
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ edit testdata/script/twice.txtar  # shout now prints SEVEN
+$ go test  # echo-shout
+    script/twice: A1 is twice B1, which both columns print.
+        shout: Does what the case's shout/ tree says.
+        out/shout/values.txt differs (-golden +got):
+        - A1 SIX
+        + A1 SEVEN
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/frozen
+            --- PASS: TestCorpus/script/frozen/echo
+            --- PASS: TestCorpus/script/frozen/shout
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- FAIL: TestCorpus/script/twice/shout
+FAIL
+[exit 1]

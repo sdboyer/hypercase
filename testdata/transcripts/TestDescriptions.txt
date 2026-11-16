@@ -1,0 +1,41 @@
+$ go test  # echo
+    testdata/script/blank.txtar: the archive has no description: its comment, the text before the first section, is empty
+        Write the case's description, in prose, as the archive's comment, the text before its first section.
+    testdata/script/empty.txtar: the archive has no description: its comment, the text before the first section, is empty
+        Write the case's description, in prose, as the archive's comment, the text before its first section.
+    testdata/script/key-value.txtar: line 2 of the comment is a key: value line, and the comment is prose: "cells: 1"
+        Write the case's description, in prose, as the archive's comment, the text before its first section.
+    script/blank: 
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/empty: 
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/key-value: A sheet whose comment sets a parameter.
+          cells: 1
+        echo: Does what the case's do/ tree says.
+        out/echo/values.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/blank
+            --- FAIL: TestCorpus/script/blank/echo
+        --- FAIL: TestCorpus/script/empty
+            --- FAIL: TestCorpus/script/empty/echo
+        --- FAIL: TestCorpus/script/key-value
+            --- FAIL: TestCorpus/script/key-value/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/blank
+            --- PASS: TestCorpus/script/blank/echo
+        --- PASS: TestCorpus/script/empty
+            --- PASS: TestCorpus/script/empty/echo
+        --- PASS: TestCorpus/script/key-value
+            --- PASS: TestCorpus/script/key-value/echo
+PASS

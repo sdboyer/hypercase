@@ -1,0 +1,41 @@
+$ go test  # probe
+    script/a: echo's probe says the case isn't for it: no formulas
+    script/b: echo's probe says the case isn't for it: only numbers
+    the suite echo applies to no case: its probe says no to every case of script.
+        A suite that applies to no case checks nothing. Add a case it applies to, or fix the probe.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/a
+            --- SKIP: TestCorpus/script/a/echo
+        --- PASS: TestCorpus/script/b
+            --- SKIP: TestCorpus/script/b/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # probe
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/a: echo's probe says the case isn't for it: no formulas
+    script/b: echo's probe says the case isn't for it: only numbers
+    the suite echo applies to no case: its probe says no to every case of script.
+        A suite that applies to no case checks nothing. Add a case it applies to, or fix the probe.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/a
+            --- SKIP: TestCorpus/script/a/echo
+        --- PASS: TestCorpus/script/b
+            --- SKIP: TestCorpus/script/b/echo
+FAIL
+[exit 1]
+$ go test -run=TestCorpus/script/a/  # probe
+    script/a: echo's probe says the case isn't for it: no formulas
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/a
+            --- SKIP: TestCorpus/script/a/echo
+PASS
+$ go test  # echo
+    the suite echo applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]

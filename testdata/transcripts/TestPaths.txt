@@ -1,0 +1,145 @@
+$ go test  # two-paths
+    from the corpus type hypercase_test.Script, of testdata/script/, *hypercase_test.Graph, which the suite evaluate consumes, is reached by 2 paths:
+          hypercase_test.Script → direct → *hypercase_test.Graph
+          hypercase_test.Script → parse → *hypercase_test.Parsed → resolve → *hypercase_test.Graph
+        There must be exactly one path to each type a column consumes. Remove a lift, or give the paths distinct product types.
+    No case runs until each type a column consumes is reached by one path.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ go test  # split
+    from the corpus type hypercase_test.Script, of testdata/script/, *hypercase_test.Graph, which the suite evaluate consumes, is reached by 2 paths:
+          hypercase_test.Script → direct → *hypercase_test.Graph
+          hypercase_test.Script → parse → *hypercase_test.Parsed → resolve → *hypercase_test.Graph
+        There must be exactly one path to each type a column consumes. Remove a lift, or give the paths distinct product types.
+    No case runs until each type a column consumes is reached by one path.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # split-second
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/stray: evaluate's probe says the case isn't for it: evaluate's probe says no, if it is called.
+    what ran, in order:
+        direct ran on both
+        evaluate's probe ran
+        evaluate ran on both
+        direct ran on fine
+        evaluate's probe ran
+        evaluate ran on fine
+        direct ran on loop
+        evaluate's probe ran
+        evaluate ran on loop
+        direct ran on noisy
+        evaluate's probe ran
+        evaluate ran on noisy
+        direct ran on stray
+        evaluate's probe ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/both
+            --- PASS: TestCorpus/script/both/direct
+            --- PASS: TestCorpus/script/both/evaluate
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/direct
+            --- PASS: TestCorpus/script/fine/evaluate
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/direct
+            --- PASS: TestCorpus/script/loop/evaluate
+        --- PASS: TestCorpus/script/noisy
+            --- PASS: TestCorpus/script/noisy/direct
+            --- PASS: TestCorpus/script/noisy/evaluate
+        --- PASS: TestCorpus/script/stray
+            --- PASS: TestCorpus/script/stray/direct
+            --- SKIP: TestCorpus/script/stray/evaluate
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/both: evaluate is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: format is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: resolve is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/loop: evaluate is blocked: the lift resolve failed on the case, and testdata/script/loop.txtar, out/resolve/error.txt, records its error.
+    script/stray: evaluate is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: format is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: resolve is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on both
+        parse ran on both
+        calc ran on fine
+        parse ran on fine
+        resolve ran on fine
+        evaluate's probe ran
+        evaluate ran on fine
+        format's probe ran
+        format ran on fine
+        calc ran on loop
+        parse ran on loop
+        resolve ran on loop
+        format's probe ran
+        format ran on loop
+        calc ran on noisy
+        parse ran on noisy
+        resolve ran on noisy
+        evaluate's probe ran
+        evaluate ran on noisy
+        format's probe ran
+        format ran on noisy
+        calc ran on stray
+        parse ran on stray
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/both
+            --- PASS: TestCorpus/script/both/calc
+            --- SKIP: TestCorpus/script/both/evaluate
+            --- SKIP: TestCorpus/script/both/format
+            --- PASS: TestCorpus/script/both/parse
+            --- SKIP: TestCorpus/script/both/resolve
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/calc
+            --- PASS: TestCorpus/script/fine/evaluate
+            --- PASS: TestCorpus/script/fine/format
+            --- PASS: TestCorpus/script/fine/parse
+            --- PASS: TestCorpus/script/fine/resolve
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/calc
+            --- SKIP: TestCorpus/script/loop/evaluate
+            --- PASS: TestCorpus/script/loop/format
+            --- PASS: TestCorpus/script/loop/parse
+            --- PASS: TestCorpus/script/loop/resolve
+        --- PASS: TestCorpus/script/noisy
+            --- PASS: TestCorpus/script/noisy/calc
+            --- PASS: TestCorpus/script/noisy/evaluate
+            --- PASS: TestCorpus/script/noisy/format
+            --- PASS: TestCorpus/script/noisy/parse
+            --- PASS: TestCorpus/script/noisy/resolve
+        --- PASS: TestCorpus/script/stray
+            --- PASS: TestCorpus/script/stray/calc
+            --- SKIP: TestCorpus/script/stray/evaluate
+            --- SKIP: TestCorpus/script/stray/format
+            --- PASS: TestCorpus/script/stray/parse
+            --- SKIP: TestCorpus/script/stray/resolve
+PASS
+$ go test  # cycle
+    from the corpus type hypercase_test.Script, of testdata/script/, *hypercase_test.Graph, which the lift back and the suite evaluate consume, is reached through the cycle resolve, back, so by more than one path:
+          hypercase_test.Script → parse → *hypercase_test.Parsed → resolve → *hypercase_test.Graph
+        There must be exactly one path to each type a column consumes. Remove a lift, or give the paths distinct product types.
+    from the corpus type hypercase_test.Script, of testdata/script/, *hypercase_test.Parsed, which the lift resolve consumes, is reached through the cycle resolve, back, so by more than one path:
+          hypercase_test.Script → parse → *hypercase_test.Parsed
+        There must be exactly one path to each type a column consumes. Remove a lift, or give the paths distinct product types.
+    No case runs until each type a column consumes is reached by one path.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ go test  # unreached
+    the suite evaluate consumes *hypercase_test.Graph, which no registered corpus type reaches.
+        Register the lift that produces it, or the corpus type.
+    No case runs until each type a column consumes is reached by one path.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ go test  # fs-lift
+    the lift parse-raw consumes fs.FS, which no corpus type is. A lift consumes a corpus type, for the raw trees, or a stage another lift reaches; only a suite runs over the raw input view, by naming a Corpus.
+        Declare a decl.Type for the archives' directory, and consume it.
+    No case runs until each type a column consumes is reached by one path.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]

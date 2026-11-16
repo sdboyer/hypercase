@@ -1,0 +1,28 @@
+$ go test  # rejects
+    testdata/script/empty.txtar has problems of form, so none of its cells run, and no update writes it:
+          gaps: the section is empty; a case with no known gaps has no gaps section
+        Fix the archive by hand.
+    testdata/script/lines.txtar has problems of form, so none of its cells run, and no update writes it:
+          gaps, line 1: the line names echo and has no text: say what is right, and the issue it waits on
+          gaps, line 2: the column's name is followed by more than one space
+          gaps, line 3: the line is blank
+          gaps, line 5: lines 4 and 5 both mark the cell of echo
+          gaps, line 6: the line starts with "transform/looped", which is not a column's name
+        Fix the archive by hand.
+    testdata/script/empty.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/lines.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    testdata/script/empty.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/lines.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/echo
+PASS

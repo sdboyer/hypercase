@@ -1,0 +1,72 @@
+$ go test  # fs-product
+panic: hypercase: the lift copy's product, hypercase_test.Other, is a corpus type, and this hypercase doesn't run lifts whose product is a corpus type. Make the product a stage, a type that isn't a named fs.FS wrapper.
+[stack]
+[exit 2]
+$ go test  # jenny-lift
+panic: hypercase: the lift parse gives a Jenny, which makes a product that is a corpus type, and its product is *hypercase_test.Parsed. Give it Run, which makes the product.
+[stack]
+[exit 2]
+$ go test  # lift-no-run
+panic: hypercase: the lift parse has no Run. Give it the function that makes its product.
+[stack]
+[exit 2]
+$ go test  # lift-bad-output
+panic: hypercase: the lift parse declares an output with the pattern "values.txt", which matches neither error.txt nor stderr.txt, the only files a lift's cell writes. Remove the declaration.
+[stack]
+[exit 2]
+$ go test  # lift-bad-name
+panic: hypercase: the lift name "Parse" breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter. Rename the lift.
+[stack]
+[exit 2]
+$ go test  # checks-dir
+panic: hypercase: the corpus type hypercase_test.Script declares the directory checks, a name reserved for the findings of corpus checks. Name another directory.
+[stack]
+[exit 2]
+$ go test  # type-twice
+panic: hypercase: the corpus type hypercase_test.Script is registered twice. Register it once.
+[stack]
+[exit 2]
+$ go test  # type-two-dirs
+panic: hypercase: the corpus type hypercase_test.Script is declared twice, with the directories script and grid. A corpus type has one directory; register one declaration.
+[stack]
+[exit 2]
+$ go test  # dir-twice
+panic: hypercase: two corpus types declare the directory script: hypercase_test.Script and hypercase_test.Grid. An archive's directory gives its type; declare another directory for one of them.
+[stack]
+[exit 2]
+$ go test  # dir-twice-calls
+panic: hypercase: two corpus types declare the directory script: hypercase_test.Script and hypercase_test.Grid. An archive's directory gives its type; declare another directory for one of them.
+[stack]
+[exit 2]
+$ go test  # lift-suite-name
+panic: hypercase: two columns are named parse: the lift parse, from hypercase_test.Script to *hypercase_test.Parsed, and the suite parse, over hypercase_test.Script. Column names are unique; rename one.
+[stack]
+[exit 2]
+$ go test  # lift-suite-name-calls
+panic: hypercase: two columns are named parse: the suite parse, over hypercase_test.Script, and the lift parse, from hypercase_test.Script to *hypercase_test.Parsed. Column names are unique; rename one.
+[stack]
+[exit 2]
+$ go test  # two-lifts-name
+panic: hypercase: two columns are named parse: the lift parse, from hypercase_test.Script to *hypercase_test.Parsed, and the lift parse, from hypercase_test.Grid to *hypercase_test.Parsed. Column names are unique; rename one.
+[stack]
+[exit 2]
+$ go test  # own-and-use
+panic: hypercase: the lift parse is given to both hypercase.Own and hypercase.Use. A package owns a lift, or only uses it: pass it to one.
+[stack]
+[exit 2]
+$ go test  # own-and-use-calls
+panic: hypercase: the lift parse is given to both hypercase.Own and hypercase.Use. A package owns a lift, or only uses it: pass it to one.
+[stack]
+[exit 2]
+$ go test  # bare-lift
+panic: hypercase: Register was given the lift parse. Pass it to hypercase.Own, in the package that owns its column, or to hypercase.Use, in a package that only reads its product.
+[stack]
+[exit 2]
+$ go test  # use-suite
+panic: hypercase: hypercase.Use was given the suite calc. It takes lifts only: a package runs only its own suites. Register the suite, or give it to hypercase.Own, in the package that runs it.
+[stack]
+[exit 2]
+$ go test  # own-other
+panic: hypercase: hypercase.Own was given a decl.Property. It takes the columns the package owns: hypercase.Suite and decl.Lift values.
+[stack]
+[exit 2]

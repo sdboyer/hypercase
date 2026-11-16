@@ -1,0 +1,59 @@
+$ go test  # echo
+    testdata/script/between.txtar has update-written sections out of their place.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to put them in place.
+    testdata/script/unsorted.txtar has update-written sections out of their place.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to put them in place.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/between
+            --- PASS: TestCorpus/script/between/echo
+        --- PASS: TestCorpus/script/unsorted
+            --- PASS: TestCorpus/script/unsorted/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/between
+            --- PASS: TestCorpus/script/between/echo
+        --- PASS: TestCorpus/script/unsorted
+            --- PASS: TestCorpus/script/unsorted/echo
+PASS
+$ cat testdata/script/unsorted.txtar
+The goldens are out of name order.
+-- in/do/out/a.txt --
+a
+-- in/do/out/b.txt --
+b
+-- out/echo/a.txt --
+a
+-- out/echo/b.txt --
+b
+$ cat testdata/script/between.txtar
+A golden sits between two inputs.
+-- in/do/out/a.txt --
+a
+-- in/do/out/b.txt --
+b
+-- out/echo/a.txt --
+a
+-- out/echo/b.txt --
+b
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/between
+            --- PASS: TestCorpus/script/between/echo
+        --- PASS: TestCorpus/script/unsorted
+            --- PASS: TestCorpus/script/unsorted/echo
+PASS
+$ go test  # echo
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/between
+            --- PASS: TestCorpus/script/between/echo
+        --- PASS: TestCorpus/script/unsorted
+            --- PASS: TestCorpus/script/unsorted/echo
+PASS

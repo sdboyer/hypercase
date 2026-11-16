@@ -1,0 +1,11 @@
+A properties section with a blank line, a name stated twice, and a line that is no name.
+-- in/do/out/values.txt --
+A1 6
+-- properties --
+circular
+
+circular
+Circular
+circular dangling
+-- out/echo/values.txt --
+stale

@@ -1,0 +1,6 @@
+$ FIXTURE_UPDATE_GOLDEN=yes go test  # echo
+    FIXTURE_UPDATE_GOLDEN is set to "yes".
+        Set it to 1 to run an update, or unset it.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]

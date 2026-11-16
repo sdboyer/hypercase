@@ -1,0 +1,11 @@
+A section under each top-level name this hypercase reserves but doesn't read.
+-- in/do/out/values.txt --
+A1 6
+-- variant/cycle/about --
+A cycle.
+-- transform/looped/in/sheet/A1 --
+=A1
+-- via/import/sheet/A1 --
+4
+-- out/echo/values.txt --
+stale

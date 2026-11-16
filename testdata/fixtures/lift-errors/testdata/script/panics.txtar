@@ -1,0 +1,9 @@
+parse panics on the script, which states malformed.
+-- in/parse/panic --
+parse: boom
+-- in/calc/error --
+D1: not a number
+-- properties --
+malformed
+-- out/calc/error.txt --
+D1: not a number

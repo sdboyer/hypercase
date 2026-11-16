@@ -1,0 +1,178 @@
+$ go test  # echo
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ cat testdata/hypercase.json
+{
+  "format": 3,
+  "updateVar": "FIXTURE_UPDATE_GOLDEN",
+  "corpusRoot": ".",
+  "rootPackage": true,
+  "issueLinks": [],
+  "properties": [],
+  "types": [
+    {
+      "dir": "script",
+      "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
+      "goType": "github.com/sdboyer/hypercase_test.Script"
+    }
+  ],
+  "lifts": [],
+  "suites": [
+    {
+      "name": "echo",
+      "description": "Does what the case's do/ tree says.",
+      "consumes": "github.com/sdboyer/hypercase_test.Script",
+      "corpora": [
+        "script"
+      ],
+      "outputs": [
+        {
+          "pattern": "?.txt",
+          "description": "A file the case's instructions name with one letter."
+        },
+        {
+          "pattern": "archive.txt",
+          "description": "The archive's name, as the run received it."
+        },
+        {
+          "pattern": "dir.txt",
+          "description": "The path of a temp dir the run made."
+        },
+        {
+          "pattern": "error.txt",
+          "description": "The error the case's instructions give."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "What the case's instructions write to stderr."
+        },
+        {
+          "pattern": "stdout.txt",
+          "description": "What the case's instructions write to stdout."
+        },
+        {
+          "pattern": "values.txt",
+          "description": "The values the case's instructions give."
+        }
+      ],
+      "rejects": []
+    }
+  ]
+}
+$ go test  # echo-shout
+    testdata/hypercase.json differs from what the package registers (-committed +registered):
+                  }
+                ],
+                "rejects": []
+        +     },
+        +     {
+        +       "name": "shout",
+        +       "description": "Does what the case's shout/ tree says.",
+        +       "consumes": "github.com/sdboyer/hypercase_test.Script",
+        +       "corpora": [
+        +         "script"
+        +       ],
+        +       "outputs": [
+        +         {
+        +           "pattern": "?.txt",
+        +           "description": "A file the case's instructions name with one letter."
+        +         },
+        +         {
+        +           "pattern": "archive.txt",
+        +           "description": "The archive's name, as the run received it."
+        +         },
+        +         {
+        +           "pattern": "dir.txt",
+        +           "description": "The path of a temp dir the run made."
+        +         },
+        +         {
+        +           "pattern": "error.txt",
+        +           "description": "The error the case's instructions give."
+        +         },
+        +         {
+        +           "pattern": "stderr.txt",
+        +           "description": "What the case's instructions write to stderr."
+        +         },
+        +         {
+        +           "pattern": "stdout.txt",
+        +           "description": "What the case's instructions write to stdout."
+        +         },
+        +         {
+        +           "pattern": "values.txt",
+        +           "description": "The values the case's instructions give."
+        +         }
+        +       ],
+        +       "rejects": []
+              }
+            ]
+          }
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/shout
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo-shout
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ go test  # echo-shout
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ rm testdata/hypercase.json  # the registry is lost
+$ go test  # echo-shout
+    testdata/hypercase.json is missing. It records what the package registers, for tools and for the root-package check.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.
+    no registry records a root-package check for the module-root corpus, so nothing reports what no column there owns.
+        Register hypercase.RootPackage() in one package over it, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... to record it in the package's registry.
+    testdata/script/ holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.
+        Declare a decl.Type with that Dir, or move or delete the archives.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/shout
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/script/twice/shout  # echo-shout
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ edit testdata/.hypercase-tmp-hypercase.json-99  # a write of the registry was killed
+$ go test  # echo-shout
+    testdata/.hypercase-tmp-hypercase.json-99 is a temp file left by a write that was cut short.
+        Delete it.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/shout
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo-shout
+    testdata/.hypercase-tmp-hypercase.json-99 is a temp file left by a write that was cut short.
+        Delete it.
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/shout
+FAIL
+[exit 1]

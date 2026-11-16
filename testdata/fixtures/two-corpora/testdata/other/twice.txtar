@@ -1,0 +1,5 @@
+A1 is twice B1, in the corpus other, under the same name.
+-- in/shout/out/values.txt --
+A1 SIX
+-- out/shout/values.txt --
+A1 SIX

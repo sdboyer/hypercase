@@ -1,0 +1,11 @@
+$ go test -run=TestCorpus/script/no$/  # probe-none
+    script/no: The probe says no, and the cell is skipped, though the case states a property echo rejects.
+        echo: Does what the case's do/ tree says.
+        echo returned no error, but the case states circular, which echo rejects.
+        Fix the code, or correct the case's properties or echo's Rejects.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/no
+            --- FAIL: TestCorpus/script/no/echo
+FAIL
+[exit 1]

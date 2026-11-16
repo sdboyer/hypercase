@@ -1,0 +1,131 @@
+$ edit testdata/script/negative.txtar  # the code's error is worded differently
+$ edit testdata/script/div-zero.txtar  # the code's wrong output changes
+$ edit testdata/script/accepted-loop.txtar  # the code writes a new file
+$ go test -run=TestCorpus/script/(negative|div-zero|accepted-loop)/  # rejects
+    testdata/script/other-column.txtar: gaps, line 1, names format, and no registry has a column of that name over the corpus script.
+        Register the column, or remove the line.
+    testdata/script/out-of-place.txtar has update-written sections out of their place.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to put them in place.
+    script/accepted-loop: A1 and B1 refer to each other, and the code wrongly accepts the sheet.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A cycle is an error. Waits on sheets#4."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/c.txt is new
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+    script/div-zero: A1 divides by zero, and the code prints a number.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A division by zero evaluates to #DIV/0!. Waits on sheets#5."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/values.txt differs (-committed +got):
+        - A1 0
+        + A1 0.0
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+    script/negative: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A negative number is valid, and evaluates to itself. Waits on sheets#3."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/error.txt differs (-committed +got):
+        - A1: unexpected "-"
+        + A1: bad number
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/accepted-loop
+            --- FAIL: TestCorpus/script/accepted-loop/echo
+        --- FAIL: TestCorpus/script/div-zero
+            --- FAIL: TestCorpus/script/div-zero/echo
+        --- FAIL: TestCorpus/script/negative
+            --- FAIL: TestCorpus/script/negative/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/script/(negative|div-zero|accepted-loop)/  # rejects
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/accepted-loop: A1 and B1 refer to each other, and the code wrongly accepts the sheet.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A cycle is an error. Waits on sheets#4."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/c.txt is new
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+    script/div-zero: A1 divides by zero, and the code prints a number.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A division by zero evaluates to #DIV/0!. Waits on sheets#5."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/values.txt differs (-committed +got):
+        - A1 0
+        + A1 0.0
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+    script/negative: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A negative number is valid, and evaluates to itself. Waits on sheets#3."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/error.txt differs (-committed +got):
+        - A1: unexpected "-"
+        + A1: bad number
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/accepted-loop
+            --- FAIL: TestCorpus/script/accepted-loop/echo
+        --- FAIL: TestCorpus/script/div-zero
+            --- FAIL: TestCorpus/script/div-zero/echo
+        --- FAIL: TestCorpus/script/negative
+            --- FAIL: TestCorpus/script/negative/echo
+FAIL
+[exit 1]
+$ edit testdata/script/negative.txtar  # restore negative
+$ edit testdata/script/negative.txtar  # the code stops erring
+$ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/script/negative/  # rejects
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/negative: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A negative number is valid, and evaluates to itself. Waits on sheets#3."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/error.txt is no longer produced
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/negative
+            --- FAIL: TestCorpus/script/negative/echo
+FAIL
+[exit 1]
+$ edit testdata/script/negative.txtar  # remove the gaps line
+$ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/script/negative/  # rejects
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/negative: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        out/echo/error.txt records an error, but the run returned none.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/negative
+            --- FAIL: TestCorpus/script/negative/echo
+FAIL
+[exit 1]
+# the orphaned error.txt is a person's to remove
+$ edit testdata/script/div-zero.txtar  # delete the frozen cell's files
+$ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/script/div-zero/  # rejects
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/div-zero
+            --- PASS: TestCorpus/script/div-zero/echo
+PASS
+$ cat testdata/script/div-zero.txtar
+A1 divides by zero, and the code prints a number.
+-- in/do/out/values.txt --
+A1 0.0
+-- gaps --
+echo A division by zero evaluates to #DIV/0!. Waits on sheets#5.
+-- out/echo/values.txt --
+A1 0.0
+$ go test -run=TestCorpus/script/div-zero/  # rejects
+    testdata/script/other-column.txtar: gaps, line 1, names format, and no registry has a column of that name over the corpus script.
+        Register the column, or remove the line.
+    testdata/script/out-of-place.txtar has update-written sections out of their place.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to put them in place.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/div-zero
+            --- PASS: TestCorpus/script/div-zero/echo
+FAIL
+[exit 1]

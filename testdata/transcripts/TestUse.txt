@@ -1,0 +1,143 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # ladder-b
+    what ran, in order:
+        parse ran on x
+        outline's probe ran
+        outline ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/outline
+PASS
+$ cat testdata/script/x.txtar
+The root package, ., owns parse, resolve and evaluate, and ./b uses parse for outline.
+-- in/evaluate/out/values.txt --
+evaluate 1
+-- in/outline/out/values.txt --
+outline 1
+-- out/evaluate/values.txt --
+evaluate 1
+-- out/outline/values.txt --
+outline 1
+$ go test  # ladder-a
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+PASS
+$ go test ./b  # ladder-b
+    what ran, in order:
+        parse ran on x
+        outline's probe ran
+        outline ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/outline
+PASS
+$ edit testdata/script/bad.txtar  # a case parse wrongly rejects
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # ladder-b
+    script/bad: outline is blocked: the lift parse failed on the case, and testdata/script/bad.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        parse ran on bad
+        parse ran on x
+        outline's probe ran
+        outline ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/bad
+            --- SKIP: TestCorpus/script/bad/outline
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/outline
+PASS
+$ go test ./b  # ladder-b
+    script/bad: outline is blocked: the lift parse failed on the case, and testdata/script/bad.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        parse ran on bad
+        parse ran on x
+        outline's probe ran
+        outline ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/bad
+            --- SKIP: TestCorpus/script/bad/outline
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/outline
+PASS
+$ go test  # ladder-a
+    script/bad: evaluate is blocked: the lift parse failed on the case, and testdata/script/bad.txtar, out/parse/error.txt, records its error.
+    script/bad: parse rejects the script, and nothing says it should.
+        parse: Parses the script, as its parse/ tree says.
+        parse returned an error, but the case states no property parse rejects:
+          A1: not a number
+        Fix the code, or state the property on the case and in parse's Rejects.
+        out/parse/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/parse/stderr.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/bad: resolve is blocked: the lift parse failed on the case, and testdata/script/bad.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        parse ran on bad
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/bad
+            --- SKIP: TestCorpus/script/bad/evaluate
+            --- FAIL: TestCorpus/script/bad/parse
+            --- SKIP: TestCorpus/script/bad/resolve
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/bad: evaluate is blocked: the lift parse failed on the case, and testdata/script/bad.txtar, out/parse/error.txt, records its error.
+    script/bad: parse rejects the script, and nothing says it should.
+        parse: Parses the script, as its parse/ tree says.
+        parse returned an error, but the case states no property parse rejects:
+          A1: not a number
+        Fix the code, or state the property on the case and in parse's Rejects.
+    script/bad: resolve is blocked: the lift parse failed on the case, and testdata/script/bad.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        parse ran on bad
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/bad
+            --- SKIP: TestCorpus/script/bad/evaluate
+            --- FAIL: TestCorpus/script/bad/parse
+            --- SKIP: TestCorpus/script/bad/resolve
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]

@@ -1,0 +1,9 @@
+The script states malformed, and parse accepts it.
+-- in/calc/error --
+D1: not a number
+-- properties --
+malformed
+-- out/calc/error.txt --
+D1: not a number
+-- out/format/trail.txt --
+parse

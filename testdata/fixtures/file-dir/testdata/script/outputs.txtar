@@ -1,0 +1,5 @@
+The run returns a.txt, and a.txt/b below it.
+-- in/do/out/a.txt --
+x
+-- in/do/extranl/a.txt/b --
+x

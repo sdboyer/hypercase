@@ -1,0 +1,11 @@
+pick picks the script.
+-- in/format/out/values.txt --
+A1 6
+-- in/walk/out/values.txt --
+A1 6
+-- out/format/trail.txt --
+unpick
+-- out/format/values.txt --
+A1 6
+-- out/walk/values.txt --
+A1 6

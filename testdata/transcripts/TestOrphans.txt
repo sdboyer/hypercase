@@ -1,0 +1,45 @@
+$ go test  # echo
+    testdata/script/gone.txtar: no registry claims out/other/values.txt: no column named other runs over the corpus script.
+        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+    script/gone: The run no longer writes old.txt, and no column named other is registered.
+        echo: Does what the case's do/ tree says.
+        out/echo/old.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/quiet: The run once erred and printed, and now does neither.
+        echo: Does what the case's do/ tree says.
+        out/echo/error.txt records an error, but the run returned none.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        out/echo/stderr.txt records output, but the run wrote nothing to stderr.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        out/echo/stdout.txt records output, but the run wrote nothing to stdout.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/gone
+            --- FAIL: TestCorpus/script/gone/echo
+        --- FAIL: TestCorpus/script/quiet
+            --- FAIL: TestCorpus/script/quiet/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/gone: The run no longer writes old.txt, and no column named other is registered.
+        echo: Does what the case's do/ tree says.
+        out/echo/old.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    script/quiet: The run once erred and printed, and now does neither.
+        echo: Does what the case's do/ tree says.
+        out/echo/error.txt records an error, but the run returned none.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        out/echo/stderr.txt records output, but the run wrote nothing to stderr.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        out/echo/stdout.txt records output, but the run wrote nothing to stdout.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/gone
+            --- FAIL: TestCorpus/script/gone/echo
+        --- FAIL: TestCorpus/script/quiet
+            --- FAIL: TestCorpus/script/quiet/echo
+FAIL
+[exit 1]

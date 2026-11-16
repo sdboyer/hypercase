@@ -1,0 +1,7 @@
+D1 holds a word, which echo doesn't reject, and echo errs on it.
+-- in/do/error --
+D1: not a number
+-- properties --
+malformed
+-- out/echo/error.txt --
+D1: not a number

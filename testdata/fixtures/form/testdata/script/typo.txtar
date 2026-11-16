@@ -1,0 +1,7 @@
+An input under a misspelled top-level name.
+-- ni/do/out/values.txt --
+A1 6
+-- in/do/out/values.txt --
+A1 6
+-- out/echo/values.txt --
+stale

@@ -1,0 +1,12 @@
+A gaps section with each kind of bad line.
+-- in/do/out/values.txt --
+A1 6
+-- gaps --
+echo
+format  Two spaces.
+
+echo Waits on sheets#3.
+echo Waits on sheets#4.
+transform/looped echo Waits on sheets#5.
+-- out/echo/values.txt --
+stale

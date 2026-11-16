@@ -1,0 +1,5 @@
+A1 is twice B1, in the corpus script.
+-- in/do/out/values.txt --
+A1 6
+-- out/echo/values.txt --
+A1 6

@@ -1,0 +1,44 @@
+$ go test  # echo
+    testdata/script/duplicate.txtar has problems of form, so none of its cells run, and no update writes it:
+          in/do/out/values.txt: the section appears twice
+        Fix the archive by hand.
+    testdata/script/paths.txtar has problems of form, so none of its cells run, and no update writes it:
+          in/../x: the name is not a valid slash path
+          in//x: the name is not a valid slash path
+        Fix the archive by hand.
+    testdata/script/reserved.txtar has problems of form, so none of its cells run, and no update writes it:
+          variant/cycle/about: the top-level name variant is reserved for a later step, and this hypercase doesn't read it yet
+          transform/looped/in/sheet/A1: the top-level name transform is reserved for a later step, and this hypercase doesn't read it yet
+          via/import/sheet/A1: the top-level name via is reserved for a later step, and this hypercase doesn't read it yet
+        Fix the archive by hand.
+    testdata/script/shape.txtar has problems of form, so none of its cells run, and no update writes it:
+          in/A1: an input belongs in a tree, as in/<tree>/<file>
+          out/values.txt: an output belongs under its column, as out/<column>/<file>
+          in/do/out/values.txt: the section is also the directory of in/do/out/values.txt/x
+        Fix the archive by hand.
+    testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it:
+          ni/do/out/values.txt: ni is not one of the framework's top-level names (gaps, in, out, properties, transform, variant, via)
+        Fix the archive by hand.
+    testdata/script/duplicate.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/paths.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/reserved.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/shape.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    testdata/script/duplicate.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/paths.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/reserved.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/shape.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+    testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it. The root-package check reports them.
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/echo
+PASS

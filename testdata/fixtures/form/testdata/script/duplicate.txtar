@@ -1,0 +1,7 @@
+The same input, twice.
+-- in/do/out/values.txt --
+A1 6
+-- in/do/out/values.txt --
+A1 7
+-- out/echo/values.txt --
+stale

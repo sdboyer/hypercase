@@ -1,0 +1,16 @@
+$ go test  # bad-link-pattern
+panic: hypercase: the project's issue link pattern "sheets#(\\d+" is not a regular expression: error parsing regexp: missing closing ): `sheets#(\d+`. Fix the pattern.
+[stack]
+[exit 2]
+$ go test -run=^$  # bad-link-pattern
+panic: hypercase: the project's issue link pattern "sheets#(\\d+" is not a regular expression: error parsing regexp: missing closing ): `sheets#(\d+`. Fix the pattern.
+[stack]
+[exit 2]
+$ go test  # link-no-url
+panic: hypercase: the project's issue link pattern "sheets#(\\d+)" has no URL. Give the template of the issue's URL, such as https://example.com/sheets/issues/$1.
+[stack]
+[exit 2]
+$ go test -run=^$  # link-no-url
+panic: hypercase: the project's issue link pattern "sheets#(\\d+)" has no URL. Give the template of the issue's URL, such as https://example.com/sheets/issues/$1.
+[stack]
+[exit 2]

@@ -1,0 +1,11 @@
+One sheet, twice.
+-- in/do/out/a.txt --
+a
+-- out/echo/b.txt --
+stale b
+-- in/do/out/b.txt --
+b
+-- in/do/stdout --
+printed
+-- out/echo/a.txt --
+stale a

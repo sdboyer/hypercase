@@ -1,0 +1,6 @@
+$ go test  # rejects
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/wrong-property
+            --- PASS: TestCorpus/script/wrong-property/echo
+PASS

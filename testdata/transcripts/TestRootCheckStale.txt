@@ -1,0 +1,22 @@
+$ go test  # pkg-a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ go test ./b  # pkg-b
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ rm corpus_test.go  # the root package's tests are deleted, and its registry left behind
+$ go test ./b  # pkg-b
+    testdata/hypercase.json records the root-package check for the module-root corpus, and . holds no _test.go file, so no test runs the check, and nothing reports what no column there owns.
+        Restore the package's tests, or register hypercase.RootPackage() in another package over it, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... to record it in that package's registry.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+FAIL
+[exit 1]

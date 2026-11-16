@@ -1,0 +1,7 @@
+A1 refers to itself, and the error is now worded differently.
+-- in/do/error --
+cycle: A1 -> A1
+-- properties --
+circular
+-- out/echo/error.txt --
+A1 -> A1: cycle

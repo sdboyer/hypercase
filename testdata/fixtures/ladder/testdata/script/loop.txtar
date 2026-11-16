@@ -1,0 +1,7 @@
+resolve rejects the script, which states circular. format reads the parsed script, and runs.
+-- in/resolve/error --
+A1 -> A1: cycle
+-- in/format/out/values.txt --
+format 2
+-- properties --
+circular

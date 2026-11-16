@@ -1,0 +1,5 @@
+The root package, ., owns parse, resolve and evaluate, and ./b uses parse for outline.
+-- in/evaluate/out/values.txt --
+evaluate 1
+-- in/outline/out/values.txt --
+outline 1

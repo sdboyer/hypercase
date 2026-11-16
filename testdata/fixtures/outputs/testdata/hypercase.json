@@ -1,0 +1,41 @@
+{
+  "format": 3,
+  "updateVar": "FIXTURE_UPDATE_GOLDEN",
+  "corpusRoot": ".",
+  "rootPackage": true,
+  "issueLinks": [],
+  "properties": [],
+  "types": [
+    {
+      "dir": "script",
+      "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
+      "goType": "github.com/sdboyer/hypercase_test.Script"
+    }
+  ],
+  "lifts": [],
+  "suites": [
+    {
+      "name": "echo",
+      "description": "Does what the case's do/ tree says.",
+      "consumes": "github.com/sdboyer/hypercase_test.Script",
+      "corpora": [
+        "script"
+      ],
+      "outputs": [
+        {
+          "pattern": "?.txt",
+          "description": "A file named with one letter."
+        },
+        {
+          "pattern": "a.txt",
+          "description": "The file a."
+        },
+        {
+          "pattern": "values.txt",
+          "description": "The values."
+        }
+      ],
+      "rejects": []
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+calc, a suite over the raw trees, rejects the script, and its error goes through RenderError too. parse panics, and a panic is never rendered.
+-- in/calc/error --
+D1: not a number
+-- in/parse/panic --
+parse: boom
+-- properties --
+malformed

@@ -1,0 +1,55 @@
+$ go test  # rejects-unregistered
+    the suite echo rejects circular, and the package registers no property of that name.
+        Register the property, or remove it from echo's Rejects.
+    No case runs until the registrations agree.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ go test  # rejects-other-description
+    the suite echo rejects a property named circular, which the package registers with another description.
+        Reject the registered property: declare it once, and use that declaration in both places.
+    No case runs until the registrations agree.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ go test  # rejects-registered-later
+    testdata/hypercase.json differs from what the package registers (-committed +registered):
+              {
+                "name": "circular",
+                "description": "Some cell's formula refers back to itself, directly or through other cells."
+        -     },
+        -     {
+        -       "name": "dangling",
+        -       "description": "Some formula refers to a cell the sheet doesn't have."
+        -     },
+        -     {
+        -       "name": "malformed",
+        -       "description": "Some cell holds neither a number nor a formula."
+              }
+            ],
+            "types": [
+          ...
+                  }
+                ],
+                "rejects": [
+        -         "circular",
+        -         "dangling"
+        +         "circular"
+                ]
+              }
+            ]
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
+    script/reworded: A1 refers to itself, and the error is now worded differently.
+        echo: Does what the case's do/ tree says.
+        out/echo/error.txt differs (-golden +got):
+        - A1 -> A1: cycle
+        + cycle: A1 -> A1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/echo
+        --- FAIL: TestCorpus/script/reworded
+            --- FAIL: TestCorpus/script/reworded/echo
+FAIL
+[exit 1]
