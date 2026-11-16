@@ -1691,8 +1691,16 @@ whether each has a probe, and whether the package owns it.
   and keeps `circular` and `dangling`, so it runs over bases that state
   either; a base that states `malformed` is declined.
 - It is materialized. An update writes `transform/<name>/in/…` and
-  `transform/<name>/delete`, and a normal run checks them like goldens. In a
-  normal run the variant's cells read the committed sections.
+  `transform/<name>/delete`, and the owner's normal run checks them like
+  goldens.
+- Every package's update runs the variant's cells on what the transform
+  makes, and every normal run on the committed sections. What an update
+  writes depends only on the inputs and the code, so one pass of the
+  module's update settles, whichever package runs first.
+- A package's update alone, after a transform changed, leaves its normal
+  run failing on the variant's cells, which read the sections the owner has
+  yet to rewrite. The failure shows how they differ from what the transform
+  makes, and names the module's update.
 - An update replaces a transform's `in/…` and `delete` whole: a file the
   transform no longer produces is removed, and the removal shows in the diff.
 - When a transform no longer applies to a base, its owner's update removes
@@ -1700,9 +1708,12 @@ whether each has a probe, and whether the package owns it.
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
   root-package check reports them and names the strip command.
-- The package that owns a transform writes and judges its `in/…` and
-  `delete`. Each column's owner writes and judges that column's cells on the
-  variant.
+- The package that owns a transform writes its `in/…` and `delete`, and
+  judges them against what the transform makes. Every package's normal run
+  fails a variant whose committed `in/…` and `delete` make no input view,
+  such as an empty `delete` or one that lists a path twice, and runs none
+  of its cells. Each column's owner writes and judges that column's cells
+  on the variant.
 
 **Known gaps in a transform's variant.** A known gap in a cell of a
 transform's variant is a line in the base's `gaps` section that names the

@@ -145,8 +145,6 @@ type plannedVariant struct {
 	properties []string
 	gaps       []archive.Gap
 	committed  archive.VariantCase
-	// invalid is what leaves a transform's committed inputs no input view.
-	invalid []archive.Problem
 
 	// A transform's variant.
 	tr       *transform
@@ -170,8 +168,9 @@ func (v *plannedVariant) runs() bool {
 }
 
 // planVariants plans an archive's variants: its hand-written ones, in the
-// order written, then one per transform of its corpus type, by name.
-func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []*plannedVariant {
+// order written, then one per transform of its corpus type, by name. view
+// is the base's input view, which each transform reads.
+func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base, view fs.FS) []*plannedVariant {
 	var vs []*plannedVariant
 	committed := map[string]archive.VariantCase{}
 	for _, v := range a.Variants() {
@@ -192,7 +191,6 @@ func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []
 	trs := slices.Clone(p.root.transforms)
 	slices.SortFunc(trs, func(a, b *transform) int { return strings.Compare(a.name, b.name) })
 	stated, gaps := a.Properties(), a.Gaps()
-	var baseView fs.FS // what each transform reads, made once
 	for _, tr := range trs {
 		v := &plannedVariant{
 			kind:      archive.Transform,
@@ -201,9 +199,6 @@ func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []
 			gapsAt:    archive.Gaps,
 			committed: committed[tr.name],
 			tr:        tr,
-		}
-		if v.committed.Inputs {
-			v.invalid = a.InputProblems(base, v.committed)
 		}
 		for _, g := range gaps {
 			if g.Transform == tr.name {
@@ -215,10 +210,7 @@ func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []
 		if len(neither) > 0 {
 			v.declined = fmt.Sprintf("the base states %s, which %s neither gives nor keeps", andList(neither), tr.name)
 		} else {
-			if baseView == nil {
-				baseView = base.View()
-			}
-			r.makeVariant(v, base, baseView)
+			r.makeVariant(v, base, view)
 		}
 		vs = append(vs, v)
 	}
@@ -259,8 +251,10 @@ func (r *runner) makeVariant(v *plannedVariant, base archive.Base, view fs.FS) {
 	files := map[string][]byte{}
 	var held []string
 	for _, f := range made.AsFiles() {
-		// A jenny's FS renders each file it adds, so AsFiles gives them
-		// all as bytes, and nothing a transform does reaches this.
+		// A jenny's FS renders each file it adds, and AsFiles gives each
+		// one as Bytes, so no transform reaches this, and no test does: it
+		// guards against a change to jenny, which would otherwise record
+		// an unrendered file as empty bytes.
 		data, ok := jenny.BytesOf(f)
 		if !ok {
 			v.problem = fmt.Sprintf("%s made %s, which its FS gave as a %T, not as rendered bytes. An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase.", tr.name, f.Path(), f)
@@ -313,6 +307,10 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	c := r.newCase(p, pc, v.kind+"/"+v.name+"/", v.about, v.gapsAt, v.properties, v.gaps)
 	c.tr = v.tr
 	owner := v.tr != nil && r.owned[v.tr]
+	// stale is whether a failing cell may be one the module's update
+	// fixes: another package's normal run reads committed inputs that may
+	// differ from what the transform makes.
+	stale := false
 	switch {
 	case v.tr == nil:
 		c.setView(p, pc.base.VariantView(v.committed))
@@ -324,29 +322,50 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	case v.declined != "":
 		r.declined(t, c, p, pc, v, owner, w)
 		return
-	case !r.update && len(v.invalid) > 0:
-		// A normal run would read them. An update reads what the
-		// transform makes, and its owner's rewrites them.
-		t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\nThe module's update, %s, rewrites them, in the package that owns %s.", c.header(), v.name, problemList(v.invalid), r.updateCmd(), v.name)
-		return
-	default:
+	case r.update || !v.committed.Inputs:
+		// An update runs the cells on what the transform makes, in every
+		// package: what it writes depends on the inputs and the code
+		// alone, never on sections an update wrote.
 		if owner {
 			r.judgeInputs(t, c, pc, v, w)
 		}
-		// An update runs the cells on what the transform makes, in every
-		// package: what it writes depends on the inputs and the code
-		// alone, never on sections an update wrote. A normal run reads the
-		// inputs the archive holds.
-		if r.update || !v.committed.Inputs {
-			c.setView(p, archive.NewFS(v.made))
-			break
+		c.setView(p, archive.NewFS(v.made))
+	default:
+		// A normal run reads the inputs the archive holds.
+		view, invalid := pc.base.InputView(v.committed)
+		if len(invalid) > 0 {
+			// An update reads what the transform makes instead, and its
+			// owner's rewrites them.
+			t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\nThe module's update, %s, rewrites them, in the package that owns %s.", c.header(), v.name, problemList(invalid), r.updateCmd(), v.name)
+			return
 		}
-		if !owner && !v.inputDiffs(pc.a).empty() {
-			c.stale = fmt.Sprintf("The archive's inputs for %s's variant differ from what %s makes now: a normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and this cell.", v.name, v.name, v.name, r.updateCmd(), v.name)
+		if owner {
+			r.judgeInputs(t, c, pc, v, w)
 		}
-		c.setView(p, pc.base.VariantView(v.committed))
+		stale = !owner
+		c.setView(p, view)
 	}
 	r.runCells(t, c, p.cols, w)
+	if !stale || !t.Failed() {
+		return
+	}
+	// However its cells failed, the failures may be the inputs'.
+	m := v.inputDiffs(pc.a)
+	if m.empty() {
+		return
+	}
+	// An update writes no frozen cell, so it rewrites none of those.
+	cells := "the variant's cells."
+	var frozen []string
+	for _, col := range p.cols {
+		if _, marked := c.gap(col.name); marked && len(c.goldens(col.name)) > 0 {
+			frozen = append(frozen, col.name+"'s")
+		}
+	}
+	if len(frozen) > 0 {
+		cells = fmt.Sprintf("the variant's cells but the frozen ones, here %s: no update writes a cell its known gap freezes, and a normal run checks what it produces on the rewritten inputs against its committed files.", andList(frozen))
+	}
+	t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and %s", c.header(), v.name, v.name, m, v.name, r.updateCmd(), v.name, cells)
 }
 
 // inputDiffs says how the committed inputs of a transform's variant differ

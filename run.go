@@ -294,6 +294,7 @@ type plannedCase struct {
 	data     []byte
 	a        *archive.Archive
 	base     archive.Base // read once, for the base's cells and the variants'
+	view     fs.FS        // the base's input view, made once, for its cells and the transforms
 	variants []*plannedVariant
 }
 
@@ -367,7 +368,8 @@ func (r *runner) planCorpus(t *testing.T, p *plan) []plannedCase {
 			continue
 		}
 		base := a.Base()
-		cases = append(cases, plannedCase{name: name, path: path, data: data, a: a, base: base, variants: r.planVariants(p, a, base)})
+		view := base.View()
+		cases = append(cases, plannedCase{name: name, path: path, data: data, a: a, base: base, view: view, variants: r.planVariants(p, a, base, view)})
 	}
 	return cases
 }
@@ -386,10 +388,6 @@ type aCase struct {
 	gaps       []archive.Gap // the lines that mark the case's cells
 	state      *caseState
 	tr         *transform // the transform whose variant the case is, if any
-	// stale says why a failing cell may be one the module's update fixes:
-	// the case is a transform's variant whose committed inputs, which a
-	// normal run reads, differ from what the transform makes.
-	stale string
 }
 
 // inputsAt names what to fix for the case's inputs to change: the case,
@@ -400,15 +398,6 @@ func (c *aCase) inputsAt() string {
 		return c.tr.name + "'s jenny, which makes the variant"
 	}
 	return "the case"
-}
-
-// fail fails a cell with its message, and what may explain it.
-func (c *aCase) fail(t *testing.T, header string, m *msg) {
-	t.Helper()
-	if c.stale != "" {
-		m.add("%s", c.stale)
-	}
-	t.Errorf("%s\n%s", header, m)
 }
 
 // newCase makes a case of an archive, with no input view yet.
@@ -496,7 +485,7 @@ func (r *runner) runCase(t *testing.T, p *plan, pc plannedCase) {
 		}
 	}
 	base := r.newCase(p, pc, "", pc.a.Comment, archive.Gaps, pc.a.Properties(), gaps)
-	base.setView(p, pc.base.View())
+	base.setView(p, pc.view)
 	w := &caseWrites{set: map[string][]byte{}}
 	r.runCells(t, base, p.cols, w)
 	for _, v := range pc.variants {
@@ -784,7 +773,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		r.compare(m, c, col, files, goldens, unjudged)
 	}
 	if !m.empty() {
-		c.fail(t, header, m)
+		t.Errorf("%s\n%s", header, m)
 		if out.panicked && !marked {
 			t.Logf("stack of the panic:\n%s", out.stack)
 		}
@@ -817,7 +806,7 @@ func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why
 		m.add("%s is recorded, and %s's probe says the case isn't for it: %s\nIf the suite should run on the case, fix the probe. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), col.name, why, r.updateCmd())
 	}
 	if !m.empty() {
-		c.fail(t, header, m)
+		t.Errorf("%s\n%s", header, m)
 		return
 	}
 	t.Skipf("%s: %s's probe says the case isn't for it: %s", c.name, col.name, why)
@@ -840,7 +829,7 @@ func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, by 
 		m.add("%s is recorded, and the cell is blocked: the lift %s, on %s's path, failed on the case.\nIf the cell should run, fix the lift or %s. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), by.name, col.name, c.inputsAt(), r.updateCmd())
 	}
 	if !m.empty() {
-		c.fail(t, header, m)
+		t.Errorf("%s\n%s", header, m)
 		return
 	}
 	if c.state.runs[by].out.noProduct {

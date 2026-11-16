@@ -26,8 +26,10 @@ type VariantCase struct {
 	Name string
 	// Overlay holds the variant's in/ files, by their paths in the input
 	// view, and Delete the base's paths it removes, in the order written.
-	Overlay map[string][]byte
-	Delete  []string
+	// EmptyDelete records a delete section that lists no path.
+	Overlay     map[string][]byte
+	Delete      []string
+	EmptyDelete bool
 	// Inputs records that the archive holds the variant's in/ or delete. A
 	// transform's variant without them is one its transform no longer
 	// makes, whose outputs are left.
@@ -107,6 +109,7 @@ func (a *Archive) Variants() []VariantCase {
 			v.Inputs = true
 		case rest == Delete:
 			v.Delete = lines(s.Data)
+			v.EmptyDelete = len(v.Delete) == 0
 			v.Inputs = true
 		case rest == About:
 			v.About = s.Data
@@ -244,7 +247,7 @@ func checkVariant(s Section, kind, name, rest string) []Problem {
 // update-written: how they differ from what the base now gives, and
 // whether they make an input view at all, is for the runs to judge and the
 // update of the package that owns the transform to rewrite, never a
-// problem of form, which no update repairs. See [Archive.InputProblems].
+// problem of form, which no update repairs. See [Base.InputView].
 func (a *Archive) checkVariants() []Problem {
 	var ps []Problem
 	base := a.baseFiles()
@@ -252,11 +255,9 @@ func (a *Archive) checkVariants() []Problem {
 		if !ValidName(v.Name) || v.Kind == Transform {
 			continue
 		}
-		if data, ok := a.Section(v.Prefix() + Delete); ok {
-			if dps := checkDelete(v, data, base); len(dps) > 0 {
-				ps = append(ps, dps...)
-				continue // a delete it can't satisfy
-			}
+		if dps := checkDelete(v, base); len(dps) > 0 {
+			ps = append(ps, dps...)
+			continue // a delete it can't satisfy
 		}
 		view := variantFiles(base, v)
 		if maps.EqualFunc(view, base, bytes.Equal) {
@@ -290,36 +291,38 @@ func (a *Archive) checkVariants() []Problem {
 	return ps
 }
 
-// InputProblems reports what leaves the committed inputs of a
-// transform's variant, v, no input view: a delete section that is empty,
-// or that holds a line that is no path of the view or a path twice, and a
-// view, the base's with the inputs laid over it and the deleted paths
-// removed, that no file tree holds. A delete line naming a path the base
-// lacks, or one the inputs lay over, still leaves a view, which the
-// package that owns the transform judges against what the transform makes.
-func (a *Archive) InputProblems(b Base, v VariantCase) []Problem {
-	if data, ok := a.Section(v.Prefix() + Delete); ok {
-		if ps := checkDelete(v, data, b.files); len(ps) > 0 {
-			return ps
-		}
+// InputView returns the input view the committed inputs of a transform's
+// variant, v, make: the base's, with the inputs laid over it and the
+// deleted paths removed. If they make none, it returns what leaves them
+// none instead: a delete section that is empty, or that holds a line that
+// is no path of the view or a path twice, and a view that no file tree
+// holds. A delete line naming a path the base lacks, or one the inputs lay
+// over, still leaves a view, which the package that owns the transform
+// judges against what the transform makes.
+func (b Base) InputView(v VariantCase) (fs.FS, []Problem) {
+	if ps := checkDelete(v, b.files); len(ps) > 0 {
+		return nil, ps
 	}
-	return checkNested(v, variantFiles(b.files, v))
+	files := variantFiles(b.files, v)
+	if ps := checkNested(v, files); len(ps) > 0 {
+		return nil, ps
+	}
+	return NewFS(files), nil
 }
 
-// checkDelete reports the problems of a variant's delete section, data: an
-// empty section, and each line that is no path of the input view or that
-// repeats one. For a hand-written variant, it also reports each line the
-// base can't satisfy: a path the base lacks, or one the variant lays over
-// it.
-func checkDelete(v VariantCase, data []byte, base map[string][]byte) []Problem {
+// checkDelete reports the problems of a variant's delete section, if it
+// has one: an empty section, and each line that is no path of the input
+// view or that repeats one. For a hand-written variant, it also reports
+// each line the base can't satisfy: a path the base lacks, or one the
+// variant lays over it.
+func checkDelete(v VariantCase, base map[string][]byte) []Problem {
 	var ps []Problem
 	section := v.Prefix() + Delete
 	seen := map[string]int{}
-	ls := lines(data)
-	if len(ls) == 0 {
+	if v.EmptyDelete {
 		ps = append(ps, Problem{Section: section, Msg: "the section is empty; a variant that removes nothing has no delete section"})
 	}
-	for i, p := range ls {
+	for i, p := range v.Delete {
 		n := i + 1
 		_, overlaid := v.Overlay[p]
 		_, inBase := base[p]

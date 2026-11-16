@@ -1,0 +1,150 @@
+$ edit b/corpus_test.go  # a package b over the corpus
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # transforms
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/echo
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/echo
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/echo
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/echo
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/echo
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # tr-b
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/copy
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/copy
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/copy
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/copy
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/copy
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/copy
+PASS
+$ edit testdata/script/twice.txtar  # add a fatal instruction to upper's input by hand
+$ go test ./b  # tr-b
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    stop
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        copy: Does what the case's do/ tree says.
+        The run failed its test, through its testing.TB.
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:
+        transform/upper/in/do/fatal is no longer made
+        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/copy
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/copy
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/copy
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/copy
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/copy
+            --- FAIL: TestCorpus/script/twice/transform/upper
+                --- FAIL: TestCorpus/script/twice/transform/upper/copy
+FAIL
+[exit 1]
+$ edit testdata/script/twice.txtar  # restore the settled archive
+$ edit testdata/script/twice.txtar  # add an empty probe instruction to upper's input by hand
+$ go test ./b  # tr-b-probe
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        copy: Does what the case's do/ tree says.
+        copy's probe said the case isn't for it, and gave no reason.
+        Fix the probe: when it says no, it says why.
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:
+        transform/upper/in/do/probe is no longer made
+        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/copy
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/copy
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/copy
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/copy
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/copy
+            --- FAIL: TestCorpus/script/twice/transform/upper
+                --- FAIL: TestCorpus/script/twice/transform/upper/copy
+FAIL
+[exit 1]
+$ edit testdata/script/twice.txtar  # restore the settled archive
+$ edit testdata/script/twice.txtar  # mark upper's cell of copy, and edit upper's input by hand
+$ go test ./b  # tr-b
+    script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
+    script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
+    script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        copy: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "transform/upper copy Waits on sheets#9."
+        Its committed files record today's behavior, and the run now produces different ones:
+        transform/upper/out/copy/values.txt differs (-committed +got):
+        - A1 SIX
+        + A1 SEVEN
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:
+        transform/upper/in/do/out/values.txt differs (-committed +made):
+        - A1 SEVEN
+        + A1 SIX
+        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, here copy's: no update writes a cell its known gap freezes, and a normal run checks what it produces on the rewritten inputs against its committed files.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/errs
+            --- PASS: TestCorpus/script/errs/copy
+            --- SKIP: TestCorpus/script/errs/transform/looped
+            --- PASS: TestCorpus/script/errs/transform/upper
+                --- PASS: TestCorpus/script/errs/transform/upper/copy
+        --- PASS: TestCorpus/script/garbled
+            --- PASS: TestCorpus/script/garbled/copy
+            --- SKIP: TestCorpus/script/garbled/transform/looped
+            --- SKIP: TestCorpus/script/garbled/transform/upper
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/copy
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- PASS: TestCorpus/script/twice/transform/looped/copy
+            --- FAIL: TestCorpus/script/twice/transform/upper
+                --- FAIL: TestCorpus/script/twice/transform/upper/copy
+FAIL
+[exit 1]
