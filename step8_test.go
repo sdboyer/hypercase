@@ -180,6 +180,27 @@ func TestFrozenOutcome(t *testing.T) {
 	s.done()
 }
 
+// TestFrozenVariantOutcome: the upgrade adds a missing outcome to a frozen
+// cell of a hand-written variant, and of a transform's variant, as it does
+// to a base's, and changes nothing else.
+func TestFrozenVariantOutcome(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "check-gaps")
+	const loop = "testdata/script/loop.txtar"
+	before := s.read(loop)
+	s.edit(loop, "drop the frozen variants' outcomes, as before outcomes were written", func(a *archive.Archive) {
+		drop("variant/neg/out/echo/outcome")(a)
+		drop("transform/looped/out/echo/outcome")(a)
+	})
+	s.fails(s.normal("check-gaps"),
+		"script/loop/variant/neg: A1 is a negative number, which the code wrongly rejects.\n    echo: Does what the case's do/ tree says.\n    The cell is frozen by its known gap, variant/neg/gaps line 1: \"echo A negative number is valid, and evaluates to itself. Waits on sheets#3.\"\n    Its committed files match the run, and it has no variant/neg/out/echo/outcome, which every cell has.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to add it. The update adds the outcome and changes nothing else.",
+		"script/loop/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.\n    echo: Does what the case's do/ tree says.\n    The cell is frozen by its known gap, gaps line 1: \"transform/looped echo A cycle's error starts with the cell where it starts. Waits on sheets#4.\"\n    Its committed files match the run, and it has no transform/looped/out/echo/outcome, which every cell has.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to add it. The update adds the outcome and changes nothing else.")
+	s.passes(s.update("check-gaps"))
+	s.same(loop, before)
+	s.passes(s.normal("check-gaps"))
+	s.done()
+}
+
 // TestFrozenRanNothing: a skipped or blocked cell that a gaps line marks,
 // with committed files, is frozen like any other: an update leaves its
 // outcome as committed, though the cell now runs nothing.
