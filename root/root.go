@@ -1,6 +1,6 @@
-// Package root finds the module root a test runs under, and the corpus
-// root under it. It doesn't import testing, so a command finds the roots
-// the same way a test does.
+// Package root finds the corpus root a package's tests read their cases
+// under, and the module root above it. It doesn't import testing, so a
+// command finds them the same way a test does.
 package root
 
 import (
@@ -11,26 +11,43 @@ import (
 	"path/filepath"
 )
 
-// Corpus returns the corpus root of a package in dir whose corpus root is
-// rel: the path the package passes to hypercase.Root, a slash path
-// relative to the module root, or "." for a package that passes none. It
-// is the module root, found from dir as [Module] finds it, with rel
-// under it. A command that writes a case under the corpus root it
-// returns writes where the package's tests read.
-func Corpus(dir, rel string) (string, error) {
-	if !fs.ValidPath(rel) {
-		return "", fmt.Errorf("the corpus root %q isn't a slash path relative to the module root, such as walkthrough/step05", rel)
-	}
-	m, err := Module(dir)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(m, filepath.FromSlash(rel)), nil
+// A Corpus is a corpus root, as [Find] finds it: the module root, and the
+// corpus root's path under it. The zero Corpus is none.
+type Corpus struct {
+	module string // the module root, an absolute path
+	rel    string // the corpus root, a slash path relative to module
 }
 
-// Module returns the module root: the nearest directory, from dir upward,
+// Find returns the corpus root of a package in dir whose corpus root is
+// rel: the path the package passes to hypercase.Root, a slash path
+// relative to the module root, or "." for a package that passes none. The
+// module root is the nearest directory, from dir upward, that holds a
+// go.mod. A command that writes a case under the corpus root Find returns
+// writes where the package's tests read.
+func Find(dir, rel string) (Corpus, error) {
+	if !fs.ValidPath(rel) {
+		return Corpus{}, fmt.Errorf("the corpus root %q isn't a slash path relative to the module root, such as walkthrough/step05", rel)
+	}
+	m, err := module(dir)
+	if err != nil {
+		return Corpus{}, err
+	}
+	return Corpus{module: m, rel: rel}, nil
+}
+
+// Dir returns the corpus root's directory.
+func (c Corpus) Dir() string { return filepath.Join(c.module, filepath.FromSlash(c.rel)) }
+
+// Module returns the module root.
+func (c Corpus) Module() string { return c.module }
+
+// Rel returns the corpus root's path relative to the module root, as a
+// package passes it to hypercase.Root: "." for the module root itself.
+func (c Corpus) Rel() string { return c.rel }
+
+// module returns the module root: the nearest directory, from dir upward,
 // that holds a go.mod.
-func Module(dir string) (string, error) {
+func module(dir string) (string, error) {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return "", err
@@ -45,13 +62,4 @@ func Module(dir string) (string, error) {
 			return "", fmt.Errorf("no go.mod in %s or any directory above it", dir)
 		}
 	}
-}
-
-// Rel returns target relative to base, with slashes.
-func Rel(base, target string) string {
-	r, err := filepath.Rel(base, target)
-	if err != nil {
-		return filepath.ToSlash(target)
-	}
-	return filepath.ToSlash(r)
 }

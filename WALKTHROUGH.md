@@ -240,7 +240,7 @@ The corpus root is the module root unless a package passes another with
 each step's corpus stands alone. A project with one corpus at its module
 root passes nothing. One package per corpus root registers
 `hypercase.RootPackage()`. A project's own command finds the same corpus
-root with `root.Corpus`, from its directory and the path the package
+root with `root.Find`, from its directory and the path the package
 passes, or `.`.
 
 <!-- source: walkthrough/sheets/step03/sheetcorpus/project.go -->

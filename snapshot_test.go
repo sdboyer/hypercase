@@ -112,7 +112,7 @@ func TestSnapshotRewriteAfterUpdate(t *testing.T) {
 }
 
 // TestSnapshotCorpusRoot: a command finds the corpus root with
-// root.Corpus, from its own directory, and Create under that root writes
+// root.Find, from its own directory, and Create under that root writes
 // where a run reads: the module root, for a package that passes no
 // hypercase.Root, and corp under it, for one that passes
 // hypercase.Root("corp").
@@ -134,12 +134,12 @@ func TestSnapshotCorpusRoot(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			dir, err := root.Corpus(cmd, c.rel)
+			corpus, err := root.Find(cmd, c.rel)
 			if err != nil {
 				t.Fatal(err)
 			}
-			s.note("root.Corpus, from cmd/snapshot, found the corpus root %s", filepath.ToSlash(mustRel(t, s.dir, dir)))
-			rel := s.createAt(dir, "six", c.trees)
+			s.note("root.Find, from cmd/snapshot, found the corpus root %s", filepath.ToSlash(mustRel(t, s.dir, corpus.Dir())))
+			rel := s.createAt(corpus.Dir(), "six", c.trees)
 			s.edit(rel, "a person describes the case", func(a *archive.Archive) {
 				a.Comment = []byte("The script gives 6.\n")
 			})

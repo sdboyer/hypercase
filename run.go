@@ -138,14 +138,12 @@ func newRunner(t *testing.T) (*runner, bool) {
 		return nil, false
 	}
 	r.pkgDir = wd
-	if r.moduleRoot, err = root.Module(wd); err != nil {
-		t.Errorf("finding the module root: %v", err)
-		return nil, false
-	}
-	if r.corpusRoot, err = root.Corpus(wd, rootRel); err != nil {
+	corpus, err := root.Find(wd, rootRel)
+	if err != nil {
 		t.Errorf("finding the corpus root: %v", err)
 		return nil, false
 	}
+	r.moduleRoot, r.corpusRoot = corpus.Module(), corpus.Dir()
 	if rootPackage && rootRel == "." && r.pkgDir != r.moduleRoot {
 		t.Errorf("the package registers the root-package check for the module-root corpus, and is not the module's root package, %s.\nRegister hypercase.RootPackage() in the module's root package, or pass this package's corpus root with hypercase.Root.", r.moduleRoot)
 		return nil, false
@@ -200,7 +198,13 @@ func (r *runner) updateCmd() string {
 
 // rel returns a path relative to the module root, with slashes, so a
 // message reads the same wherever go test ran.
-func (r *runner) rel(p string) string { return root.Rel(r.moduleRoot, p) }
+func (r *runner) rel(p string) string {
+	rel, err := filepath.Rel(r.moduleRoot, p)
+	if err != nil {
+		return filepath.ToSlash(p)
+	}
+	return filepath.ToSlash(rel)
+}
 
 // rootName names the corpus root in a message.
 func (r *runner) rootName() string {

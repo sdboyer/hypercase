@@ -8,8 +8,7 @@
 // Which real files make a good case is the project's to say, so the
 // command that takes them is the project's, and so is the update command
 // it prints, which fills a new case's outputs. The command finds the
-// corpus root it passes them with the root package's Corpus, as a run
-// finds it.
+// corpus root it passes them with root.Find, as a run finds it.
 //
 // Create and RewriteInputs write a case's inputs, which no update writes,
 // so each refuses while the project's update variable is set. Serialize,

@@ -1,4 +1,4 @@
-# root.Corpus, from cmd/snapshot, found the corpus root .
+# root.Find, from cmd/snapshot, found the corpus root .
 # snapshot.Create wrote testdata/script/six.txtar
 $ cat testdata/script/six.txtar
 -- in/calc/out/values.txt --
