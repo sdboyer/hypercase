@@ -2,9 +2,12 @@ package archive
 
 import (
 	"bytes"
+	"errors"
+	"io/fs"
 	"os"
 
 	"github.com/rogpeppe/go-internal/lockedfile"
+	"github.com/sdboyer/hypercase/internal/hooks"
 )
 
 // LockFile is the name of a corpus root's lock file, in the root's
@@ -13,14 +16,11 @@ import (
 // ignores it.
 const LockFile = ".hypercase.lock"
 
-// modifyHook, when set, is called at each step of [Modify]: "locked",
-// "read", "renamed" and "unlock", which comes just before the lock is
-// released. Tests sequence the steps through it.
-var modifyHook func(step string)
-
+// hook calls hooks.Modify, through which tests sequence the steps of
+// [Modify].
 func hook(step string) {
-	if modifyHook != nil {
-		modifyHook(step)
+	if hooks.Modify != nil {
+		hooks.Modify(step)
 	}
 }
 
@@ -36,6 +36,7 @@ func hook(step string) {
 // on the archive, because the rename replaces the archive's file: a waiter
 // holding the old file would take a lock nobody else waits on.
 func Modify(lockPath, path string, fn func(current *Archive) (*Archive, error)) error {
+	hook("lock")
 	unlock, err := lockedfile.MutexAt(lockPath).Lock()
 	if err != nil {
 		return err
@@ -61,5 +62,26 @@ func Modify(lockPath, path string, fn func(current *Archive) (*Archive, error)) 
 		return err
 	}
 	hook("renamed")
+	return nil
+}
+
+// RemoveFile removes the named file under the lock on the file at
+// lockPath, which it holds as [Modify] does, around the removal alone. A
+// file that is already gone is no error.
+func RemoveFile(lockPath, name string) error {
+	hook("lock")
+	unlock, err := lockedfile.MutexAt(lockPath).Lock()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		hook("unlock")
+		unlock()
+	}()
+	hook("locked")
+	if err := os.Remove(name); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	hook("removed")
 	return nil
 }

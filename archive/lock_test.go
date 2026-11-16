@@ -3,6 +3,8 @@ package archive
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -10,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/rogpeppe/go-internal/lockedfile"
+	"github.com/sdboyer/hypercase/internal/hooks"
 )
 
 // modifyFixture writes the well-formed archive in a temp dir, and returns
@@ -44,7 +47,7 @@ func TestModifyHoldsTheLockAcrossTheRename(t *testing.T) {
 		mu.Unlock()
 	}
 	held := make(chan *lockedfile.File, 1)
-	modifyHook = func(step string) {
+	hooks.Modify = func(step string) {
 		record("A " + step)
 		if step == "read" {
 			go func() {
@@ -58,7 +61,7 @@ func TestModifyHoldsTheLockAcrossTheRename(t *testing.T) {
 		}
 	}
 	err := Modify(lock, name, scaled)
-	modifyHook = nil
+	hooks.Modify = nil
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +73,7 @@ func TestModifyHoldsTheLockAcrossTheRename(t *testing.T) {
 	mu.Lock()
 	got := slices.Clone(steps)
 	mu.Unlock()
-	if want := []string{"A locked", "A read", "A renamed", "A unlock", "B locked"}; !slices.Equal(got, want) {
+	if want := []string{"A lock", "A locked", "A read", "A renamed", "A unlock", "B locked"}; !slices.Equal(got, want) {
 		t.Errorf("the steps ran in the order %q, not %q", got, want)
 	}
 	holds, err := f.Stat()
@@ -94,9 +97,9 @@ func TestModifyHoldsTheLockAcrossTheRename(t *testing.T) {
 // so the next update completes.
 func TestModifyFailedWrite(t *testing.T) {
 	name, lock := modifyFixture(t)
-	afterTemp = func(string) error { return errors.New("disk full") }
+	hooks.AfterTemp = func(string) error { return errors.New("disk full") }
 	err := Modify(lock, name, scaled)
-	afterTemp = nil
+	hooks.AfterTemp = nil
 	if err == nil {
 		t.Fatal("Modify succeeded, and its write failed")
 	}
@@ -121,11 +124,11 @@ func TestModifyFailedWrite(t *testing.T) {
 // error, or the bytes it read.
 func TestModifyWritesNothing(t *testing.T) {
 	name, lock := modifyFixture(t)
-	afterTemp = func(string) error {
+	hooks.AfterTemp = func(string) error {
 		t.Error("Modify wrote a temp file")
 		return nil
 	}
-	defer func() { afterTemp = nil }()
+	defer func() { hooks.AfterTemp = nil }()
 	if err := Modify(lock, name, func(*Archive) (*Archive, error) { return nil, nil }); err != nil {
 		t.Error(err)
 	}
@@ -135,5 +138,53 @@ func TestModifyWritesNothing(t *testing.T) {
 	}
 	if err := Modify(lock, name, func(a *Archive) (*Archive, error) { return a, nil }); err != nil {
 		t.Error(err)
+	}
+}
+
+// TestRemoveFile: RemoveFile removes the file while it holds the lock, and
+// another writer, B, that asks for the lock once it is held gets it only
+// after the removal. A file already gone is no error.
+func TestRemoveFile(t *testing.T) {
+	name, lock := modifyFixture(t)
+	var (
+		mu    sync.Mutex
+		steps []string
+	)
+	record := func(s string) {
+		mu.Lock()
+		steps = append(steps, s)
+		mu.Unlock()
+	}
+	held := make(chan *lockedfile.File, 1)
+	hooks.Modify = func(step string) {
+		record("A " + step)
+		if step == "locked" {
+			go func() {
+				f, err := lockedfile.OpenFile(lock, os.O_RDWR|os.O_CREATE, 0o666)
+				if err != nil {
+					t.Error(err)
+				}
+				_, statErr := os.Stat(name)
+				record(fmt.Sprintf("B locked, the file gone: %v", errors.Is(statErr, fs.ErrNotExist)))
+				held <- f
+			}()
+		}
+	}
+	err := RemoveFile(lock, name)
+	hooks.Modify = nil
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := <-held; f != nil {
+		f.Close()
+	}
+	mu.Lock()
+	got := slices.Clone(steps)
+	mu.Unlock()
+	if want := []string{"A lock", "A locked", "A removed", "A unlock", "B locked, the file gone: true"}; !slices.Equal(got, want) {
+		t.Errorf("the steps ran in the order %q, not %q", got, want)
+	}
+	if err := RemoveFile(lock, name); err != nil {
+		t.Errorf("removing a file already gone: %v", err)
 	}
 }
