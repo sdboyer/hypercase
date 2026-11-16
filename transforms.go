@@ -145,8 +145,10 @@ type plannedVariant struct {
 	gaps       []archive.Gap
 	committed  archive.VariantCase
 	// view is the committed input view: a hand-written variant's, or a
-	// transform's when the archive holds its inputs.
+	// transform's when the archive holds its inputs and they make one.
 	view fs.FS
+	// invalid is what leaves a transform's committed inputs no input view.
+	invalid []archive.Problem
 
 	// A transform's variant.
 	tr       *transform
@@ -205,7 +207,9 @@ func (r *runner) planVariants(p *plan, a *archive.Archive) []*plannedVariant {
 			tr:        tr,
 		}
 		if v.committed.Inputs {
-			v.view = base.VariantView(v.committed)
+			if v.invalid = a.InputProblems(base, v.committed); len(v.invalid) == 0 {
+				v.view = base.VariantView(v.committed)
+			}
 		}
 		for _, g := range gaps {
 			if g.Transform == tr.name {
@@ -331,6 +335,11 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		t.Skipf("%s: the transform %s failed on the base, and the package that owns it reports why.", c.name, v.name)
 	case v.declined != "":
 		r.declined(t, c, p, pc, v, owner, w)
+		return
+	case !r.update && len(v.invalid) > 0:
+		// A normal run would read them. An update reads what the
+		// transform makes, and its owner's rewrites them.
+		t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\nThe module's update, %s, rewrites them, in the package that owns %s.", c.header(), v.name, problemList(v.invalid), r.updateCmd(), v.name)
 		return
 	default:
 		if owner {

@@ -280,6 +280,49 @@ func TestTransformBaseEdited(t *testing.T) {
 	s.done()
 }
 
+// TestTransformInvalidInputs: a transform's committed inputs edited by
+// hand into ones that make no input view are judged as inputs, never as
+// problems of form: a normal run, in any package, would read them, so it
+// fails the variant's cells, and the owner's update rewrites them.
+func TestTransformInvalidInputs(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "a package b over the corpus")
+	s.passes(s.update("transforms"))
+	s.passes(s.run("b", "tr-b", true))
+	fresh := s.read(twice)
+	const (
+		failure = "script/twice/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.\n    The archive's inputs for looped's variant are invalid, and no cell runs on them:\n      "
+		repair  = "\n    The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns looped."
+	)
+	for _, e := range []struct {
+		desc, section, data, before, problem string
+	}{
+		{"lay a file over looped's view below the base's values.txt", "transform/looped/in/do/out/values.txt/x", "x\n", "transform/looped/in/resolve/",
+			"transform/looped: the variant's input view holds do/out/values.txt, and do/out/values.txt/x below it"},
+		{"give looped a delete line that is no path", "transform/looped/delete", "../x\n", "transform/looped/out/",
+			`transform/looped/delete, line 1: "../x" is not a path in the input view`},
+		{"give looped a delete line twice", "transform/looped/delete", "do/out/values.txt\ndo/out/values.txt\n", "transform/looped/out/",
+			"transform/looped/delete, line 2: do/out/values.txt is listed twice, on lines 1 and 2"},
+		{"give looped an empty delete", "transform/looped/delete", "", "transform/looped/out/",
+			"transform/looped/delete: the section is empty; a variant that removes nothing has no delete section"},
+	} {
+		s.edit(twice, e.desc, insert(e.section, e.data, e.before))
+		r := s.normal("transforms")
+		s.fails(r, failure+e.problem+repair)
+		s.lacks(r, "problems of form", "differs from its committed inputs")
+		s.fails(s.run("b", "tr-b", false), failure+e.problem+repair)
+		// b's update reads what looped makes, and leaves the inputs to
+		// looped's owner, whose update rewrites them.
+		s.passes(s.run("b", "tr-b", true))
+		s.passes(s.update("transforms"))
+		s.same(twice, fresh)
+		s.passes(s.normal("transforms"))
+		s.passes(s.run("b", "tr-b", false))
+	}
+	s.done()
+}
+
 // TestTransformDeclines: when a transform no longer applies to a base, its
 // owner's update removes the variant's inputs, and what is left under
 // transform/<name>/out/ is each column's orphan.

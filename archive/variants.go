@@ -241,9 +241,10 @@ func checkVariant(s Section, kind, name, rest string) []Problem {
 // hand-written variant's delete line the base can't satisfy, and its view
 // equal to the base's or one no file tree holds; and hand-written sections
 // that don't sit with their case's. A transform's in/ and delete are
-// update-written: how they differ from what the base now gives is for the
-// package that owns the transform to judge and rewrite, never a problem of
-// form, which no update repairs.
+// update-written: how they differ from what the base now gives, and
+// whether they make an input view at all, is for the runs to judge and the
+// update of the package that owns the transform to rewrite, never a
+// problem of form, which no update repairs. See [Archive.InputProblems].
 func (a *Archive) checkVariants() []Problem {
 	var ps []Problem
 	base := a.baseFiles()
@@ -251,40 +252,17 @@ func (a *Archive) checkVariants() []Problem {
 		if !ValidName(v.Name) || v.Kind == Transform {
 			continue
 		}
-		before := len(ps)
 		if data, ok := a.Section(v.Prefix() + Delete); ok {
-			seen := map[string]int{}
-			ls := lines(data)
-			if len(ls) == 0 {
-				ps = append(ps, Problem{Section: v.Prefix() + Delete, Msg: "the section is empty; a variant that removes nothing has no delete section"})
+			if dps := checkDelete(v, data, base); len(dps) > 0 {
+				ps = append(ps, dps...)
+				continue // a delete it can't satisfy
 			}
-			for i, p := range ls {
-				n := i + 1
-				_, overlaid := v.Overlay[p]
-				_, inBase := base[p]
-				switch {
-				case !fs.ValidPath(p) || p == ".":
-					ps = append(ps, Problem{Section: v.Prefix() + Delete, Line: n, Msg: fmt.Sprintf("%q is not a path in the input view", p)})
-				case seen[p] > 0:
-					ps = append(ps, Problem{Section: v.Prefix() + Delete, Line: n, Msg: fmt.Sprintf("%s is listed twice, on lines %d and %d", p, seen[p], n)})
-				case !inBase:
-					ps = append(ps, Problem{Section: v.Prefix() + Delete, Line: n, Msg: fmt.Sprintf("the base has no %s to remove", p)})
-				case overlaid:
-					ps = append(ps, Problem{Section: v.Prefix() + Delete, Line: n, Msg: fmt.Sprintf("the variant both lays %s over the base and removes it", p)})
-				}
-				seen[p] = n
-			}
-		}
-		if len(ps) > before {
-			continue // a delete it can't satisfy
 		}
 		view := variantFiles(base, v)
 		if maps.EqualFunc(view, base, bytes.Equal) {
 			ps = append(ps, Problem{Section: v.Case(), Msg: "the variant's input view equals the base's; a variant changes a file or two of the base"})
 		}
-		for _, n := range Nested(view) {
-			ps = append(ps, Problem{Section: v.Case(), Msg: "the variant's input view holds " + n})
-		}
+		ps = append(ps, checkNested(v, view)...)
 	}
 
 	// Each case's hand-written sections sit together, the base's first, so
@@ -308,6 +286,64 @@ func (a *Archive) checkVariants() []Problem {
 			ps = append(ps, Problem{Section: s.Name, Msg: fmt.Sprintf("the section sits apart from %s's other hand-written sections; each case's hand-written sections sit together", c)})
 		}
 		seen[c], last = true, c
+	}
+	return ps
+}
+
+// InputProblems reports what leaves the committed inputs of a
+// transform's variant, v, no input view: a delete section that is empty,
+// or that holds a line that is no path of the view or a path twice, and a
+// view, the base's with the inputs laid over it and the deleted paths
+// removed, that no file tree holds. A delete line naming a path the base
+// lacks, or one the inputs lay over, still leaves a view, which the
+// package that owns the transform judges against what the transform makes.
+func (a *Archive) InputProblems(b Base, v VariantCase) []Problem {
+	if data, ok := a.Section(v.Prefix() + Delete); ok {
+		if ps := checkDelete(v, data, b.files); len(ps) > 0 {
+			return ps
+		}
+	}
+	return checkNested(v, variantFiles(b.files, v))
+}
+
+// checkDelete reports the problems of a variant's delete section, data: an
+// empty section, and each line that is no path of the input view or that
+// repeats one. For a hand-written variant, it also reports each line the
+// base can't satisfy: a path the base lacks, or one the variant lays over
+// it.
+func checkDelete(v VariantCase, data []byte, base map[string][]byte) []Problem {
+	var ps []Problem
+	section := v.Prefix() + Delete
+	seen := map[string]int{}
+	ls := lines(data)
+	if len(ls) == 0 {
+		ps = append(ps, Problem{Section: section, Msg: "the section is empty; a variant that removes nothing has no delete section"})
+	}
+	for i, p := range ls {
+		n := i + 1
+		_, overlaid := v.Overlay[p]
+		_, inBase := base[p]
+		switch {
+		case !fs.ValidPath(p) || p == ".":
+			ps = append(ps, Problem{Section: section, Line: n, Msg: fmt.Sprintf("%q is not a path in the input view", p)})
+		case seen[p] > 0:
+			ps = append(ps, Problem{Section: section, Line: n, Msg: fmt.Sprintf("%s is listed twice, on lines %d and %d", p, seen[p], n)})
+		case v.Kind == Variant && !inBase:
+			ps = append(ps, Problem{Section: section, Line: n, Msg: fmt.Sprintf("the base has no %s to remove", p)})
+		case v.Kind == Variant && overlaid:
+			ps = append(ps, Problem{Section: section, Line: n, Msg: fmt.Sprintf("the variant both lays %s over the base and removes it", p)})
+		}
+		seen[p] = n
+	}
+	return ps
+}
+
+// checkNested reports each path of a variant's input view that is the
+// directory of another.
+func checkNested(v VariantCase, view map[string][]byte) []Problem {
+	var ps []Problem
+	for _, n := range Nested(view) {
+		ps = append(ps, Problem{Section: v.Case(), Msg: "the variant's input view holds " + n})
 	}
 	return ps
 }
