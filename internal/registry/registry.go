@@ -301,6 +301,24 @@ func Find(moduleRoot string) ([]Found, error) {
 	return found, err
 }
 
+// HasTestFile reports whether dir holds a file whose name ends in
+// _test.go, and doesn't start with _ or ., the names Go ignores. It reads
+// no build constraints, so a file they exclude still counts. A registry in
+// a package with no such file records what no test runs.
+func HasTestFile(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if !e.IsDir() && strings.HasSuffix(name, "_test.go") && !strings.HasPrefix(name, "_") && !strings.HasPrefix(name, ".") {
+			return true
+		}
+	}
+	return false
+}
+
 // FindFS is [Find] over a file system whose root is the module root, such
 // as a revision's tree. It returns the directory of each registry's
 // package, as a slash path: "." for the module root.

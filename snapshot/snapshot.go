@@ -118,11 +118,17 @@ func noCorpus(fn string) error {
 // testdata/<typ.Dir>/<name>.txtar under the corpus root c, and returns its
 // path. c is as root.Find finds it, and its directory exists; Create makes
 // testdata/<typ.Dir>/ under it if it is missing. A registry under the
-// module root records c as its package's corpus root, so some package's
-// tests read the case: the path a package passes to hypercase.Root and
-// the one a command passes to root.Find are written apart, and Create
-// checks one against the other. A package's registry is written by its
-// first update, so Create works once that has run. project is the project's
+// module root, in a package with a _test.go file, records c as its
+// package's corpus root and declares typ.Dir, as a corpus type's
+// directory or the corpus of a suite over the raw input, so that
+// package's tests read the case: the path a package passes to
+// hypercase.Root and the one a command passes to root.Find are written
+// apart, and Create checks one against the other. Every update writes the
+// package's registry, its first included: with no case yet, that update
+// fails, since each of the package's suites applies to no case, and it
+// writes the registry still, so Create works once it has run. Create
+// reads every registry under the module root, and writes nothing while
+// one can't be read. project is the project's
 // declaration, as the project registers it: no update creates a case, so
 // while the variable its UpdateVar names is set, Create fails, naming it,
 // and writes nothing.
@@ -160,7 +166,7 @@ func Create[T ~struct{ fs.FS }](c root.Corpus, project decl.Project, typ decl.Ty
 	if err := checkDir(typ); err != nil {
 		return "", err
 	}
-	if err := recorded(c, project.UpdateVar); err != nil {
+	if err := recorded(c, typ.Dir, project.UpdateVar); err != nil {
 		return "", err
 	}
 	dir := c.Dir()
@@ -197,16 +203,26 @@ func Create[T ~struct{ fs.FS }](c root.Corpus, project decl.Project, typ decl.Ty
 	return path, nil
 }
 
-// recorded refuses a corpus root that no registry under its module root
-// records as its package's corpus root, naming the roots they do record.
-// It reads every registry's head, and one it can't read fails it, since
-// that registry may be the one that records the root.
-func recorded(c root.Corpus, updateVar string) error {
+// recorded refuses a corpus root that no registry under its module root,
+// in a package with a _test.go file, records as its package's corpus
+// root, and a corpus directory, dir, that none of those registries
+// declares, as the root-package check counts a directory declared: a
+// corpus type's, or the corpus of a suite over the raw input. Each refusal
+// names what the registries do record, or declare. A registry in a
+// package with no _test.go file records what no test runs, so it counts
+// for neither. Every registry is read first, and one that can't be read
+// fails Create before it writes anything.
+func recorded(c root.Corpus, dir, updateVar string) error {
 	found, err := registry.Find(c.Module())
 	if err != nil {
 		return fmt.Errorf("finding the registries under the module root %s: %v.\nFix what stopped the walk, and create the case again.", c.Module(), err)
 	}
-	roots := map[string]bool{}
+	unreadable := func(path string, err error) error {
+		return fmt.Errorf("%s can't be read: %v, and Create writes nothing while a registry under the module root can't be read.\nRun the update, %s=1 go test ./..., to write it again.", path, err, updateVar)
+	}
+	roots := map[string]bool{}    // the corpus roots tested packages' registries record
+	declared := map[string]bool{} // the directories the root's tested registries declare
+	var stale []string            // the root's registries in packages with no _test.go file
 	for _, f := range found {
 		data, err := os.ReadFile(f.Path)
 		if err != nil {
@@ -214,22 +230,59 @@ func recorded(c root.Corpus, updateVar string) error {
 		}
 		h, err := registry.Peek(data)
 		if err != nil {
-			return fmt.Errorf("%s can't be read: %v, so it may record the corpus root %q.\nRun the update, %s=1 go test ./..., to write it again.", f.Path, err, c.Rel(), updateVar)
+			return unreadable(f.Path, err)
+		}
+		if !registry.HasTestFile(f.Pkg) {
+			if h.CorpusRoot == c.Rel() {
+				stale = append(stale, f.Path)
+			}
+			continue
 		}
 		roots[h.CorpusRoot] = true
-	}
-	if roots[c.Rel()] {
-		return nil
-	}
-	have := "no registry is under it"
-	if len(roots) > 0 {
-		var quoted []string
-		for _, r := range slices.Sorted(maps.Keys(roots)) {
-			quoted = append(quoted, fmt.Sprintf("%q", r))
+		if h.CorpusRoot != c.Rel() {
+			continue
 		}
-		have = "its registries record " + strings.Join(quoted, ", ")
+		g, err := registry.Parse(data)
+		if err != nil {
+			return unreadable(f.Path, err)
+		}
+		for _, t := range g.Types {
+			declared[t.Dir] = true
+		}
+		for _, s := range g.Suites {
+			if s.Consumes == registry.RawInput {
+				for _, d := range s.Corpora {
+					declared[d] = true
+				}
+			}
+		}
 	}
-	return fmt.Errorf("no registry under the module root %s records the corpus root %q, so no package's tests would read the case: %s.\nPass root.Find the path a package passes to hypercase.Root, or . for one that passes none. A package's first update, %s=1 go test ./..., writes its registry.", c.Module(), c.Rel(), have, updateVar)
+	switch {
+	case !roots[c.Rel()] && len(stale) > 0:
+		return fmt.Errorf("the corpus root %q is recorded only by registries in packages with no _test.go file, %s, so no test reads cases under it.\nRestore the package's tests, or pass root.Find the corpus root of a package that has them.", c.Rel(), strings.Join(stale, ", "))
+	case !roots[c.Rel()]:
+		have := "no registry of a package with tests is under it"
+		if len(roots) > 0 {
+			have = "its registries record " + quotedList(roots)
+		}
+		return fmt.Errorf("no registry under the module root %s records the corpus root %q, so no package's tests would read the case: %s.\nPass root.Find the path a package passes to hypercase.Root, or . for one that passes none. A new package's first update, %s=1 go test ./..., writes its registry: it fails, since the package's suites apply to no case yet, and writes the registry still.", c.Module(), c.Rel(), have, updateVar)
+	case !declared[dir]:
+		have := "they declare none"
+		if len(declared) > 0 {
+			have = "they declare " + quotedList(declared)
+		}
+		return fmt.Errorf("no registry of the corpus root %q declares the directory %s, as a corpus type's directory or the corpus of a suite over the raw input, so no package's tests would read the case: %s.\nPass the corpus type a package of the corpus root registers.", c.Rel(), dir, have)
+	}
+	return nil
+}
+
+// quotedList lists a set's members, sorted and quoted.
+func quotedList(set map[string]bool) string {
+	var quoted []string
+	for _, s := range slices.Sorted(maps.Keys(set)) {
+		quoted = append(quoted, fmt.Sprintf("%q", s))
+	}
+	return strings.Join(quoted, ", ")
 }
 
 // checkDir refuses a corpus type's directory that no corpus type can

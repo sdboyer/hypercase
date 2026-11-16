@@ -279,7 +279,7 @@ func (r *runner) requireRootCheck(t *testing.T, found []registry.Found) {
 			continue
 		}
 		if h, err := registry.Peek(data); err == nil && h.CorpusRoot == r.rootRel && h.RootPackage {
-			if hasTestFile(f.Pkg) {
+			if registry.HasTestFile(f.Pkg) {
 				return
 			}
 			stale = append(stale, f)

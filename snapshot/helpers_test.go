@@ -2,7 +2,6 @@ package snapshot
 
 import (
 	"bytes"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -46,20 +45,43 @@ func twice(t *testing.T) []byte {
 }
 
 // newModule makes a module whose root package's registry records the
-// corpus root corp, and returns the module root.
+// corpus root corp and declares the corpus type sheet, and returns the
+// module root.
 func newModule(t *testing.T) string {
 	t.Helper()
-	mod := t.TempDir()
-	writeFile(t, filepath.Join(mod, "go.mod"), []byte("module example.com/m\n"))
+	mod := newBareModule(t)
 	writeRegistry(t, mod, "corp")
 	return mod
 }
 
+// newBareModule makes a module with no registry, and returns its root.
+func newBareModule(t *testing.T) string {
+	t.Helper()
+	mod := t.TempDir()
+	writeFile(t, filepath.Join(mod, "go.mod"), []byte("module example.com/m\n"))
+	return mod
+}
+
+// testFile is the _test.go file a fixture's package holds beside its
+// registry, so that what the registry records is tested.
+const testFile = "corpus_test.go"
+
 // writeRegistry writes, in the package directory pkg, a registry that
-// records the corpus root rel.
+// records the corpus root rel and declares the corpus type sheet, and the
+// package's _test.go file.
 func writeRegistry(t *testing.T, pkg, rel string) {
 	t.Helper()
-	writeFile(t, filepath.Join(pkg, "testdata", registry.Name), fmt.Appendf(nil, `{"format": %d, "corpusRoot": %q}`, registry.Format, rel))
+	writeRegistryOf(t, pkg, registry.Registry{CorpusRoot: rel, Types: []registry.Type{{Dir: sheetType.Dir}}}, true)
+}
+
+// writeRegistryOf writes g as the registry of the package directory pkg,
+// with the package's _test.go file when tested is set.
+func writeRegistryOf(t *testing.T, pkg string, g registry.Registry, tested bool) {
+	t.Helper()
+	writeFile(t, filepath.Join(pkg, "testdata", registry.Name), g.Marshal())
+	if tested {
+		writeFile(t, filepath.Join(pkg, testFile), []byte("package corpus\n"))
+	}
 }
 
 // corpusIn returns the corpus root rel of the module mod.
