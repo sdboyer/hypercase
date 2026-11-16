@@ -438,6 +438,8 @@ var fixturePackages = map[string][]fixturePkg{
 	"chain-render": {{".", "chain-render"}},
 	"chain-past":   {{".", "chain-past"}},
 	"chain-shared": {{".", "chain-a"}, {"b", "chain-b"}},
+
+	"strip": {{".", "strip-a"}, {"b", "strip-b"}},
 }
 
 type fixturePkg struct{ dir, registration string }

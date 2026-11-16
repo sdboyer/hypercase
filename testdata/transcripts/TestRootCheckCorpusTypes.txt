@@ -68,7 +68,7 @@ FAIL
 [exit 1]
 $ go test  # ladder-a
     testdata/script/x.txtar: no registry claims out/outline/outcome and out/outline/values.txt: no column named outline runs over the corpus script.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -column outline at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.
     what ran, in order:
         parse ran on x
         resolve ran on x

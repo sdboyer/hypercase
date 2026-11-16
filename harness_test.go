@@ -59,6 +59,9 @@ func init() {
 		register, ok = chainRegistrations[name]
 	}
 	if !ok {
+		register, ok = stripRegistrations[name]
+	}
+	if !ok {
 		panic("selftest: no registration named " + name)
 	}
 	register()
@@ -168,6 +171,13 @@ func (s *sandbox) runEnv(pkg, registration string, extra []string, args ...strin
 // and records them in the order given.
 func (s *sandbox) parallel(runs ...childRun) []result {
 	s.t.Helper()
+	results := s.execParallel(runs...)
+	s.recordAll(runs, results)
+	return results
+}
+
+// execParallel runs several children at once, and records nothing.
+func (s *sandbox) execParallel(runs ...childRun) []result {
 	results := make([]result, len(runs))
 	done := make(chan struct{})
 	for i, c := range runs {
@@ -179,10 +189,14 @@ func (s *sandbox) parallel(runs ...childRun) []result {
 	for range runs {
 		<-done
 	}
+	return results
+}
+
+// recordAll records the children of a parallel run, in the order given.
+func (s *sandbox) recordAll(runs []childRun, results []result) {
 	for i, c := range runs {
 		s.record(c.pkg, c.registration, c.env(), nil, results[i])
 	}
-	return results
 }
 
 // A childRun is one child of a parallel run.

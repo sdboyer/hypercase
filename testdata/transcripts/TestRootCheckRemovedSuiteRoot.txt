@@ -1,0 +1,34 @@
+$ edit corp/testdata/script/twice.txtar  # a corpus under the root corp, whose package registers echo alone
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # corp-a
+    The root-package check for the corpus root corp runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ go test  # corp-a
+    corp/testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
+        If a column should write them, register the column. If not, run hypercase strip -root corp -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ hypercase strip -root corp -column shout
+testdata/script/twice.txtar: removed 2 sections
+Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
+# the update, run until a pass changes nothing; that pass:
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # corp-a
+    The root-package check for the corpus root corp runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ go test  # corp-a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS

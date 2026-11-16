@@ -210,6 +210,15 @@ func (r *runner) updateCmd() string {
 	return r.updateVar + "=1 go test ./..."
 }
 
+// stripCmd is the hypercase strip command, run at the module root, that
+// removes the sections the flag given selects under the corpus root.
+func (r *runner) stripCmd(flag string) string {
+	if r.rootRel == "." {
+		return "hypercase strip " + flag
+	}
+	return "hypercase strip -root " + r.rootRel + " " + flag
+}
+
 // rel returns a path relative to the module root, with slashes, so a
 // message reads the same wherever go test ran.
 func (r *runner) rel(p string) string { return root.Rel(r.moduleRoot, p) }

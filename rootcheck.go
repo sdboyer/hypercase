@@ -388,25 +388,26 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, tr
 
 	// Sections no registry claims: a column's outputs and a bytes lift's
 	// product, in any case, and a transform's variant, whole, when no
-	// corpus type lists the transform.
-	type claim struct{ what, why string }
+	// corpus type lists the transform. A claim's strip is the flag that
+	// limits hypercase strip to its sections.
+	type claim struct{ what, why, strip string }
 	unclaimed := map[claim][]string{}
 	for _, s := range a.Sections {
 		kind, name, rest := archive.SplitCase(s.Name)
 		if kind == archive.Transform && !transforms[name] {
-			c := claim{archive.Transform + "/" + name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s.\nIf a transform should make the variant, list it in its corpus type's Transforms", corpus, name)}
+			c := claim{archive.Transform + "/" + name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s.\nIf a transform should make the variant, list it in its corpus type's Transforms", corpus, name), "-transform " + name}
 			unclaimed[c] = append(unclaimed[c], s.Name)
 			continue
 		}
 		if out, ok := strings.CutPrefix(rest, archive.Out+"/"); ok {
 			if col, _, _ := strings.Cut(out, "/"); !cols[col] {
-				c := claim{col, fmt.Sprintf("no column named %s runs over the corpus %s.\nIf a column should write them, register the column", col, corpus)}
+				c := claim{col, fmt.Sprintf("no column named %s runs over the corpus %s.\nIf a column should write them, register the column", col, corpus), "-column " + col}
 				unclaimed[c] = append(unclaimed[c], s.Name)
 			}
 		}
 		if via, ok := strings.CutPrefix(rest, archive.Via+"/"); ok {
 			if l, _, _ := strings.Cut(via, "/"); !products[l] {
-				c := claim{archive.Via + "/" + l, fmt.Sprintf("no bytes lift named %s runs over the corpus %s.\nIf a bytes lift should write them, register it", l, corpus)}
+				c := claim{archive.Via + "/" + l, fmt.Sprintf("no bytes lift named %s runs over the corpus %s.\nIf a bytes lift should write them, register it", l, corpus), "-column " + l}
 				unclaimed[c] = append(unclaimed[c], s.Name)
 			}
 		}
@@ -417,7 +418,7 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, tr
 	}
 	slices.SortFunc(claims, func(a, b claim) int { return strings.Compare(a.what, b.what) })
 	for _, c := range claims {
-		t.Errorf("%s: no registry claims %s: %s. If not, delete them by hand; %s leaves them in place.", rel, andList(unclaimed[c]), c.why, r.updateCmd())
+		t.Errorf("%s: no registry claims %s: %s. If not, run %s at the module root, then %s until it changes nothing.", rel, andList(unclaimed[c]), c.why, r.stripCmd(c.strip), r.updateCmd())
 	}
 }
 

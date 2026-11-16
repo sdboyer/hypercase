@@ -1,0 +1,8 @@
+A script, not an export, which evaluate and list run on directly.
+-- in/evaluate/out/values.txt --
+a1 1
+-- variant/more/about --
+The script evaluates to a second value too.
+-- variant/more/in/evaluate/out/values.txt --
+a1 1
+b1 2

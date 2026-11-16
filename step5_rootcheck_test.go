@@ -15,11 +15,40 @@ func TestRootCheckRemovedSuite(t *testing.T) {
 	s := newSandbox(t, "shared")
 	before := s.read(twice)
 	s.passes(s.run("b", "pkg-b-gone", true))
-	want := "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place."
+	want := "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing."
 	s.fails(s.normal("pkg-a"), want)
 	s.passes(s.update("pkg-a"))
 	s.same(twice, before)
 	s.fails(s.normal("pkg-a"), want)
+	// The command the message names, then the update, leave the check
+	// passing.
+	s.passes(s.strip("-column", "shout"))
+	for _, r := range s.settle(childRun{"", "pkg-a", true}, childRun{"b", "pkg-b-gone", true}) {
+		s.passes(r)
+	}
+	s.hasSections(twice, nil, "out/shout/")
+	s.passes(s.normal("pkg-a"))
+	s.done()
+}
+
+// TestRootCheckRemovedSuiteRoot: under a corpus root other than the
+// module root, the message names it with -root, as the module root sees
+// it, and the command it names, run there, strips that corpus root alone.
+func TestRootCheckRemovedSuiteRoot(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	corp := "corp/testdata/script/twice.txtar"
+	s.write(corp, s.read(twice), "a corpus under the root corp, whose package registers echo alone")
+	s.passes(s.update("corp-a"))
+	s.fails(s.normal("corp-a"), corp+": no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root corp -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
+	before := s.read(twice)
+	s.passes(s.strip("-root", "corp", "-column", "shout"))
+	for _, r := range s.settle(childRun{"", "corp-a", true}) {
+		s.passes(r)
+	}
+	s.hasSections(corp, nil, "out/shout/")
+	s.same(twice, before)
+	s.passes(s.normal("corp-a"))
 	s.done()
 }
 
