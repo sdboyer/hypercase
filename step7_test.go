@@ -537,7 +537,7 @@ func TestTransformOwners(t *testing.T) {
 	s.passes(s.run("b", "tr-b", true))
 	r := s.normal("tr-unowned")
 	s.fails(r,
-		"the transform looped, of testdata/script/, is owned by no package, so nothing writes or judges its variants' inputs.\nGive it to hypercase.Own in one package that registers its corpus type.",
+		"the transform looped, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.\nGive it to hypercase.Own in one package that registers its corpus type.",
 		"the transform upper, of testdata/script/, is owned by no package")
 	s.passes(s.update("transforms"))
 	s.passes(s.run("b", "tr-b-owns", true))
