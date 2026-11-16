@@ -2,9 +2,18 @@
 package step12
 
 import (
+	"fmt"
+	"io"
+	"io/fs"
+	"maps"
+	"regexp"
 	"slices"
+	"strings"
+	"unicode"
 
+	"github.com/sdboyer/hypercase"
 	"github.com/sdboyer/hypercase/decl"
+	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step12/sheetcorpus"
 )
 
@@ -58,5 +67,142 @@ var stated = source{
 			return neither, nil
 		}
 		return anti, nil
+	},
+}
+
+// circularParsed is circular with its polarities from a predicate over
+// parse's product, the parsed sheet, in place of what each case states:
+// #20's question 2.
+var circularParsed = hypothesis{
+	name:        "circular-parsed",
+	description: "circular, with each case's polarity from its parsed sheet: P when its formulas make a cycle, anti-P when they make none and refer to no missing cell.",
+	property:    sheetcorpus.Circular,
+	source:      parsed,
+	claims:      circular.claims,
+}
+
+// parsed classifies a case for circular from what parse makes of its
+// committed input: P when the parsed formulas make a cycle, neither when
+// they make none and refer to a cell the sheet lacks, and anti-P
+// otherwise. A case that parse rejects is unclassified. It runs parse's
+// function, once per case, outside the framework: a predicate over a
+// stage computes the stage.
+var parsed = source{
+	name: "parsed",
+	runs: []string{"parse"},
+	classify: func(k *kase) (casePolarity, error) {
+		view, err := k.inputView()
+		if err != nil {
+			return "", err
+		}
+		p, err := sheetcorpus.Parse.Run(k.archive, sheetcorpus.Sheet{FS: view}, io.Discard)
+		if err != nil {
+			return unclassified, nil
+		}
+		// Parse accepted the sheet, so each file under sheet/ is a cell.
+		entries, err := fs.ReadDir(view, "sheet")
+		if err != nil {
+			return "", err
+		}
+		cells := map[string]bool{}
+		for _, e := range entries {
+			cells[e.Name()] = true
+		}
+		// The references are read from the parsed formulas, as Format
+		// prints them: A1 =B1 * 2.
+		refs := map[string][]string{}
+		for _, line := range strings.Split(string(sheet.Format(p)), "\n") {
+			name, formula, ok := strings.Cut(line, " =")
+			if !ok {
+				continue
+			}
+			for _, tok := range strings.FieldsFunc(formula, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+				if cellName.MatchString(tok) {
+					refs[name] = append(refs[name], tok)
+				}
+			}
+		}
+		if hasCycle(cells, refs) {
+			return pos, nil
+		}
+		for _, rs := range refs {
+			for _, r := range rs {
+				if !cells[r] {
+					return neither, nil
+				}
+			}
+		}
+		return anti, nil
+	},
+}
+
+var cellName = regexp.MustCompile(`^[A-Z]{1,3}[1-9][0-9]*$`)
+
+// hasCycle reports whether some cell refers back to itself, directly or
+// through other cells. A reference to a cell the sheet lacks leads
+// nowhere.
+func hasCycle(cells map[string]bool, refs map[string][]string) bool {
+	const (
+		visiting = 1
+		done     = 2
+	)
+	state := map[string]int{}
+	var visit func(c string) bool
+	visit = func(c string) bool {
+		switch state[c] {
+		case visiting:
+			return true
+		case done:
+			return false
+		}
+		state[c] = visiting
+		for _, r := range refs[c] {
+			if cells[r] && visit(r) {
+				return true
+			}
+		}
+		state[c] = done
+		return false
+	}
+	for _, c := range slices.Sorted(maps.Keys(cells)) {
+		if visit(c) {
+			return true
+		}
+	}
+	return false
+}
+
+// circularSources is no hypothesis: it records each case's polarity for
+// circular from both sources, so a polarity that changes is a line of its
+// findings that changes (#20's question 2), and a disagreement between the
+// sources is a line that says so (question 3).
+var circularSources = hypercase.Check{
+	Name:        "circular-sources",
+	Description: "Each case's polarity for circular, from what it states and from its parsed sheet, and whether the two disagree.",
+	Run: func(cells []hypercase.Cell) ([]string, error) {
+		return counted("circular-sources", parsed.runs, func() ([]string, int, error) {
+			ks := cases(cells)
+			var findings []string
+			for _, k := range ks {
+				s, err := stated.classify(k)
+				if err != nil {
+					return nil, 0, err
+				}
+				p, err := parsed.classify(k)
+				if err != nil {
+					return nil, 0, err
+				}
+				f := fmt.Sprintf("%s: stated %s, parsed %s", k.name, s, p)
+				switch predicts := func(p casePolarity) bool { return p == pos || p == anti }; {
+				case s == p:
+				case !predicts(s) && !predicts(p):
+					f += ", neither of which predicts anything"
+				default:
+					f += ", which disagree"
+				}
+				findings = append(findings, f)
+			}
+			return findings, len(ks), nil
+		})
 	},
 }

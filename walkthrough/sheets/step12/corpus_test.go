@@ -26,11 +26,12 @@ func init() {
 		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
 		hypercase.Own(codes),
 		hypercase.Own(checksOf(hypotheses)...),
+		hypercase.Own(circularSources),
 	)
 }
 
 // hypotheses are #20's, written by hand, each owned as a corpus check.
-var hypotheses = []hypothesis{circular, circularRelabelled}
+var hypotheses = []hypothesis{circular, circularRelabelled, circularParsed}
 
 func checksOf(hs []hypothesis) []any {
 	var checks []any
