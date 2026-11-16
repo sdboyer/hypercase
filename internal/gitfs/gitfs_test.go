@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/sdboyer/hypercase/internal/gitfs"
 	"github.com/sdboyer/hypercase/internal/gittest"
@@ -306,6 +307,47 @@ exec "$GIT" "$@"
 		first := strings.TrimPrefix(err.Error(), "readfile a.txt: ")
 		if _, err := fs.ReadFile(tree, "dir/b.txt"); err == nil || err.Error() != "readfile dir/b.txt: "+first {
 			t.Errorf("ReadFile(dir/b.txt): got %v, want %q", err, "readfile dir/b.txt: "+first)
+		}
+	})
+	// A bad header, then more than a pipe holds, which no read takes:
+	// stopping cat-file closes the pipe it writes to, so it exits, and
+	// neither the read nor Close waits on it. The deadlines fail only a
+	// read or a Close that never returns.
+	t.Run("header then more", func(t *testing.T) {
+		wrapGit(t, `if [ "$1" = cat-file ]; then read -r line; echo "nonsense"; head -c 1048576 /dev/zero 2>/dev/null; while read -r line; do :; done; exit 0; fi
+exec "$GIT" "$@"
+`)
+		r, err := gitfs.Open(g.Dir, gittest.Env())
+		if err != nil {
+			t.Fatal(err)
+		}
+		tree, err := r.Tree(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		read := make(chan error, 1)
+		go func() {
+			_, err := fs.ReadFile(tree, "a.txt")
+			read <- err
+		}()
+		want := `readfile a.txt: git cat-file gave "nonsense" for the blob ` + strings.TrimSpace(g.Git("rev-parse", c+":a.txt"))
+		select {
+		case err := <-read:
+			if err == nil || err.Error() != want {
+				t.Errorf("ReadFile(a.txt): got %v, want %q", err, want)
+			}
+		case <-time.After(time.Minute):
+			t.Fatal("ReadFile(a.txt) never returned: git cat-file is blocked writing what no read takes")
+		}
+		closed := make(chan error, 1)
+		go func() { closed <- r.Close() }()
+		select {
+		case err := <-closed:
+			if err != nil {
+				t.Errorf("Close: %v", err)
+			}
+		case <-time.After(time.Minute):
+			t.Fatal("Close never returned")
 		}
 	})
 }

@@ -38,6 +38,7 @@ type Repo struct {
 	catStderr bytes.Buffer // cat's stderr, read once it exits
 	catErr    error        // the failure that stopped cat, which every later read gives
 	in        io.WriteCloser
+	outPipe   io.ReadCloser // cat's stdout, which out reads
 	out       *bufio.Reader
 	blobs     map[string][]byte
 }
@@ -129,9 +130,12 @@ func (r *Repo) Close() error {
 }
 
 // stopCat stops the repository's git cat-file, and returns its failure,
-// holding what it wrote on stderr.
+// holding what it wrote on stderr. It closes the pipe cat-file writes to
+// before it waits, so a cat-file blocked writing what no read will take
+// gets a broken pipe, and exits.
 func (r *Repo) stopCat() error {
 	r.in.Close()
+	r.outPipe.Close()
 	err := r.cat.Wait()
 	r.cat = nil
 	if err != nil {
@@ -207,7 +211,7 @@ func (r *Repo) blob(hash string) ([]byte, error) {
 		if err := cmd.Start(); err != nil {
 			return nil, fmt.Errorf("git cat-file: %w", err)
 		}
-		r.cat, r.in, r.out = cmd, in, bufio.NewReader(out)
+		r.cat, r.in, r.outPipe, r.out = cmd, in, out, bufio.NewReader(out)
 	}
 	if _, err := io.WriteString(r.in, hash+"\n"); err != nil {
 		return nil, r.catFailed(err)
@@ -228,11 +232,11 @@ func (r *Repo) blob(hash string) ([]byte, error) {
 	}
 	if size < 0 {
 		// The header doesn't say how much content follows it, so no later
-		// read can find its own header: each gives this error.
+		// read can find its own header: each gives this error. Stopping
+		// cat-file before it has written what follows may fail it, so its
+		// exit says nothing the header doesn't.
 		r.catErr = fmt.Errorf("git cat-file gave %q for the blob %s", strings.TrimSpace(head), hash)
-		if stop := r.stopCat(); stop != nil {
-			r.catErr = stop
-		}
+		r.stopCat()
 		return nil, r.catErr
 	}
 	if fields[1] != "blob" {
