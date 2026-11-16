@@ -397,8 +397,10 @@ func TestChecks(t *testing.T) {
 	s.write(twice, before, "remove the transform's cells")
 	s.edit(twice, "state a property each transform declines", insert("properties", "malformed\n", "out/"))
 	declined := "can't read its cells: testdata/script/twice.txtar holds transform/looped, and looped declines the base: the base states malformed, which looped neither gives nor keeps\n    Fix what the message names. No check runs, and an update writes no findings."
-	s.fails(s.normal("tr-checks"), "the corpus check alters "+declined, "the corpus check cells "+declined, "the corpus check unsorted "+declined)
-	s.same("testdata/checks/cells.txt", findings)
+	for _, update := range []bool{false, true} {
+		s.fails(s.run(".", "tr-checks", update), "the corpus check alters "+declined, "the corpus check cells "+declined, "the corpus check unsorted "+declined)
+		s.same("testdata/checks/cells.txt", findings)
+	}
 	s.done()
 }
 
