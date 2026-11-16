@@ -263,10 +263,12 @@ func TestFrozenOutcomeCodes(t *testing.T) {
 	s.fails(s.normal("rejects-codes"), want)
 
 	s.edit(negative, "drop the frozen cell's outcome", drop("out/echo/outcome"))
-	s.passes(s.update("rejects-codes"))
+	files := s.snapshot()
 	a := archive.Parse(edited)
 	set("out/echo/outcome", "rejected S1\n")(a)
-	s.same(negative, a.Format())
+	files[negative] = a.Format()
+	s.passes(s.update("rejects-codes"))
+	s.unchanged(files)
 	s.passes(s.normal("rejects-codes"))
 
 	s.write(negative, original, "restore the frozen cell, whose error Codes gives no code")
