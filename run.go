@@ -809,7 +809,7 @@ func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why
 	if marked {
 		m.add("%s marks the cell, and %s's probe says the case isn't for it: %s\nRemove the line, or fix the probe.", c.gapAt(gap), col.name, why)
 	}
-	r.ranNothing(m, c, col, archive.Outcome{State: archive.Skipped, Detail: why}, goldens, res)
+	r.ranNothing(m, c, col, archive.Outcome{State: archive.Skipped, Detail: why}, marked, goldens, res)
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		if p == outcomeFile {
 			continue
@@ -832,7 +832,7 @@ func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, by 
 	if marked {
 		m.add("%s marks the cell, and the cell is blocked: the lift %s, on %s's path, failed on the case, so the cell runs nothing.\nRemove the line, or fix the lift or %s.", c.gapAt(gap), by.name, col.name, c.inputsAt())
 	}
-	r.ranNothing(m, c, col, archive.Outcome{State: archive.Blocked, Detail: by.name}, goldens, res)
+	r.ranNothing(m, c, col, archive.Outcome{State: archive.Blocked, Detail: by.name}, marked, goldens, res)
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		if p == outcomeFile {
 			continue
@@ -850,10 +850,18 @@ func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, by 
 }
 
 // ranNothing records the outcome of a cell that ran nothing, its one file:
-// a normal run compares it with its golden, and an update writes it.
-func (r *runner) ranNothing(m *msg, c *aCase, col *column, o archive.Outcome, goldens map[string][]byte, res *cellResult) {
+// a normal run compares it with its golden, and an update writes it. A
+// frozen cell, one a gaps line marks that has committed files, keeps them
+// as they are: its line fails it already, and since the run made none of
+// its files but the outcome, the upgrade that adds a missing outcome to a
+// frozen cell whose files match the run's doesn't apply.
+func (r *runner) ranNothing(m *msg, c *aCase, col *column, o archive.Outcome, marked bool, goldens map[string][]byte, res *cellResult) {
 	data := o.Format()
 	res.ran, res.writable, res.files = true, true, map[string][]byte{outcomeFile: data}
+	if marked && len(goldens) > 0 {
+		res.writable = false
+		return
+	}
 	if r.update {
 		return
 	}

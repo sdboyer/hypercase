@@ -1925,7 +1925,8 @@ whether the project supplies `Codes`.
   cells that ran. An error or a panic in a classifier fails the cell, and the
   update then writes nothing for that cell: an update is atomic per cell.
 - Skipped and blocked cells write an outcome, and their other committed
-  files are orphans.
+  files are orphans. A frozen one keeps the files it has, outcome
+  included: its `gaps` line fails it already.
 - The expected-error check reads what the run did, never the committed
   outcome. A cell that erred has the outcome `rejected`, so the two agree. A
   `panicked` cell fails unless a `gaps` line marks it.

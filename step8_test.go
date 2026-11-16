@@ -128,6 +128,49 @@ func TestFrozenOutcome(t *testing.T) {
 	s.done()
 }
 
+// TestFrozenRanNothing: a skipped or blocked cell that a gaps line marks,
+// with committed files, is frozen like any other: an update leaves its
+// outcome as committed, though the cell now runs nothing.
+func TestFrozenRanNothing(t *testing.T) {
+	t.Parallel()
+	t.Run("skipped", func(t *testing.T) {
+		t.Parallel()
+		s := newSandbox(t, "probes")
+		for _, a := range []string{"marked", "no", "noreason", "panics", "stale"} {
+			s.remove("testdata/script/"+a+".txtar", "leave yes, which echo runs on")
+		}
+		const frozen = "testdata/script/frozen.txtar"
+		s.write(frozen, []byte("The probe now says no to a cell a gaps line freezes.\n-- in/do/probe --\nno formulas\n-- gaps --\necho A1 should be 7. Waits on sheets#13.\n-- out/echo/outcome --\naccepted\n"), "a frozen cell the probe now skips")
+		before := s.read(frozen)
+		skipped := "gaps, line 1, marks the cell, and echo's probe says the case isn't for it: no formulas\n    Remove the line, or fix the probe."
+		s.fails(s.update("probe"), skipped)
+		s.same(frozen, before)
+		r := s.normal("probe")
+		s.fails(r, skipped)
+		s.lacks(r, "out/echo/outcome differs")
+		s.done()
+	})
+	t.Run("blocked", func(t *testing.T) {
+		t.Parallel()
+		s := newSandbox(t, "transforms")
+		s.remove("testdata/script/errs.txtar", "leave twice, whose cases the lifts run on as they should")
+		s.remove("testdata/script/garbled.txtar", "leave twice, whose cases the lifts run on as they should")
+		s.passes(s.update("tr-ladder-eval"))
+		s.edit(twice, "mark looped's blocked cell, and record another outcome for it", func(a *archive.Archive) {
+			insert("gaps", "transform/looped evaluate Waits on sheets#9.\n", "out/")(a)
+			set("transform/looped/out/evaluate/outcome", "accepted\n")(a)
+		})
+		before := s.read(twice)
+		blocked := "gaps, line 1, marks the cell, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case, so the cell runs nothing."
+		s.fails(s.update("tr-ladder-eval"), blocked)
+		s.same(twice, before)
+		r := s.normal("tr-ladder-eval")
+		s.fails(r, blocked)
+		s.lacks(r, "transform/looped/out/evaluate/outcome differs")
+		s.done()
+	})
+}
+
 // TestOutcomeClash: a column's output under outcome/ is one no archive
 // can hold beside the cell's outcome.
 func TestOutcomeClash(t *testing.T) {
