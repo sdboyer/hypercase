@@ -376,7 +376,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		cells = "the variant's cells but the frozen ones, which no update writes."
 	}
 	if len(differs) > 0 {
-		cells += fmt.Sprintf(" A normal run checks each frozen cell that failed, here %s, again on the rewritten inputs, against its committed files.", andList(differs))
+		cells += fmt.Sprintf(" A normal run checks each frozen cell whose files differ, here %s, again on the rewritten inputs, against its committed files.", andList(differs))
 	}
 	t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and %s%s", c.header(), v.name, v.name, m, v.name, r.updateCmd(), v.name, cells, r.ifUnowned(v))
 }
