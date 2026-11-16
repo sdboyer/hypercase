@@ -3,6 +3,7 @@ $ edit testdata/script/framework.txtar  # a cell the run can't write, which also
 $ edit testdata/script/doubled.txtar  # a cell the run can't write, which also gives values.txt
 $ edit testdata/script/up.txtar  # a cell the run can't write, which also gives values.txt
 $ edit testdata/script/render.txtar  # a cell the run can't write, which also gives values.txt
+$ edit testdata/script/render-nonl.txtar  # a cell the run can't write, which also gives values.txt
 $ edit testdata/script/conflict.txtar  # a cell the run can't write, which also gives values.txt
 $ edit testdata/script/undeclared.txtar  # a cell the run can't write, which also gives values.txt
 $ edit testdata/script/matched.txtar  # a cell the run can't write, which also gives values.txt
@@ -25,6 +26,13 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # unwritable
         echo: Does what the case's do/ tree says.
         out/echo/a.txt matches two of echo's output declarations, ?.txt and a.txt.
         Change the patterns so that one declaration matches each file. An update writes nothing for this cell.
+    script/render-nonl: RenderError gives the run's error with no final newline.
+        echo: Does what the case's do/ tree says.
+        The project's RenderError returned "rendered: boom" for echo's error, which doesn't end with a newline.
+        Its output must end with a newline: fix RenderError. An update writes nothing for this cell.
+        echo returned an error, but the case states no property echo rejects:
+          boom
+        Fix the code, or state the property on the case and in echo's Rejects.
     script/render: RenderError panics on the run's error.
         echo: Does what the case's do/ tree says.
         The project's RenderError panicked on echo's error: render boom
@@ -54,6 +62,8 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # unwritable
             --- FAIL: TestCorpus/script/framework/echo
         --- FAIL: TestCorpus/script/matched
             --- FAIL: TestCorpus/script/matched/echo
+        --- FAIL: TestCorpus/script/render-nonl
+            --- FAIL: TestCorpus/script/render-nonl/echo
         --- FAIL: TestCorpus/script/render
             --- FAIL: TestCorpus/script/render/echo
         --- FAIL: TestCorpus/script/undeclared
@@ -81,6 +91,13 @@ $ go test  # unwritable
         echo: Does what the case's do/ tree says.
         out/echo/a.txt matches two of echo's output declarations, ?.txt and a.txt.
         Change the patterns so that one declaration matches each file. An update writes nothing for this cell.
+    script/render-nonl: RenderError gives the run's error with no final newline.
+        echo: Does what the case's do/ tree says.
+        The project's RenderError returned "rendered: boom" for echo's error, which doesn't end with a newline.
+        Its output must end with a newline: fix RenderError. An update writes nothing for this cell.
+        echo returned an error, but the case states no property echo rejects:
+          boom
+        Fix the code, or state the property on the case and in echo's Rejects.
     script/render: RenderError panics on the run's error.
         echo: Does what the case's do/ tree says.
         The project's RenderError panicked on echo's error: render boom
@@ -110,6 +127,8 @@ $ go test  # unwritable
             --- FAIL: TestCorpus/script/framework/echo
         --- FAIL: TestCorpus/script/matched
             --- FAIL: TestCorpus/script/matched/echo
+        --- FAIL: TestCorpus/script/render-nonl
+            --- FAIL: TestCorpus/script/render-nonl/echo
         --- FAIL: TestCorpus/script/render
             --- FAIL: TestCorpus/script/render/echo
         --- FAIL: TestCorpus/script/undeclared
@@ -124,6 +143,7 @@ $ edit testdata/script/framework.txtar  # commit a values.txt the run no longer 
 $ edit testdata/script/doubled.txtar  # commit a values.txt the run no longer gives
 $ edit testdata/script/up.txtar  # commit a values.txt the run no longer gives
 $ edit testdata/script/render.txtar  # commit a values.txt the run no longer gives
+$ edit testdata/script/render-nonl.txtar  # commit a values.txt the run no longer gives
 $ edit testdata/script/conflict.txtar  # commit a values.txt the run no longer gives
 $ edit testdata/script/undeclared.txtar  # commit a values.txt the run no longer gives
 $ edit testdata/script/matched.txtar  # commit a values.txt the run no longer gives
@@ -161,6 +181,17 @@ $ go test  # unwritable
         - A1 7
         + A1 6
         An update writes nothing for this cell until the problems above are fixed.
+    script/render-nonl: RenderError gives the run's error with no final newline.
+        echo: Does what the case's do/ tree says.
+        The project's RenderError returned "rendered: boom" for echo's error, which doesn't end with a newline.
+        Its output must end with a newline: fix RenderError. An update writes nothing for this cell.
+        echo returned an error, but the case states no property echo rejects:
+          boom
+        Fix the code, or state the property on the case and in echo's Rejects.
+        out/echo/values.txt differs (-golden +got):
+        - A1 7
+        + A1 6
+        An update writes nothing for this cell until the problems above are fixed.
     script/render: RenderError panics on the run's error.
         echo: Does what the case's do/ tree says.
         The project's RenderError panicked on echo's error: render boom
@@ -206,6 +237,8 @@ $ go test  # unwritable
             --- FAIL: TestCorpus/script/framework/echo
         --- FAIL: TestCorpus/script/matched
             --- FAIL: TestCorpus/script/matched/echo
+        --- FAIL: TestCorpus/script/render-nonl
+            --- FAIL: TestCorpus/script/render-nonl/echo
         --- FAIL: TestCorpus/script/render
             --- FAIL: TestCorpus/script/render/echo
         --- FAIL: TestCorpus/script/undeclared
@@ -234,6 +267,13 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # unwritable
         echo: Does what the case's do/ tree says.
         out/echo/a.txt matches two of echo's output declarations, ?.txt and a.txt.
         Change the patterns so that one declaration matches each file. An update writes nothing for this cell.
+    script/render-nonl: RenderError gives the run's error with no final newline.
+        echo: Does what the case's do/ tree says.
+        The project's RenderError returned "rendered: boom" for echo's error, which doesn't end with a newline.
+        Its output must end with a newline: fix RenderError. An update writes nothing for this cell.
+        echo returned an error, but the case states no property echo rejects:
+          boom
+        Fix the code, or state the property on the case and in echo's Rejects.
     script/render: RenderError panics on the run's error.
         echo: Does what the case's do/ tree says.
         The project's RenderError panicked on echo's error: render boom
@@ -263,6 +303,8 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # unwritable
             --- FAIL: TestCorpus/script/framework/echo
         --- FAIL: TestCorpus/script/matched
             --- FAIL: TestCorpus/script/matched/echo
+        --- FAIL: TestCorpus/script/render-nonl
+            --- FAIL: TestCorpus/script/render-nonl/echo
         --- FAIL: TestCorpus/script/render
             --- FAIL: TestCorpus/script/render/echo
         --- FAIL: TestCorpus/script/undeclared

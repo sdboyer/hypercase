@@ -124,6 +124,7 @@ func TestUnwritableCell(t *testing.T) {
 		{"doubled", "The run returns two outputs at one path.", "-- in/do/twice/b.txt --\nx\n", "The run returned two outputs at b.txt."},
 		{"up", "The run returns an output outside its cell's directory.", "-- in/do/up/b.txt --\nx\n", `The run returned an output at "../b.txt", which is not a valid slash path under out/echo/.`},
 		{"render", "RenderError panics on the run's error.", "-- in/do/error --\nboom\n-- in/render/panic --\nrender boom\n", "The project's RenderError panicked on echo's error: render boom"},
+		{"render-nonl", "RenderError gives the run's error with no final newline.", "-- in/do/error --\nboom\n-- in/render/nonl --\n", `The project's RenderError returned "rendered: boom" for echo's error, which doesn't end with a newline.`},
 		{"conflict", "The run returns c.txt, and c.txt/d below it.", "-- in/do/extranl/c.txt/d --\nx\n-- in/do/out/c.txt --\nx\n", "out/echo/c.txt can't be held in an archive: the section is also the directory of out/echo/c.txt/d."},
 		{"undeclared", "The run returns an output no declaration matches.", "-- in/do/out/notes.txt --\nx\n", "out/echo/notes.txt is not declared."},
 		{"matched", "The run returns an output two declarations match.", "-- in/do/out/a.txt --\nx\n", "out/echo/a.txt matches two of echo's output declarations, ?.txt and a.txt."},
