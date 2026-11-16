@@ -246,6 +246,46 @@ func TestFrozenVariantOutcome(t *testing.T) {
 	s.done()
 }
 
+// TestFrozenOutcomeStaleInputs: an update that rewrites a transform's
+// stale inputs runs the variant's frozen cell on what the transform makes
+// now, and adds its missing outcome when its files match that run. A cell
+// whose files match only the old inputs gains nothing, and fails.
+func TestFrozenOutcomeStaleInputs(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.passes(s.update("transforms"))
+	settled := s.read(twice)
+	freeze := func(values string) func(*archive.Archive) {
+		return func(a *archive.Archive) {
+			insert("gaps", "transform/upper echo The values are printed once. Waits on sheets#9.\n", "out/")(a)
+			drop("transform/upper/out/echo/outcome")(a)
+			set("transform/upper/out/echo/values.txt", values)(a)
+		}
+	}
+	const doubled = "A1 SIX\nA1 SIX\n"
+
+	// upper's jenny now doubles what it uppercases, and the frozen cell
+	// holds what the variant's cell gives on the doubled inputs.
+	s.edit(twice, "freeze upper's echo cell as before outcomes were written, with the values the changed jenny's variant gives", freeze(doubled))
+	s.passes(s.update("tr-jenny"))
+	s.hasSections(twice, map[string]string{
+		"transform/upper/in/do/out/values.txt": doubled,
+		"transform/upper/out/echo/outcome":     "accepted\n",
+		"transform/upper/out/echo/values.txt":  doubled,
+	})
+	s.passes(s.normal("tr-jenny"))
+
+	// The frozen cell holds what the old inputs gave.
+	s.write(twice, settled, "restore the settled archive")
+	s.edit(twice, "freeze upper's echo cell as before outcomes were written, with the values the old inputs give", freeze("A1 SIX\n"))
+	s.fails(s.update("tr-jenny"), "The cell is frozen by its known gap, gaps line 1: \"transform/upper echo The values are printed once. Waits on sheets#9.\"\n    Its committed files record today's behavior, and the run now produces different ones:\n    transform/upper/out/echo/values.txt differs (-committed +got):\n      A1 SIX\n    + A1 SIX")
+	s.hasSections(twice, map[string]string{
+		"transform/upper/in/do/out/values.txt": doubled,
+		"transform/upper/out/echo/values.txt":  "A1 SIX\n",
+	}, "transform/upper/out/echo/outcome")
+	s.done()
+}
+
 // TestFrozenRanNothing: a skipped or blocked cell that a gaps line marks,
 // with committed files, is frozen like any other: an update leaves its
 // outcome as committed, though the cell now runs nothing.
