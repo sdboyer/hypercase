@@ -1,0 +1,173 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+PASS
+$ edit c/corpus_test.go  # a package c over the corpus
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # ladder-b-suite
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./c  # ladder-b-owns
+    script/x: The root package, ., owns parse, resolve and evaluate, and ./b uses parse for outline.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/values.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    what ran, in order:
+        parse ran on x
+        outline's probe ran
+        outline ran on x
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/outline
+            --- FAIL: TestCorpus/script/x/parse
+FAIL
+[exit 1]
+$ go test  # ladder-a
+    the column parse is owned by ./b as a suite, and by . and ./c, each as a lift. Lifts share the suites' column names, which are unique per corpus root, and one package owns each column.
+        Rename or remove all but one of the columns. Of . and ./c, which own the lift, one that only reads its product removes its column by giving the lift to hypercase.Use in place of hypercase.Own.
+    script/x: The root package, ., owns parse, resolve and evaluate, and ./b uses parse for outline.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/values.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- FAIL: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./c  # ladder-b-suite
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+PASS
+$ go test  # ladder-a
+    the column parse is owned by ./b and ./c, each as a suite, and by . as a lift. Lifts share the suites' column names, which are unique per corpus root, and one package owns each column.
+        Rename or remove all but one of the columns.
+    testdata/script/x.txtar: no registry claims out/outline/outcome and out/outline/values.txt: no column named outline runs over the corpus script.
+        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+    script/x: The root package, ., owns parse, resolve and evaluate, and ./b uses parse for outline.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/values.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- FAIL: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a-useonly
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/resolve
+PASS
+$ go test  # ladder-a-useonly
+    the column parse is owned by ./b and ./c, each as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root. No package owns the lift, and owning it would add a column of the name.
+        Rename or remove all but one of the suites and the lift. To remove the lift, drop it from hypercase.Use in every package that uses it.
+    the lift parse is used by ., and no package owns it, so its error is recorded nowhere.
+        Once no suite shares the lift's name, own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
+    testdata/script/x.txtar: no registry claims out/outline/outcome and out/outline/values.txt: no column named outline runs over the corpus script.
+        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]
+$ edit d/corpus_test.go  # a package d over the corpus
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./d  # ladder-b-owns
+    script/x: The root package, ., owns parse, resolve and evaluate, and ./b uses parse for outline.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/values.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    what ran, in order:
+        parse ran on x
+        outline's probe ran
+        outline ran on x
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/outline
+            --- FAIL: TestCorpus/script/x/parse
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/x: The root package, ., owns parse, resolve and evaluate, and ./b uses parse for outline.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/values.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- FAIL: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]
+$ go test  # ladder-a
+    the column parse is owned by ./b and ./c, each as a suite, and by . and ./d, each as a lift. Lifts share the suites' column names, which are unique per corpus root, and one package owns each column.
+        Rename or remove all but one of the columns. Of . and ./d, which own the lift, one that only reads its product removes its column by giving the lift to hypercase.Use in place of hypercase.Own.
+    script/x: The root package, ., owns parse, resolve and evaluate, and ./b uses parse for outline.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/values.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- FAIL: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]

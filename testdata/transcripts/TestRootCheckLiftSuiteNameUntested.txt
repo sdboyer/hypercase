@@ -33,10 +33,49 @@ PASS
 $ go test  # ladder-a-useonly
     c/testdata/hypercase.json is a registry, and c holds no _test.go file, so no test compares it, and it still claims sections.
         Delete it, or restore the package's tests.
-    the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root.
-        Rename the suite or the lift.
+    the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root. No package owns the lift, and owning it would add a column of the name.
+        Rename the suite or the lift, or remove one. To remove the lift, drop it from hypercase.Use in every package that uses it.
     the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registry of ./c records that its package owns the lift, and ./c holds no _test.go file, so no test runs the lift there.
-        Restore the tests of ./c, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.
+        Once no suite shares the lift's name, restore the tests of ./c, or delete its registry and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]
+$ edit d/corpus_test.go  # a package d over the corpus
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./d  # ladder-b-owns
+    script/x: The root package, ., owns parse, resolve and evaluate, and ./b uses parse for outline.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/values.txt is an output the run no longer produces.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    what ran, in order:
+        parse ran on x
+        outline's probe ran
+        outline ran on x
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/outline
+            --- FAIL: TestCorpus/script/x/parse
+FAIL
+[exit 1]
+$ rm d/corpus_test.go  # remove d's tests, and leave its registry
+$ go test  # ladder-a-useonly
+    c/testdata/hypercase.json is a registry, and c holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+    d/testdata/hypercase.json is a registry, and d holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+    the column parse is owned by ./b as a suite, and used by . as a lift. Lifts share the suites' column names, which are unique per corpus root. No package owns the lift, and owning it would add a column of the name.
+        Rename the suite or the lift, or remove one. To remove the lift, drop it from hypercase.Use in every package that uses it.
+    the lift parse is used by ., and no package owns it, so its error is recorded nowhere. The registries of ./c and ./d record that their packages own the lift, and they hold no _test.go file, so no test runs the lift there.
+        Once no suite shares the lift's name, restore the tests of one of them and delete the others' registries, or delete all their registries and own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use.
     what ran, in order:
         parse ran on x
         resolve ran on x
