@@ -1983,10 +1983,10 @@ whether the project supplies `Codes`.
   to fail, whether or not it is the lift whose product the column consumes.
 - `skipped`, then the probe's reason.
 - `panicked`, alone.
-- A code holds no space, semicolon or newline. A reason or a classifier's
-  detail is one line, not empty, with no space at either end. A cell whose
-  code, reason or detail breaks this fails, naming it, and an update writes
-  nothing for that cell.
+- A code holds no space, semicolon, carriage return or newline. A reason or
+  a classifier's detail is one line, not empty, with no space at either end.
+  A cell whose code, reason or detail breaks this fails, naming it, and an
+  update writes nothing for that cell.
 
 **Descriptions.** Classifiers carry a description, under step 3's rule.
 

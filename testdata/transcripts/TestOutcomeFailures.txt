@@ -2,7 +2,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # outcomes
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
     script/bad-code: Codes gives a code with a space in it.
         echo: Does what the case's do/ tree says.
-        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon or newline.
+        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon, carriage return or newline.
         Fix Codes. An update writes nothing for this cell.
     script/cl-bad: The classifier gives a detail with a space at its start.
         echo: Does what the case's do/ tree says.
@@ -45,7 +45,7 @@ FAIL
 $ go test  # outcomes
     script/bad-code: Codes gives a code with a space in it.
         echo: Does what the case's do/ tree says.
-        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon or newline.
+        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon, carriage return or newline.
         Fix Codes. An update writes nothing for this cell.
         out/echo/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
@@ -99,7 +99,7 @@ $ edit testdata/script/cl-error.txtar  # commit the cell's files, as before the 
 $ go test  # outcomes
     script/bad-code: Codes gives a code with a space in it.
         echo: Does what the case's do/ tree says.
-        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon or newline.
+        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon, carriage return or newline.
         Fix Codes. An update writes nothing for this cell.
         out/echo/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
@@ -151,7 +151,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # outcomes
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
     script/bad-code: Codes gives a code with a space in it.
         echo: Does what the case's do/ tree says.
-        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon or newline.
+        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon, carriage return or newline.
         Fix Codes. An update writes nothing for this cell.
     script/cl-bad: The classifier gives a detail with a space at its start.
         echo: Does what the case's do/ tree says.
@@ -195,7 +195,7 @@ $ edit testdata/script/cl-error.txtar  # freeze the cell
 $ go test  # outcomes
     script/bad-code: Codes gives a code with a space in it.
         echo: Does what the case's do/ tree says.
-        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon or newline.
+        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon, carriage return or newline.
         Fix Codes. An update writes nothing for this cell.
         out/echo/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
@@ -247,7 +247,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # outcomes
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
     script/bad-code: Codes gives a code with a space in it.
         echo: Does what the case's do/ tree says.
-        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon or newline.
+        The project's Codes gave echo's error a code an outcome can't hold: the code "a b" can't be held in an outcome: a code is not empty, and holds no space, semicolon, carriage return or newline.
         Fix Codes. An update writes nothing for this cell.
     script/cl-bad: The classifier gives a detail with a space at its start.
         echo: Does what the case's do/ tree says.

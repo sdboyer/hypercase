@@ -39,6 +39,39 @@ func TestOutcomeFormat(t *testing.T) {
 	}
 }
 
+// TestOutcomeBytes: each code CheckCode accepts and each detail
+// CheckDetail accepts, whatever byte it holds, makes an outcome that reads
+// back as itself. Any other is refused before it is written.
+func TestOutcomeBytes(t *testing.T) {
+	for b := range 256 {
+		s := "a" + string([]byte{byte(b)}) + "z"
+		var outcomes []Outcome
+		if CheckCode(s) == nil {
+			outcomes = append(outcomes, Outcome{State: Rejected, Codes: []string{s}}, Outcome{State: Rejected, Codes: []string{s}, Detail: "d"})
+		}
+		if CheckDetail(s) == nil {
+			outcomes = append(outcomes, Outcome{State: Accepted, Detail: s}, Outcome{State: Rejected, Codes: []string{"S1"}, Detail: s}, Outcome{State: Skipped, Detail: s})
+		}
+		for _, o := range outcomes {
+			if err := o.Check(); err != nil {
+				t.Errorf("%#v: %v", o, err)
+				continue
+			}
+			got, err := ParseOutcome(o.Format())
+			if err != nil {
+				t.Errorf("ParseOutcome(%q), as Format writes %#v: %v", o.Format(), o, err)
+			} else if !reflect.DeepEqual(got, o) {
+				t.Errorf("ParseOutcome(%q) = %#v, want %#v", o.Format(), got, o)
+			}
+		}
+	}
+	for _, code := range []string{"", "a b", "a;b", "a\nb", "a\rb"} {
+		if CheckCode(code) == nil {
+			t.Errorf("CheckCode(%q) accepts it", code)
+		}
+	}
+}
+
 // TestOutcomeRefused: an outcome file holds one form of each outcome, and
 // nothing else.
 func TestOutcomeRefused(t *testing.T) {

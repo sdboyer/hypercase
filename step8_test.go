@@ -62,7 +62,7 @@ func TestOutcomeFailures(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "outcome-failures")
 	want := []string{
-		"script/bad-code: Codes gives a code with a space in it.\n    echo: Does what the case's do/ tree says.\n    The project's Codes gave echo's error a code an outcome can't hold: the code \"a b\" can't be held in an outcome: a code is not empty, and holds no space, semicolon or newline.\n    Fix Codes. An update writes nothing for this cell.",
+		"script/bad-code: Codes gives a code with a space in it.\n    echo: Does what the case's do/ tree says.\n    The project's Codes gave echo's error a code an outcome can't hold: the code \"a b\" can't be held in an outcome: a code is not empty, and holds no space, semicolon, carriage return or newline.\n    Fix Codes. An update writes nothing for this cell.",
 		"script/codes-panic: Codes panics on echo's error.\n    echo: Does what the case's do/ tree says.\n    The project's Codes panicked on echo's error: codes boom\n    Fix Codes. An update writes nothing for this cell.",
 		"script/cl-error: The classifier fails.\n    echo: Does what the case's do/ tree says.\n    echo's classifier steered failed: no detail today\n    Fix the classifier. An update writes nothing for this cell.",
 		"script/cl-panic: The classifier panics.\n    echo: Does what the case's do/ tree says.\n    echo's classifier steered panicked: classifier boom\n    Fix the classifier. An update writes nothing for this cell.",

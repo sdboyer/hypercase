@@ -70,9 +70,9 @@ func (o Outcome) Format() []byte {
 }
 
 // Check reports what makes the outcome one no outcome file holds. Each
-// code holds no space, semicolon or newline, and the codes are sorted,
-// each once; the detail is one line with no space at either end; and each
-// state has the parts its format gives it.
+// code holds no space, semicolon, carriage return or newline, and the
+// codes are sorted, each once; the detail is one line with no space at
+// either end; and each state has the parts its format gives it.
 func (o Outcome) Check() error {
 	if !slices.Contains(States, o.State) {
 		return fmt.Errorf("an outcome starts with its state, one of %s, not %q", strings.Join(States, ", "), o.State)
@@ -107,10 +107,10 @@ func (o Outcome) Check() error {
 }
 
 // CheckCode reports what makes a string no code an outcome holds: a code
-// is not empty, and holds no space, semicolon or newline.
+// is not empty, and holds no space, semicolon, carriage return or newline.
 func CheckCode(code string) error {
-	if code == "" || strings.ContainsAny(code, " ;\n") {
-		return fmt.Errorf("the code %q can't be held in an outcome: a code is not empty, and holds no space, semicolon or newline", code)
+	if code == "" || strings.ContainsAny(code, " ;\r\n") {
+		return fmt.Errorf("the code %q can't be held in an outcome: a code is not empty, and holds no space, semicolon, carriage return or newline", code)
 	}
 	return nil
 }

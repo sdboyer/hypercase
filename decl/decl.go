@@ -27,7 +27,8 @@ type Project struct {
 	RenderError func(in fs.FS, err error) []byte
 	// Codes gives the codes of an error that a column's function returned,
 	// for the cell's outcome: rejected, then the codes, sorted, each once.
-	// A code is not empty, and holds no space, semicolon or newline.
+	// A code is not empty, and holds no space, semicolon, carriage return
+	// or newline.
 	// Without Codes, a rejected cell carries no codes.
 	Codes func(err error) []string
 	// IssueLinks link the text that names an issue, in a gaps line or a
