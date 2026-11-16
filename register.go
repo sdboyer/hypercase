@@ -78,12 +78,15 @@ type Option struct {
 //
 // Own also takes the transforms the package owns, [decl.Transform] values:
 // it writes their variants' inputs, and judges them against what the
-// transforms make. Every package's normal run fails a variant whose inputs
-// make no input view. Every package's update runs the variants' cells on
+// transforms make. Every package's normal run fails a variant the
+// transform makes whose inputs make no input view; for a base the
+// transform declines, the owner's normal run fails on any inputs the
+// archive holds. Every package's update runs the variants' cells on
 // what the transforms make, and every normal run on the inputs the archive
-// holds, so a package's update alone, after a transform changed, leaves
-// its normal run failing until the module's update rewrites them. A corpus
-// type the package registers lists each, and one package owns each
+// holds. So after a transform changed, a package's update alone leaves its
+// normal run failing on each cell whose output on those inputs differs
+// from what the update wrote, until the module's update rewrites them. A
+// corpus type the package registers lists each, and one package owns each
 // transform.
 func Own(columns ...any) Option {
 	return Option{apply: func(r *registrations) {

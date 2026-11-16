@@ -284,7 +284,9 @@ func TestTransformBaseEdited(t *testing.T) {
 // TestTransformInvalidInputs: a transform's committed inputs edited by
 // hand into ones that make no input view are judged as inputs, never as
 // problems of form: a normal run, in any package, would read them, so it
-// fails the variant's cells, and the owner's update rewrites them.
+// fails the variant's cells, and the owner's update rewrites them. When
+// the transform declines the base, no run reads them, and only the
+// owner's fails, on their being there at all.
 func TestTransformInvalidInputs(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -321,6 +323,22 @@ func TestTransformInvalidInputs(t *testing.T) {
 		s.passes(s.normal("transforms"))
 		s.passes(s.run("b", "tr-b", false))
 	}
+
+	// Inputs for a base the transform declines are read by no cell. The
+	// owner's normal run fails on them, valid or not, and its update
+	// removes them; another package's run passes the variant by.
+	errs := "testdata/script/errs.txtar"
+	before := s.read(errs)
+	s.edit(errs, "give looped, which declines errs, an empty delete", insert("transform/looped/delete", "", "transform/upper/"))
+	r := s.normal("transforms")
+	s.fails(r, "script/errs/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.\n    transform/looped/delete is written, and looped declines the base: the base's do/ tree already errs\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to remove them.")
+	s.lacks(r, "are invalid")
+	b := s.run("b", "tr-b", false)
+	s.passes(b)
+	s.contains(b, "script/errs/transform/looped: looped declines the base: the base's do/ tree already errs")
+	s.passes(s.update("transforms"))
+	s.same(errs, before)
+	s.passes(s.normal("transforms"))
 	s.done()
 }
 
@@ -495,11 +513,43 @@ func TestTransformJennyChanges(t *testing.T) {
 	s.done()
 }
 
+// TestTransformJennyFrozen: a frozen cell is the exception to one pass of
+// the module's update settling a jenny's change. No update writes it, so
+// when the change moves its output, every run fails on it, updates
+// included, until a person deletes its files, and the next update writes
+// them.
+func TestTransformJennyFrozen(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.passes(s.update("transforms"))
+	s.edit(twice, "mark upper's cell of echo", insert("gaps", "transform/upper echo Waits on sheets#9.\n", "out/"))
+	s.passes(s.normal("transforms"))
+
+	// upper's jenny now doubles what it uppercases. The update rewrites
+	// the inputs, and leaves the frozen cell.
+	frozen := "script/twice/transform/upper: Uppercases every file under do/out/.\n    echo: Does what the case's do/ tree says.\n    The cell is frozen by its known gap, gaps line 1: \"transform/upper echo Waits on sheets#9.\""
+	s.fails(s.update("tr-jenny"), frozen)
+	s.hasSections(twice, map[string]string{
+		"transform/upper/in/do/out/values.txt": "A1 SIX\nA1 SIX\n",
+		"transform/upper/out/echo/values.txt":  "A1 SIX\n",
+	})
+	s.fails(s.update("tr-jenny"), frozen)
+	s.fails(s.normal("tr-jenny"), frozen)
+
+	// A person deletes the cell's files, and the next update writes them.
+	s.edit(twice, "delete upper's frozen cell of echo", drop("transform/upper/out/echo/"))
+	s.passes(s.update("tr-jenny"))
+	s.hasSections(twice, map[string]string{"transform/upper/out/echo/values.txt": "A1 SIX\nA1 SIX\n"})
+	s.passes(s.normal("tr-jenny"))
+	s.done()
+}
+
 // TestTransformStaleInputs: another package's normal run on a variant
 // whose committed inputs differ from what its transform makes notes it
 // once for the variant, however a cell fails: here a run that fails its
 // test through its testing.TB, a probe that says no with no reason, and a
-// frozen cell, which the note says no update rewrites.
+// frozen cell, which the note says no update rewrites, and names if it
+// failed.
 func TestTransformStaleInputs(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "transforms")
@@ -524,7 +574,43 @@ func TestTransformStaleInputs(t *testing.T) {
 		set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n")(a)
 	})
 	s.fails(s.run("b", "tr-b", false), "The cell is frozen by its known gap, gaps line 1: \"transform/upper copy Waits on sheets#9.\"",
-		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n- A1 SEVEN\n+ A1 SIX\nA normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, here copy's: no update writes a cell its known gap freezes, and a normal run checks what it produces on the rewritten inputs against its committed files.")
+		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n- A1 SEVEN\n+ A1 SIX\nA normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, which no update writes. A normal run checks each frozen cell that failed, here copy's, again on the rewritten inputs, against its committed files.")
+
+	// The note names only the frozen cells that failed: not one that
+	// passes, nor one its probe skips.
+	s.write(twice, settled, "restore the settled archive")
+	s.passes(s.run("b", "tr-b-keep", true))
+	s.edit(twice, "mark upper's cells of copy and keep, and add a probe instruction to upper's input by hand", func(a *archive.Archive) {
+		insert("gaps", "transform/upper copy Waits on sheets#9.\ntransform/upper keep Waits on sheets#10.\n", "out/")(a)
+		insert("transform/upper/in/do/probe", "not for copy\n", "transform/upper/out/")(a)
+	})
+	r := s.run("b", "tr-b-keep", false)
+	s.fails(r, "gaps, line 1, marks the cell, and copy's probe says the case isn't for it: not for copy",
+		"A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, which no update writes.\n")
+	s.lacks(r, "A normal run checks each frozen cell that failed", "keep's", "--- FAIL: TestCorpus/script/twice/transform/upper/keep")
+	s.done()
+}
+
+// TestTransformUnowned: when no package owns a transform, no update
+// rewrites its variants' inputs, and a message that would name the update
+// in the package that owns it says so instead.
+func TestTransformUnowned(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "a package b over the corpus")
+	s.passes(s.update("transforms"))
+	s.passes(s.run("b", "tr-b", true))
+	// The root package gives up its transforms, and its update records it.
+	s.passes(s.update("tr-unowned"))
+	settled := s.read(twice)
+
+	s.edit(twice, "edit upper's input by hand", set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n"))
+	s.fails(s.run("b", "tr-b", false), "transform/upper/out/copy/values.txt differs (-golden +got):",
+		"A normal run reads the inputs, and an update what upper makes. upper is owned by no package, so no update rewrites them. Give it to hypercase.Own in one package that registers its corpus type, and the module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them there, and the variant's cells.")
+
+	s.write(twice, settled, "restore the archive")
+	s.edit(twice, "give upper an empty delete by hand", insert("transform/upper/delete", "", "transform/upper/out/"))
+	s.fails(s.run("b", "tr-b", false), "script/twice/transform/upper: Uppercases every file under do/out/.\n    The archive's inputs for upper's variant are invalid, and no cell runs on them:\n      transform/upper/delete: the section is empty; a variant that removes nothing has no delete section\n    upper is owned by no package, so no update rewrites them. Give it to hypercase.Own in one package that registers its corpus type, and the module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them there.")
 	s.done()
 }
 
@@ -538,7 +624,7 @@ func TestTransformOwners(t *testing.T) {
 	s.passes(s.run("b", "tr-b", true))
 	r := s.normal("tr-unowned")
 	s.fails(r,
-		"the transform looped, of testdata/script/, is owned by no package, so nothing writes or judges its variants' inputs.\nGive it to hypercase.Own in one package that registers its corpus type.",
+		"the transform looped, of testdata/script/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.\nGive it to hypercase.Own in one package that registers its corpus type.",
 		"the transform upper, of testdata/script/, is owned by no package")
 	s.passes(s.update("transforms"))
 	s.passes(s.run("b", "tr-b-owns", true))

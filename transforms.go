@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -168,9 +169,11 @@ func (v *plannedVariant) runs() bool {
 }
 
 // planVariants plans an archive's variants: its hand-written ones, in the
-// order written, then one per transform of its corpus type, by name. view
-// is the base's input view, which each transform reads.
-func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base, view fs.FS) []*plannedVariant {
+// order written, then one per transform of its corpus type, by name. Each
+// transform runs here, on the base's input view, since whether its variant
+// has cells sets the count of each suite's cells, which doesn't depend on
+// -run. The view is made once, if a transform runs, and dropped after.
+func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base) []*plannedVariant {
 	var vs []*plannedVariant
 	committed := map[string]archive.VariantCase{}
 	for _, v := range a.Variants() {
@@ -191,6 +194,7 @@ func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base, vi
 	trs := slices.Clone(p.root.transforms)
 	slices.SortFunc(trs, func(a, b *transform) int { return strings.Compare(a.name, b.name) })
 	stated, gaps := a.Properties(), a.Gaps()
+	var view fs.FS
 	for _, tr := range trs {
 		v := &plannedVariant{
 			kind:      archive.Transform,
@@ -210,6 +214,9 @@ func (r *runner) planVariants(p *plan, a *archive.Archive, base archive.Base, vi
 		if len(neither) > 0 {
 			v.declined = fmt.Sprintf("the base states %s, which %s neither gives nor keeps", andList(neither), tr.name)
 		} else {
+			if view == nil {
+				view = base.View()
+			}
 			r.makeVariant(v, base, view)
 		}
 		vs = append(vs, v)
@@ -336,7 +343,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if len(invalid) > 0 {
 			// An update reads what the transform makes instead, and its
 			// owner's rewrites them.
-			t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\nThe module's update, %s, rewrites them, in the package that owns %s.", c.header(), v.name, problemList(invalid), r.updateCmd(), v.name)
+			t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\n%s.", c.header(), v.name, problemList(invalid), r.rewritesInputs(p, v))
 			return
 		}
 		if owner {
@@ -345,7 +352,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		stale = !owner
 		c.setView(p, view)
 	}
-	r.runCells(t, c, p.cols, w)
+	results := r.runCells(t, c, p.cols, w)
 	if !stale || !t.Failed() {
 		return
 	}
@@ -354,18 +361,65 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	if m.empty() {
 		return
 	}
-	// An update writes no frozen cell, so it rewrites none of those.
+	// An update writes no frozen cell, so it rewrites none of those, and
+	// one whose files differ from its run's is checked on the new inputs.
 	cells := "the variant's cells."
-	var frozen []string
-	for _, col := range p.cols {
+	var frozen, differs []string
+	for i, col := range p.cols {
 		if _, marked := c.gap(col.name); marked && len(c.goldens(col.name)) > 0 {
-			frozen = append(frozen, col.name+"'s")
+			frozen = append(frozen, col.name)
+		}
+		if results[i].frozenDiffers {
+			differs = append(differs, col.name+"'s")
 		}
 	}
 	if len(frozen) > 0 {
-		cells = fmt.Sprintf("the variant's cells but the frozen ones, here %s: no update writes a cell its known gap freezes, and a normal run checks what it produces on the rewritten inputs against its committed files.", andList(frozen))
+		cells = "the variant's cells but the frozen ones, which no update writes."
 	}
-	t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and %s", c.header(), v.name, v.name, m, v.name, r.updateCmd(), v.name, cells)
+	if len(differs) > 0 {
+		cells += fmt.Sprintf(" A normal run checks each frozen cell that failed, here %s, again on the rewritten inputs, against its committed files.", andList(differs))
+	}
+	t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. %s, and %s", c.header(), v.name, v.name, m, v.name, r.rewritesInputs(p, v), cells)
+}
+
+// ownedByAny reports whether some package's registry over the corpus root
+// records that it owns the transform name, of the corpus directory dir.
+// The registries are read when a message first needs to know.
+func (r *runner) ownedByAny(dir, name string) bool {
+	if r.trOwners == nil {
+		r.trOwners = map[string]bool{}
+		for _, f := range r.found {
+			data, err := os.ReadFile(f.Path)
+			if err != nil {
+				continue
+			}
+			if h, err := registry.Peek(data); err != nil || h.CorpusRoot != r.rootRel {
+				continue
+			}
+			g, err := registry.Parse(data)
+			if err != nil {
+				continue
+			}
+			for _, ct := range g.Types {
+				for _, tr := range ct.Transforms {
+					if tr.Owned {
+						r.trOwners[ct.Dir+"/"+tr.Name] = true
+					}
+				}
+			}
+		}
+	}
+	return r.trOwners[dir+"/"+name]
+}
+
+// rewritesInputs says which update rewrites the committed inputs of a
+// transform's variant: the module's, in the package that owns the
+// transform, if a package does.
+func (r *runner) rewritesInputs(p *plan, v *plannedVariant) string {
+	if r.owned[v.tr] || r.ownedByAny(p.root.dir, v.name) {
+		return fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s", r.updateCmd(), v.name)
+	}
+	return fmt.Sprintf("%s is owned by no package, so no update rewrites them. Give it to hypercase.Own in one package that registers its corpus type, and the module's update, %s, rewrites them there", v.name, r.updateCmd())
 }
 
 // inputDiffs says how the committed inputs of a transform's variant differ

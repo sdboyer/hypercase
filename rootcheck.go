@@ -161,7 +161,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		for _, name := range slices.Sorted(maps.Keys(transforms[dir])) {
 			switch pkgs := transforms[dir][name]; {
 			case len(pkgs) == 0:
-				t.Errorf("the transform %s, of testdata/%s/, is owned by no package, so nothing writes or judges its variants' inputs.\nGive it to hypercase.Own in one package that registers its corpus type.", name, dir)
+				t.Errorf("the transform %s, of testdata/%s/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.\nGive it to hypercase.Own in one package that registers its corpus type.", name, dir)
 			case len(pkgs) > 1:
 				t.Errorf("the transform %s, of testdata/%s/, is owned by %s. One package owns each transform.\nOwn it in one of them.", name, dir, andList(pkgs))
 			}

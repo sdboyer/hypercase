@@ -1700,24 +1700,32 @@ whether each has a probe, and whether the package owns it.
 - Every package's update runs the variant's cells on what the transform
   makes, and every normal run on the committed sections. What an update
   writes depends only on the inputs and the code, so one pass of the
-  module's update settles, whichever package runs first.
-- A package's update alone, after a transform changed, leaves its normal
-  run failing on the variant's cells, which read the sections the owner has
-  yet to rewrite. The failure shows how they differ from what the transform
-  makes, and names the module's update.
+  module's update settles, whichever package runs first. A frozen cell is
+  the exception: no update writes it, so when a transform's change moves
+  its output, every run fails on it, updates included, until a person
+  deletes its files, and the next update writes them, or removes its
+  `gaps` line.
+- A package's update alone, after a transform changed, writes the
+  variant's cells on what the transform makes, while its normal run reads
+  the sections the owner has yet to rewrite. A cell whose output on those
+  sections differs from what the update wrote fails, and the failure shows
+  how the sections differ from what the transform makes, and names the
+  module's update.
 - An update replaces a transform's `in/…` and `delete` whole: a file the
   transform no longer produces is removed, and the removal shows in the diff.
-- When a transform no longer applies to a base, its owner's update removes
-  its `in/…` and `delete`, and what remains under `transform/<name>/out/` is
+- When a transform no longer applies to a base, no cell runs on its
+  variant. Its owner's normal run fails on any `in/…` and `delete` the
+  archive still holds for it, whether or not they make an input view, and
+  its update removes them. What remains under `transform/<name>/out/` is
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
   root-package check reports them and names the strip command.
 - The package that owns a transform writes its `in/…` and `delete`, and
-  judges them against what the transform makes. Every package's normal run
-  fails a variant whose committed `in/…` and `delete` make no input view,
-  such as an empty `delete` or one that lists a path twice, and runs none
-  of its cells. Each column's owner writes and judges that column's cells
-  on the variant.
+  judges them against what the transform makes. When the transform makes
+  the variant, every package's normal run fails it if its committed `in/…`
+  and `delete` make no input view, such as an empty `delete` or one that
+  lists a path twice, and runs none of its cells. Each column's owner
+  writes and judges that column's cells on the variant.
 
 **Known gaps in a transform's variant.** A known gap in a cell of a
 transform's variant is a line in the base's `gaps` section that names the

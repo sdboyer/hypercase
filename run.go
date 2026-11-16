@@ -46,6 +46,7 @@ func Test(t *testing.T) {
 	if err != nil {
 		t.Errorf("finding the module's registries: %v", err)
 	}
+	r.found = found
 	if !r.update {
 		r.requireRootCheck(t, found)
 	}
@@ -82,6 +83,10 @@ type runner struct {
 	stats       map[string]*colStats
 	owned       map[*transform]bool // the types' transforms the package owns
 	checks      []Check             // sorted by name
+	found       []registry.Found    // the module's registries
+	// trOwners holds <dir>/<name> for each transform some registry over
+	// the corpus root records as owned. It is read when first needed.
+	trOwners map[string]bool
 }
 
 // colStats counts a suite's cells, for the check that it applies to some
@@ -294,7 +299,6 @@ type plannedCase struct {
 	data     []byte
 	a        *archive.Archive
 	base     archive.Base // read once, for the base's cells and the variants'
-	view     fs.FS        // the base's input view, made once, for its cells and the transforms
 	variants []*plannedVariant
 }
 
@@ -368,8 +372,7 @@ func (r *runner) planCorpus(t *testing.T, p *plan) []plannedCase {
 			continue
 		}
 		base := a.Base()
-		view := base.View()
-		cases = append(cases, plannedCase{name: name, path: path, data: data, a: a, base: base, view: view, variants: r.planVariants(p, a, base, view)})
+		cases = append(cases, plannedCase{name: name, path: path, data: data, a: a, base: base, variants: r.planVariants(p, a, base)})
 	}
 	return cases
 }
@@ -485,7 +488,9 @@ func (r *runner) runCase(t *testing.T, p *plan, pc plannedCase) {
 		}
 	}
 	base := r.newCase(p, pc, "", pc.a.Comment, archive.Gaps, pc.a.Properties(), gaps)
-	base.setView(p, pc.view)
+	// The view copies the base's files, so it is made here, where the
+	// base's cells read it, and held no longer than they run.
+	base.setView(p, pc.base.View())
 	w := &caseWrites{set: map[string][]byte{}}
 	r.runCells(t, base, p.cols, w)
 	for _, v := range pc.variants {
@@ -497,8 +502,9 @@ func (r *runner) runCase(t *testing.T, p *plan, pc plannedCase) {
 }
 
 // runCells runs a case's cells, one subtest each, named for its column, and
-// adds what an update writes for them to w.
-func (r *runner) runCells(t *testing.T, c *aCase, cols []*column, w *caseWrites) {
+// adds what an update writes for them to w. It returns each cell's result,
+// in the order of cols.
+func (r *runner) runCells(t *testing.T, c *aCase, cols []*column, w *caseWrites) []*cellResult {
 	results := make([]*cellResult, len(cols))
 	for i := range cols {
 		results[i] = &cellResult{}
@@ -521,6 +527,7 @@ func (r *runner) runCells(t *testing.T, c *aCase, cols []*column, w *caseWrites)
 			}
 		}
 	}
+	return results
 }
 
 // caseWrites is what an update writes to one archive: the sections it
@@ -607,6 +614,9 @@ type cellResult struct {
 	ran      bool
 	writable bool              // whether an update writes the cell's files
 	files    map[string][]byte // the cell's outputs, by path under out/<column>/
+	// frozenDiffers records a frozen cell whose run produced files other
+	// than its committed ones.
+	frozenDiffers bool
 }
 
 // The names the framework owns directly under a column's directory.
@@ -759,6 +769,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		_, made := files[outcomeFile]
 		switch {
 		case len(diffs) > 0:
+			res.frozenDiffers = true
 			m.add("The cell is frozen by its known gap, %s line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s\nIf the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.", c.gapsAt, gap.Line, gap.Raw, strings.Join(diffs, "\n"))
 		case hasOutcome || !made:
 		case r.update:
