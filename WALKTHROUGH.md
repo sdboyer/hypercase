@@ -1096,9 +1096,8 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
   consumes, the corpora it runs over, its declared outputs and the
   properties it rejects. It records the package's corpus root, and whether
   the package runs the root-package check.
-- It records the name of the project's update variable, so
-  `hypercase report`, and `hypercase strip` once it is built, can print the
-  update command.
+- It records the name of the project's update variable, for a tool to print
+  the update command. No tool reads it yet.
 - It carries a format version, which changes on any change to what the
   registry holds.
 - It is compared like a golden. An update writes it by temp file and rename.
@@ -1883,9 +1882,12 @@ whether each has a probe, and whether the package owns it.
   which is a fact about the sheet: it has no cells; for `looped`, its first
   cell already refers to itself; for `renamed`, a cell or a reference is on
   the last row, with no row below. A sheet a probe can't read, or one
-  holding a file that isn't a cell, is malformed, and no reason to decline:
-  the probe leaves it to the jenny, which fails on it, and so the transform
-  fails.
+  holding a file that isn't a cell, is malformed, and no reason to decline.
+  By design, the probe leaves it to the jenny, which fails on it, and so the
+  transform fails. No case in the sheets corpus reaches that: `parse`
+  rejects such a sheet, so its base states `malformed`, and both transforms
+  decline a base that states a property they neither give nor keep, before
+  their probes run.
 - It is materialized. An update writes `transform/<name>/in/…` and
   `transform/<name>/delete`, and the owner's normal run checks them like
   goldens.
@@ -2134,10 +2136,10 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 
 ### How the files change
 
-From this step, every cell has an `outcome` file, skipped and blocked cells
-included. The archives shown in steps 3 to 7 have them too: they come from
-their examples, which today's updates write. Their projects supply no
-`Codes`, so their rejected cells carry none.
+Every cell has an `outcome` file, skipped and blocked cells included. The
+archives shown in steps 3 to 7 have them too: they come from their examples,
+which today's updates write. Their projects supply no `Codes`, so their
+rejected cells carry none.
 
 `testdata/sheet/divide.txtar`, whose `A1` is `=B1/C1` with `C1` at `0`. The
 classifier makes `evaluate`'s outcome `accepted div-zero`, on the base and
