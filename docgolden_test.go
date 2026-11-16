@@ -21,8 +21,10 @@ import (
 //
 // The file is under walkthrough/. The second form names a region of a Go
 // file: the lines between the delimiter lines "// doc:begin loop" and
-// "// doc:end loop". A block never shows a delimiter line, its own or another
-// region's. Any other file is shown whole, with nothing taken out. The
+// "// doc:end loop", less the blank lines at the region's start and end, so
+// that a delimiter can stand apart from the code beside it, as gofmt sets a
+// comment after a declaration. A block never shows a delimiter line, its own
+// or another region's. Any other file is shown whole, with nothing taken out. The
 // block's contents are the file's bytes, ending with a newline, each line
 // indented as the block's opening fence is. A Go file shown whole that starts
 // with a comment naming a path under walkthrough/ must name itself. The doc
@@ -318,11 +320,23 @@ func docSource(src fs.FS, source, region, indent, fence string) ([]byte, error) 
 		}
 		from, to = s.begin+1, s.end
 	}
-	var out []byte
+	var shown []int
 	for j := from; j < to; j++ {
-		if delim[j] {
-			continue
+		if !delim[j] {
+			shown = append(shown, j)
 		}
+	}
+	if region != "" {
+		blank := func(j int) bool { return strings.Trim(lines[j].trimmed(), " \t") == "" }
+		for len(shown) > 0 && blank(shown[0]) {
+			shown = shown[1:]
+		}
+		for len(shown) > 0 && blank(shown[len(shown)-1]) {
+			shown = shown[:len(shown)-1]
+		}
+	}
+	var out []byte
+	for _, j := range shown {
 		// Indentation is all spaces, so a line closes the indented block
 		// exactly when it would close the block unindented.
 		if docCloses(lines[j].trimmed(), "", fence) {

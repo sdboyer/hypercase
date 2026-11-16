@@ -1,0 +1,18 @@
+A1 and B1 refer to each other.
+-- in/sheet/A1 --
+=B1
+-- in/sheet/B1 --
+=A1
+-- properties --
+circular
+-- out/calc/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1
+  sheet/B1:1: =A1
+-- out/format/formulas.txt --
+A1 =B1
+B1 =A1
+-- out/resolve/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1
+  sheet/B1:1: =A1

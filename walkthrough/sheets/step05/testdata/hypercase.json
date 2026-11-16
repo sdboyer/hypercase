@@ -1,0 +1,48 @@
+{
+  "format": 3,
+  "updateVar": "SHEETS_UPDATE_GOLDEN",
+  "corpusRoot": "step05",
+  "rootPackage": true,
+  "issueLinks": [],
+  "properties": [
+    {
+      "name": "circular",
+      "description": "Some cell's formula refers back to itself, directly or through other cells."
+    },
+    {
+      "name": "dangling",
+      "description": "Some formula refers to a cell the sheet doesn't have."
+    },
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    }
+  ],
+  "types": [],
+  "lifts": [],
+  "suites": [
+    {
+      "name": "evaluate",
+      "description": "Evaluates every cell of the sheet.",
+      "consumes": "io/fs.FS",
+      "corpora": [
+        "sheet"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why the sheet can't be evaluated."
+        },
+        {
+          "pattern": "values.txt",
+          "description": "Each cell's value, one per line, in cell order."
+        }
+      ],
+      "rejects": [
+        "circular",
+        "dangling",
+        "malformed"
+      ]
+    }
+  ]
+}
