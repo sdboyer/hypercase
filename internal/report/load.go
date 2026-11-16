@@ -248,6 +248,7 @@ func (s *snapshot) addArchive(corpus, name string, data []byte) error {
 	a := archive.Parse(data)
 	baseKey := caseKey{corpus: corpus, archive: name, kind: base}
 	s.cases[baseKey] = &caseAt{description: strings.TrimSpace(string(a.Comment))}
+	var transforms []caseKey // the archive's transforms' variants
 	seen := map[string]bool{}
 	for _, sec := range a.Sections {
 		if seen[sec.Name] {
@@ -266,6 +267,9 @@ func (s *snapshot) addArchive(corpus, name string, data []byte) error {
 			}
 			if s.cases[k] == nil {
 				s.cases[k] = &caseAt{}
+				if k.kind == transform {
+					transforms = append(transforms, k)
+				}
 			}
 		}
 		top, file, _ := strings.Cut(rest, "/")
@@ -298,16 +302,15 @@ func (s *snapshot) addArchive(corpus, name string, data []byte) error {
 					ck.c = caseKey{corpus: corpus, archive: name, kind: transform, name: g.Transform}
 					if s.cases[ck.c] == nil {
 						s.cases[ck.c] = &caseAt{}
+						transforms = append(transforms, ck.c)
 					}
 				}
 				s.gaps[ck] = g.Text
 			}
 		}
 	}
-	for k, c := range s.cases {
-		if k.kind == transform && k.corpus == corpus && k.archive == name {
-			c.properties = s.transformProperties(corpus, k.name, s.cases[baseKey].properties)
-		}
+	for _, k := range transforms {
+		s.cases[k].properties = s.transformProperties(corpus, k.name, s.cases[baseKey].properties)
 	}
 	return nil
 }
