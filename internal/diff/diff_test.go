@@ -1,6 +1,8 @@
 package diff
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -40,7 +42,8 @@ func TestLinesMinimal(t *testing.T) {
 	for _, a := range inputs {
 		for _, b := range inputs {
 			x, y := chars(a), chars(b)
-			ops := edits(x, y)
+			var pairs int
+			ops := edits(x, y, &pairs)
 			changes := 0
 			var gotA, gotB []string
 			for _, o := range ops {
@@ -101,5 +104,93 @@ func TestLinesTruncated(t *testing.T) {
 	lines := strings.Split(strings.TrimSuffix(got, "\n"), "\n")
 	if len(lines) != maxLines+1 || lines[len(lines)-1] != "  ... (1800 more lines of diff)" {
 		t.Errorf("got %d lines, ending %q", len(lines), lines[len(lines)-1])
+	}
+}
+
+// TestDiff: Diff gives the lines Lines shows, uncapped, with each skip
+// between hunks and each missing final newline marked.
+func TestDiff(t *testing.T) {
+	got, _ := Diff([]byte("1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n"), []byte("0\n2\n3\n4\n5\n6\n7\n8\n9\n10"))
+	want := []Line{
+		{Kind: '-', Text: "1"}, {Kind: '+', Text: "0"}, {Kind: ' ', Text: "2"}, {Kind: ' ', Text: "3"}, {Kind: ' ', Text: "4"},
+		{Kind: Skip},
+		{Kind: ' ', Text: "7"}, {Kind: ' ', Text: "8"}, {Kind: ' ', Text: "9"}, {Kind: '-', Text: "10"}, {Kind: '+', Text: "10", NoNewline: true},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+	var a, b strings.Builder
+	for range 1000 {
+		a.WriteString("a\n")
+		b.WriteString("b\n")
+	}
+	if got, _ := Diff([]byte(a.String()), []byte(b.String())); len(got) != 2000 {
+		t.Errorf("a diff of 2,000 changed lines has %d lines, want every one", len(got))
+	}
+	if got, pairs := Diff([]byte("a\n"), []byte("a\n")); got != nil || pairs != 0 {
+		t.Errorf("equal files: got %v, %d pairs", got, pairs)
+	}
+}
+
+// TestDiffPairs: a diff of two 100,000-line files compares a number of
+// line pairs that grows with their length and the size of the change, far
+// under the 10^10 of a table of every pair: with one line changed in the
+// middle, and with the first and last lines changed, which leave no common
+// prefix or suffix to trim.
+func TestDiffPairs(t *testing.T) {
+	const n = 100_000
+	lines := func(change ...int) []byte {
+		var b strings.Builder
+		for i := range n {
+			if slices.Contains(change, i) {
+				fmt.Fprintf(&b, "line %d, changed\n", i)
+				continue
+			}
+			fmt.Fprintf(&b, "line %d\n", i)
+		}
+		return []byte(b.String())
+	}
+	for _, change := range [][]int{{n / 2}, {0, n - 1}} {
+		got, pairs := Diff(lines(), lines(change...))
+		if pairs >= 1_000_000 {
+			t.Errorf("changing lines %v compared %d pairs of lines, want fewer than 1,000,000", change, pairs)
+		}
+		var changed, want []string
+		for _, l := range got {
+			if l.Kind == '-' || l.Kind == '+' {
+				changed = append(changed, string(l.Kind)+" "+l.Text)
+			}
+		}
+		for _, i := range change {
+			want = append(want, fmt.Sprintf("- line %d", i), fmt.Sprintf("+ line %d, changed", i))
+		}
+		if !slices.Equal(changed, want) {
+			t.Errorf("changing lines %v: the diff's changed lines are %q, want %q", change, changed, want)
+		}
+	}
+}
+
+// TestDiffBudget: a change past the edit graph's budget shows as the
+// changed region removed whole, then added whole, where a minimal diff
+// would interleave them.
+func TestDiffBudget(t *testing.T) {
+	const n = 3000
+	var a, b strings.Builder
+	for i := range n {
+		fmt.Fprintf(&a, "line %d\n", i)
+		if i%2 == 1 {
+			fmt.Fprintf(&b, "line %d, changed\n", i)
+			continue
+		}
+		fmt.Fprintf(&b, "line %d\n", i)
+	}
+	got, _ := Diff([]byte(a.String()), []byte(b.String()))
+	var kinds strings.Builder
+	for _, l := range got {
+		kinds.WriteByte(l.Kind)
+	}
+	want := " " + strings.Repeat("-", n-1) + strings.Repeat("+", n-1)
+	if kinds.String() != want {
+		t.Errorf("the diff's kinds begin %.40q, want one line of context, %d removed, then %d added", kinds.String(), n-1, n-1)
 	}
 }

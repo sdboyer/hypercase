@@ -26,13 +26,66 @@ const (
 // with no final newline is followed by `\ no final newline`. Lines returns
 // "" when a and b are equal.
 func Lines(a, b []byte) string {
+	lines, _ := Diff(a, b)
+	var sb strings.Builder
+	printed := 0
+	for i, l := range lines {
+		if printed >= maxLines {
+			rest := 0
+			for _, l := range lines[i:] {
+				if l.Kind != Skip {
+					rest++
+				}
+			}
+			fmt.Fprintf(&sb, "  ... (%d more lines of diff)\n", rest)
+			break
+		}
+		if l.Kind == Skip {
+			sb.WriteString("  ...\n")
+			continue
+		}
+		sb.WriteByte(l.Kind)
+		sb.WriteByte(' ')
+		sb.WriteString(l.Text)
+		sb.WriteByte('\n')
+		if l.NoNewline {
+			sb.WriteByte(l.Kind)
+			sb.WriteString(" \\ no final newline\n")
+		}
+		printed++
+	}
+	return sb.String()
+}
+
+// Skip is the Kind of the [Line] that stands for the lines left out
+// between two hunks.
+const Skip = '.'
+
+// A Line is one line of a diff, as [Lines] shows it.
+type Line struct {
+	// Kind is ' ' for a line in both, '-' for one only in a, '+' for one
+	// only in b, or Skip.
+	Kind byte
+	// Text is the line without its newline, quoted when it holds a
+	// carriage return or another control character: "" for a Skip.
+	Text string
+	// NoNewline records that the line is its file's last, and has no
+	// final newline.
+	NoNewline bool
+}
+
+// Diff returns every line [Lines] shows from a to b, with no cap on how
+// many, and how many pairs of lines it compared to find them. That count
+// grows with the files' lengths and the size of the change, never with the
+// product of the lengths. Diff returns no lines when a and b are equal.
+func Diff(a, b []byte) (lines []Line, pairs int) {
 	if bytes.Equal(a, b) {
-		return ""
+		return nil, 0
 	}
 	x, y := split(a), split(b)
-	ops := edits(x, y)
+	ops := edits(x, y, &pairs)
 
-	// Mark which ops to print: every change, and context around it.
+	// Mark which ops to show: every change, and context around it.
 	show := make([]bool, len(ops))
 	for i, op := range ops {
 		if op.kind != ' ' {
@@ -41,38 +94,19 @@ func Lines(a, b []byte) string {
 			}
 		}
 	}
-	var sb strings.Builder
-	printed, skipped := 0, false
+	skipped := false
 	for i, op := range ops {
 		if !show[i] {
 			skipped = true
 			continue
 		}
-		if printed >= maxLines {
-			rest := 0
-			for j := i; j < len(ops); j++ {
-				if show[j] {
-					rest++
-				}
-			}
-			fmt.Fprintf(&sb, "  ... (%d more lines of diff)\n", rest)
-			break
-		}
-		if skipped && printed > 0 {
-			sb.WriteString("  ...\n")
+		if skipped && len(lines) > 0 {
+			lines = append(lines, Line{Kind: Skip})
 		}
 		skipped = false
-		sb.WriteByte(op.kind)
-		sb.WriteByte(' ')
-		sb.WriteString(display(op.line))
-		sb.WriteByte('\n')
-		if !strings.HasSuffix(op.line, "\n") {
-			sb.WriteByte(op.kind)
-			sb.WriteString(" \\ no final newline\n")
-		}
-		printed++
+		lines = append(lines, Line{Kind: op.kind, Text: display(op.line), NoNewline: !strings.HasSuffix(op.line, "\n")})
 	}
-	return sb.String()
+	return lines, pairs
 }
 
 func split(b []byte) []string {
@@ -104,31 +138,39 @@ type op struct {
 	line string
 }
 
-// edits returns an edit script from x to y.
-func edits(x, y []string) []op {
+// edits returns an edit script from x to y, and adds each pair of lines it
+// compares to *pairs.
+func edits(x, y []string, pairs *int) []op {
 	// Trim the common prefix and suffix, which most diffs are.
 	pre := 0
-	for pre < len(x) && pre < len(y) && x[pre] == y[pre] {
+	for pre < len(x) && pre < len(y) && same(x[pre], y[pre], pairs) {
 		pre++
 	}
 	suf := 0
-	for suf < len(x)-pre && suf < len(y)-pre && x[len(x)-1-suf] == y[len(y)-1-suf] {
+	for suf < len(x)-pre && suf < len(y)-pre && same(x[len(x)-1-suf], y[len(y)-1-suf], pairs) {
 		suf++
 	}
 	var ops []op
 	for _, l := range x[:pre] {
 		ops = append(ops, op{' ', l})
 	}
-	ops = append(ops, myers(x[pre:len(x)-suf], y[pre:len(y)-suf])...)
+	ops = append(ops, myers(x[pre:len(x)-suf], y[pre:len(y)-suf], pairs)...)
 	for _, l := range x[len(x)-suf:] {
 		ops = append(ops, op{' ', l})
 	}
 	return ops
 }
 
+// same compares two lines, and counts the pair in *pairs.
+func same(a, b string, pairs *int) bool {
+	*pairs++
+	return a == b
+}
+
 // myers returns a shortest edit script from x to y, by Myers' O(ND)
-// algorithm, preferring deletions before insertions.
-func myers(x, y []string) []op {
+// algorithm, preferring deletions before insertions. It adds each pair of
+// lines it compares to *pairs.
+func myers(x, y []string, pairs *int) []op {
 	n, m := len(x), len(y)
 	whole := func() []op {
 		var ops []op
@@ -160,7 +202,7 @@ func myers(x, y []string) []op {
 				i = v[off+k-1] + 1 // right: a deletion
 			}
 			j := i - k
-			for i < n && j < m && x[i] == y[j] {
+			for i < n && j < m && same(x[i], y[j], pairs) {
 				i, j = i+1, j+1
 			}
 			v[off+k] = i
