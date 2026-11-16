@@ -101,7 +101,9 @@ func TestOutcomeFailures(t *testing.T) {
 		s.edit(p, "mark the cell", insert("gaps", "echo The cell has an outcome. Waits on sheets#10.\n", "out/"))
 	}
 	for _, update := range []bool{false, true} {
-		s.fails(s.run(".", "outcomes", update), want...)
+		r := s.run(".", "outcomes", update)
+		s.fails(r, want...)
+		s.lacks(r, "has no golden", "The cell is frozen", "If the change is intended")
 	}
 	for _, name := range failing {
 		p := "testdata/script/" + name + ".txtar"
