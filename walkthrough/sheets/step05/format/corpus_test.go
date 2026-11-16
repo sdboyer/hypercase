@@ -12,11 +12,11 @@ import (
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step05/sheetcorpus"
 )
 
+// doc:begin format
 func init() {
 	hypercase.Register(sheetcorpus.Project, hypercase.Root("step05"), sheetcorpus.Malformed, format)
 }
 
-// doc:begin format
 var format = hypercase.Suite[fs.FS]{
 	Name:        "format",
 	Description: "Prints each formula back in canonical form.",

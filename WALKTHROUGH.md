@@ -807,12 +807,15 @@ var evaluate = hypercase.Suite[fs.FS]{
 func TestCorpus(t *testing.T) { hypercase.Test(t) }
 ```
 
-`walkthrough/sheets/step05/format/corpus_test.go` registers
-`sheetcorpus.Project`, `hypercase.Root("step05")`, `sheetcorpus.Malformed`
-and `format`, whose probe skips a sheet with no formulas:
+`walkthrough/sheets/step05/format/corpus_test.go` owns `format`, whose probe
+skips a sheet with no formulas:
 
 <!-- source: walkthrough/sheets/step05/format/corpus_test.go#format -->
 ```go
+func init() {
+	hypercase.Register(sheetcorpus.Project, hypercase.Root("step05"), sheetcorpus.Malformed, format)
+}
+
 var format = hypercase.Suite[fs.FS]{
 	Name:        "format",
 	Description: "Prints each formula back in canonical form.",
@@ -838,12 +841,20 @@ var format = hypercase.Suite[fs.FS]{
 }
 ```
 
-`walkthrough/sheets/step05/cli/corpus_test.go` registers
-`sheetcorpus.Project`, `hypercase.Root("step05")`, the three properties and
-`calc`, which hands the command its stdout and stderr:
+`walkthrough/sheets/step05/cli/corpus_test.go` owns `calc`, which hands the
+command its stdout and stderr:
 
 <!-- source: walkthrough/sheets/step05/cli/corpus_test.go#calc -->
 ```go
+func init() {
+	hypercase.Register(
+		sheetcorpus.Project,
+		hypercase.Root("step05"),
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		calc,
+	)
+}
+
 var calc = hypercase.Suite[fs.FS]{
 	Name:        "calc",
 	Description: "Runs the calc command on the sheet.",
