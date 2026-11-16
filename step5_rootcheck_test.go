@@ -115,6 +115,11 @@ func TestRootCheckRegistries(t *testing.T) {
 	s.fails(s.normal("pkg-a"), untested)
 	s.remove("b/_corpus_test.go", "remove the file Go ignores")
 	s.remove("b/.corpus_test.go", "remove the file Go ignores")
+	// The check reads no build constraints, so a test file they exclude
+	// still counts.
+	s.write("b/x_test.go", []byte("//go:build ignore\n\npackage fixture\n"), "a test file a build constraint excludes")
+	s.passes(s.normal("pkg-a"))
+	s.remove("b/x_test.go", "remove the excluded file")
 	s.write("b/corpus_test.go", []byte(packageTestFile), "restore b's tests")
 	s.write("b/testdata/hypercase.json", []byte("{\n  \"format\": 9\n}\n"), "a registry from a later hypercase")
 	s.fails(s.normal("pkg-a"), fmt.Sprintf("b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format %d.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.", registry.Format))

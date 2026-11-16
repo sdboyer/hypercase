@@ -21,6 +21,14 @@ FAIL
 [exit 1]
 $ rm b/_corpus_test.go  # remove the file Go ignores
 $ rm b/.corpus_test.go  # remove the file Go ignores
+$ edit b/x_test.go  # a test file a build constraint excludes
+$ go test  # pkg-a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ rm b/x_test.go  # remove the excluded file
 $ edit b/corpus_test.go  # restore b's tests
 $ edit b/testdata/hypercase.json  # a registry from a later hypercase
 $ go test  # pkg-a
