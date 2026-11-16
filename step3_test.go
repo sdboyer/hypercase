@@ -67,13 +67,13 @@ func TestChangedOutput(t *testing.T) {
 func TestErrorFailsItsCase(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "error")
-	s.fails(s.normal("echo"), "echo returned an error:\n", `A1: unexpected "-"`, "out/echo/values.txt differs", "out/echo/error.txt has no golden.")
-	s.fails(s.update("echo"), "echo returned an error:\n")
+	s.fails(s.normal("echo"), "echo returned an error, but the case states no property echo rejects:\n", `A1: unexpected "-"`, "out/echo/values.txt differs", "out/echo/error.txt has no golden.")
+	s.fails(s.update("echo"), "echo returned an error, but the case states no property echo rejects:\n")
 	s.cat("testdata/negative.txtar")
 	if !bytes.Contains(s.read("testdata/negative.txtar"), []byte("-- out/echo/error.txt --\nA1: unexpected \"-\"\n")) {
 		t.Error("the update didn't write error.txt with the error's text and a final newline")
 	}
-	s.fails(s.normal("echo"), "echo returned an error:\n")
+	s.fails(s.normal("echo"), "echo returned an error, but the case states no property echo rejects:\n")
 	s.done()
 }
 
@@ -230,8 +230,6 @@ func TestProblemsOfForm(t *testing.T) {
 	want := []string{
 		"testdata/typo.txtar has problems of form, so none of its cells run, and no update writes it:\n",
 		"ni/do/out/values.txt: ni is not one of the framework's top-level names",
-		"properties: the top-level name properties is reserved for a later step",
-		"gaps: the top-level name gaps is reserved",
 		"variant/cycle/about: the top-level name variant is reserved",
 		"transform/looped/in/sheet/A1: the top-level name transform is reserved",
 		"via/import/sheet/A1: the top-level name via is reserved",

@@ -4,7 +4,10 @@ import (
 	"io"
 	"io/fs"
 	"reflect"
+	"slices"
 	"testing"
+
+	"github.com/sdboyer/hypercase/decl"
 )
 
 // A File is one output of a run: its path under the column's directory,
@@ -22,6 +25,9 @@ type Suite[T any] struct {
 	Name string
 	// Description says what the suite does. It is required.
 	Description string
+	// Rejects lists the properties the suite rejects. A cell is expected to
+	// err exactly when its case states one of them.
+	Rejects []decl.Property
 	// Run runs one case. It receives the cell's testing.TB, the archive's
 	// name, the case's input and one writer each for stdout and stderr, and
 	// returns its output files and the error the code under test returned.
@@ -34,8 +40,23 @@ type Suite[T any] struct {
 type column struct {
 	name        string
 	description string
+	rejects     []decl.Property
 	consumes    reflect.Type
 	run         func(t testing.TB, archive string, in any, stdout, stderr io.Writer) ([]File, error)
+}
+
+// rejectsAny returns the properties of names the column rejects, in the
+// order the names are given.
+func (c *column) rejectsAny(names []string) []string {
+	var hit []string
+	for _, n := range names {
+		for _, p := range c.rejects {
+			if p.Name == n {
+				hit = append(hit, n)
+			}
+		}
+	}
+	return hit
 }
 
 // columnDecl is what Register accepts as a column.
@@ -47,6 +68,7 @@ func (s Suite[T]) column() *column {
 	c := &column{
 		name:        s.Name,
 		description: s.Description,
+		rejects:     slices.Clone(s.Rejects),
 		consumes:    reflect.TypeFor[T](),
 	}
 	if s.Run != nil {

@@ -1,0 +1,112 @@
+$ edit testdata/negative.txtar  # the code's error is worded differently
+$ edit testdata/div-zero.txtar  # the code's wrong output changes
+$ edit testdata/accepted-loop.txtar  # the code writes a new file
+$ go test -run=TestCorpus/(negative|div-zero|accepted-loop)/  # rejects
+    accepted-loop: A1 and B1 refer to each other, and the code wrongly accepts the sheet.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A cycle is an error. Waits on sheets#4."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/more.txt is new
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+    div-zero: A1 divides by zero, and the code prints a number.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A division by zero evaluates to #DIV/0!. Waits on sheets#5."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/values.txt differs (-committed +got):
+        - A1 0
+        + A1 0.0
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+    negative: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A negative number is valid, and evaluates to itself. Waits on sheets#3."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/error.txt differs (-committed +got):
+        - A1: unexpected "-"
+        + A1: bad number
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/accepted-loop
+        --- FAIL: TestCorpus/accepted-loop/echo
+    --- FAIL: TestCorpus/div-zero
+        --- FAIL: TestCorpus/div-zero/echo
+    --- FAIL: TestCorpus/negative
+        --- FAIL: TestCorpus/negative/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/(negative|div-zero|accepted-loop)/  # rejects
+    accepted-loop: A1 and B1 refer to each other, and the code wrongly accepts the sheet.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A cycle is an error. Waits on sheets#4."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/more.txt is new
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+    div-zero: A1 divides by zero, and the code prints a number.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A division by zero evaluates to #DIV/0!. Waits on sheets#5."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/values.txt differs (-committed +got):
+        - A1 0
+        + A1 0.0
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+    negative: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A negative number is valid, and evaluates to itself. Waits on sheets#3."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/error.txt differs (-committed +got):
+        - A1: unexpected "-"
+        + A1: bad number
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/accepted-loop
+        --- FAIL: TestCorpus/accepted-loop/echo
+    --- FAIL: TestCorpus/div-zero
+        --- FAIL: TestCorpus/div-zero/echo
+    --- FAIL: TestCorpus/negative
+        --- FAIL: TestCorpus/negative/echo
+FAIL
+[exit 1]
+$ edit testdata/negative.txtar  # restore negative
+$ edit testdata/negative.txtar  # the code stops erring
+$ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/negative/  # rejects
+    negative: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        The cell is frozen by its known gap, gaps line 1: "echo A negative number is valid, and evaluates to itself. Waits on sheets#3."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/echo/error.txt is no longer produced
+        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/negative
+        --- FAIL: TestCorpus/negative/echo
+FAIL
+[exit 1]
+$ edit testdata/negative.txtar  # remove the gaps line
+$ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/negative/  # rejects
+    negative: A1 is a negative number, which the code wrongly rejects.
+        echo: Does what the case's do/ tree says.
+        out/echo/error.txt records an error, but the run returned none.
+        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/negative
+        --- FAIL: TestCorpus/negative/echo
+FAIL
+[exit 1]
+# the orphaned error.txt is a person's to remove
+$ edit testdata/div-zero.txtar  # delete the frozen cell's files
+$ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/div-zero/  # rejects
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/div-zero
+        --- PASS: TestCorpus/div-zero/echo
+PASS
+$ cat testdata/div-zero.txtar
+A1 divides by zero, and the code prints a number.
+-- in/do/out/values.txt --
+A1 0.0
+-- gaps --
+echo A division by zero evaluates to #DIV/0!. Waits on sheets#5.
+-- out/echo/values.txt --
+A1 0.0
+$ go test -run=TestCorpus/div-zero/  # rejects
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/div-zero
+        --- PASS: TestCorpus/div-zero/echo
+PASS

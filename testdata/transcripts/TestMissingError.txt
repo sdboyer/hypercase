@@ -1,0 +1,20 @@
+$ go test  # rejects
+    loop: A1 and B1 refer to each other, and the code no longer notices.
+        echo: Does what the case's do/ tree says.
+        echo returned no error, but the case states circular and dangling, which echo rejects.
+        Fix the code, or correct the case's properties or echo's Rejects.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/loop
+        --- FAIL: TestCorpus/loop/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
+    loop: A1 and B1 refer to each other, and the code no longer notices.
+        echo: Does what the case's do/ tree says.
+        echo returned no error, but the case states circular and dangling, which echo rejects.
+        Fix the code, or correct the case's properties or echo's Rejects.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/loop
+        --- FAIL: TestCorpus/loop/echo
+FAIL
+[exit 1]

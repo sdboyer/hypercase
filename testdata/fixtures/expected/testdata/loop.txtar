@@ -1,0 +1,7 @@
+A1 and B1 refer to each other.
+-- in/do/error --
+A1 -> B1 -> A1: cycle
+-- properties --
+circular
+-- out/echo/error.txt --
+A1 -> B1 -> A1: cycle

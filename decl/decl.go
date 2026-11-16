@@ -13,3 +13,15 @@ type Project struct {
 	// whole module's: UpdateVar=1 go test ./..., at the module root.
 	UpdateVar string
 }
+
+// A Property is a named fact about a case, such as circular: a sheet in
+// which some formula refers back to itself. A case states the properties it
+// has in its archive's properties section, and a column lists those it
+// rejects. A case is expected to err in a column exactly when it states a
+// property the column rejects.
+type Property struct {
+	// Name is the property's name, as a case's properties section states it.
+	Name string
+	// Description says what the fact is. It is required.
+	Description string
+}

@@ -1,0 +1,20 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # property-nodesc
+    the property circular has no description.
+        Add one: it says what the fact about a case is, in prose.
+    testdata/loopy.txtar: properties states loopy, and no property of that name is registered.
+        Declare the property, or correct the line.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/loopy
+        --- PASS: TestCorpus/loopy/echo
+FAIL
+[exit 1]
+$ go test  # property-nodesc
+    the property circular has no description.
+        Add one: it says what the fact about a case is, in prose.
+    testdata/loopy.txtar: properties states loopy, and no property of that name is registered.
+        Declare the property, or correct the line.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/loopy
+        --- PASS: TestCorpus/loopy/echo
+FAIL
+[exit 1]

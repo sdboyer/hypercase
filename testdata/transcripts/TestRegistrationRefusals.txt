@@ -31,11 +31,11 @@ panic: hypercase: Register was given a decl.Project a second time. Register the 
 [stack]
 [exit 2]
 $ go test  # unknown
-panic: hypercase: Register was given a int, which is nothing hypercase registers. Pass a decl.Project or a hypercase.Suite.
+panic: hypercase: Register was given a int, which is nothing hypercase registers. Pass a decl.Project, a decl.Property or a hypercase.Suite.
 [stack]
 [exit 2]
 $ go test -run=^$  # unknown
-panic: hypercase: Register was given a int, which is nothing hypercase registers. Pass a decl.Project or a hypercase.Suite.
+panic: hypercase: Register was given a int, which is nothing hypercase registers. Pass a decl.Project, a decl.Property or a hypercase.Suite.
 [stack]
 [exit 2]
 $ go test  # late

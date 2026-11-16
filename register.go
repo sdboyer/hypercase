@@ -7,16 +7,20 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
 )
 
-// Register registers what a package declares to hypercase: its project and
-// its suites. It is called when the package is initialized, from an init
-// function, before any test runs. A test function runs what was registered
-// with [Test], and registers nothing.
+// Register registers what a package declares to hypercase: its project, its
+// properties and its suites. It is called when the package is initialized,
+// from an init function, before any test runs. A test function runs what
+// was registered with [Test], and registers nothing.
 //
 // A refusal, such as two suites with one name, panics with the message the
-// framework would otherwise print, so no test in the package runs.
+// framework would otherwise print, so no test in the package runs. A check
+// that relates two registrations, such as a Rejects entry naming a property,
+// waits until initialization is over, and fails the run before any case
+// runs.
 func Register(items ...any) {
 	reg.mu.Lock()
 	defer reg.mu.Unlock()
@@ -27,10 +31,12 @@ func Register(items ...any) {
 		switch v := item.(type) {
 		case decl.Project:
 			reg.addProject(v)
+		case decl.Property:
+			reg.addProperty(v)
 		case columnDecl:
 			reg.addColumn(v.column())
 		default:
-			refuse(fmt.Sprintf("Register was given a %T, which is nothing hypercase registers. Pass a decl.Project or a hypercase.Suite.", item))
+			refuse(fmt.Sprintf("Register was given a %T, which is nothing hypercase registers. Pass a decl.Project, a decl.Property or a hypercase.Suite.", item))
 		}
 	}
 }
@@ -40,10 +46,11 @@ func Register(items ...any) {
 var reg registry
 
 type registry struct {
-	mu      sync.Mutex
-	started bool
-	project *decl.Project
-	columns []*column
+	mu         sync.Mutex
+	started    bool
+	project    *decl.Project
+	properties []decl.Property
+	columns    []*column
 }
 
 func (r *registry) addProject(p decl.Project) {
@@ -56,6 +63,18 @@ func (r *registry) addProject(p decl.Project) {
 	r.project = &p
 }
 
+func (r *registry) addProperty(p decl.Property) {
+	if !validName(p.Name) {
+		refuse(fmt.Sprintf("the property name %q breaks the naming rule: %s. Rename the property.", p.Name, nameRule))
+	}
+	for _, o := range r.properties {
+		if o.Name == p.Name {
+			refuse(fmt.Sprintf("two properties are named %s. Register each property once.", p.Name))
+		}
+	}
+	r.properties = append(r.properties, p)
+}
+
 func (r *registry) addColumn(c *column) {
 	if !validName(c.name) {
 		refuse(fmt.Sprintf("the suite name %q breaks the naming rule: %s. Rename the suite.", c.name, nameRule))
@@ -66,12 +85,29 @@ func (r *registry) addColumn(c *column) {
 	if c.consumes != fsType {
 		refuse(fmt.Sprintf("the suite %s consumes %s. A suite consumes the input view, fs.FS.", c.name, c.consumes))
 	}
+	for i, p := range c.rejects {
+		for _, q := range c.rejects[:i] {
+			if p.Name == q.Name {
+				refuse(fmt.Sprintf("the suite %s rejects %s twice. List each property once.", c.name, p.Name))
+			}
+		}
+	}
 	for _, o := range r.columns {
 		if o.name == c.name {
 			refuse(fmt.Sprintf("two suites are named %s. Column names are unique; rename one.", c.name))
 		}
 	}
 	r.columns = append(r.columns, c)
+}
+
+// property returns the registered property of a name.
+func (r *registry) property(name string) (decl.Property, bool) {
+	for _, p := range r.properties {
+		if p.Name == name {
+			return p, true
+		}
+	}
+	return decl.Property{}, false
 }
 
 // refuse panics with a refusal at registration.
@@ -95,11 +131,8 @@ func inTest() bool {
 	}
 }
 
-var (
-	nameRE      = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
-	updateVarRE = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
-)
+var updateVarRE = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 
-const nameRule = "lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter"
+const nameRule = archive.NameRule
 
-func validName(s string) bool { return nameRE.MatchString(s) }
+func validName(s string) bool { return archive.ValidName(s) }

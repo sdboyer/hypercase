@@ -1,0 +1,10 @@
+A1 and B1 refer to each other, and the code no longer notices.
+-- in/do/out/values.txt --
+A1 0
+B1 0
+-- properties --
+circular
+dangling
+-- out/echo/values.txt --
+A1 0
+B1 0

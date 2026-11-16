@@ -1,0 +1,11 @@
+A known gap whose committed sections sit out of their place.
+-- in/do/out/b.txt --
+b
+-- out/echo/b.txt --
+b
+-- in/do/out/a.txt --
+a
+-- gaps --
+echo b.txt should say a. Waits on sheets#7.
+-- out/echo/a.txt --
+a

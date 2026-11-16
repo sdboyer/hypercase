@@ -1,0 +1,38 @@
+$ go test  # rejects
+    loop: A1 and B1 refer to each other, and the code panics instead of rejecting the sheet.
+        echo: Does what the case's do/ tree says.
+        echo panicked: stack overflow
+        Fix the code. A panic is never an expected error.
+        out/echo/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    stack of the panic: [stack]
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/loop
+        --- FAIL: TestCorpus/loop/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
+    loop: A1 and B1 refer to each other, and the code panics instead of rejecting the sheet.
+        echo: Does what the case's do/ tree says.
+        echo panicked: stack overflow
+        Fix the code. A panic is never an expected error.
+    stack of the panic: [stack]
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/loop
+        --- FAIL: TestCorpus/loop/echo
+FAIL
+[exit 1]
+$ cat testdata/loop.txtar
+A1 and B1 refer to each other, and the code panics instead of rejecting the sheet.
+-- in/do/panic --
+stack overflow
+-- properties --
+circular
+-- out/echo/error.txt --
+stack overflow
+$ edit testdata/loop.txtar  # mark the cell as a known gap
+$ go test  # rejects
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/loop
+        --- PASS: TestCorpus/loop/echo
+PASS

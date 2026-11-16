@@ -1,10 +1,6 @@
 A section under each top-level name this hypercase reserves but doesn't read.
 -- in/do/out/values.txt --
 A1 6
--- properties --
-circular
--- gaps --
-echo Waits on an issue.
 -- variant/cycle/about --
 A cycle.
 -- transform/looped/in/sheet/A1 --

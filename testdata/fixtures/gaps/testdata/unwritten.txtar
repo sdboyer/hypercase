@@ -1,0 +1,5 @@
+A1 rounds wrongly, and nothing has run the update since the gap was stated.
+-- in/do/out/values.txt --
+A1 0.3333
+-- gaps --
+echo A1 rounds to 0.33. Waits on sheets#6.

@@ -1,0 +1,11 @@
+A1 and B1 refer to each other, and the code wrongly accepts the sheet.
+-- in/do/out/values.txt --
+A1 0
+B1 0
+-- properties --
+circular
+-- gaps --
+echo A cycle is an error. Waits on sheets#4.
+-- out/echo/values.txt --
+A1 0
+B1 0
