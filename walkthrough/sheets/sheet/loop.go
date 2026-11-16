@@ -1,7 +1,6 @@
 package sheet
 
 import (
-	"errors"
 	"io/fs"
 	"testing/fstest"
 )
@@ -12,17 +11,8 @@ import (
 // (=A1, = (A1)). A sheet holding something that is not a cell file, or one
 // that can't be read, is loopable: Loop reports what is wrong with it.
 func Loopable(fsys fs.FS) (why string, ok bool) {
-	files, err := readCells(fsys)
-	if err != nil {
-		return "", true
-	}
-	if _, err := checkFiles(files); err != nil {
-		return "", true
-	}
-	if why := loopRefusal(files); why != "" {
-		return why, false
-	}
-	return "", true
+	_, err := Loop(fsys)
+	return probe(err)
 }
 
 // Loop returns the sheet in fsys with its first cell, in cell order, replaced
@@ -36,13 +26,11 @@ func Loop(fsys fs.FS) (fs.FS, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, f := range files {
-		if _, err := checkFile(f); err != nil {
-			return nil, err
-		}
+	if _, err := checkFiles(files); err != nil {
+		return nil, err
 	}
 	if why := loopRefusal(files); why != "" {
-		return nil, errors.New(why)
+		return nil, refusal(why)
 	}
 	out := fstest.MapFS{}
 	for i, f := range files {
