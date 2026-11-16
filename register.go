@@ -226,7 +226,7 @@ func (r *registrations) addColumn(c *column) {
 			refuseCorpusOfType(c, t)
 		}
 	}
-	checkRejects("suite", c.name, c.rejects)
+	checkListed("the suite "+c.name, "Rejects", c.rejects)
 	checkPatterns("suite", c.name, c.outputs)
 	r.checkColumnName("suite", c.name, c.describe())
 	r.columns = append(r.columns, c)
@@ -244,7 +244,7 @@ func (r *registrations) addLift(l *lift) {
 	case l.run == nil:
 		refuse(fmt.Sprintf("the lift %s has no Run. Give it the function that makes its product.", l.name))
 	}
-	checkRejects("lift", l.name, l.rejects)
+	checkListed("the lift "+l.name, "Rejects", l.rejects)
 	checkPatterns("lift", l.name, l.outputs)
 	for _, o := range l.outputs {
 		if a, _ := path.Match(o.Pattern, errorFile); !a {
@@ -293,11 +293,14 @@ func (r *registrations) checkColumnName(kind, name, what string) {
 	}
 }
 
-func checkRejects(kind, name string, rejects []decl.Property) {
-	for i, p := range rejects {
-		for _, q := range rejects[:i] {
+// checkListed refuses a property one of a registration's lists of
+// properties holds twice: what names the registration, as "the suite
+// echo", and field the list, as "Rejects".
+func checkListed(what, field string, ps []decl.Property) {
+	for i, p := range ps {
+		for _, q := range ps[:i] {
 			if p.Name == q.Name {
-				refuse(fmt.Sprintf("the %s %s rejects %s twice. List each property once.", kind, name, p.Name))
+				refuse(fmt.Sprintf("%s %s %s twice. List each property once.", what, strings.ToLower(field), p.Name))
 			}
 		}
 	}

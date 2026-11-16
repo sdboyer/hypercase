@@ -27,8 +27,8 @@ $ go test  # tr-unregistered-gives
 FAIL
 [exit 1]
 $ go test  # tr-other-description
-    the transform upper keeps a property named circular, which the package registers with another description.
-        List the registered property: declare it once, and use that declaration in both places.
+    the transform upper, of the corpus type hypercase_test.Script, keeps a property named circular, which the package registers with another description.
+        Keep the registered property: declare it once, and use that declaration in both places.
     No case runs until the registrations agree.
 --- FAIL: TestCorpus
 FAIL

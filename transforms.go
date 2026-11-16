@@ -68,18 +68,8 @@ func checkTransforms(t *corpusType) {
 		if tr.generate == nil {
 			refuse(fmt.Sprintf("the transform %s, of the corpus type %s, has no Jenny. Give it the jenny that makes its variant's input view from the base's.", tr.name, t.goType))
 		}
-		for _, list := range []struct {
-			verb string
-			ps   []decl.Property
-		}{{"gives", tr.gives}, {"keeps", tr.keeps}} {
-			for j, p := range list.ps {
-				for _, q := range list.ps[:j] {
-					if p.Name == q.Name {
-						refuse(fmt.Sprintf("the transform %s %s %s twice. List each property once.", tr.name, list.verb, p.Name))
-					}
-				}
-			}
-		}
+		checkListed("the transform "+tr.name, "Gives", tr.gives)
+		checkListed("the transform "+tr.name, "Keeps", tr.keeps)
 		for _, p := range tr.gives {
 			for _, q := range tr.keeps {
 				if p.Name == q.Name {
@@ -136,22 +126,9 @@ func (r *runner) checkTransformRelations(t *testing.T, owned []*transform) bool 
 	}
 	for _, ct := range r.types {
 		for _, tr := range ct.transforms {
-			for _, list := range []struct {
-				verb, field string
-				ps          []decl.Property
-			}{{"gives", "Gives", tr.gives}, {"keeps", "Keeps", tr.keeps}} {
-				for _, p := range list.ps {
-					q, found := reg.property(p.Name)
-					switch {
-					case !found:
-						t.Errorf("the transform %s, of the corpus type %s, %s %s, and the package registers no property of that name.\nRegister the property, or remove it from %s's %s.", tr.name, ct.goType, list.verb, p.Name, tr.name, list.field)
-						ok = false
-					case q != p:
-						t.Errorf("the transform %s %s a property named %s, which the package registers with another description.\nList the registered property: declare it once, and use that declaration in both places.", tr.name, list.verb, p.Name)
-						ok = false
-					}
-				}
-			}
+			what := fmt.Sprintf("the transform %s, of the corpus type %s,", tr.name, ct.goType)
+			ok = checkRegistered(t, what, tr.name, "Gives", tr.gives) && ok
+			ok = checkRegistered(t, what, tr.name, "Keeps", tr.keeps) && ok
 		}
 	}
 	return ok
