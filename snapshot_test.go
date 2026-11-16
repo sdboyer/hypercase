@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -17,7 +18,9 @@ import (
 //
 // Create and RewriteInputs refuse while the fixtures' update variable is
 // set, and these tests call them in this process, so each clears the
-// variable with t.Setenv, and none runs in parallel.
+// variable with t.Setenv, and none runs in parallel. Create writes only
+// under a corpus root a registry records, so each test's first update
+// writes the package's registry before it creates a case.
 
 // moduleCorpus returns the sandbox's module-root corpus.
 func (s *sandbox) moduleCorpus() root.Corpus {
@@ -40,11 +43,7 @@ func (s *sandbox) create(name string, trees map[string]fs.FS) string {
 // snapshot.Create, and notes it.
 func (s *sandbox) createAt(corpus root.Corpus, name string, trees map[string]fs.FS) string {
 	s.t.Helper()
-	ss, err := snapshot.Serialize(trees)
-	if err != nil {
-		s.t.Fatal(err)
-	}
-	path, err := snapshot.Create(corpus, project, scriptType, name, ss)
+	path, err := snapshot.Create(corpus, project, scriptType, name, s.serialize(trees))
 	if err != nil {
 		s.t.Fatal(err)
 	}
@@ -55,6 +54,27 @@ func (s *sandbox) createAt(corpus root.Corpus, name string, trees map[string]fs.
 	return rel
 }
 
+func (s *sandbox) serialize(trees map[string]fs.FS) []archive.Section {
+	s.t.Helper()
+	ss, err := snapshot.Serialize(trees)
+	if err != nil {
+		s.t.Fatal(err)
+	}
+	return ss
+}
+
+// registers runs the first update of a registration, which writes the
+// package's registry, and notes it. With no case yet, the update fails on
+// each suite, which applies to no case, and writes the registry still.
+func (s *sandbox) registers(registration string) {
+	s.t.Helper()
+	s.note("the first update writes the package's registry, which records the corpus root Create writes under, and fails, since no suite has a case yet")
+	s.fails(s.update(registration), "applies to no case: its corpus, ")
+	if !s.exists("testdata/hypercase.json") {
+		s.t.Fatal("the first update wrote no registry")
+	}
+}
+
 // TestSnapshotProperties: a case that Create wrote from a script whose
 // resolve/ tree makes resolve err, as a sheet with a cycle does, states
 // no property. After an update, resolve's cell fails as an unexpected
@@ -63,6 +83,7 @@ func (s *sandbox) createAt(corpus root.Corpus, name string, trees map[string]fs.
 func TestSnapshotProperties(t *testing.T) {
 	t.Setenv(fixtureUpdate, "")
 	s := newSandbox(t, "")
+	s.registers("ladder")
 	rel := s.create("cycle", map[string]fs.FS{"resolve": fstest.MapFS{"error": {Data: []byte("A1 -> B1 -> A1: cycle\n")}}})
 	unexpected := "resolve returned an error, but the case states no property resolve rejects:"
 	s.fails(s.update("ladder"), unexpected)
@@ -86,6 +107,7 @@ func TestSnapshotProperties(t *testing.T) {
 func TestSnapshotDescription(t *testing.T) {
 	t.Setenv(fixtureUpdate, "")
 	s := newSandbox(t, "")
+	s.registers("ladder")
 	rel := s.create("six", map[string]fs.FS{"calc": fstest.MapFS{"out/values.txt": {Data: []byte("6\n")}}})
 	s.passes(s.update("ladder"))
 	s.cat(rel)
@@ -101,6 +123,7 @@ func TestSnapshotDescription(t *testing.T) {
 func TestSnapshotRewriteAfterUpdate(t *testing.T) {
 	t.Setenv(fixtureUpdate, "")
 	s := newSandbox(t, "")
+	s.registers("ladder")
 	rel := s.create("six", map[string]fs.FS{"calc": fstest.MapFS{"out/values.txt": {Data: []byte("6\n")}}})
 	s.edit(rel, "a person describes the case", func(a *archive.Archive) {
 		a.Comment = []byte("calc gives 6.\n")
@@ -125,25 +148,38 @@ func TestSnapshotRewriteAfterUpdate(t *testing.T) {
 // root.Find, from its own directory, and Create under that root writes
 // where a run reads: the module root, for a package that passes no
 // hypercase.Root, and corp under it, for one that passes
-// hypercase.Root("corp").
+// hypercase.Root("corp"). Create under the other root, which the
+// package's registry doesn't record, is refused, and writes nothing.
 func TestSnapshotCorpusRoot(t *testing.T) {
 	t.Setenv(fixtureUpdate, "")
 	for _, c := range []struct {
-		name, rel, registration, column string
-		trees                           map[string]fs.FS
-		out                             map[string]string
+		name, rel, other, registration, column string
+		trees                                  map[string]fs.FS
+		out                                    map[string]string
 	}{
-		{"module", ".", "ladder", "calc", map[string]fs.FS{"calc": fstest.MapFS{"out/values.txt": {Data: []byte("6\n")}}}, map[string]string{"out/calc/values.txt": "6\n"}},
-		{"corp", "corp", "corp-a", "echo", map[string]fs.FS{"do": fstest.MapFS{"out/values.txt": {Data: []byte("A1 6\n")}}}, map[string]string{"out/echo/values.txt": "A1 6\n"}},
+		{"module", ".", "corp", "ladder", "calc", map[string]fs.FS{"calc": fstest.MapFS{"out/values.txt": {Data: []byte("6\n")}}}, map[string]string{"out/calc/values.txt": "6\n"}},
+		{"corp", "corp", ".", "corp-a", "echo", map[string]fs.FS{"do": fstest.MapFS{"out/values.txt": {Data: []byte("A1 6\n")}}}, map[string]string{"out/echo/values.txt": "A1 6\n"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			s := newSandbox(t, "")
 			cmd := s.path("cmd/snapshot")
-			for _, d := range []string{cmd, s.path(c.rel)} {
+			for _, d := range []string{cmd, s.path(c.rel), s.path(c.other)} {
 				if err := os.MkdirAll(d, 0o755); err != nil {
 					t.Fatal(err)
 				}
 			}
+			s.registers(c.registration)
+			other, err := root.Find(cmd, c.other)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before := s.snapshot()
+			_, err = snapshot.Create(other, project, scriptType, "six", s.serialize(c.trees))
+			if err == nil {
+				t.Fatalf("Create wrote under %s, which no registry records", c.other)
+			}
+			s.note("snapshot.Create under the corpus root %s, which the registry doesn't record, is refused:\n%s", c.other, strings.TrimSuffix(s.normalize([]byte(err.Error())), "\n"))
+			s.unchanged(before)
 			corpus, err := root.Find(cmd, c.rel)
 			if err != nil {
 				t.Fatal(err)

@@ -241,7 +241,9 @@ each step's corpus stands alone. A project with one corpus at its module
 root passes nothing. One package per corpus root registers
 `hypercase.RootPackage()`. A project's own command finds the same corpus
 root with `root.Find`, from its directory and the path the package
-passes, or `.`.
+passes, or `.`. `snapshot.Create` writes a case only under a corpus root
+that a package's registry records, so a package's first update, which
+writes its registry, comes before its first case.
 
 <!-- source: walkthrough/sheets/step03/sheetcorpus/project.go -->
 ```go

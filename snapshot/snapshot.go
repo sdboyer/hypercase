@@ -32,6 +32,7 @@ import (
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/internal/hooks"
+	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/hypercase/root"
 )
 
@@ -116,7 +117,12 @@ func noCorpus(fn string) error {
 // Create writes sections, under an empty comment, as the new case
 // testdata/<typ.Dir>/<name>.txtar under the corpus root c, and returns its
 // path. c is as root.Find finds it, and its directory exists; Create makes
-// testdata/<typ.Dir>/ under it if it is missing. project is the project's
+// testdata/<typ.Dir>/ under it if it is missing. A registry under the
+// module root records c as its package's corpus root, so some package's
+// tests read the case: the path a package passes to hypercase.Root and
+// the one a command passes to root.Find are written apart, and Create
+// checks one against the other. A package's registry is written by its
+// first update, so Create works once that has run. project is the project's
 // declaration, as the project registers it: no update creates a case, so
 // while the variable its UpdateVar names is set, Create fails, naming it,
 // and writes nothing.
@@ -150,6 +156,9 @@ func Create[T ~struct{ fs.FS }](c root.Corpus, project decl.Project, typ decl.Ty
 		return "", fmt.Errorf("the case's name, %q, breaks the naming rule: %s. A case's name is its archive's file name, less .txtar, and never a path.\nName the case by the rule.", name, archive.NameRule)
 	}
 	if err := checkDir(typ); err != nil {
+		return "", err
+	}
+	if err := recorded(c, project.UpdateVar); err != nil {
 		return "", err
 	}
 	dir := c.Dir()
@@ -189,6 +198,41 @@ func Create[T ~struct{ fs.FS }](c root.Corpus, project decl.Project, typ decl.Ty
 		return "", fmt.Errorf("creating %s: %v.\nFix what stopped the write, and create the case again.", path, err)
 	}
 	return path, nil
+}
+
+// recorded refuses a corpus root that no registry under its module root
+// records as its package's corpus root, naming the roots they do record.
+// It reads every registry's head, and one it can't read fails it, since
+// that registry may be the one that records the root.
+func recorded(c root.Corpus, updateVar string) error {
+	found, err := registry.Find(c.Module())
+	if err != nil {
+		return fmt.Errorf("finding the registries under the module root %s: %v.\nFix what stopped the walk, and create the case again.", c.Module(), err)
+	}
+	roots := map[string]bool{}
+	for _, f := range found {
+		data, err := os.ReadFile(f.Path)
+		if err != nil {
+			return fmt.Errorf("reading %s: %v.\nFix what stopped the read, and create the case again.", f.Path, err)
+		}
+		h, err := registry.Peek(data)
+		if err != nil {
+			return fmt.Errorf("%s can't be read: %v, so it may record the corpus root %q.\nRun the update, %s=1 go test ./..., to write it again.", f.Path, err, c.Rel(), updateVar)
+		}
+		roots[h.CorpusRoot] = true
+	}
+	if roots[c.Rel()] {
+		return nil
+	}
+	have := "no registry is under it"
+	if len(roots) > 0 {
+		var quoted []string
+		for _, r := range slices.Sorted(maps.Keys(roots)) {
+			quoted = append(quoted, fmt.Sprintf("%q", r))
+		}
+		have = "its registries record " + strings.Join(quoted, ", ")
+	}
+	return fmt.Errorf("no registry under the module root %s records the corpus root %q, so no package's tests would read the case: %s.\nPass root.Find the path a package passes to hypercase.Root, or . for one that passes none. A package's first update, %s=1 go test ./..., writes its registry.", c.Module(), c.Rel(), have, updateVar)
 }
 
 // mkdirs makes each missing directory of the path that the elements name

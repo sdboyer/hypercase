@@ -1,3 +1,19 @@
+# the first update writes the package's registry, which records the corpus root Create writes under, and fails, since no suite has a case yet
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    the suite calc applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+    the suite evaluate applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+    the suite format applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+# snapshot.Create under the corpus root corp, which the registry doesn't record, is refused:
+no registry under the module root $SANDBOX records the corpus root "corp", so no package's tests would read the case: its registries record ".".
+Pass root.Find the path a package passes to hypercase.Root, or . for one that passes none. A package's first update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., writes its registry.
 # root.Find, from cmd/snapshot, found the corpus root .
 # snapshot.Create wrote testdata/script/six.txtar
 $ cat testdata/script/six.txtar

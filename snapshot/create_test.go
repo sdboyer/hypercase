@@ -15,6 +15,7 @@ import (
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/internal/hooks"
+	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/hypercase/root"
 )
 
@@ -151,6 +152,42 @@ func TestCreateRefuses(t *testing.T) {
 	fails(t, err, "the corpus root "+file+" isn't a directory")
 	_, err = Create(root.Corpus{}, project, sheetType, "twice", ss)
 	fails(t, err, "Create was given no corpus root.\nFind it with root.Find")
+}
+
+// TestCreateUnrecordedRoot: a corpus root that no registry under the
+// module records is refused, naming the roots the registries record, and
+// nothing is written; so is a module with no registry. Any package's
+// registry records a root, not only the module root's. A registry Create
+// can't read is refused, naming it, even beside one that records the
+// root.
+func TestCreateUnrecordedRoot(t *testing.T) {
+	mod := newModule(t)
+	before := dirs(t, mod)
+	_, err := Create(corpusIn(t, mod, "."), project, sheetType, "twice", serialize(t, cells))
+	fails(t, err, `no registry under the module root `+mod+` records the corpus root ".", so no package's tests would read the case: its registries record "corp".`, "Pass root.Find the path a package passes to hypercase.Root")
+	_, err = Create(corpusIn(t, mod, "other"), project, sheetType, "twice", serialize(t, cells))
+	fails(t, err, `records the corpus root "other"`, `its registries record "corp".`)
+	if got := dirs(t, mod); !slices.Equal(got, before) {
+		t.Errorf("a refused Create left %q, not %q", got, before)
+	}
+
+	bare := t.TempDir()
+	writeFile(t, filepath.Join(bare, "go.mod"), []byte("module example.com/m\n"))
+	_, err = Create(corpusIn(t, bare, "."), project, sheetType, "twice", serialize(t, cells))
+	fails(t, err, `records the corpus root ".", so no package's tests would read the case: no registry is under it.`, "A package's first update, "+updateVar+"=1 go test ./..., writes its registry.")
+	if got := dirs(t, bare); !slices.Equal(got, []string{"go.mod"}) {
+		t.Errorf("a refused Create left %q", got)
+	}
+
+	// ./pkg records the module root.
+	writeRegistry(t, filepath.Join(mod, "pkg"), ".")
+	if _, err := Create(corpusIn(t, mod, "."), project, sheetType, "twice", serialize(t, cells)); err != nil {
+		t.Errorf("Create refused a root ./pkg's registry records: %v", err)
+	}
+	reg := filepath.Join(mod, "pkg", "testdata", registry.Name)
+	writeFile(t, reg, []byte("{"))
+	_, err = Create(corpusIn(t, mod, "corp"), project, sheetType, "twice", serialize(t, cells))
+	fails(t, err, reg+" can't be read: it is not a registry", `so it may record the corpus root "corp".`)
 }
 
 // TestCreateDuringUpdate: while the variable the project's UpdateVar
