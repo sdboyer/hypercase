@@ -165,24 +165,61 @@ func firstDiff(got, want []byte) (n int, g, w string) {
 }
 
 // goEnv is the environment of each go command the test runs: this
-// process's, which holds where the toolchain keeps its caches, with no
-// GOFLAGS, the module system offline, on this toolchain and off any
-// workspace, and the update variable only as updateVar sets it.
+// process's, which holds where the toolchain keeps its caches, with no go
+// env file, no GOFLAGS, the module system offline, on this toolchain and
+// off any workspace, and the update variable only as updateVar sets it.
+//
+// The go command reads a variable that is empty from its env file, so an
+// empty GOFLAGS holds none only with the file off. A cache location set only
+// in that file goes unused, and with the module system offline, a module
+// missing from the cache this environment names fails the build.
 func goEnv(updateVar string) []string {
 	var env []string
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
 		switch k {
-		case sheetcorpus.Project.UpdateVar, "GOFLAGS", "GOWORK", "GOPROXY", "GOTOOLCHAIN":
+		case sheetcorpus.Project.UpdateVar, "GOENV", "GOFLAGS", "GOWORK", "GOPROXY", "GOTOOLCHAIN":
 			continue
 		}
 		env = append(env, kv)
 	}
-	env = append(env, "GOFLAGS=", "GOWORK=off", "GOPROXY=off", "GOTOOLCHAIN=local")
+	env = append(env, "GOENV=off", "GOFLAGS=", "GOWORK=off", "GOPROXY=off", "GOTOOLCHAIN=local")
 	if updateVar != "" {
 		env = append(env, updateVar)
 	}
 	return env
+}
+
+// TestGoEnv: GOFLAGS that a caller keeps in a go env file reaches no go
+// command the test runs. The probe's GOFLAGS would build it from another
+// source, through an overlay.
+func TestGoEnv(t *testing.T) {
+	probe := t.TempDir()
+	for name, data := range map[string]string{
+		"go.mod":       "module probe\n\ngo 1.27.0\n",
+		"main.go":      "package main\n\nfunc main() { println(\"main.go\") }\n",
+		"alt/main.txt": "package main\n\nfunc main() { println(\"the overlay\") }\n",
+		"overlay.json": `{"Replace": {"main.go": "alt/main.txt"}}`,
+	} {
+		if err := writeFile(filepath.Join(probe, filepath.FromSlash(name)), []byte(data)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	envFile := filepath.Join(t.TempDir(), "env")
+	if err := writeFile(envFile, []byte("GOFLAGS=-overlay=overlay.json\n")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GOENV", envFile)
+	cmd := exec.Command("go", "run", ".")
+	cmd.Dir = probe
+	cmd.Env = goEnv("")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("go run: %v\n%s", err, out)
+	}
+	if string(out) != "main.go\n" {
+		t.Errorf("the probe built from the go env file's GOFLAGS, and wrote %q", out)
+	}
 }
 
 // buildHypercase builds the hypercase command into a temp dir, and returns
