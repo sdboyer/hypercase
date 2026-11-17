@@ -79,7 +79,8 @@ $ go test ./b  # tr-b-jenny
         transform/upper/in/do/out/values.txt differs (-committed +made):
           PARTIAL
         + PARTIAL
-        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
+        A normal run reads the inputs, and an update what upper makes.
+        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
     script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
     script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
     script/twice/transform/upper: Uppercases every file under do/out/.
@@ -93,7 +94,8 @@ $ go test ./b  # tr-b-jenny
         transform/upper/in/do/out/values.txt differs (-committed +made):
           A1 SIX
         + A1 SIX
-        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
+        A normal run reads the inputs, and an update what upper makes.
+        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/errs

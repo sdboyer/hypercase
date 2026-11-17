@@ -261,7 +261,7 @@ func TestLiftNoProduct(t *testing.T) {
 	s := newSandbox(t, "no-product")
 	none := s.read("testdata/script/none.txtar")
 	marked := s.read("testdata/script/marked.txtar")
-	const noProduct = "pick: Picks the script's view, as its pick/ tree says.\npick returned no product and no error, so the cell has no outcome.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell."
+	const noProduct = "pick: Picks the script's view, as its pick/ tree says.\npick returned no product and no error, so the cell has no outcome.\nFix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error. An update writes nothing for this cell."
 	want := []string{
 		"script/none: pick returns no product.\n" + noProduct,
 		"script/marked: pick returns no product, and a gaps line marks its cell.\n" + noProduct,

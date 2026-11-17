@@ -53,7 +53,7 @@ $ go test  # chain-twice
         out/import/outcome differs (-golden +got):
         - accepted
         + blocked export
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's, not this outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
         via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has no committed outcome, out/export/outcome, which a normal run reads, so it has no product in this run.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     what ran, in order:

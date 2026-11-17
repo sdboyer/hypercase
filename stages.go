@@ -551,7 +551,7 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 		lr.out.jennyErr, lr.out.err = lr.out.err, nil
 		lr.problems.add(aboutFault,
 			fmt.Sprintf("%s's jenny failed on the case, with an error that is no rejection:\n  %s", l.name, indent(lr.out.jennyErr.Error(), "  ")),
-			fmt.Sprintf("If %s rejects the case, return the error as decl.Reject(err). If not, fix %s's jenny. An update writes nothing for this cell.", l.name, l.name))
+			closing{fmt.Sprintf("If %s rejects the case, return the error as decl.Reject(err). If not, fix %s's jenny.", l.name, l.name), claims{Nothing: true}})
 		return lr
 	}
 	lr.product, lr.problems = productOf(l, s.c.prefix, made)
@@ -578,7 +578,7 @@ func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, notes
 		if !ok {
 			problems.add(aboutFault,
 				fmt.Sprintf("%s made %s, which its FS gave as a %T, not as rendered bytes.", l.name, f.Path(), f),
-				"An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase.")
+				closing{advice: "An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase."})
 			continue
 		}
 		files[f.Path()] = data
@@ -591,28 +591,28 @@ func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, notes
 		if err := archive.HoldsName(dir + p); err != nil {
 			problems.add(aboutFault,
 				fmt.Sprintf("%q can't be held in an archive: %v.", dir+p, err),
-				fmt.Sprintf("Fix %s's jenny so the file's name can be held. An update writes nothing for this cell.", l.name))
+				closing{fmt.Sprintf("Fix %s's jenny so the file's name can be held.", l.name), claims{Nothing: true}})
 			continue
 		}
 		paths = append(paths, p)
 	}
 	for _, p := range archive.CheckVia(prefix, l.name, paths) {
 		problems.add(aboutFault, p.String()+".",
-			fmt.Sprintf("Fix %s's jenny: what it makes is its product's input view, with the trees as its top-level directories. An update writes nothing for this cell.", l.name))
+			closing{fmt.Sprintf("Fix %s's jenny: what it makes is its product's input view, with the trees as its top-level directories.", l.name), claims{Nothing: true}})
 	}
 	for _, p := range paths {
 		switch hit := l.declaredProduct(p); len(hit) {
 		case 0:
 			problems.add(aboutFault, fmt.Sprintf("%s is not declared.", dir+p),
-				fmt.Sprintf("Declare it in %s's Product, with a description, or fix %s's jenny. An update writes nothing for this cell.", l.name, l.name))
+				closing{fmt.Sprintf("Declare it in %s's Product, with a description, or fix %s's jenny.", l.name, l.name), claims{Nothing: true}})
 		case 1:
 		default:
 			problems.add(aboutFault, fmt.Sprintf("%s matches two of %s's product declarations, %s and %s.", dir+p, l.name, hit[0], hit[1]),
-				"Change the patterns so that one declaration matches each file. An update writes nothing for this cell.")
+				closing{"Change the patterns so that one declaration matches each file.", claims{Nothing: true}})
 		}
 		if err := archive.Holds(files[p]); err != nil {
 			problems.add(aboutFault, fmt.Sprintf("%s can't be held in an archive: %v.", dir+p, err),
-				fmt.Sprintf("Fix %s's jenny so the file can be held. An update writes nothing for this cell.", l.name))
+				closing{fmt.Sprintf("Fix %s's jenny so the file can be held.", l.name), claims{Nothing: true}})
 		}
 	}
 	return files, problems
