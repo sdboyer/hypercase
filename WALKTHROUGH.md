@@ -1915,22 +1915,30 @@ whether each has a probe, and whether the package owns it.
   rewrite. A cell whose output on those sections differs from what the
   update wrote fails, and the failure shows how the sections differ from
   what the transform makes, and names the module's update.
-- When the committed sections differ from what the transform makes, a
-  cell that a lift blocks on them, or whose probe says no on them, may be
-  one the update runs, or skips or blocks otherwise. A normal run stages
-  the variant on what the transform makes, as the update does, to tell,
-  and runs the cell's probe, if it has one, on what that reaches. It says
-  what the update does with the cell. When the update runs the cell, its
-  committed files are no orphans: the normal run says to delete none of
-  them by hand before the update has run, and, from step 8 on, that what
-  the update writes for the cell, if anything, is its run's. When the
-  update skips or blocks the cell otherwise, the normal run says why, and,
-  from step 8 on, which outcome the update writes; when the cell's probe
-  fails there, that the probe needs fixing. A cell that runs on the
-  committed sections, and no longer produces a file it commits, runs on
-  what the transform makes in the update, whose run may still write the
+- When the committed sections give another input view than the one the
+  transform makes, a cell that a lift blocks on them, whose probe says no
+  or fails on them, or whose error or files differ from what it commits,
+  may be one the update runs on another value, or skips or blocks
+  otherwise. A normal run stages the variant on what the transform makes,
+  as the update does, to tell, and runs the cell's probe, if it has one, on
+  what that reaches. It says what the update does with the cell. When the
+  update runs the cell, its committed files are no orphans: the normal run
+  says to delete none of them by hand before the update has run, and,
+  from step 8 on, that what the update writes for the cell, if anything,
+  is its run's. Its failure on the cell's error or a file says to run the
+  update, fix what it reports, and read the diff before committing. When
+  the update skips or blocks the cell otherwise, the normal run says why,
+  and, from step 8 on, which outcome the update writes. When the cell's
+  probe fails there, it says that the probe needs fixing, and, from step 8
+  on, what the update writes for the cell: `panicked`, with the panic in
+  `error.txt`, for a probe that panics, and nothing for one that says no
+  with no reason, or with one an outcome can't hold. A cell that runs on
+  the committed sections, and no longer produces a file it commits, runs
+  on what the transform makes in the update, whose run may still write the
   file: the normal run says to delete nothing by hand before the update
-  has run.
+  has run. Sections that give the same input view, as a `delete` line
+  naming a path the base lacks does, run every cell on the same value in
+  both runs, and a normal run's advice is its own.
 - An update replaces a transform's `in/…` and `delete` whole: a file the
   transform no longer produces is removed, and the removal shows in the diff.
 - When a transform no longer applies to a base, no cell runs on its
@@ -2887,7 +2895,8 @@ lift.
   the removal shows in the diff. A lift that fails on the case or is
   blocked, or whose variant's transform declines the base, has no product,
   and the update removes its `via/<lift>/`. That package's normal run fails
-  on what remains there, and says to run the update.
+  on what remains there, and says to run the update, unless the update
+  runs the lift on another value, past another bytes lift, as below.
 - In an update, the cells past the lift read the product it makes in that
   run, in every package. In a normal run, every package's cells past it
   read the committed `via/` bytes, so churn upstream fails only the
@@ -2896,22 +2905,28 @@ lift.
   committed `outcome`: any outcome but `accepted`, or none, blocks it. A
   lift that is `accepted` with no product files gives its readers an empty
   view.
-- A cell that a normal run finds blocked past a bytes lift, by a committed
-  outcome or by a lift that fails on a committed product, or whose probe
-  says no on a committed product, may run in the update, which reruns
-  every lift on its path, or be skipped or blocked there otherwise. When
-  the update runs the cell, the cell's committed files, a bytes lift's
-  product among them, are no orphans, and what the update writes for the
-  cell, if anything, is its run's. A normal run of a package that owns
-  every bytes lift on the cell's path stages the case as its update does,
-  on what a transform makes for its variant, and runs the cell's probe, if
-  it has one, on what that reaches. It says what the update does with the
-  cell: if it runs the cell, to delete nothing by hand before it has run,
-  and that what it writes for the cell, if anything, is its run's; if it
-  skips or blocks the cell otherwise, why, and which outcome it writes, if
-  any; if the cell's probe fails there, that the probe needs fixing.
-  Another package's normal run doesn't run the lifts it doesn't own, so it
-  says to run the update before deleting any of them.
+- A cell past a bytes lift that a normal run finds blocked, by a committed
+  outcome or by a lift that fails on a committed product, whose probe says
+  no or fails on a committed product, or whose error or files differ from
+  what it commits, may run in the update on another value, since the
+  update reruns every lift on its path, or be skipped or blocked there
+  otherwise. When the update runs the cell, the cell's committed files, a
+  bytes lift's product among them, are no orphans, and what the update
+  writes for the cell, if anything, is its run's. A normal run of a
+  package that owns every bytes lift on the cell's path stages the case as
+  its update does, on what a transform makes for its variant, and runs the
+  cell's probe, if it has one, on what that reaches. It says what the
+  update does with the cell: if it runs the cell, to delete nothing by
+  hand before it has run, that what it writes for the cell, if anything,
+  is its run's, and, on the cell's error or a file, to run it, fix what it
+  reports, and read the diff before committing; if it skips or blocks the
+  cell otherwise, why, and which outcome it writes, if any; if the cell's
+  probe fails there, that the probe needs fixing, and what the update
+  writes for the cell: `panicked`, with the panic in `error.txt`, for a
+  probe that panics, and nothing for one that says no with no reason, or
+  with one an outcome can't hold. Another package's normal run doesn't run
+  the lifts it doesn't own, so it says to run the update before deleting
+  any of them.
 - A cell past a bytes lift that runs on a committed product the lift no
   longer makes, and no longer produces a file it commits, runs on what the
   lift makes in the update, whose run may still write the file. A normal
@@ -2920,6 +2935,16 @@ lift.
   says to delete nothing by hand before the update has run. Another
   package's can't tell, and says so, and to run the update before deleting
   the file.
+- A bytes lift past another bytes lift is such a cell too: in a normal run
+  of the package that owns both, it runs on the earlier lift's committed
+  product, and its update reruns it on what the earlier lift makes. A file
+  of its committed product that its normal run doesn't make, because the
+  run made another product or failed on the case, is one the update may
+  still make. The normal run says what the update does with the lift's
+  cell: if it runs the lift, to delete nothing by hand before it has run;
+  if it blocks the lift, that it removes the file; if it writes nothing for
+  the earlier lift's cell, to fix what that cell reports, and delete
+  nothing by hand before the update has run.
 - A bytes lift's frozen cell includes its `via/` product: no update writes
   it, and a product that differs from what the lift makes fails the cell,
   in every run. An update writes the cells past it from what the lift makes
@@ -2960,7 +2985,10 @@ lift.
   each cell past the lift ranks on its own files. The lift's product
   declarations are described with its outputs, each as `via/<lift>/` and
   its pattern. A `via/<lift>/` section whose lift no registry declares as a
-  bytes lift over its corpus is a problem, which the report leaves out.
+  bytes lift over its corpus is a problem, which the report leaves out, so
+  it compares no product of the section's cell between the revisions. A
+  product with no `outcome` in its cell is a problem too, as step 9's
+  files with no `outcome` are, named by the cell's `via/<lift>/`.
 - `testdata/sheet/prices.txtar` and `testdata/csv/prices.txtar` both reach
   `evaluate`, the second through `import`. Their cases are `sheet/prices` and
   `csv/prices` (step 3), and their cells' subtests
