@@ -503,6 +503,41 @@ func TestStripRootCheckRefusedName(t *testing.T) {
 	s.done()
 }
 
+// TestStripRootCheckRefusedArchive: an archive whose name breaks the
+// naming rule, Bad.txtar, runs no cell, and hypercase strip refuses it by
+// its path, so it strips none of its sections. The root-package check
+// reports that alone, as strip words it, and names no strip for a section
+// no registry claims in it. Renamed, it is an archive, and the check names
+// the strip that removes the section.
+func TestStripRootCheckRefusedArchive(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	s.settle(stripModule...)
+	const bad, renamed = "testdata/export/Bad.txtar", "testdata/export/copy.txtar"
+	s.write(bad, s.read(prices), "a copy of prices, under a name that breaks the naming rule")
+	s.edit(bad, "a removed column's outcome", insert("out/nobody/outcome", "accepted\n", "out/parse/"))
+	r := s.normal("strip-a")
+	s.fails(r, `testdata/export/Bad.txtar is no archive a run reads: the archive's name, "Bad", breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter, so none of its cells run, and no update writes it. Rename the archive.`)
+	s.lacks(r, "no registry claims", "hypercase strip")
+	before := s.read(bad)
+	if got := s.strip("-root", ".", "-column", "nobody"); got.code != 1 {
+		t.Errorf("hypercase strip -column nobody exited %d, not 1, where only an archive it refuses holds the section:\n%s", got.code, got.out)
+	}
+	s.same(bad, before)
+
+	s.write(renamed, s.read(bad), "the archive renamed, as the message says")
+	s.remove(bad, "")
+	r = s.normal("strip-a")
+	s.fails(r, "testdata/export/copy.txtar: no registry claims out/nobody/outcome: no column named nobody runs over the corpus export.")
+	s.passes(s.strip(s.printedStrip(r, "-column", "nobody")...))
+	for _, r := range s.settle(stripModule...) {
+		s.passes(r)
+	}
+	s.hasSections(renamed, nil, "out/nobody/")
+	s.passes(s.normal("strip-a"))
+	s.done()
+}
+
 // TestStripFaultingLift: import's jenny now faults on prices, with an
 // error decl.Reject doesn't mark, and its cell still holds the files it
 // wrote when it accepted the case. No update writes a faulting cell, so

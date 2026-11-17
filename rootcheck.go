@@ -533,8 +533,11 @@ func typeEntry(ct registry.Type) string {
 func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, bytesLifts, disputed, transforms map[string]bool, props func(string) bool) {
 	t.Helper()
 	rel := r.rel(p)
-	if name := strings.TrimSuffix(filepath.Base(p), ".txtar"); !validName(name) {
-		t.Errorf("%s: the archive's name, %q, breaks the naming rule: %s.\nRename the archive.", rel, name, nameRule)
+	// An archive hypercase strip refuses by its path runs no cell, and
+	// strip strips none of its sections, so the check reports that alone.
+	if err := walk.CheckPath(r.corpusRoot, p); err != nil {
+		t.Errorf("%s is no archive a run reads: %v.", rel, err)
+		return
 	}
 	data, err := os.ReadFile(p)
 	if err != nil {

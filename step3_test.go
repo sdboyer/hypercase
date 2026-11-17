@@ -392,7 +392,7 @@ func TestLeftoverTempFile(t *testing.T) {
 func TestArchiveNameRule(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "bad-archive-name")
-	s.fails(s.normal("echo"), `testdata/script/Twice.txtar: the archive's name, "Twice", breaks the naming rule`)
+	s.fails(s.normal("echo"), `testdata/script/Twice.txtar is no archive a run reads: the archive's name, "Twice", breaks the naming rule`)
 	s.done()
 }
 

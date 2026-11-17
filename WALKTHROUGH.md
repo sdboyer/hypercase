@@ -1182,6 +1182,9 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
     one of theirs. Where the column's name breaks the naming rule, as in
     `out/Old/…`, strip refuses it as `-column`, so the failure names no
     strip, and says to delete the sections by hand;
+  - an archive whose name breaks the naming rule, as `Bad.txtar`: none of
+    its cells run, and `hypercase strip` refuses it, so the check reports
+    that alone, as strip words it, and names no strip for its sections;
   - a problem of an archive as a whole: a missing description, a top-level
     name outside the closed set, hand-written sections that don't sit
     together, a `properties`
