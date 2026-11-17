@@ -264,6 +264,33 @@ func TestDiffUnaligned(t *testing.T) {
 	}
 }
 
+// TestDiffUnalignedEnds: a stretch the diff can't align that ends both
+// files, with no final newline, says so of each side: Diff's Unaligned
+// line, and in Lines the note for each side that leaves the last line out.
+// A note that leaves out one line says "line".
+func TestDiffUnalignedEnds(t *testing.T) {
+	// 51 lines of a and 5,000 of b, which share no line and which no
+	// attempt of Myers' algorithm aligns.
+	a := []byte(strings.Repeat("a\n", maxUnaligned) + "a")
+	b := []byte(strings.Repeat("b\n", 4999) + "b")
+	got, _ := Diff(a, b)
+	if want := []Line{{Kind: Unaligned, Old: maxUnaligned + 1, New: 5000, OldNoNewline: true, NewNoNewline: true}}; !slices.Equal(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+	lines := strings.Split(strings.TrimSuffix(Lines(a, b), "\n"), "\n")
+	if len(lines) != 2*maxUnaligned+4 ||
+		lines[maxUnaligned] != "  ... (1 more line removed, which the diff can't align)" ||
+		lines[maxUnaligned+1] != `- \ no final newline` || lines[maxUnaligned+2] != "+ b" ||
+		lines[2*maxUnaligned+2] != fmt.Sprintf("  ... (%d more lines added, which the diff can't align)", 5000-maxUnaligned) ||
+		lines[2*maxUnaligned+3] != `+ \ no final newline` {
+		t.Errorf("Lines gives:\n%s", strings.Join(lines, "\n"))
+	}
+	// One line past the cap is "1 more line".
+	if got := Lines([]byte(strings.Repeat("a\n", maxLines/2)), []byte(strings.Repeat("b\n", maxLines/2+1))); !strings.HasSuffix(got, "\n+ b\n  ... (1 more line of diff)\n") {
+		t.Errorf("Lines of %d changed lines ends:\n%s", maxLines+1, got[max(0, len(got)-100):])
+	}
+}
+
 // chain returns a file of k marker lines, each after a filler line, where
 // each marker but the last appears again after the next: so the only line
 // two such files each hold once is the last marker, and only with it taken

@@ -16,8 +16,11 @@ const (
 	// maxLines caps how many diff lines a message prints.
 	maxLines = 200
 	// maxUnaligned caps how many lines of each side of a stretch the diff
-	// can't align a message prints, so that both sides show under
-	// maxLines.
+	// can't align a message prints, so that a long stretch's removed lines
+	// don't fill a message alone: each side shows its first maxUnaligned
+	// lines and how many more it leaves out. maxLines still caps the whole
+	// message, so a stretch that starts late in one is cut there, its notes
+	// with it.
 	maxUnaligned = maxLines / 4
 	// maxCells caps the work of one attempt of Myers' algorithm on a
 	// stretch of the files. Past it, the stretch is aligned on its unique
@@ -50,8 +53,8 @@ const (
 // can't align is shown as removed, then added, each side's first lines
 // and how many more it leaves out. A line holding a carriage return or
 // another control character is quoted, and a last line with no final
-// newline is followed by `\ no final newline`. Lines returns "" when a and
-// b are equal.
+// newline is followed by `\ no final newline`, as is the note for a side
+// that leaves such a line out. Lines returns "" when a and b are equal.
 func Lines(a, b []byte) string {
 	lines, _ := diff(a, b, false)
 	var sb strings.Builder
@@ -65,7 +68,7 @@ func Lines(a, b []byte) string {
 					rest++
 				}
 			}
-			fmt.Fprintf(&sb, "  ... (%d more lines of diff)\n", rest)
+			fmt.Fprintf(&sb, "  ... (%s of diff)\n", more(rest))
 			break
 		}
 		if l.Kind == Skip {
@@ -87,7 +90,11 @@ func Lines(a, b []byte) string {
 				if l.Kind == '+' {
 					how = "added"
 				}
-				fmt.Fprintf(&sb, "  ... (%d more lines %s, which the diff can't align)\n", end-i, how)
+				fmt.Fprintf(&sb, "  ... (%s %s, which the diff can't align)\n", more(end-i), how)
+				if lines[end-1].NoNewline {
+					sb.WriteByte(l.Kind)
+					sb.WriteString(" \\ no final newline\n")
+				}
 				printed++
 				i = end - 1
 				continue
@@ -104,6 +111,14 @@ func Lines(a, b []byte) string {
 		printed++
 	}
 	return sb.String()
+}
+
+// more says how many more lines there are.
+func more(n int) string {
+	if n == 1 {
+		return "1 more line"
+	}
+	return fmt.Sprintf("%d more lines", n)
 }
 
 // The Kinds of a [Line] that stands for other lines.
@@ -129,8 +144,10 @@ type Line struct {
 	// final newline.
 	NoNewline bool
 	// Old and New count the lines of a and of b an Unaligned line stands
-	// for.
-	Old, New int
+	// for, and OldNoNewline and NewNoNewline record that the last of them
+	// is a's, or b's, last line, and has no final newline.
+	Old, New                   int
+	OldNoNewline, NewNoNewline bool
 	// unaligned marks a '-' or '+' line of a stretch the diff can't align,
 	// in the lines Lines shows, which hold no Unaligned line.
 	unaligned bool
@@ -194,8 +211,10 @@ func diff(a, b []byte, collapse bool) (lines []Line, work int) {
 			l := &lines[len(lines)-1]
 			if op.kind == '-' {
 				l.Old++
+				l.OldNoNewline = noNewline
 			} else {
 				l.New++
+				l.NewNoNewline = noNewline
 			}
 			continue
 		}

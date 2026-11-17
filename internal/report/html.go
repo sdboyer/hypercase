@@ -82,7 +82,14 @@ func diffLine(l diff.Line) (class, text string) {
 	case diff.Skip:
 		return "skip", "  ..."
 	case diff.Unaligned:
-		return "unaligned", fmt.Sprintf("  ... left out: %s before and %s after, which the diff can't align", lines(l.Old), lines(l.New))
+		text = fmt.Sprintf("  ... left out: %s before and %s after, which the diff can't align", lines(l.Old), lines(l.New))
+		if l.OldNoNewline {
+			text += "\n- \\ no final newline"
+		}
+		if l.NewNoNewline {
+			text += "\n+ \\ no final newline"
+		}
+		return "unaligned", text
 	case '+':
 		class = "add"
 	case '-':
