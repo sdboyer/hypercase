@@ -463,12 +463,12 @@ Its `.gitignore` names the corpus root's lock, which an update takes
   the registries that record the root and the findings files in their
   packages' `testdata/checks/` (steps 5 and 8). It keeps a package's
   registry while any findings file of the package is left, so that strip
-  run again finds it, and every registry while an archive it strips is
-  left, for a problem of form or a failed write, so that strip run again
-  reads them as this run did. `-column <name>` limits it to a column's
-  sections, at every level, and `-transform <name>` to those under a
-  transform's variant (step 7). Either leaves the registries and findings
-  files.
+  run again finds it, and every registry while it leaves any `*.txtar`
+  file as it was, for a problem of form, a failed write or a place that is
+  no archive's, so that strip run again reads them as this run did.
+  `-column <name>` limits it to a column's sections, at every level, and
+  `-transform <name>` to those under a transform's variant (step 7).
+  Either leaves the registries and findings files.
 - `-root <dir>` names the corpus root. Without it, strip takes the root
   that the registry of the package in the current directory records, or,
   at the module root with no registry there, the module-root corpus.

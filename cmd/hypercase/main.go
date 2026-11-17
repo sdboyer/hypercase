@@ -21,9 +21,10 @@
 // strips every archive, and removes the registries that record the corpus
 // root and the findings files in their packages' testdata/checks/. It
 // keeps a package's registry while a findings file of the package is
-// left, so that strip run again finds it, and every registry while an
-// archive it strips is left, for a problem of form or a failed write, so
-// that strip run again reads the registries as this run did.
+// left, so that strip run again finds it, and every registry while it
+// leaves a *.txtar file as it was, for a problem of form, a failed write or
+// a place that is no archive's, so that strip run again reads the
+// registries as this run did.
 // -column limits it to a column's sections, at every level, and -transform
 // to those under a transform's variant, transform/<name>/; given together,
 // they limit it to the column's sections under that variant. Either leaves

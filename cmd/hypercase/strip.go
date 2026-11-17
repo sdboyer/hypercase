@@ -243,14 +243,11 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	add := func(p, text string, problem bool) {
 		lines = append(lines, stripped{path: rel(p), text: text, problem: problem})
 	}
-	// Whether an archive that strip strips was left, so that strip must run
-	// again.
+	// Whether a *.txtar file was left as it was, so that strip must run
+	// again: one that Archive refuses, as no archive of the corpus root by
+	// its path or for problems of form, or one whose write failed.
 	leftArchive := false
 	for _, p := range paths {
-		if err := strip.CheckPath(corpusRoot, p); err != nil {
-			add(p, "left as it was: "+err.Error()+".", true)
-			continue
-		}
 		// What the registries say of the bytes lifts over the corpus.
 		each := sel
 		corpus, _, _ := strings.Cut(root.Rel(td, p), "/")
@@ -286,8 +283,9 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	}
 	if sel.Column == "" && sel.Transform == "" {
 		// A registry goes only once its package's findings files have, so
-		// that a strip run again finds those left, and only once every
-		// archive is stripped, so that a strip run again reads the
+		// that a strip run again finds those left, and only once no
+		// *.txtar file is left as it was, so that a strip run again, once
+		// it is fixed or moved into a corpus's directory, reads the
 		// registries as this one did.
 		lock := filepath.Join(td, archive.LockFile)
 		for _, g := range own {
