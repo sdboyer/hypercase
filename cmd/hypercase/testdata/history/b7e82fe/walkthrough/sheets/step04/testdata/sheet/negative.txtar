@@ -1,0 +1,9 @@
+A1 is a negative number.
+-- in/sheet/A1 --
+-3
+-- gaps --
+evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
+-- out/evaluate/error.txt --
+A1: unexpected "-"
+-- out/evaluate/outcome --
+rejected

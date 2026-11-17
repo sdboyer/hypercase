@@ -39,9 +39,16 @@ func matrixRow(t *testing.T, page, corpus, name string) (head string, cells []st
 func change(t *testing.T, page, name, column string) string {
 	t.Helper()
 	changes := section(t, page, `<section id="changes">`, "</section>")
-	entry := section(t, changes, `<span class="case">`+name+`</span> <span class="col">`+column+`</span>`, "</li>\n<li class=\"change")
-	if i := strings.Index(entry, "</ul>\n<h3"); i >= 0 {
-		entry = entry[:i]
+	start := `<span class="case">` + name + `</span> <span class="col">` + column + `</span>`
+	i := strings.Index(changes, start)
+	if i < 0 {
+		t.Fatalf("the changes don't hold %q", start)
+	}
+	entry := changes[i:]
+	for _, end := range []string{"\n<li class=\"change ", "\n<h3"} {
+		if j := strings.Index(entry, end); j >= 0 {
+			entry = entry[:j]
+		}
 	}
 	return entry
 }
@@ -104,7 +111,7 @@ func TestPageMatrix(t *testing.T) {
 	for _, r := range regexp.MustCompile(`<th scope="row"><span class="case">([^<]*)</span>`).FindAllStringSubmatch(m, -1) {
 		rows = append(rows, r[1])
 	}
-	want := []string{"sheet/div", "sheet/loop", "sheet/negative", "sheet/ratio", "sheet/twice", "sheet/twice/variant/cycle", "sheet/twice/transform/looped"}
+	want := []string{"sheet/div", "sheet/loop", "sheet/negative", "sheet/negative/variant/positive", "sheet/ratio", "sheet/twice", "sheet/twice/variant/cycle", "sheet/twice/transform/looped"}
 	if !slices.Equal(rows, want) {
 		t.Errorf("the matrix's rows are %q, want %q", rows, want)
 	}
@@ -120,9 +127,10 @@ func TestPageMatrix(t *testing.T) {
 	_, cells = matrixRow(t, page, "sheet", "sheet/twice")
 	lacks(t, "twice's calc", cells[0], "changed", "appeared")
 	lacks(t, "the matrix", m, "sheet/blank")
+	holds(t, "the matrix", m, `<p class="desc">A sheet: one file per cell, under sheet/, named for the cell.</p>`)
 
-	dl := section(t, m, `<dl class="columns">`, "</dl>")
-	holds(t, "the columns' descriptions", dl, "<dt>parse</dt><dd>Parses every cell.</dd>")
+	dl := section(t, page, `<section class="corpus" id="describe-sheet">`, "</section>")
+	holds(t, "the columns' descriptions", dl, "<dt>parse</dt><dd>Parses every cell.<ul class=\"outputs\">")
 }
 
 // TestPageProperties: each case's stated properties are shown beside it,
@@ -145,11 +153,64 @@ func TestPageProperties(t *testing.T) {
 
 // TestPageTransformProperties: a transform's variant states what the
 // registries say its transform gives, and each property the transform
-// keeps that its base states, shown as a case's are. A transform declines
-// a base that states a property it neither gives nor keeps, and the
-// variant's sections left in the archive state nothing.
+// keeps that its base states, each marked as given or kept. A base states
+// its own properties and a hand-written variant its own, none of the
+// base's. A transform declines a base that states a property it neither
+// gives nor keeps, and the variant's sections left in the archive state
+// nothing.
 func TestPageTransformProperties(t *testing.T) {
 	t.Parallel()
+	const archive = "A dangling reference.\n-- in/sheet/A1 --\n=B9\n-- properties --\ndangling\n-- out/calc/outcome --\nrejected\n" +
+		"-- variant/v/about --\nA1 refers to itself instead.\n-- variant/v/in/sheet/A1 --\n=A1\n-- variant/v/properties --\ncircular\n-- variant/v/out/calc/outcome --\nrejected\n" +
+		"-- transform/t/in/sheet/A1 --\n=A1\n-- transform/t/in/sheet/B1 --\n=B9\n-- transform/t/out/calc/outcome --\nrejected\n"
+	const (
+		dangling = `<span class="prop" title="A reference to nothing.">dangling</span>`
+		circular = `<span class="prop" title="A loop.">circular</span>`
+		given    = `<span class="prop given" title="A loop.">circular <span class="how">given</span></span>`
+		kept     = `<span class="prop kept" title="A reference to nothing.">dangling <span class="how">kept</span></span>`
+	)
+	for _, tt := range []struct {
+		name    string
+		keeps   []string
+		want    []string
+		unwants []string
+	}{
+		{"keeps dangling", []string{"dangling"}, []string{given, kept}, nil},
+		// With nothing kept, the transform declines a base that states
+		// dangling, and its variant states nothing.
+		{"keeps nothing", nil, nil, []string{"dangling", "circular"}},
+		{"keeps what the base doesn't state", []string{"dangling", "orphan"}, []string{given, kept}, []string{"orphan"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			reg := moduleRegistry()
+			reg.Properties = append(reg.Properties,
+				registry.Property{Name: "dangling", Description: "A reference to nothing."},
+				registry.Property{Name: "orphan", Description: "A cell nothing refers to."})
+			reg.Types = []registry.Type{{Dir: "sheet", Description: "A sheet.", GoType: "example.com/m.Sheet", Transforms: []registry.Transform{
+				{Name: "t", Description: "Makes A1 refer to itself.", Gives: []string{"circular"}, Keeps: tt.keeps, Owned: true},
+			}}}
+			files := module(map[string]string{"x": archive})
+			files["testdata/hypercase.json"] = string(reg.Marshal())
+			g := gittest.New(t)
+			c := revisions(t, g, module(nil), files)
+			page := ok(t, g, "", "report", c[0], c[1])
+			head, _ := matrixRow(t, page, "sheet", "sheet/x")
+			holds(t, "x's row", head, dangling)
+			lacks(t, "x's row", head, "circular")
+			head, _ = matrixRow(t, page, "sheet", "sheet/x/variant/v")
+			holds(t, "x/variant/v's row", head, circular)
+			lacks(t, "x/variant/v's row", head, "dangling")
+			head, _ = matrixRow(t, page, "sheet", "sheet/x/transform/t")
+			holds(t, "x/transform/t's row", head, tt.want...)
+			lacks(t, "x/transform/t's row", head, tt.unwants...)
+			holds(t, "x/transform/t calc's change", change(t, page, "sheet/x/transform/t", "calc"), tt.want...)
+		})
+	}
+
+	// A base that states nothing, and one a transform declines, whose
+	// variant's sections are left in the archive, or which a gaps line
+	// names.
 	reg := moduleRegistry()
 	reg.Properties = append(reg.Properties, registry.Property{Name: "dangling", Description: "A reference to nothing."})
 	reg.Types = []registry.Type{{Dir: "sheet", Description: "A sheet.", GoType: "example.com/m.Sheet", Transforms: []registry.Transform{
@@ -157,7 +218,6 @@ func TestPageTransformProperties(t *testing.T) {
 		{Name: "kept", Description: "Adds a number.", Keeps: []string{"dangling", "circular"}, Owned: true},
 	}}}
 	files := module(map[string]string{
-		"loop":  "A loop.\n-- in/sheet/A1 --\n=A1\n-- properties --\ncircular\n-- out/calc/outcome --\nrejected\n-- transform/kept/in/sheet/B1 --\n1\n-- transform/kept/out/calc/outcome --\nrejected\n",
 		"plain": "A number.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n-- transform/kept/in/sheet/B1 --\n1\n-- transform/kept/out/calc/outcome --\naccepted\n-- transform/looped/in/sheet/A1 --\n=A1\n-- transform/looped/out/calc/outcome --\nrejected\n",
 		// looped declines both bases: it neither gives nor keeps dangling.
 		"orphan": "A dangling reference.\n-- in/sheet/A1 --\n=B9\n-- properties --\ndangling\n-- out/calc/outcome --\nrejected\n-- transform/looped/out/calc/outcome --\nrejected\n",
@@ -167,23 +227,20 @@ func TestPageTransformProperties(t *testing.T) {
 	g := gittest.New(t)
 	c := revisions(t, g, module(nil), files)
 	page := ok(t, g, "", "report", c[0], c[1])
-	const circular = `<span class="prop" title="A loop.">circular</span>`
-	head, _ := matrixRow(t, page, "sheet", "sheet/loop/transform/kept")
-	holds(t, "loop/transform/kept's row", head, circular)
-	head, _ = matrixRow(t, page, "sheet", "sheet/plain/transform/looped")
-	holds(t, "plain/transform/looped's row", head, circular)
+	head, _ := matrixRow(t, page, "sheet", "sheet/plain/transform/looped")
+	holds(t, "plain/transform/looped's row", head, `<span class="prop given" title="A loop.">circular <span class="how">given</span></span>`)
 	head, _ = matrixRow(t, page, "sheet", "sheet/plain/transform/kept")
-	lacks(t, "plain/transform/kept's row", head, `class="prop"`)
-	holds(t, "loop/transform/kept calc's change", change(t, page, "sheet/loop/transform/kept", "calc"), circular)
+	lacks(t, "plain/transform/kept's row", head, `class="prop`)
 	for _, c := range []string{"sheet/orphan/transform/looped", "sheet/gap/transform/looped"} {
 		head, _ = matrixRow(t, page, "sheet", c)
-		lacks(t, c+"'s row", head, `class="prop"`)
+		lacks(t, c+"'s row", head, `class="prop`)
 	}
 }
 
 // TestPageGaps: each gaps line is shown on the cell it marks, linked to
-// its issue, and marks a cell with committed files frozen. A transform's
-// line, in its base's gaps, marks the transform's variant's cell.
+// its issue, and marks a cell that exists frozen. A base's line marks the
+// base's cell, never a variant's, and a transform's line, in its base's
+// gaps, marks the transform's variant's cell.
 func TestPageGaps(t *testing.T) {
 	t.Parallel()
 	g, a, b := sheets(t)
@@ -193,11 +250,16 @@ func TestPageGaps(t *testing.T) {
 	holds(t, "negative's calc", cells[0], `class="cell s-empty"`, `<div class="gap">A negative number is valid. Waits on <a href="https://example.com/sheets/issues/3">sheets#3</a>.</div>`)
 	lacks(t, "negative's calc", cells[0], "frozen")
 	lacks(t, "negative's format", cells[2], "gap")
+	_, cells = matrixRow(t, page, "sheet", "sheet/negative/variant/positive")
+	holds(t, "negative/variant/positive's evaluate", cells[1], `class="cell s-accepted"`)
+	lacks(t, "negative/variant/positive's evaluate", cells[1], "frozen", "gap")
 
 	_, cells = matrixRow(t, page, "sheet", "sheet/twice/transform/looped")
 	holds(t, "twice/transform/looped's format", cells[2], "frozen", `Waits on <a href="https://example.com/sheets/issues/7">sheets#7</a>.`)
 	_, cells = matrixRow(t, page, "sheet", "sheet/twice")
 	lacks(t, "twice's format", cells[2], "frozen", "gap")
+	_, cells = matrixRow(t, page, "sheet", "sheet/twice/variant/cycle")
+	lacks(t, "twice/variant/cycle's format", cells[2], "frozen", "gap")
 }
 
 // TestPageGapWithoutCell: a gaps line is shown on the cell it marks even
@@ -223,11 +285,85 @@ func TestPageLinks(t *testing.T) {
 	page := ok(t, g, "step09", "report", a, b)
 	head, _ := matrixRow(t, page, "sheet", "sheet/negative")
 	holds(t, "negative's description", head, `which <a href="https://example.com/sheets/issues/3">sheets#3</a> is about.`)
-	holds(t, "calc's description", page, `<dd>Runs the calc command on the sheet; see <a href="https://example.com/sheets/issues/12">sheets#12</a>.</dd>`,
+	holds(t, "calc's description", page, `<dd>Runs the calc command on the sheet; see <a href="https://example.com/sheets/issues/12">sheets#12</a>.<ul class="outputs">`,
 		`title="Runs the calc command on the sheet; see sheets#12."`)
 	// a's registries link to another URL.
 	lacks(t, "the page", page, "old.example.com")
 	// The report from b to a links through a's.
 	back := ok(t, g, "step09", "report", b, a)
 	holds(t, "the page from b to a", back, `<a href="https://old.example.com/3">sheets#3</a>`)
+}
+
+// TestPageTwoTrackers: with a pattern for each of two issue trackers, text
+// naming an issue in either links to it in its own tracker, in gaps lines
+// and descriptions alike, and text that matches neither pattern links
+// nowhere.
+func TestPageTwoTrackers(t *testing.T) {
+	t.Parallel()
+	reg := moduleRegistry()
+	reg.IssueLinks = []registry.IssueLink{
+		{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/issues/$1"},
+		{Pattern: `calc-lib#(\d+)`, URL: "https://example.com/calc-lib/pull/$1"},
+	}
+	reg.Suites[0].Description = "Runs calc, which calc-lib#2 changes."
+	files := module(map[string]string{
+		"x": "Waits on sheets#1 and calc-lib#2, and not on other#3.\n-- in/sheet/A1 --\n1\n" +
+			"-- gaps --\ncalc Waits on calc-lib#4.\nevaluate Waits on sheets#5, not other#6.\n" +
+			"-- out/calc/outcome --\naccepted\n-- out/evaluate/outcome --\naccepted\n",
+	})
+	files["testdata/hypercase.json"] = string(reg.Marshal())
+	g := gittest.New(t)
+	c := revisions(t, g, module(nil), files)
+	page := ok(t, g, "", "report", c[0], c[1])
+	head, cells := matrixRow(t, page, "sheet", "sheet/x")
+	holds(t, "x's description", head, `Waits on <a href="https://example.com/sheets/issues/1">sheets#1</a> and <a href="https://example.com/calc-lib/pull/2">calc-lib#2</a>, and not on other#3.`)
+	holds(t, "x's calc", cells[0], `<div class="gap">Waits on <a href="https://example.com/calc-lib/pull/4">calc-lib#4</a>.</div>`)
+	holds(t, "x's evaluate", cells[1], `<div class="gap">Waits on <a href="https://example.com/sheets/issues/5">sheets#5</a>, not other#6.</div>`)
+	holds(t, "calc's description", page, `<dt>calc</dt><dd>Runs calc, which <a href="https://example.com/calc-lib/pull/2">calc-lib#2</a> changes.</dd>`)
+	for _, m := range regexp.MustCompile(`<a href="([^"]*)">([^<]*)</a>`).FindAllStringSubmatch(page, -1) {
+		if strings.HasPrefix(m[2], "other#") {
+			t.Errorf("%s links to %s, and matches no pattern", m[2], m[1])
+		}
+	}
+}
+
+// TestPageBadLink: a link pattern at b that isn't a regular expression is
+// one problem at b, naming every registry that gives it, each once, and
+// links nothing, while the report still links through the patterns that
+// are.
+func TestPageBadLink(t *testing.T) {
+	t.Parallel()
+	reg := moduleRegistry()
+	reg.IssueLinks = []registry.IssueLink{
+		{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/issues/$1"},
+		{Pattern: `calc-lib#(\d+`, URL: "https://example.com/calc-lib/pull/$1"},
+	}
+	other := registry.Registry{UpdateVar: "M_UPDATE_GOLDEN", CorpusRoot: ".", IssueLinks: reg.IssueLinks[1:]}
+	files := module(map[string]string{
+		"x": "Waits on sheets#1 and calc-lib#(2.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n",
+	})
+	files["testdata/hypercase.json"] = string(reg.Marshal())
+	files["pkg/testdata/hypercase.json"] = string(other.Marshal())
+	g := gittest.New(t)
+	c := revisions(t, g, module(nil), files)
+	page := ok(t, g, "", "report", c[0], c[1])
+	ps := section(t, page, `<section id="problems">`, "</section>")
+	holds(t, "the problems", ps, `<h2>Problems <span class="count">1</span></h2>`, `<h3>At <span class="rev">`+c[1]+`</span></h3>`,
+		"<li>testdata/hypercase.json and pkg/testdata/hypercase.json give the issue link pattern &#34;calc-lib#(\\\\d&#43;&#34;, which is not a regular expression (error parsing regexp: missing closing ): `calc-lib#(\\d&#43;`), so the report links no text through it.</li>")
+	head, _ := matrixRow(t, page, "sheet", "sheet/x")
+	holds(t, "x's description", head, `Waits on <a href="https://example.com/sheets/issues/1">sheets#1</a> and calc-lib#(2.`)
+	if back := ok(t, g, "", "report", c[1], c[0]); strings.Contains(back, `<section id="problems">`) {
+		t.Errorf("the report from b to a lists a problem, and a's registries give no pattern:\n%s", section(t, back, `<section id="problems">`, "</section>"))
+	}
+
+	// One registry that gives the pattern twice, with two URLs, is named
+	// once, in a problem of its own.
+	reg.IssueLinks = append(reg.IssueLinks, registry.IssueLink{Pattern: `calc-lib#(\d+`, URL: "https://example.com/calc-lib/issues/$1"})
+	files = module(map[string]string{"x": "A case.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"})
+	files["testdata/hypercase.json"] = string(reg.Marshal())
+	g = gittest.New(t)
+	c = revisions(t, g, module(nil), files)
+	ps = section(t, ok(t, g, "", "report", c[0], c[1]), `<section id="problems">`, "</section>")
+	holds(t, "the problems", ps, `<h2>Problems <span class="count">1</span></h2>`,
+		"<li>testdata/hypercase.json gives the issue link pattern &#34;calc-lib#(\\\\d&#43;&#34;, which is not a regular expression (error parsing regexp: missing closing ): `calc-lib#(\\d&#43;`), so the report links no text through it.</li>")
 }

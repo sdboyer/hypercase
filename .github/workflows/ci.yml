@@ -58,3 +58,50 @@ jobs:
 
       - name: Tests change no tracked file
         run: git diff --exit-code && test -z "$(git status --porcelain)"
+
+  report:
+    name: report
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The report reads both revisions from the object store, so it
+          # needs the history back to the merge base.
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build the report
+        run: go build -o "$RUNNER_TEMP/hypercase" ./cmd/hypercase
+
+      - name: Report on the toys
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base=$(git merge-base "$BASE_SHA" HEAD)
+          head=$(git rev-parse HEAD)
+          mkdir -p "$RUNNER_TEMP/reports"
+          # One report per corpus root, run in the root package, whose
+          # registry records it. A walkthrough with no root would pass
+          # with no report, so finding none fails.
+          if ! regs=$(git grep -l '"rootPackage": true' -- 'walkthrough/*/testdata/hypercase.json'); then
+            echo "::error::no registry under walkthrough/ records a corpus root"
+            exit 1
+          fi
+          for reg in $regs; do
+            dir=$(dirname "$(dirname "$reg")")
+            page="$RUNNER_TEMP/reports/$(echo "$dir" | tr / -).html"
+            (cd "$dir" && "$RUNNER_TEMP/hypercase" report "$base" "$head") > "$page"
+            echo "$dir: $page"
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: report
+          path: ${{ runner.temp }}/reports/
+          if-no-files-found: error

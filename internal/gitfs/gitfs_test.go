@@ -4,10 +4,13 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/sdboyer/hypercase/internal/gitfs"
 	"github.com/sdboyer/hypercase/internal/gittest"
@@ -112,6 +115,8 @@ func TestPrefixAndResolve(t *testing.T) {
 	g := gittest.New(t)
 	g.Write(map[string]string{"sub/dir/f.txt": "f\n"})
 	c := g.Commit("first")
+	g.Write(map[string]string{"sub/dir/f.txt": "g\n"})
+	d := g.Commit("second")
 
 	top := open(t, g.Dir)
 	if got := top.Prefix(); got != "." {
@@ -121,12 +126,17 @@ func TestPrefixAndResolve(t *testing.T) {
 	if got := sub.Prefix(); got != "sub/dir" {
 		t.Errorf("Prefix below the top = %q, want sub/dir", got)
 	}
-	for _, rev := range []string{"main", "HEAD", c, c[:10]} {
+	for _, rev := range []string{"main~1", "HEAD~", c, c[:10]} {
 		if got, err := sub.Resolve(rev); err != nil || got != c {
 			t.Errorf("Resolve(%q) = %q, %v; want %s", rev, got, err, c)
 		}
 	}
-	for _, rev := range []string{"nope", "--all", "HEAD~5"} {
+	// A range is no commit, though rev-parse prints the commits it names
+	// before it exits 1.
+	if out := g.Git("rev-parse", c+".."+d); !strings.Contains(out, c) {
+		t.Fatalf("git rev-parse %s..%s printed %q, and this test wants it to print the range's commits", c, d, out)
+	}
+	for _, rev := range []string{"nope", "--all", "-x", "HEAD~5", c + ".." + d, c + "..." + d, "main..HEAD"} {
 		if _, err := sub.Resolve(rev); err == nil || err.Error() != rev+" names no commit in this repository" {
 			t.Errorf("Resolve(%q): got %v", rev, err)
 		}
@@ -134,4 +144,266 @@ func TestPrefixAndResolve(t *testing.T) {
 	if _, err := gitfs.Open(t.TempDir(), gittest.Env()); err == nil {
 		t.Error("Open outside a repository: got no error")
 	}
+}
+
+// TestMissingBlob: a blob the object store has lost is an error that says
+// so, never an absent or empty file.
+func TestMissingBlob(t *testing.T) {
+	t.Parallel()
+	g := gittest.New(t)
+	g.Write(map[string]string{"kept.txt": "kept\n", "lost.txt": "lost\n"})
+	c := g.Commit("first")
+	hash := strings.TrimSpace(g.Git("rev-parse", c+":lost.txt"))
+	if err := os.Remove(filepath.Join(g.Dir, ".git", "objects", hash[:2], hash[2:])); err != nil {
+		t.Fatal(err)
+	}
+	tree, err := open(t, g.Dir).Tree(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := fs.ReadFile(tree, "kept.txt"); err != nil || string(got) != "kept\n" {
+		t.Errorf("kept.txt: got %q, %v", got, err)
+	}
+	want := "readfile lost.txt: git cat-file finds no object " + hash + " in the repository"
+	if _, err := fs.ReadFile(tree, "lost.txt"); err == nil || err.Error() != want {
+		t.Errorf("lost.txt: got %v, want %q", err, want)
+	}
+	if _, err := fs.Stat(tree, "lost.txt"); err == nil || !strings.Contains(err.Error(), "finds no object "+hash) {
+		t.Errorf("stat lost.txt: got %v", err)
+	}
+}
+
+// TestNotABlob: an object that cat-file gives as another kind than a blob,
+// such as a tree, is an error, and the read goes past its content, so the
+// next read gets its own object.
+func TestNotABlob(t *testing.T) {
+	t.Parallel()
+	g := gittest.New(t)
+	g.Write(map[string]string{"a.txt": "a\n", "dir/b.txt": "b\n"})
+	c := g.Commit("first")
+	r := open(t, g.Dir)
+	treeHash := strings.TrimSpace(g.Git("rev-parse", c+"^{tree}"))
+	blobHash := strings.TrimSpace(g.Git("rev-parse", c+":a.txt"))
+	want := "git cat-file gives a tree, not a blob, for " + treeHash
+	for range 2 {
+		if _, err := r.Blob(treeHash); err == nil || err.Error() != want {
+			t.Errorf("Blob(tree): got %v, want %q", err, want)
+		}
+		if got, err := r.Blob(blobHash); err != nil || string(got) != "a\n" {
+			t.Errorf("Blob(a.txt) after the tree: got %q, %v", got, err)
+		}
+	}
+}
+
+// wrapGit puts a git on PATH that runs script, a shell script given the
+// real git as $GIT, before git's arguments.
+func wrapGit(t *testing.T, script string) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the wrapper is a shell script")
+	}
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	body := "#!/bin/sh\nGIT='" + real + "'\n" + script
+	if err := os.WriteFile(filepath.Join(dir, "git"), []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+// TestStderr: git's stderr never reaches a file's content, and a git
+// command that fails is an error that names the command and holds its
+// stderr. It sets PATH, so it can't run in parallel.
+func TestStderr(t *testing.T) {
+	g := gittest.New(t)
+	files := map[string]string{"a.txt": "a\n", "dir/b.txt": "b\n", "empty.txt": ""}
+	g.Write(files)
+	c := g.Commit("first")
+
+	t.Run("noise", func(t *testing.T) {
+		wrapGit(t, `echo "noise on stderr from git $1" >&2
+"$GIT" "$@"
+status=$?
+echo "more noise from git $1" >&2
+exit $status
+`)
+		r := open(t, g.Dir)
+		got, err := r.Resolve("HEAD")
+		if err != nil || got != c {
+			t.Fatalf("Resolve(HEAD) = %q, %v", got, err)
+		}
+		tree, err := r.Tree(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for name, want := range files {
+			if got, err := fs.ReadFile(tree, name); err != nil || string(got) != want {
+				t.Errorf("%s: got %q, %v; want %q", name, got, err, want)
+			}
+		}
+	})
+	for _, cmd := range []string{"rev-parse", "ls-tree", "cat-file"} {
+		t.Run(cmd, func(t *testing.T) {
+			wrapGit(t, `if [ "$1" = `+cmd+` ]; then echo "the wrapper fails $1" >&2; exit 3; fi
+exec "$GIT" "$@"
+`)
+			want := "git " + cmd + ": the wrapper fails " + cmd
+			r, err := gitfs.Open(g.Dir, gittest.Env())
+			if cmd == "rev-parse" {
+				if err == nil || err.Error() != want {
+					t.Errorf("Open: got %v, want %q", err, want)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer r.Close()
+			tree, err := r.Tree(c)
+			if cmd == "ls-tree" {
+				if err == nil || err.Error() != want {
+					t.Errorf("Tree: got %v, want %q", err, want)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			for range 2 { // the failure holds for every read after it
+				if _, err := fs.ReadFile(tree, "a.txt"); err == nil || err.Error() != "readfile a.txt: "+want {
+					t.Errorf("ReadFile: got %v, want %q", err, want)
+				}
+			}
+		})
+	}
+	// A revision git resolves to no commit writes nothing on stderr, and a
+	// rev-parse that fails otherwise is the failure, with its stderr.
+	t.Run("resolve", func(t *testing.T) {
+		wrapGit(t, `if [ "$1" = rev-parse ] && [ "$2" = --verify ]; then echo "the wrapper fails $1" >&2; exit 3; fi
+exec "$GIT" "$@"
+`)
+		r := open(t, g.Dir)
+		if _, err := r.Resolve("HEAD"); err == nil || err.Error() != "git rev-parse: the wrapper fails rev-parse" {
+			t.Errorf("Resolve(HEAD): got %v, want %q", err, "git rev-parse: the wrapper fails rev-parse")
+		}
+	})
+	// A header that says nothing of how much content follows leaves no
+	// later read able to find its own: each gives the first one's error.
+	t.Run("header", func(t *testing.T) {
+		wrapGit(t, `if [ "$1" = cat-file ]; then while read -r line; do echo "nonsense"; done; exit 0; fi
+exec "$GIT" "$@"
+`)
+		r := open(t, g.Dir)
+		tree, err := r.Tree(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = fs.ReadFile(tree, "a.txt")
+		if err == nil || !strings.Contains(err.Error(), `git cat-file gave "nonsense" for the blob `) {
+			t.Fatalf("ReadFile(a.txt): got %v", err)
+		}
+		first := strings.TrimPrefix(err.Error(), "readfile a.txt: ")
+		if _, err := fs.ReadFile(tree, "dir/b.txt"); err == nil || err.Error() != "readfile dir/b.txt: "+first {
+			t.Errorf("ReadFile(dir/b.txt): got %v, want %q", err, "readfile dir/b.txt: "+first)
+		}
+	})
+	// A bad header and a failure on stderr: the error holds both, for
+	// every read after it.
+	t.Run("header and stderr", func(t *testing.T) {
+		wrapGit(t, `if [ "$1" = cat-file ]; then read -r line; echo "nonsense"; echo "fatal: the wrapper's reason" >&2; exit 3; fi
+exec "$GIT" "$@"
+`)
+		r := open(t, g.Dir)
+		tree, err := r.Tree(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := `git cat-file gave "nonsense" for the blob ` + strings.TrimSpace(g.Git("rev-parse", c+":a.txt")) + `: fatal: the wrapper's reason`
+		for _, name := range []string{"a.txt", "dir/b.txt"} {
+			if _, err := fs.ReadFile(tree, name); err == nil || err.Error() != "readfile "+name+": "+want {
+				t.Errorf("ReadFile(%s): got %v, want %q", name, err, "readfile "+name+": "+want)
+			}
+		}
+	})
+	// answer has the wrapper answer one read as git does, which starts
+	// cat-file and every process the wrapper starts. more then writes more
+	// than a pipe holds, which no read takes, and starts no process: with
+	// SIGPIPE ignored, each write after the pipe is closed fails, and the
+	// loop ends.
+	const answer = `read -r line; printf '%s\n' "$line" | "$GIT" cat-file --batch
+`
+	const more = `trap '' PIPE; s=0123456789abcdef; s=$s$s$s$s; s=$s$s$s$s; s=$s$s; i=0
+while [ $i -lt 2048 ]; do echo "$s"; i=$((i+1)); done 2>/dev/null
+while read -r line; do :; done; exit 0
+`
+	// A bad header, then more than a pipe holds: stopping cat-file closes
+	// the pipe it writes to, so it exits, and the read doesn't wait on it.
+	// The read before it has started every process, so the deadline fails
+	// only a read that never returns.
+	t.Run("header then more", func(t *testing.T) {
+		wrapGit(t, `if [ "$1" = cat-file ]; then
+`+answer+`read -r line; echo "nonsense"
+`+more+`fi
+exec "$GIT" "$@"
+`)
+		// Not open's Close, which would wait on a read that never returns.
+		r, err := gitfs.Open(g.Dir, gittest.Env())
+		if err != nil {
+			t.Fatal(err)
+		}
+		tree, err := r.Tree(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := fs.ReadFile(tree, "a.txt"); err != nil || string(got) != files["a.txt"] {
+			t.Fatalf("ReadFile(a.txt) = %q, %v", got, err)
+		}
+		read := make(chan error, 1)
+		go func() {
+			_, err := fs.ReadFile(tree, "dir/b.txt")
+			read <- err
+		}()
+		want := `readfile dir/b.txt: git cat-file gave "nonsense" for the blob ` + strings.TrimSpace(g.Git("rev-parse", c+":dir/b.txt"))
+		select {
+		case err := <-read:
+			if err == nil || err.Error() != want {
+				t.Errorf("ReadFile(dir/b.txt): got %v, want %q", err, want)
+			}
+		case <-time.After(time.Minute):
+			t.Fatal("ReadFile(dir/b.txt) never returned: git cat-file is blocked writing what no read takes")
+		}
+	})
+	// An answer, then more than a pipe holds: Close closes the pipe
+	// cat-file writes to before it waits, so it exits, and Close doesn't
+	// wait on it. The read before it has started every process, so the
+	// deadline fails only a Close that never returns.
+	t.Run("answer then more", func(t *testing.T) {
+		wrapGit(t, `if [ "$1" = cat-file ]; then
+`+answer+more+`fi
+exec "$GIT" "$@"
+`)
+		r, err := gitfs.Open(g.Dir, gittest.Env())
+		if err != nil {
+			t.Fatal(err)
+		}
+		tree, err := r.Tree(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := fs.ReadFile(tree, "a.txt"); err != nil || string(got) != files["a.txt"] {
+			t.Fatalf("ReadFile(a.txt) = %q, %v", got, err)
+		}
+		closed := make(chan error, 1)
+		go func() { closed <- r.Close() }()
+		select {
+		case err := <-closed:
+			if err != nil {
+				t.Errorf("Close: %v", err)
+			}
+		case <-time.After(time.Minute):
+			t.Fatal("Close never returned: git cat-file is blocked writing what no read takes")
+		}
+	})
 }
