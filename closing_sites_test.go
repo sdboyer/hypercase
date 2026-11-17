@@ -291,6 +291,7 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "a properties line naming no registered property, in the root-package check"},
 		{"Errorf", "a gaps line naming no transform, in the root-package check"},
 		{"Errorf", "a gaps line naming no column, in the root-package check"},
+		{"Errorf", "sections no registry claims, of a lift the registries differ on, in the root-package check"},
 		{"Errorf", "sections no registry claims, in the root-package check"},
 	},
 	"runner.checkColumnDescriptions": {
