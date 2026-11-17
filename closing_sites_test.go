@@ -30,10 +30,11 @@ import (
 // composite literal, and any other use. Each is report's one t.Errorf, or
 // a site messageSites lists for its function by what it is and its
 // message, saying what it reports, which is no cell's note: each listed
-// site is one use. And no note's body gives advice, which is its
-// closing's: no body holds a run of the words of a closing's advice, or of
-// what a closing's claims say. A closing's advice says nothing of what an
-// update does: no constant of it names an update.
+// site is one use. A message method's call gives its message's words in
+// the constant it formats, which names it. And no note's body gives
+// advice, which is its closing's: no body holds a run of the words of a
+// closing's advice, or of what a closing's claims say. A closing's advice
+// says nothing of what an update does: no constant of it names an update.
 // Nor does a note's body mention the update at all, which is its
 // closing's to name: no constant of a body says "update", in any case, or
 // holds the words updateCmd gives the update command. TestClosings checks
@@ -45,6 +46,17 @@ func TestOneClosing(t *testing.T) {
 		t.Errorf("report's uses of testing values are %v, and the boundary is its one t.Errorf.", got)
 	}
 	delete(sites, "report")
+	// messageSites lists a site by its message, so a message method's call
+	// gives its message's words in the constant it formats, which name it:
+	// a message made elsewhere and passed whole, as "%s\n%s" or a variable,
+	// would be listed by what names no message, and match any.
+	for _, name := range slices.Sorted(maps.Keys(sites)) {
+		for _, st := range sites[name] {
+			if st.msg != "" && !st.text && slices.Contains(messageMethods, st.what) {
+				t.Errorf("%s: %s uses %s, with the message %q, which holds no words of its own.\nmessageSites lists a site by its message, so the message's words are the constant it formats, which names it: give them there, and the values as its arguments.", st.at, name, st.what, st.msg)
+			}
+		}
+	}
 	type key struct{ what, msg string }
 	names := slices.Sorted(maps.Keys(sites))
 	for name := range messageSites {
@@ -177,7 +189,12 @@ func sentences(s string) []string {
 // messageMethods nor quietMethods lists), and msg is the use's message: a
 // message method's, as message gives it, or the source of what it is
 // passed to, or of the statement or expression that uses it otherwise.
-type site struct{ what, msg, at string }
+// text records, of a message method's call, that its message is a
+// constant that holds words past its format verbs, which name it.
+type site struct {
+	what, msg, at string
+	text          bool
+}
 
 // messageSites returns, for each function of the package, by funcName,
 // and each package-level variable, as var <name>, the sites in its body or
@@ -294,7 +311,7 @@ func (s *source) messageSites(t *testing.T) map[string][]site {
 	found := map[string][]site{}
 	inspect := func(name string, root ast.Node) {
 		add := func(what, msg string, at token.Pos) {
-			found[name] = append(found[name], site{what, msg, s.fset.Position(at).String()})
+			found[name] = append(found[name], site{what: what, msg: msg, at: s.fset.Position(at).String()})
 		}
 		var stack []ast.Node
 		ast.Inspect(root, func(n ast.Node) bool {
@@ -314,11 +331,11 @@ func (s *source) messageSites(t *testing.T) map[string][]site {
 			if sel, ok := n.(*ast.SelectorExpr); ok {
 				if ms := s.info.Selections[sel]; ms != nil && ms.Kind() != types.FieldVal {
 					if fn := ms.Obj().(*types.Func); isMessage(fn) {
-						msg := ""
+						st := site{what: fn.Name(), at: s.fset.Position(sel.Sel.Pos()).String()}
 						if call, ok := parent.(*ast.CallExpr); ok && ast.Unparen(call.Fun) == sel {
-							msg = s.message(call)
+							st.msg, st.text = s.message(call)
 						}
-						add(fn.Name(), msg, sel.Sel.Pos())
+						found[name] = append(found[name], st)
 					}
 				}
 			}
@@ -452,15 +469,18 @@ func method(t *testing.T) { r.take(r{}, t) }
 
 // message is a message method's message, as messageSites names it: its
 // first argument's constant value, with its words single-spaced, or, where
-// that has none, the argument's source, or "" for a call with none.
-func (s *source) message(call *ast.CallExpr) string {
+// that has none, the argument's source, or "" for a call with none. text
+// reports that the message is a constant that holds words past its
+// format verbs.
+func (s *source) message(call *ast.CallExpr) (msg string, text bool) {
 	if len(call.Args) == 0 {
-		return ""
+		return "", false
 	}
 	if tv := s.info.Types[call.Args[0]]; tv.Value != nil && tv.Value.Kind() == constant.String {
-		return strings.Join(strings.Fields(constant.StringVal(tv.Value)), " ")
+		v := constant.StringVal(tv.Value)
+		return strings.Join(strings.Fields(v), " "), words(formatVerb.ReplaceAllString(v, " ")) > 0
 	}
-	return s.src(call.Args[0])
+	return s.src(call.Args[0]), false
 }
 
 // src is a node's source, with its words single-spaced.
@@ -585,10 +605,10 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "%s can't be read: %v. Run %s to write it.", "a registry that can't be parsed, in the root-package check"},
 		{"Errorf", "%s is a registry, and %s holds no _test.go file, so no test compares it, and it still claims sections. Delete it, or restore the package's tests.", "a registry with no tests beside it, in the root-package check"},
 		{"Errorf", "%s register the root-package check for %s. It runs once per corpus root. Register it in one package.", "a root-package check registered twice"},
-		{"Error", "msg", "a column two registrations hold, in the root-package check"},
-		{"Errorf", "%s %s", "a lift packages use and no package owns, in the root-package check"},
+		{"Errorf", "the column %s is %s. %s %s", "a column two registrations hold, in the root-package check"},
+		{"Errorf", "the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.%s %s", "a lift packages use and no package owns, in the root-package check"},
 		{"Errorf", "the corpus directory %s has two different corpus types: %s An archive's directory gives its type. %s", "a corpus directory with two corpus types, in the root-package check"},
-		{"Errorf", "%s %s", "a transform no package owns, in the root-package check"},
+		{"Errorf", "the transform %s, of testdata/%s/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.%s %s", "a transform no package owns, in the root-package check"},
 		{"Errorf", "the transform %s, of testdata/%s/, is owned by %s. One package owns each transform. Own it in one of them.", "a transform two packages own, in the root-package check"},
 		{"Errorf", "the property %s has two different entries: %s Declare the property once, in a package the others import, and register that declaration. %s", "a property's differing entries, in the root-package check"},
 		{"Errorf", "the registries that own or use the lift %s differ in %s: %s Every package that owns or uses a lift registers one declaration of it: %s. Declare the lift once, in a package the others import, and register that declaration. %s", "a lift's differing registry entries, in the root-package check"},
