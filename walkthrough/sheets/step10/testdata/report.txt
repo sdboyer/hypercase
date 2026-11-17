@@ -1,0 +1,24 @@
+outcome changed
+  sheet/divide calc: accepted -> accepted warned
+  sheet/divide/transform/renamed calc: accepted -> accepted warned
+appeared
+  sheet/empty calc: rejected S101
+    error.txt added
+  sheet/empty evaluate: blocked parse
+  sheet/empty format: blocked parse
+  sheet/empty parse: rejected S101
+    error.txt added
+  sheet/empty resolve: blocked parse
+disappeared
+  sheet/blank calc: rejected S101
+    error.txt removed
+  sheet/blank evaluate: blocked parse
+  sheet/blank format: blocked parse
+  sheet/blank parse: rejected S101
+    error.txt removed
+  sheet/blank resolve: blocked parse
+bytes changed
+  sheet/notes calc: rejected S101
+    error.txt changed
+  sheet/notes parse: rejected S101
+    error.txt changed

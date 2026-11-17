@@ -1,0 +1,20 @@
+A quoted field that never closes.
+-- in/csv/open-quote.csv --
+4,"six,=A1+B1
+-- properties --
+unterminated
+-- out/calc/outcome --
+blocked import
+-- out/evaluate/outcome --
+blocked import
+-- out/format/outcome --
+blocked import
+-- out/import/error.txt --
+import: line 1: quote never closes
+  csv/open-quote.csv:1: 4,"six,=A1+B1
+-- out/import/outcome --
+rejected C101
+-- out/parse/outcome --
+blocked import
+-- out/resolve/outcome --
+blocked import
