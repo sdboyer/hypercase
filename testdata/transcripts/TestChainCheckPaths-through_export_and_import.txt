@@ -1,0 +1,35 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-twice-paths
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        export ran
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/sheet
+            --- PASS: TestCorpus/grid/sheet/export
+            --- PASS: TestCorpus/grid/sheet/import
+            --- PASS: TestCorpus/grid/sheet/list
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ go test  # chain-twice-paths
+    what ran, in order:
+        export ran
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/sheet
+            --- PASS: TestCorpus/grid/sheet/export
+            --- PASS: TestCorpus/grid/sheet/import
+            --- PASS: TestCorpus/grid/sheet/list
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ cat testdata/checks/paths.txt
+grid export: through no lift
+grid import: through export
+grid list: through import, export

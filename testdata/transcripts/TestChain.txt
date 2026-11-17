@@ -253,7 +253,7 @@ accepted
 accepted
 $ cat testdata/hypercase.json
 {
-  "format": 6,
+  "format": 7,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -313,6 +313,12 @@ $ cat testdata/hypercase.json
       "corpora": [
         "export"
       ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": []
+        }
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
@@ -364,6 +370,18 @@ $ cat testdata/hypercase.json
         "export",
         "script"
       ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": [
+            "import"
+          ]
+        },
+        {
+          "corpus": "script",
+          "lifts": []
+        }
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
@@ -390,6 +408,21 @@ $ cat testdata/hypercase.json
         "export",
         "script"
       ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": [
+            "parse",
+            "import"
+          ]
+        },
+        {
+          "corpus": "script",
+          "lifts": [
+            "parse"
+          ]
+        }
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
@@ -415,6 +448,23 @@ $ cat testdata/hypercase.json
       "corpora": [
         "export",
         "script"
+      ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": [
+            "resolve",
+            "parse",
+            "import"
+          ]
+        },
+        {
+          "corpus": "script",
+          "lifts": [
+            "resolve",
+            "parse"
+          ]
+        }
       ],
       "outputs": [
         {
@@ -456,6 +506,18 @@ $ cat testdata/hypercase.json
       "corpora": [
         "export",
         "script"
+      ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": [
+            "import"
+          ]
+        },
+        {
+          "corpus": "script",
+          "lifts": []
+        }
       ],
       "outputs": [
         {

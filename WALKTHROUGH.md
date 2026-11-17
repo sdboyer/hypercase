@@ -983,15 +983,16 @@ skipped no formulas
 The root package's registry, `step05/testdata/hypercase.json`, holds the
 update variable, the corpus root, that the package runs the root-package
 check, the properties it registers, and `evaluate`: the type it consumes,
-`io/fs.FS`, its corpora, its outputs and what it rejects. Its `types` and
-`lifts` stay empty until step 6, and `issueLinks` until step 9. `codes`,
+`io/fs.FS`, its corpora, its path from each, its outputs and what it
+rejects. Its `types` and `lifts` stay empty until step 6, as do the
+`lifts` of `evaluate`'s path, and `issueLinks` until step 9. `codes`,
 whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 `classifier` stays `null`, until step 8:
 
 <!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 6,
+  "format": 7,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
@@ -1020,6 +1021,12 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
       "consumes": "io/fs.FS",
       "corpora": [
         "sheet"
+      ],
+      "paths": [
+        {
+          "corpus": "sheet",
+          "lifts": []
+        }
       ],
       "outputs": [
         {
@@ -1093,9 +1100,9 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 
 - It lists everything the package registers but its corpus checks
   (step 8), each with its description, and for each column the type it
-  consumes, the corpora it runs over, its declared outputs and the
-  properties it rejects. It records the package's corpus root, and whether
-  the package runs the root-package check.
+  consumes, the corpora it runs over, its path from each (step 6), its
+  declared outputs and the properties it rejects. It records the package's
+  corpus root, and whether the package runs the root-package check.
 - It records the name of the project's update variable, for a tool to print
   the update command. No tool reads it yet.
 - It carries a format version, which changes on any change to what the
@@ -1384,7 +1391,9 @@ on raw input: `hypercase.Suite[sheetcorpus.Sheet]`, with its outputs and
 - `hypercase.json` lists each corpus type under `types`, with its Go type,
   and each lift under `lifts`, with its input and product types, the
   properties it rejects and whether the package owns it. Each suite's
-  `consumes` names the type it consumes.
+  `consumes` names the type it consumes. Each column's `paths` gives, for
+  each corpus it runs over, the lifts its input passes through, nearest
+  first: `resolve`, then `parse`, for `evaluate` over `sheet`.
 
 `testdata/sheet/stray.txtar`. `parse` rejects the sheet once; `calc` still
 reads the raw cells:
@@ -1501,7 +1510,9 @@ blocked parse
   consumes any other type names no `Corpus`: the type says which archives it
   runs over.
 - There must be exactly one path to each consumed type, or the run fails
-  before any case runs.
+  before any case runs. The registry records that path, for each column
+  and each corpus it runs over, as its lifts, nearest the column first. A
+  column that consumes a corpus type records a path with no lifts.
 - Probes are distinct from corpus types: the type decides what a suite
   receives, and the probe decides whether a case is for it.
 - A suite's probe receives the value of the type the suite consumes, and
@@ -2406,10 +2417,21 @@ S202
   sections, its column's registry entry, its case's stated properties and
   its known gap. `hypercase.Cell` holds (proposed) `Type`, `Archive`,
   `Case` and `Column`; `Outcome`, with its `State`, `Codes` and `Detail`;
-  `Entry`; `Properties`; `Files`, the cell's committed files under its
-  `out/<column>/`; and `Gap`, the text of the `gaps` line that marks the
-  cell, or empty when none does. A transform's variant's `Gap` is read from
-  the base's `gaps`, from the line that starts `transform/<name>`.
+  `Entry`; `Path`, the lifts the column's input passes through from the
+  cell's corpus type, nearest the column first, as its `paths` in the
+  registry give them; `Properties`; `Files`, the cell's committed files
+  under its `out/<column>/`; and `Gap`, the text of the `gaps` line that
+  marks the cell, or empty when none does. A transform's variant's `Gap` is
+  read from the base's `gaps`, from the line that starts
+  `transform/<name>`.
+- A cell's `Path` is read from the registry of the package that owns its
+  column, as its `Entry` is, so a check sees the path of another package's
+  cells too, through the lifts that package uses, and plans none itself.
+  Each lift on the path has a cell of the same case, the one the cell is
+  built through. A rule over what a cell is built on reads those cells: a
+  check that holds back a cell a `gaps` line marks can also hold back each
+  cell built through a lift's cell a line marks, since the cells past it
+  are still built on the lift's product.
 - A check sees every cell, frozen ones included: the framework exempts
   none, and each check decides. One that states a requirement over cells
   can excuse a cell with a `Gap`, so that a known gap and the requirement
@@ -2420,7 +2442,8 @@ S202
   transform. An archive that can't be read fails every check of the
   package, and an update writes no findings. So does a transform's variant
   whose properties can't be known: one no corpus type lists, or one its
-  transform declines.
+  transform declines. So does a registry that doesn't give a column one
+  path from each corpus it runs over, in their order.
 - A check reads the cells as they are committed when it runs. The module's
   update runs packages at once, so a check can run before another package
   writes its cells: its findings can take a second update to settle, and a
@@ -3009,7 +3032,9 @@ lift.
   a cycle states `circular`, which `resolve` rejects.
 - One type's lift can feed another type's ladder: a `CSV`'s `import` makes a
   sheet. Paths through bytes lifts count toward the one path to each
-  consumed type.
+  consumed type, and a column's path from `csv` in the registry, and so its
+  cells' `Path` (step 8), runs through `import`: `resolve`, `parse`, then
+  `import`, for `evaluate`.
 - A suite reaches across types by the type it consumes: `calc`, which
   consumes `Sheet`, runs on every CSV that `import` accepts.
 - Past a bytes lift, a cell's input view, which `RenderError` receives, is

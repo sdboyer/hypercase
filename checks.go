@@ -57,6 +57,14 @@ type Cell struct {
 	Outcome archive.Outcome
 	// Entry is the cell's column, as its package's registry records it.
 	Entry Entry
+	// Path names the lifts the column's input passes through from the
+	// cell's corpus type, nearest the column first, as the registry of the
+	// column's package records them: resolve, then parse, for evaluate's
+	// cell of a sheet, and past a bytes lift, resolve, parse, then import,
+	// for its cell of a CSV that import makes a sheet of. Each is a lift's
+	// column, and its cell of the case is one the cell is built through.
+	// Path is empty for a column that consumes its corpus type.
+	Path []string
 	// Properties are what the case states: the base's properties, a
 	// hand-written variant's own, or what a transform gives and each
 	// property it keeps that the base states.
@@ -225,10 +233,16 @@ func (r *runner) orphanFindings(t *testing.T) {
 // then case, the base first, then its hand-written variants in the order
 // written, then its transforms' by name, then column. A registry or an
 // archive that can't be read, or a cell's outcome, is an error, and so is
-// a transform's variant whose properties can't be known: one no corpus
-// type lists, or one its transform declines.
+// a column whose registry entry doesn't give one path from each of its
+// corpora, and a transform's variant whose properties can't be known: one
+// no corpus type lists, or one its transform declines.
 func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
-	columns := map[string][]Entry{}                          // corpus → its columns
+	// A col is a column over one corpus, and its path from the corpus.
+	type col struct {
+		entry Entry
+		path  []string
+	}
+	columns := map[string][]col{}                            // corpus → its columns
 	products := map[string]bool{}                            // the bytes lifts, by name
 	transforms := map[string]map[string]registry.Transform{} // corpus → transform → its declaration
 	for _, f := range found {
@@ -244,23 +258,31 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 			return nil, fmt.Errorf("%s: %w", r.rel(f.Path), err)
 		}
 		pkg := r.pkgName(f.Pkg)
+		add := func(e Entry, corpora []string, paths []registry.Path) error {
+			if from := pathCorpora(paths); !slices.Equal(from, corpora) {
+				return fmt.Errorf("%s: the %s %s runs over %s, and has paths from %s. A registry gives each column one path from each corpus it runs over, in the same order", r.rel(f.Path), e.Kind, e.Name, dirList(corpora), dirList(from))
+			}
+			for i, corpus := range corpora {
+				columns[corpus] = append(columns[corpus], col{e, paths[i].Lifts})
+			}
+			return nil
+		}
 		for _, s := range g.Suites {
 			e := Entry{Kind: "suite", Name: s.Name, Description: s.Description, Package: pkg, Rejects: s.Rejects}
 			if s.Classifier != nil {
 				e.Classifier = s.Classifier.Name
 			}
-			for _, corpus := range s.Corpora {
-				columns[corpus] = append(columns[corpus], e)
+			if err := add(e, s.Corpora, s.Paths); err != nil {
+				return nil, err
 			}
 		}
 		for _, l := range g.Lifts {
 			if !l.Owned {
 				continue
 			}
-			e := Entry{Kind: "lift", Name: l.Name, Description: l.Description, Package: pkg, Rejects: l.Rejects}
 			products[l.Name] = l.Bytes
-			for _, corpus := range l.Corpora {
-				columns[corpus] = append(columns[corpus], e)
+			if err := add(Entry{Kind: "lift", Name: l.Name, Description: l.Description, Package: pkg, Rejects: l.Rejects}, l.Corpora, l.Paths); err != nil {
+				return nil, err
 			}
 		}
 		for _, ct := range g.Types {
@@ -277,7 +299,7 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 	var cells []Cell
 	for _, corpus := range slices.Sorted(maps.Keys(columns)) {
 		cols := columns[corpus]
-		slices.SortStableFunc(cols, func(a, b Entry) int { return strings.Compare(a.Name, b.Name) })
+		slices.SortStableFunc(cols, func(a, b col) int { return strings.Compare(a.entry.Name, b.entry.Name) })
 		dir := filepath.Join(r.corpusRoot, "testdata", corpus)
 		entries, err := os.ReadDir(dir)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -327,18 +349,19 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 			}
 			for _, c := range cases {
 				for _, col := range cols {
-					cell := Cell{Type: corpus, Archive: name, Case: c.name, Column: col.Name, Entry: col, Properties: c.properties, Files: map[string][]byte{}, Gap: c.gaps[col.Name]}
+					e := col.entry
+					cell := Cell{Type: corpus, Archive: name, Case: c.name, Column: e.Name, Entry: e, Path: col.path, Properties: c.properties, Files: map[string][]byte{}, Gap: c.gaps[e.Name]}
 					for _, s := range a.Sections {
-						if f, ok := strings.CutPrefix(s.Name, c.prefix+archive.Out+"/"+col.Name+"/"); ok {
+						if f, ok := strings.CutPrefix(s.Name, c.prefix+archive.Out+"/"+e.Name+"/"); ok {
 							cell.Files[f] = s.Data
 						}
 					}
-					if col.Kind == "lift" && products[col.Name] {
-						cell.Product = committedUnder(a, c.prefix+archive.Via+"/"+col.Name+"/")
+					if e.Kind == "lift" && products[e.Name] {
+						cell.Product = committedUnder(a, c.prefix+archive.Via+"/"+e.Name+"/")
 					}
 					if data, ok := cell.Files[archive.OutcomeFile]; ok {
 						if cell.Outcome, err = archive.ParseOutcome(data); err != nil {
-							return nil, fmt.Errorf("%s, %s%s/%s/%s: %v", r.rel(p), c.prefix, archive.Out, col.Name, archive.OutcomeFile, err)
+							return nil, fmt.Errorf("%s, %s%s/%s/%s: %v", r.rel(p), c.prefix, archive.Out, e.Name, archive.OutcomeFile, err)
 						}
 					}
 					cells = append(cells, cell)
@@ -361,12 +384,34 @@ func gapTexts(transform string, gaps []archive.Gap) map[string]string {
 	return m
 }
 
+// pathCorpora gives the corpus of each of a column's paths, in their order.
+func pathCorpora(paths []registry.Path) []string {
+	from := []string{}
+	for _, p := range paths {
+		from = append(from, p.Corpus)
+	}
+	return from
+}
+
+// dirList names corpus directories, as testdata/<dir>/ each, or none.
+func dirList(dirs []string) string {
+	if len(dirs) == 0 {
+		return "none"
+	}
+	var names []string
+	for _, d := range dirs {
+		names = append(names, "testdata/"+d+"/")
+	}
+	return andList(names)
+}
+
 // cloneCells copies cells deeply, so no check sees what another changed.
 func cloneCells(cells []Cell) []Cell {
 	out := make([]Cell, len(cells))
 	for i, c := range cells {
 		c.Outcome.Codes = slices.Clone(c.Outcome.Codes)
 		c.Entry.Rejects = slices.Clone(c.Entry.Rejects)
+		c.Path = slices.Clone(c.Path)
 		c.Properties = slices.Clone(c.Properties)
 		files := make(map[string][]byte, len(c.Files))
 		for p, data := range c.Files {

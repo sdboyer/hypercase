@@ -1,0 +1,220 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-a-paths
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+PASS
+$ go test  # chain-a-paths
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ go test ./b  # chain-b
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+PASS
+$ cat testdata/checks/paths.txt
+export evaluate: through resolve, parse, import
+export import: through no lift
+export list: through import
+export parse: through import
+export resolve: through parse, import
+$ edit b/testdata/hypercase.json  # drop evaluate's path from export from b's registry, by hand
+$ go test  # chain-a-paths
+    the corpus check paths can't read its cells: b/testdata/hypercase.json: the suite evaluate runs over testdata/export/ and testdata/script/, and has paths from testdata/script/. A registry gives each column one path from each corpus it runs over, in the same order
+        Fix what the message names. No check runs, and an update writes no findings.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-a-paths
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    the corpus check paths can't read its cells: b/testdata/hypercase.json: the suite evaluate runs over testdata/export/ and testdata/script/, and has paths from testdata/script/. A registry gives each column one path from each corpus it runs over, in the same order
+        Fix what the message names. No check runs, and an update writes no findings.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ edit b/testdata/hypercase.json  # give evaluate a second path from script in b's registry, by hand
+$ go test  # chain-a-paths
+    the corpus check paths can't read its cells: b/testdata/hypercase.json: the suite evaluate runs over testdata/export/ and testdata/script/, and has paths from testdata/script/ and testdata/script/. A registry gives each column one path from each corpus it runs over, in the same order
+        Fix what the message names. No check runs, and an update writes no findings.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ edit b/testdata/hypercase.json  # give evaluate no paths in b's registry, by hand
+$ go test  # chain-a-paths
+    the corpus check paths can't read its cells: b/testdata/hypercase.json: the suite evaluate runs over testdata/export/ and testdata/script/, and has paths from none. A registry gives each column one path from each corpus it runs over, in the same order
+        Fix what the message names. No check runs, and an update writes no findings.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ edit b/testdata/hypercase.json  # restore it
+$ go test  # chain-a-paths
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS

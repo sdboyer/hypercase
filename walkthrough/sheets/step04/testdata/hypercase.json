@@ -1,5 +1,5 @@
 {
-  "format": 6,
+  "format": 7,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step04",
   "rootPackage": true,
@@ -20,6 +20,12 @@
       "consumes": "io/fs.FS",
       "corpora": [
         "sheet"
+      ],
+      "paths": [
+        {
+          "corpus": "sheet",
+          "lifts": []
+        }
       ],
       "outputs": [
         {

@@ -131,6 +131,18 @@ $ go test  # bytes-product-nodesc
         -         "export",
         -         "script"
         -       ],
+        -       "paths": [
+        -         {
+        -           "corpus": "export",
+        -           "lifts": [
+        -             "import"
+        -           ]
+        -         },
+        -         {
+        -           "corpus": "script",
+        -           "lifts": []
+        -         }
+        -       ],
         -       "outputs": [
         -         {
         -           "pattern": "error.txt",
@@ -156,6 +168,21 @@ $ go test  # bytes-product-nodesc
         -       "corpora": [
         -         "export",
         -         "script"
+        -       ],
+        -       "paths": [
+        -         {
+        -           "corpus": "export",
+        -           "lifts": [
+        -             "parse",
+        -             "import"
+        -           ]
+        -         },
+        -         {
+        -           "corpus": "script",
+        -           "lifts": [
+        -             "parse"
+        -           ]
+        -         }
         -       ],
         -       "outputs": [
         -         {
@@ -183,6 +210,23 @@ $ go test  # bytes-product-nodesc
         -         "export",
         -         "script"
         -       ],
+        -       "paths": [
+        -         {
+        -           "corpus": "export",
+        -           "lifts": [
+        -             "resolve",
+        -             "parse",
+        -             "import"
+        -           ]
+        -         },
+        -         {
+        -           "corpus": "script",
+        -           "lifts": [
+        -             "resolve",
+        -             "parse"
+        -           ]
+        -         }
+        -       ],
         -       "outputs": [
         -         {
         -           "pattern": "?.txt",
@@ -203,39 +247,7 @@ $ go test  # bytes-product-nodesc
         -         {
         -           "pattern": "stderr.txt",
         -           "description": "What the case's instructions write to stderr."
-        -         },
-        -         {
-        -           "pattern": "stdout.txt",
-        -           "description": "What the case's instructions write to stdout."
-        -         },
-        -         {
-        -           "pattern": "values.txt",
-        -           "description": "The values the case's instructions give."
-        -         }
-        -       ],
-        -       "rejects": [],
-        -       "classifier": null
-        -     },
-        -     {
-        -       "name": "list",
-        -       "description": "Lists the files of the script's input view, with their bytes.",
-        -       "consumes": "github.com/sdboyer/hypercase_test.Script",
-        -       "corpora": [
-        -         "export",
-        -         "script"
-        -       ],
-        -       "outputs": [
-        -         {
-        -           "pattern": "files.txt",
-        -           "description": "How many files the view holds, then each one's path and bytes, quoted."
-        -         }
-        -       ],
-        -       "rejects": [],
-        -       "classifier": null
-        -     }
-        -   ]
-        +   "suites": []
-          }
+          ... (45 more lines of diff)
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
     export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
         import: Imports the export as a script, as its import/ tree says.

@@ -53,6 +53,7 @@ func (r *runner) ownRegistry() registry.Registry {
 			Owned:        l.owned,
 			Bytes:        l.bytes,
 			Corpora:      r.corpora[l.name],
+			Paths:        r.paths[l.name],
 			Outputs:      registryOutputs(l.outputs),
 			ProductFiles: registryOutputs(l.product),
 			Rejects:      propertyNames(l.rejects),
@@ -71,6 +72,7 @@ func (r *runner) ownRegistry() registry.Registry {
 			Description: c.description,
 			Consumes:    consumes,
 			Corpora:     r.corpora[c.name],
+			Paths:       r.paths[c.name],
 			Outputs:     registryOutputs(c.outputs),
 			Rejects:     propertyNames(c.rejects),
 		}

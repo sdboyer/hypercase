@@ -23,7 +23,7 @@ import (
 
 // Format is the version of what a registry holds. It changes on any change
 // to that.
-const Format = 6
+const Format = 7
 
 // Name is a registry's file name, in its package's testdata/ directory.
 const Name = "hypercase.json"
@@ -130,6 +130,9 @@ type Lift struct {
 	// Corpora are the directories of the corpus types that reach the
 	// lift's input, under the corpus root's testdata/.
 	Corpora []string `json:"corpora"`
+	// Paths are the paths of lifts the lift's input passes through, one
+	// from each of Corpora.
+	Paths   []Path   `json:"paths"`
 	Outputs []Output `json:"outputs"`
 	// ProductFiles declares a bytes lift's product's files, by their paths
 	// under via/<Name>/. Any other lift's is empty.
@@ -148,12 +151,27 @@ type Suite struct {
 	// Corpora are the directories of the corpus types that reach the type
 	// the suite consumes, under the corpus root's testdata/.
 	Corpora []string `json:"corpora"`
+	// Paths are the paths of lifts the suite's input passes through, one
+	// from each of Corpora.
+	Paths   []Path   `json:"paths"`
 	Outputs []Output `json:"outputs"`
 	// Rejects names the properties the suite rejects.
 	Rejects []string `json:"rejects"`
 	// Classifier is the suite's classifier, which refines its cells'
 	// outcomes, or nil.
 	Classifier *Classifier `json:"classifier"`
+}
+
+// A Path is the path of lifts a column's input passes through from one
+// corpus type: the one path the package plans from it.
+type Path struct {
+	// Corpus is the corpus type's directory, under the corpus root's
+	// testdata/.
+	Corpus string `json:"corpus"`
+	// Lifts names the path's lifts, the nearest to the column first: from
+	// a sheet to a *sheet.Graph, resolve, then parse. It is empty for a
+	// column that consumes the corpus type.
+	Lifts []string `json:"lifts"`
 }
 
 // A Classifier is a suite's classifier.
@@ -190,6 +208,7 @@ func (r Registry) Marshal() []byte {
 	lifts := sorted(r.Lifts, func(l Lift) string { return l.Name })
 	for i, l := range lifts {
 		l.Corpora = sorted(l.Corpora, func(n string) string { return n })
+		l.Paths = sortedPaths(l.Paths)
 		l.Outputs = sorted(l.Outputs, func(o Output) string { return o.Pattern })
 		l.ProductFiles = sorted(l.ProductFiles, func(o Output) string { return o.Pattern })
 		l.Rejects = sorted(l.Rejects, func(n string) string { return n })
@@ -199,6 +218,7 @@ func (r Registry) Marshal() []byte {
 	suites := sorted(r.Suites, func(s Suite) string { return s.Name })
 	for i, s := range suites {
 		s.Corpora = sorted(s.Corpora, func(n string) string { return n })
+		s.Paths = sortedPaths(s.Paths)
 		s.Outputs = sorted(s.Outputs, func(o Output) string { return o.Pattern })
 		s.Rejects = sorted(s.Rejects, func(n string) string { return n })
 		suites[i] = s
@@ -219,6 +239,16 @@ func (r Registry) Marshal() []byte {
 func sorted[T any](s []T, key func(T) string) []T {
 	out := append(make([]T, 0, len(s)), s...)
 	slices.SortStableFunc(out, func(a, b T) int { return cmp.Compare(key(a), key(b)) })
+	return out
+}
+
+// sortedPaths returns a copy of ps sorted by corpus, never nil, with each
+// path's lifts in their order, never nil either.
+func sortedPaths(ps []Path) []Path {
+	out := sorted(ps, func(p Path) string { return p.Corpus })
+	for i, p := range out {
+		out[i].Lifts = append(make([]string, 0, len(p.Lifts)), p.Lifts...)
+	}
 	return out
 }
 
@@ -272,9 +302,10 @@ const OutcomeFormat = 5
 // added is what each format version added to the one before it, by the
 // key that holds it, which a registry of an older format doesn't hold.
 // Format 4 added each corpus type's transforms, format 5 whether the
-// project supplies Codes and each suite's classifier, and format 6 whether
-// each lift is a bytes lift and its product's declarations. None changed
-// what an earlier key holds. Each format's keys are in
+// project supplies Codes and each suite's classifier, format 6 whether
+// each lift is a bytes lift and its product's declarations, and format 7
+// each lift's and suite's path from each of its corpora. None changed what
+// an earlier key holds. Each format's keys are in
 // testdata/keys-<N>.txt, which TestFormatKeys checks the table against.
 var added = []struct {
 	format int
@@ -294,6 +325,12 @@ var added = []struct {
 	{6, "lifts[].productFiles", func(p presence) bool {
 		return slices.ContainsFunc(p.Lifts, func(l liftPresence) bool { return l.ProductFiles != nil })
 	}},
+	{7, "lifts[].paths", func(p presence) bool {
+		return slices.ContainsFunc(p.Lifts, func(l liftPresence) bool { return l.Paths != nil })
+	}},
+	{7, "suites[].paths", func(p presence) bool {
+		return slices.ContainsFunc(p.Suites, func(s suitePresence) bool { return s.Paths != nil })
+	}},
 }
 
 // presence records which keys that a later format added a registry
@@ -308,6 +345,7 @@ type presence struct {
 type liftPresence struct {
 	Bytes        json.RawMessage `json:"bytes"`
 	ProductFiles json.RawMessage `json:"productFiles"`
+	Paths        json.RawMessage `json:"paths"`
 }
 
 type typePresence struct {
@@ -316,6 +354,7 @@ type typePresence struct {
 
 type suitePresence struct {
 	Classifier json.RawMessage `json:"classifier"`
+	Paths      json.RawMessage `json:"paths"`
 }
 
 // ParseAny parses a registry of any format version from [Oldest] to

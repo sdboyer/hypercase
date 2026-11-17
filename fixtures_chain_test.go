@@ -322,16 +322,21 @@ var chainRegistrations = map[string]func(){
 	"chain-check": func() {
 		chain(project, exportType, own(importLift, parse, resolve, evaluate, list, louder, exportCheck))
 	},
-	"chain-codes":     func() { chain(projectCodesAs, exportType, own(importLift, parse, resolve, evaluate, list, louder)) },
-	"chain-render":    func() { chain(projectRender, plainExportType, own(importLift, parse, resolve, evaluate)) },
-	"chain-past":      func() { chain(project, plainExportType, own(unpack, repack, parse, resolve, evaluate, list)) },
-	"chain-two-paths": func() { chain(project, plainExportType, own(importLift, parse, importParsed, format)) },
-	"chain-twice":     func() { chain(project, gridType, plainExportType, own(exportGrid, importLift, list)) },
+	"chain-paths": func() {
+		chain(project, exportType, own(importLift, parse, resolve, evaluate, list, louder, pathsCheck))
+	},
+	"chain-twice-paths": func() { chain(project, gridType, plainExportType, own(exportGrid, importLift, list, pathsCheck)) },
+	"chain-codes":       func() { chain(projectCodesAs, exportType, own(importLift, parse, resolve, evaluate, list, louder)) },
+	"chain-render":      func() { chain(projectRender, plainExportType, own(importLift, parse, resolve, evaluate)) },
+	"chain-past":        func() { chain(project, plainExportType, own(unpack, repack, parse, resolve, evaluate, list)) },
+	"chain-two-paths":   func() { chain(project, plainExportType, own(importLift, parse, importParsed, format)) },
+	"chain-twice":       func() { chain(project, gridType, plainExportType, own(exportGrid, importLift, list)) },
 
 	// Packages over one export corpus: . owns import, parse and resolve,
 	// and ./b uses them, and owns evaluate, list and the transform louder.
 	// In the -render pairs, one package's Project is projectRender.
 	"chain-a":        func() { chain(project, exportType, own(importLift, parse, resolve)) },
+	"chain-a-paths":  func() { chain(project, exportType, own(importLift, parse, resolve, pathsCheck)) },
 	"chain-b":        func() { chainB(project) },
 	"chain-a-render": func() { chain(projectRender, exportType, own(importLift, parse, resolve)) },
 	"chain-b-render": func() { chainB(projectRender) },

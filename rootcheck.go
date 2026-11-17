@@ -438,7 +438,8 @@ type liftEntry struct {
 // liftFields are the fields of a lift's registry entry that every registry
 // that owns or uses the lift records alike, each by its name in the
 // registry and as the root-package check shows it. Whether a package owns
-// the lift differs between them, and so may the corpora that reach it.
+// the lift differs between them, and so may the corpora that reach it,
+// and the paths from them.
 var liftFields = []struct {
 	name  string
 	value func(registry.Lift) string

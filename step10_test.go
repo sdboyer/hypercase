@@ -104,7 +104,7 @@ func TestChain(t *testing.T) {
 	s.hasSections("testdata/hypercase.json", map[string]string{})
 	reg := string(s.read("testdata/hypercase.json"))
 	for _, want := range []string{
-		`"format": 6,`,
+		`"format": 7,`,
 		"\"name\": \"import\",\n      \"description\": \"Imports the export as a script, as its import/ tree says.\",\n      \"input\": \"github.com/sdboyer/hypercase_test.Export\",\n      \"product\": \"github.com/sdboyer/hypercase_test.Script\",\n      \"owned\": true,\n      \"bytes\": true,",
 		"\"productFiles\": [\n        {\n          \"pattern\": \"evaluate/*\",",
 		"\"rejects\": [\n        \"unterminated\"\n      ]",
@@ -1086,6 +1086,117 @@ func TestChainCheck(t *testing.T) {
 	s.fails(r, "--- FAIL: TestCorpus/export/prices/import")
 	s.contains(r, "--- PASS: TestCorpus/checks/products")
 	s.same(findings, committed)
+	s.done()
+}
+
+// TestChainCheckPaths: a cell's path runs through a bytes lift whose
+// product is another corpus type, on to the cell's own corpus type: an
+// export's cell of evaluate is built through resolve, parse and import,
+// and a script's, of the type import makes, through resolve and parse.
+// Past two bytes lifts, the path runs through both. The registry records
+// each path, and a check reads it there.
+func TestChainCheckPaths(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name, fixture, registration string
+		findings                    string
+		paths                       map[string][]registry.Path
+	}{
+		{
+			"through import", "chain", "chain-paths",
+			"export evaluate: through resolve, parse, import\n" +
+				"export import: through no lift\n" +
+				"export list: through import\n" +
+				"export parse: through import\n" +
+				"export resolve: through parse, import\n" +
+				"script evaluate: through resolve, parse\n" +
+				"script list: through no lift\n" +
+				"script parse: through no lift\n" +
+				"script resolve: through parse\n",
+			map[string][]registry.Path{
+				"suite evaluate": {{Corpus: "export", Lifts: []string{"resolve", "parse", "import"}}, {Corpus: "script", Lifts: []string{"resolve", "parse"}}},
+				"suite list":     {{Corpus: "export", Lifts: []string{"import"}}, {Corpus: "script", Lifts: []string{}}},
+				"lift import":    {{Corpus: "export", Lifts: []string{}}},
+				"lift resolve":   {{Corpus: "export", Lifts: []string{"parse", "import"}}, {Corpus: "script", Lifts: []string{"parse"}}},
+			},
+		},
+		{
+			"through export and import", "chain-twice", "chain-twice-paths",
+			"grid export: through no lift\n" +
+				"grid import: through export\n" +
+				"grid list: through import, export\n",
+			map[string][]registry.Path{
+				"suite list":  {{Corpus: "export", Lifts: []string{"import"}}, {Corpus: "grid", Lifts: []string{"import", "export"}}, {Corpus: "script", Lifts: []string{}}},
+				"lift import": {{Corpus: "export", Lifts: []string{}}, {Corpus: "grid", Lifts: []string{"export"}}},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := newSandbox(t, tt.fixture)
+			s.passes(s.update(tt.registration))
+			s.passes(s.normal(tt.registration))
+			const findings = "testdata/checks/paths.txt"
+			s.cat(findings)
+			if got := string(s.read(findings)); got != tt.findings {
+				t.Errorf("the cells' paths are\n%s\nwant\n%s", got, tt.findings)
+			}
+			s.wantPaths("testdata/hypercase.json", tt.paths)
+			s.done()
+		})
+	}
+}
+
+// TestChainSharedCheckPaths: a check reads the path of each column over
+// the corpus root from the registry of the package that owns it, so a
+// cell of a column that another package runs through lifts it only uses
+// carries the path that package's registry records. A registry entry that
+// doesn't give one path from each corpus its column runs over fails every
+// check, which can't tell a cell's path.
+func TestChainSharedCheckPaths(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "chain-shared")
+	s.passes(s.update("chain-a-paths"))
+	s.passes(s.run("b", "chain-b", true))
+	s.passes(s.normal("chain-a-paths"))
+	s.passes(s.run("b", "chain-b", false))
+	const findings, reg = "testdata/checks/paths.txt", "b/testdata/hypercase.json"
+	s.cat(findings)
+	const want = "export evaluate: through resolve, parse, import\n" +
+		"export import: through no lift\n" +
+		"export list: through import\n" +
+		"export parse: through import\n" +
+		"export resolve: through parse, import\n"
+	if got := string(s.read(findings)); got != want {
+		t.Errorf("the cells' paths are\n%s\nwant\n%s", got, want)
+	}
+	s.wantPaths(reg, map[string][]registry.Path{
+		"suite evaluate": {{Corpus: "export", Lifts: []string{"resolve", "parse", "import"}}, {Corpus: "script", Lifts: []string{"resolve", "parse"}}},
+		"lift resolve":   {{Corpus: "export", Lifts: []string{"parse", "import"}}, {Corpus: "script", Lifts: []string{"parse"}}},
+	})
+
+	clean := s.read(reg)
+	edit := func(why string, change func(*registry.Suite)) {
+		g, err := registry.Parse(clean)
+		if err != nil {
+			t.Fatal(err)
+		}
+		change(&g.Suites[slices.IndexFunc(g.Suites, func(c registry.Suite) bool { return c.Name == "evaluate" })])
+		s.write(reg, g.Marshal(), why)
+	}
+	const unreadable = "the corpus check paths can't read its cells: b/testdata/hypercase.json: the suite evaluate runs over testdata/export/ and testdata/script/, and has paths from "
+	const rule = ". A registry gives each column one path from each corpus it runs over, in the same order\n    Fix what the message names. No check runs, and an update writes no findings."
+	edit("drop evaluate's path from export from b's registry, by hand", func(c *registry.Suite) { c.Paths = c.Paths[1:] })
+	for _, update := range []bool{false, true} {
+		s.fails(s.run(".", "chain-a-paths", update), unreadable+"testdata/script/"+rule)
+		s.same(findings, []byte(want))
+	}
+	edit("give evaluate a second path from script in b's registry, by hand", func(c *registry.Suite) { c.Paths[0].Corpus = "script" })
+	s.fails(s.normal("chain-a-paths"), unreadable+"testdata/script/ and testdata/script/"+rule)
+	edit("give evaluate no paths in b's registry, by hand", func(c *registry.Suite) { c.Paths = nil })
+	s.fails(s.normal("chain-a-paths"), unreadable+"none"+rule)
+	s.write(reg, clean, "restore it")
+	s.passes(s.normal("chain-a-paths"))
 	s.done()
 }
 

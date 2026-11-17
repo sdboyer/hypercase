@@ -1,5 +1,5 @@
 {
-  "format": 6,
+  "format": 7,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step07",
   "rootPackage": true,
@@ -60,6 +60,12 @@
       "corpora": [
         "sheet"
       ],
+      "paths": [
+        {
+          "corpus": "sheet",
+          "lifts": []
+        }
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
@@ -81,6 +87,14 @@
       "corpora": [
         "sheet"
       ],
+      "paths": [
+        {
+          "corpus": "sheet",
+          "lifts": [
+            "parse"
+          ]
+        }
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
@@ -101,6 +115,15 @@
       "consumes": "*github.com/sdboyer/hypercase/walkthrough/sheets/sheet.Graph",
       "corpora": [
         "sheet"
+      ],
+      "paths": [
+        {
+          "corpus": "sheet",
+          "lifts": [
+            "resolve",
+            "parse"
+          ]
+        }
       ],
       "outputs": [
         {

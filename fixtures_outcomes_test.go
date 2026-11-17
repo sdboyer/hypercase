@@ -162,6 +162,89 @@ var locatedCheck = hypercase.Check{
 
 var cellLead = regexp.MustCompile(`^[A-Z]+[0-9]+: `)
 
+// cellCase names a cell's case: its corpus, its archive, and the variant,
+// if any.
+func cellCase(c hypercase.Cell) string {
+	name := c.Type + "/" + c.Archive
+	if c.Case != "" {
+		name += "/" + c.Case
+	}
+	return name
+}
+
+// pathsCheck lists the path of each column from each corpus, as each of
+// its cells gives it, so a cell whose path differs from its column's
+// others' adds a finding.
+var pathsCheck = hypercase.Check{
+	Name:        "paths",
+	Description: "Lists the lifts each column's cells are built through, from each corpus.",
+	Run: func(cells []hypercase.Cell) ([]string, error) {
+		var findings []string
+		for _, c := range cells {
+			through := "no lift"
+			if len(c.Path) > 0 {
+				through = strings.Join(c.Path, ", ")
+			}
+			findings = append(findings, fmt.Sprintf("%s %s: through %s", c.Type, c.Column, through))
+		}
+		return findings, nil
+	},
+}
+
+// pathMutatingCheck changes the paths of the cells it reads, which no
+// other check sees. Its name sorts before pathsCheck's, so it runs first.
+var pathMutatingCheck = hypercase.Check{
+	Name:        "alters-paths",
+	Description: "Changes the paths of the cells it reads, and finds nothing.",
+	Run: func(cells []hypercase.Cell) ([]string, error) {
+		for i := range cells {
+			for j := range cells[i].Path {
+				cells[i].Path[j] = "changed"
+			}
+		}
+		return nil, nil
+	},
+}
+
+// pageCheck lists what a page made of evaluate's accepted cells shows. It
+// holds back each cell a gaps line marks, and each cell built through a
+// lift's cell a gaps line marks: the line freezes the lift's cell, and the
+// lift's product still reaches the cells past it, which may be built on
+// what the case says is wrong.
+var pageCheck = hypercase.Check{
+	Name:        "page",
+	Description: "Lists what a page of evaluate's accepted cells shows, holding back each known gap and each cell built through one.",
+	Run: func(cells []hypercase.Cell) ([]string, error) {
+		gapped := map[string]bool{} // a cell, by its case and its column
+		for _, c := range cells {
+			if c.Gap != "" {
+				gapped[cellCase(c)+" "+c.Column] = true
+			}
+		}
+		var findings []string
+		for _, c := range cells {
+			if c.Column != "evaluate" || c.Outcome.State != archive.Accepted {
+				continue
+			}
+			var through []string
+			for _, l := range c.Path {
+				if gapped[cellCase(c)+" "+l] {
+					through = append(through, l)
+				}
+			}
+			switch {
+			case c.Gap != "":
+				findings = append(findings, cellCase(c)+": held back, a known gap")
+			case len(through) > 0:
+				findings = append(findings, cellCase(c)+": held back, built through the known gaps of "+strings.Join(through, ", "))
+			default:
+				findings = append(findings, cellCase(c)+": shown")
+			}
+		}
+		return findings, nil
+	},
+}
+
 func checks(items ...any) {
 	hypercase.Register(append([]any{project, rootPkg, scriptType}, items...)...)
 }
@@ -196,6 +279,10 @@ var outcomeRegistrations = map[string]func(){
 		transforms(transformType, own(echoRejects, looped, upper), cellsCheck, unsortedCheck, mutatingCheck)
 	},
 	"check-gaps": func() { transforms(transformType, own(echoRejects, looped, upper), locatedCheck) },
+	"two-types-paths": func() {
+		hypercase.Register(project, rootPkg, malformed, scriptType, gridType, own(parse, gridParse, format, pathMutatingCheck, pathsCheck))
+	},
+	"ladder-page": func() { ladder(project, parse, resolve, evaluate, format, calc, pageCheck) },
 	"tr-b-checks": func() {
 		hypercase.Register(append([]any{project, transformType, own(withName(echoRejects, "copy"), cellsCheck)}, sheetsProps...)...)
 	},
