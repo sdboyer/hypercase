@@ -379,7 +379,7 @@ func findCorpusRoot(dir, given string) (string, error) {
 	}
 	corpusRoot := filepath.Join(mod, filepath.FromSlash(h.CorpusRoot))
 	if m, err := root.Module(corpusRoot); err == nil && m != mod {
-		return "", fmt.Errorf("%s records the corpus root %s, which lies inside the module at %s, and not in the module of the package here, at %s.\nMove the corpus root out of the module at %s, or name it with -root, relative to the current directory, to strip it as a corpus root of that module.", root.Rel(dir, p), h.CorpusRoot, root.Rel(dir, m), root.Rel(dir, mod), root.Rel(dir, m))
+		return "", fmt.Errorf("%s records the corpus root %s, which lies inside the module at %s, and not in the module at %s, the package's.\nMove the corpus root out of the module at %s, or name it with -root, relative to the current directory, to strip it as a corpus root of that module.", root.Rel(dir, p), h.CorpusRoot, root.Rel(dir, m), root.Rel(dir, mod), root.Rel(dir, m))
 	}
 	return corpusRoot, nil
 }

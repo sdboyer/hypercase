@@ -918,7 +918,7 @@ func TestStripRoot(t *testing.T) {
 		"sub/corp/testdata/sheet/twice.txtar": twiceFull,
 	})
 	top = writeTree(t, files)
-	stripFails(t, top, "step09", 1, nil, "hypercase strip: testdata/hypercase.json records the corpus root sub/corp, which lies inside the module at ../sub, and not in the module of the package here, at ...\nMove the corpus root out of the module at ../sub, or name it with -root, relative to the current directory, to strip it as a corpus root of that module.\n")
+	stripFails(t, top, "step09", 1, nil, "hypercase strip: testdata/hypercase.json records the corpus root sub/corp, which lies inside the module at ../sub, and not in the module at .., the package's.\nMove the corpus root out of the module at ../sub, or name it with -root, relative to the current directory, to strip it as a corpus root of that module.\n")
 	sameTree(t, top, files)
 
 	// A directory in no module, run from or named with -root.
