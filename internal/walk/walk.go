@@ -43,6 +43,30 @@ func Testdata(td string, others map[string]bool, file func(p string, d fs.DirEnt
 	return links, err
 }
 
+// Link returns the first of td and the files below it on the way to p, a
+// path under td, that is a symbolic link, or "" when none is: of them,
+// what [Testdata] returns in links. An update calls it before it writes
+// an archive, since the root-package check, which refuses links, runs in
+// normal runs alone.
+func Link(td, p string) (string, error) {
+	rel, err := filepath.Rel(td, p)
+	if err != nil {
+		return "", err
+	}
+	cur := td
+	for _, part := range append([]string{"."}, strings.Split(rel, string(filepath.Separator))...) {
+		cur = filepath.Join(cur, part)
+		fi, err := os.Lstat(cur)
+		if err != nil {
+			return "", err
+		}
+		if fi.Mode()&fs.ModeSymlink != 0 {
+			return cur, nil
+		}
+	}
+	return "", nil
+}
+
 // IsFile reports whether p names a regular file.
 func IsFile(p string) bool {
 	fi, err := os.Stat(p)

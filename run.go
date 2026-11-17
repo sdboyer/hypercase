@@ -19,6 +19,7 @@ import (
 	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/hypercase/internal/root"
 	"github.com/sdboyer/hypercase/internal/shell"
+	"github.com/sdboyer/hypercase/internal/walk"
 )
 
 // Test runs every case through every column the package registered, as
@@ -607,7 +608,10 @@ func (w *caseWrites) replaced(section string) bool {
 	return strings.HasPrefix(rest, archive.In+"/") || rest == archive.Delete
 }
 
-var errChanged = errors.New("the archive's hand-written sections changed")
+var (
+	errChanged = errors.New("the archive's hand-written sections changed")
+	errLinked  = errors.New("a symbolic link is on the archive's path")
+)
 
 // write writes the package's own sections of one archive: a
 // read-modify-write under the corpus root's lock. The bytes of every
@@ -631,7 +635,20 @@ func (r *runner) write(t *testing.T, pc plannedCase, w *caseWrites) {
 		return
 	}
 	rel := r.rel(pc.path)
+	td := filepath.Join(r.corpusRoot, "testdata")
+	var link string
 	err := archive.Modify(r.lockPath(), pc.path, func(current *archive.Archive) (*archive.Archive, error) {
+		// The rename would write through a symbolic link, outside the
+		// corpus root or in the link's place, and the root-package check,
+		// which refuses links, runs in normal runs alone.
+		l, err := walk.Link(td, pc.path)
+		if err != nil {
+			return nil, err
+		}
+		if l != "" {
+			link = l
+			return nil, errLinked
+		}
 		// The cells ran on the hand-written sections first read. Outputs
 		// written beside other inputs would make an update that passed and
 		// a normal run that fails.
@@ -644,6 +661,10 @@ func (r *runner) write(t *testing.T, pc plannedCase, w *caseWrites) {
 		return apply(current), nil
 	})
 	switch {
+	case errors.Is(err, errLinked) && link == td:
+		t.Errorf("%s is a symbolic link, and a corpus root's testdata/ is a directory that holds none, so the update wrote nothing to %s.\nRemove it, or replace it with a copy of what it names, if it names anything, then run %s again.", r.rel(link), rel, r.updateCmd())
+	case errors.Is(err, errLinked):
+		t.Errorf("testdata/ holds no symbolic links: %s is one, so the update wrote nothing to %s.\nRemove it, or replace it with a copy of what it names, if it names anything, then run %s again.", r.rel(link), rel, r.updateCmd())
 	case errors.Is(err, errChanged):
 		t.Errorf("%s changed while the update ran: its comment or hand-written sections differ from those its cells ran on, so the update wrote nothing to it.\nRun %s again.", rel, r.updateCmd())
 	case err != nil:

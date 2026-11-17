@@ -689,6 +689,8 @@ var messageSites = map[string][]messageSite{
 		{"Skipf", "%s: %s's probe says the case isn't for it: %s", "a cell whose probe says the case isn't for it, with no note, which it skips: it fails nothing"},
 	},
 	"runner.write": {
+		{"Errorf", "%s is a symbolic link, and a corpus root's testdata/ is a directory that holds none, so the update wrote nothing to %s. Remove it, or replace it with a copy of what it names, if it names anything, then run %s again.", "a symbolic link in place of testdata/, which an update writes no archive through"},
+		{"Errorf", "testdata/ holds no symbolic links: %s is one, so the update wrote nothing to %s. Remove it, or replace it with a copy of what it names, if it names anything, then run %s again.", "a symbolic link under testdata/ on an archive's path, which an update writes no archive through"},
 		{"Errorf", "%s changed while the update ran: its comment or hand-written sections differ from those its cells ran on, so the update wrote nothing to it. Run %s again.", "an archive that changed while the update ran, which it doesn't write"},
 		{"Errorf", "writing %s: %v", "an archive the update can't write"},
 	},

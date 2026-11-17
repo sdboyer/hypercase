@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"os/exec"
@@ -674,5 +675,38 @@ func TestRootCheckLinks(t *testing.T) {
 		s.unchanged(before)
 		s.passes(s.normal("strip-a"))
 	}
+	s.done()
+}
+
+// TestUpdateLinks: an update writes no archive through a symbolic link,
+// which would write it outside the corpus root, or in the link's place.
+// The root-package check, which refuses links, runs in normal runs alone,
+// so before the update writes an archive, it refuses a link in place of
+// testdata/, of the corpus's directory or of the archive, with the
+// check's reason, and writes nothing, outside the corpus root or in it.
+// With the link replaced, the update writes the archive.
+func TestUpdateLinks(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	s.settle(stripModule...)
+	settled := s.read(prices)
+	for _, l := range []struct{ rel, why string }{
+		{"testdata/export", "testdata/ holds no symbolic links: testdata/export is one"},
+		{prices, "testdata/ holds no symbolic links: " + prices + " is one"},
+		{"testdata", "testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none"},
+	} {
+		s.edit(prices, "parse's outcome, out of its place, where the update puts it back", move("out/parse/outcome", "out/import/"))
+		before := s.snapshot()
+		s.link(l.rel, "")
+		s.fails(s.update("strip-a"), l.why+", so the update wrote nothing to "+prices+".\nRemove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.")
+		if fi, err := os.Lstat(s.path(l.rel)); err != nil || fi.Mode()&fs.ModeSymlink == 0 {
+			t.Errorf("%s is no symbolic link after the update, which wrote in its place", l.rel)
+		}
+		s.unlink(l.rel)
+		s.unchanged(before)
+	}
+	s.passes(s.update("strip-a"))
+	s.same(prices, settled)
+	s.passes(s.normal("strip-a"))
 	s.done()
 }
