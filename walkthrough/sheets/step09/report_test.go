@@ -23,9 +23,10 @@ import (
 //
 // The scratch repository's commits hold what the report reads, and nothing
 // else: go.mod, which places the module root, and the corpus root's
-// registries, archives and corpus checks' findings. The Go source the update
-// builds is in its working tree, out of the commits, so the page's commits
-// move only when what the report reads does.
+// registries and archives. The Go source the update builds, and the corpus
+// checks' findings, which the report doesn't read, are in its working tree,
+// out of the commits, so the page's commits move only when what the report
+// reads does.
 //
 // The toy is copied from this module's working tree. In the module's update,
 // another package can write the corpus while this test copies it, so its
@@ -261,12 +262,17 @@ func copyFile(t *testing.T, from, to string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+	if err := writeFile(to, data); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(to, data, 0o644); err != nil {
-		t.Fatal(err)
+}
+
+// writeFile writes data to the file at name, making its directory first.
+func writeFile(name string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+		return err
 	}
+	return os.WriteFile(name, data, 0o644)
 }
 
 // read is what the report reads, as pathspecs: everything the commits hold.
@@ -274,7 +280,6 @@ var read = []string{
 	"go.mod",
 	":(glob)step09/**/testdata/hypercase.json",
 	":(glob)step09/testdata/*/*.txtar",
-	":(glob)step09/testdata/checks/*.txt",
 }
 
 // commit commits what the report reads, as it is in the working tree.
@@ -282,6 +287,34 @@ func commit(t *testing.T, repo, msg string) {
 	t.Helper()
 	git(t, repo, append([]string{"add", "-A", "--"}, read...)...)
 	git(t, repo, "commit", "-q", "-m", msg)
+}
+
+// TestCommit: a commit holds go.mod, the registries and the archives, and
+// none of the rest of the toy: its Go source, its corpus check's findings,
+// which the report doesn't read, and the report's own goldens.
+func TestCommit(t *testing.T) {
+	repo := t.TempDir()
+	git(t, repo, "init", "-q", "-b", "main")
+	for _, name := range []string{
+		"go.mod",
+		"sheet/sheet.go",
+		"step09/corpus_test.go",
+		"step09/cli/testdata/hypercase.json",
+		"step09/testdata/hypercase.json",
+		"step09/testdata/checks/codes.txt",
+		"step09/testdata/report.txt",
+		"step09/testdata/sheet/notes.txtar",
+	} {
+		if err := writeFile(filepath.Join(repo, filepath.FromSlash(name)), []byte(name+"\n")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	commit(t, repo, "main")
+	got := git(t, repo, "ls-tree", "-r", "--name-only", "HEAD")
+	const want = "go.mod\nstep09/cli/testdata/hypercase.json\nstep09/testdata/hypercase.json\nstep09/testdata/sheet/notes.txtar\n"
+	if got != want {
+		t.Errorf("the commit holds:\n%s\nwant:\n%s", got, want)
+	}
 }
 
 // runUpdate runs the update of step09's packages in the scratch module,
