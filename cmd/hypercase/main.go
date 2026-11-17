@@ -21,6 +21,13 @@
 // knows to its own, and refuses a newer one, naming the hypercase that
 // reads it.
 //
+// report's -root names the corpus root, relative to the current directory
+// and inside the repository; it refuses an absolute path. Without -root,
+// the corpus root is the one the registry of the package in the current
+// directory records, at <b>, or at <a> where <b> has no module there, or,
+// with no registry there, the module root, from any directory of the
+// module.
+//
 // strip removes update-written sections from the archives of a corpus
 // root, telling them from hand-written ones by name alone, and leaves every
 // hand-written section's bytes as they were. A person runs it, never an
@@ -62,12 +69,12 @@
 // argument, an empty -root, or an empty or ill-formed -column or
 // -transform.
 //
-// -root names the corpus root, relative to the current directory. Without
-// it, the corpus root is the one the registry of the package in the
-// current directory records, or, at the module root with no registry
-// there, the module root. Anywhere else with no registry, strip asks for
-// -root, and so it does for a registry's corpus root that lies inside a
-// module nested in the package's.
+// strip's -root names the corpus root, relative to the current directory,
+// or by an absolute path. Without -root, the corpus root is the one the
+// registry of the package in the current directory records, or, at the
+// module root with no registry there, the module root. Anywhere else with
+// no registry, strip asks for -root, and so it does for a registry's
+// corpus root that lies inside a module nested in the package's.
 package main
 
 import (

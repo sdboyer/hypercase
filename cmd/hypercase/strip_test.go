@@ -872,6 +872,10 @@ func TestStripRoot(t *testing.T) {
 		stripOK(t, top, tt.dir, tt.out, tt.args...)
 		sameTree(t, top, tt.want)
 	}
+	// An absolute -root names the root as a relative one does.
+	abs := writeTree(t, files)
+	stripOK(t, abs, "format", step09Out, "-root", filepath.Join(abs, "step09"))
+	sameTree(t, abs, step09)
 
 	top := writeTree(t, files)
 	for _, tt := range []struct {

@@ -469,16 +469,18 @@ Its `.gitignore` names the corpus root's lock, which an update takes
   `-column <name>` limits it to a column's sections, at every level, and
   `-transform <name>` to those under a transform's variant (step 7).
   Either leaves the registries and findings files.
-- `-root <dir>` names the corpus root. Without it, strip takes the root
-  that the registry of the package in the current directory records, or,
-  at the module root with no registry there, the module-root corpus.
-  Anywhere else it asks for `-root`, and so it does for a recorded root
-  inside a module nested in the package's. A line that says to run strip
-  again gives the command, with `-root` unless strip ran at the module
-  root on the module-root corpus and the registry there, if there is one,
-  records that corpus: a strip may remove the registry that named the
-  root, and one that names another root would find that one. A path a
-  shell would read as other than itself is quoted.
+- `-root <dir>` names the corpus root, relative to the current directory
+  or by an absolute path. Without it, strip takes the root that the
+  registry of the package in the current directory records, or, at the
+  module root with no registry there, the module-root corpus. Anywhere
+  else it asks for `-root`, unlike the report (step 9), and so it does
+  for a recorded root inside a module nested in the package's. A line
+  that says to run strip again gives the command, with `-root` unless
+  strip ran at the module root on the module-root corpus and the registry
+  there, if there is one, records that corpus: a strip may remove the
+  registry that named the root, and one that names another root would
+  find that one. A path a shell would read as other than itself is
+  quoted.
 - It leaves frozen cells (step 4) in place and lists them, and `-frozen`
   strips those too. A frozen cell's line gives the command that strips
   it: `-column` with its column, and `-transform` for a cell of a
@@ -2655,8 +2657,12 @@ the same outcome.
 
 **Flags.**
 
-- `-root <dir>` names the corpus root, relative to the current directory.
-  Without it, the report finds the root as a test does.
+- `-root <dir>` names the corpus root, relative to the current directory
+  and inside the repository; the report refuses an absolute path. Without
+  it, the report takes the root that the registry of the package in the
+  current directory records, at `<b>`, or at `<a>` where `<b>` has no
+  module there, or, with no registry there, the module-root corpus, from
+  any directory of the module.
 - `-text` writes the problems and the ranked changes as plain text instead
   of the page.
 
