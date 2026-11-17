@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/internal/cells"
 	"github.com/sdboyer/hypercase/internal/registry"
 )
 
@@ -473,13 +474,21 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, tr
 	// limits hypercase strip to its sections, and whose names them.
 	type claim struct{ what, why, strip, whose string }
 	unclaimed := map[claim][]string{}
-	// The gaps lines that keep strip from removing a claim's sections.
+	// The gaps lines that keep strip from removing a claim's sections, as
+	// strip reads the archive's cells, knowing what the registries say of
+	// the columns over the corpus.
 	kept := map[claim][]string{}
+	marks := cells.Marks(a)
+	bytesLifts := map[string]bool{}
+	for col := range cols {
+		bytesLifts[col] = products[col]
+	}
+	for col := range products {
+		bytesLifts[col] = true
+	}
 	keep := func(c claim, section string) {
-		for _, l := range stripKeeps(a, section, cols, products) {
-			if !slices.Contains(kept[c], l) {
-				kept[c] = append(kept[c], l)
-			}
+		if l, ok := stripKeeps(marks, section, bytesLifts); ok && !slices.Contains(kept[c], l) {
+			kept[c] = append(kept[c], l)
 		}
 	}
 	for _, s := range a.Sections {
@@ -521,43 +530,21 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, tr
 	}
 }
 
-// stripKeeps returns the gaps lines that keep hypercase strip, run without
-// -frozen, from removing an archive's section, as strip reads them: those
-// that mark the section's cell, which a via/<column>/… is part of unless
-// the column is one over the corpus that is no bytes lift. cols are the
-// columns over the archive's corpus, and products the bytes lifts among
-// them.
-func stripKeeps(a *archive.Archive, section string, cols, products map[string]bool) []string {
-	kind, name, rest := archive.SplitCase(section)
-	top, below, ok := strings.Cut(rest, "/")
-	if !ok || (top != archive.Out && top != archive.Via) {
-		return nil
+// stripKeeps returns the gaps line that keeps hypercase strip, run without
+// -frozen, from removing an archive's section, as strip reads the
+// archive's cells, and whether one does: the line that marks the cell the
+// section is part of. marks are the cells the archive's gaps lines mark,
+// and bytesLifts says which columns over its corpus are bytes lifts.
+func stripKeeps(marks map[cells.Cell]cells.Mark, section string, bytesLifts map[string]bool) (string, bool) {
+	c, ok := cells.Of(section)
+	if !ok || !cells.Part(section, bytesLifts) {
+		return "", false
 	}
-	col, _, _ := strings.Cut(below, "/")
-	if top == archive.Via && cols[col] && !products[col] {
-		return nil
+	m, ok := marks[c]
+	if !ok {
+		return "", false
 	}
-	var lines []string
-	switch kind {
-	case "", archive.Transform:
-		for _, g := range a.Gaps() {
-			if g.Column == col && g.Transform == name {
-				lines = append(lines, fmt.Sprintf("%s line %d", archive.Gaps, g.Line))
-			}
-		}
-	case archive.Variant:
-		for _, v := range a.Variants() {
-			if v.Kind != archive.Variant || v.Name != name {
-				continue
-			}
-			for _, g := range v.Gaps {
-				if g.Column == col {
-					lines = append(lines, fmt.Sprintf("%s line %d", v.Prefix()+archive.Gaps, g.Line))
-				}
-			}
-		}
-	}
-	return lines
+	return fmt.Sprintf("%s line %d", m.Gaps, m.Line), true
 }
 
 // pkgName names a package by its directory, as go test does: ., ./format.

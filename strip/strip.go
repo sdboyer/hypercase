@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/internal/cells"
 )
 
 // A Selection says which update-written sections [Archive] removes. The
@@ -100,20 +101,20 @@ type Frozen struct {
 // leaves, and writes nothing. It is meant for an archive
 // [archive.Archive.Check] passes, the one kind Archive strips.
 func Plan(a *archive.Archive, sel Selection) Result {
-	marked := marks(a)
+	marked := cells.Marks(a)
 	var r Result
-	frozen := map[cell]int{} // each frozen cell's index in r.Frozen
+	frozen := map[cells.Cell]int{} // each frozen cell's index in r.Frozen
 	for _, s := range a.Sections {
 		if !selected(s.Name, sel) {
 			continue
 		}
-		if c, ok := cellOf(s.Name); ok && !sel.Frozen && sel.ofCell(s.Name, c) {
-			if f, ok := marked[c]; ok {
+		if c, ok := cells.Of(s.Name); ok && !sel.Frozen && cells.Part(s.Name, sel.BytesLifts) {
+			if m, ok := marked[c]; ok {
 				i, seen := frozen[c]
 				if !seen {
 					i = len(r.Frozen)
 					frozen[c] = i
-					r.Frozen = append(r.Frozen, f)
+					r.Frozen = append(r.Frozen, Frozen{Case: m.Case, Column: c.Column, Gaps: m.Gaps, Line: m.Line})
 				}
 				r.Frozen[i].Sections = append(r.Frozen[i].Sections, s.Name)
 				continue
@@ -135,63 +136,11 @@ func selected(name string, sel Selection) bool {
 		return false
 	}
 	if sel.Column != "" {
-		if c, ok := cellOf(name); !ok || c.column != sel.Column {
+		if c, ok := cells.Of(name); !ok || c.Column != sel.Column {
 			return false
 		}
 	}
 	return true
-}
-
-// A cell names a cell by its case and its column. kind and name are "" for
-// the base's cells.
-type cell struct{ kind, name, column string }
-
-// cellOf returns the cell whose section the named one is, a column's
-// out/<column>/… or via/<column>/… in any case, and whether it is one.
-func cellOf(section string) (cell, bool) {
-	kind, name, rest := archive.SplitCase(section)
-	top, below, ok := strings.Cut(rest, "/")
-	if !ok || (top != archive.Out && top != archive.Via) {
-		return cell{}, false
-	}
-	col, _, _ := strings.Cut(below, "/")
-	return cell{kind, name, col}, true
-}
-
-// ofCell reports whether the named section, one whose name gives the cell
-// c, is part of that cell: an out/<column>/… is, and a via/<column>/… is
-// unless sel.BytesLifts says the column is no bytes lift.
-func (sel Selection) ofCell(section string, c cell) bool {
-	_, _, rest := archive.SplitCase(section)
-	if !strings.HasPrefix(rest, archive.Via+"/") {
-		return true
-	}
-	bytes, known := sel.BytesLifts[c.column]
-	return bytes || !known
-}
-
-// marks returns the cells the archive's gaps lines mark: the base's gaps
-// mark the base's cells and, by lines that name a transform, its
-// variant's; a hand-written variant's gaps mark its own.
-func marks(a *archive.Archive) map[cell]Frozen {
-	m := map[cell]Frozen{}
-	for _, g := range a.Gaps() {
-		c, cs := cell{column: g.Column}, ""
-		if g.Transform != "" {
-			c.kind, c.name = archive.Transform, g.Transform
-			cs = archive.Transform + "/" + g.Transform
-		}
-		m[c] = Frozen{Case: cs, Column: g.Column, Gaps: archive.Gaps, Line: g.Line}
-	}
-	for _, v := range a.Variants() {
-		if v.Kind != archive.Variant {
-			continue
-		}
-		for _, g := range v.Gaps {
-			m[cell{archive.Variant, v.Name, g.Column}] = Frozen{Case: v.Case(), Column: g.Column, Gaps: v.Prefix() + archive.Gaps, Line: g.Line}
-		}
-	}
-	return m
 }
 
 // Archive removes from the archive at path every update-written section
