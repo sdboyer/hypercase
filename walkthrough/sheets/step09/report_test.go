@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step09/sheetcorpus"
 )
 
@@ -30,8 +32,9 @@ import (
 // out of the commits, so the page's commits move only when what the report
 // reads does.
 //
-// The toy is copied from this module's working tree. In the module's update,
-// another package can write the corpus while this test copies it, so its
+// The toy is copied from this module's working tree, which, in the module's
+// update, another package can be writing while this test copies it. Each
+// file is copied as it was before such a write or after it, so the test's
 // goldens, like a corpus check's findings, can take a second update to
 // settle.
 func TestReport(t *testing.T) {
@@ -360,21 +363,86 @@ func TestGitInit(t *testing.T) {
 	}
 }
 
+// copyDir copies the files under from to the same paths under to. In the
+// module's update, another package can be writing them, each through a temp
+// file that it renames over the file it replaces. So copyDir skips temp
+// files, and a file that is gone by the time it reads it, and copies each
+// file as it was before such a write or after it.
 func copyDir(t *testing.T, from, to string) {
 	t.Helper()
-	err := filepath.WalkDir(from, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+	if err := copyTree(from, to, os.ReadFile); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// copyTree is copyDir, reading each file with read.
+func copyTree(from, to string, read func(string) ([]byte, error)) error {
+	return filepath.WalkDir(from, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || archive.IsTemp(d.Name()) {
+			return err
+		}
+		data, err := read(p)
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
 			return err
 		}
 		rel, err := filepath.Rel(from, p)
 		if err != nil {
 			return err
 		}
-		copyFile(t, p, filepath.Join(to, rel))
-		return nil
+		return writeFile(filepath.Join(to, rel), data)
+	})
+}
+
+// TestCopyTree: the copy leaves out a temp file of a write, and a file that
+// is gone by the time it is read, and copies the rest.
+func TestCopyTree(t *testing.T) {
+	from, to := t.TempDir(), t.TempDir()
+	tmp := filepath.Join("sheet", ".hypercase-tmp-divide.txtar-123")
+	if !archive.IsTemp(tmp) {
+		t.Fatalf("%s is not the name of a temp file", tmp)
+	}
+	gone := filepath.Join("sheet", "blank.txtar")
+	for _, name := range []string{"hypercase.json", filepath.Join("sheet", "divide.txtar"), tmp, gone} {
+		if err := writeFile(filepath.Join(from, name), []byte(name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	read := func(p string) ([]byte, error) {
+		if p == filepath.Join(from, gone) {
+			if err := os.Remove(p); err != nil {
+				return nil, err
+			}
+		}
+		return os.ReadFile(p)
+	}
+	if err := copyTree(from, to, read); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	err := filepath.WalkDir(to, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(to, p)
+		got[rel] = string(data)
+		return err
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	want := map[string]string{
+		"hypercase.json":                       "hypercase.json",
+		filepath.Join("sheet", "divide.txtar"): filepath.Join("sheet", "divide.txtar"),
+	}
+	if !maps.Equal(got, want) {
+		t.Errorf("copied %v, want %v", got, want)
 	}
 }
 
