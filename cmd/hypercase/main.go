@@ -38,8 +38,8 @@
 // command strips the column's other frozen cells too. A line that says to
 // run strip again gives the command, with -root unless strip ran at the
 // module root on the module-root corpus and the registry there, if there
-// is one, records that corpus. A command quotes the root's path for a
-// shell where the path needs it.
+// is one, records that corpus. A command quotes the root's path where a
+// shell would read it as other than itself.
 //
 // strip exits 1 having removed nothing when it can't find the corpus root
 // or the module root, or the corpus root holds no testdata/; when a

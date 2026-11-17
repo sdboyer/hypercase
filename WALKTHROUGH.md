@@ -477,8 +477,8 @@ Its `.gitignore` names the corpus root's lock, which an update takes
   again gives the command, with `-root` unless strip ran at the module
   root on the module-root corpus and the registry there, if there is one,
   records that corpus: a strip may remove the registry that named the
-  root, and one that names another root would find that one. A path that
-  a shell would read as more than one word is quoted.
+  root, and one that names another root would find that one. A path a
+  shell would read as other than itself is quoted.
 - It leaves frozen cells (step 4) in place and lists them, and `-frozen`
   strips those too. A frozen cell's line gives the command that strips
   it: `-column` with its column, and `-transform` for a cell of a
