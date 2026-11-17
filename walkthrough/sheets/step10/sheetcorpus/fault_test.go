@@ -25,7 +25,8 @@ func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
 		hypercase.Root("."),
-		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling, sheetcorpus.Unterminated,
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.Unterminated, sheetcorpus.StrayQuote, sheetcorpus.OutOfRange,
 		sheetcorpus.SheetType, sheetcorpus.CSVType,
 		hypercase.Own(sheetcorpus.Import),
 		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),

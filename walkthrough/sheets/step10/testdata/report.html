@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>hypercase report: a888bb0f93a8c2673cf065efd8e932d1c769f513 to HEAD</title>
+<title>hypercase report: e0a70a24a7ac2eab5a1635c2389e68b78e1c6f81 to HEAD</title>
 <style>
 :root {
   color-scheme: light dark;
@@ -94,7 +94,7 @@ ul.outputs { padding-left: 18px; }
 <body>
 <header>
 <h1>hypercase report</h1>
-<p class="revs"><span class="rev">a888bb0f93a8c2673cf065efd8e932d1c769f513</span> <code>a888bb0f93a8</code> to <span class="rev">HEAD</span> <code>45cbe6e41efe</code>, over the corpus root <code>step10</code></p>
+<p class="revs"><span class="rev">e0a70a24a7ac2eab5a1635c2389e68b78e1c6f81</span> <code>e0a70a24a7ac</code> to <span class="rev">HEAD</span> <code>449bcc52c4cb</code>, over the corpus root <code>step10</code></p>
 </header>
 <main>
 <section id="changes">
@@ -206,6 +206,15 @@ ul.outputs { padding-left: 18px; }
 <td class="cell s-blocked"><span class="outcome">blocked import</span></td>
 </tr>
 <tr>
+<th scope="row"><span class="case">csv/past-xfd</span> <span class="props"><span class="prop" title="Some field that is not empty lies past the sheet&#39;s last column, XFD, or its last row, 1048576.">out-of-range</span></span><div class="desc">A field past the last column, XFD: 16384 commas put 1 in column 16385.</div></th>
+<td class="cell s-blocked"><span class="outcome">blocked import</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked import</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked import</span></td>
+<td class="cell s-rejected"><span class="outcome">rejected C103</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked import</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked import</span></td>
+</tr>
+<tr>
 <th scope="row"><span class="case">csv/prices</span><div class="desc">Two prices and their total, exported as CSV.</div></th>
 <td class="cell s-accepted"><span class="outcome">accepted</span></td>
 <td class="cell s-accepted"><span class="outcome">accepted</span></td>
@@ -213,6 +222,15 @@ ul.outputs { padding-left: 18px; }
 <td class="cell s-accepted"><span class="outcome">accepted</span></td>
 <td class="cell s-accepted"><span class="outcome">accepted</span></td>
 <td class="cell s-accepted"><span class="outcome">accepted</span></td>
+</tr>
+<tr>
+<th scope="row"><span class="case">csv/stray-quote</span> <span class="props"><span class="prop" title="Some unquoted field holds a quote, or some quoted field has text after its closing quote.">stray-quote</span></span><div class="desc">A quote inside an unquoted field, exported as CSV.</div></th>
+<td class="cell s-blocked"><span class="outcome">blocked import</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked import</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked import</span></td>
+<td class="cell s-rejected"><span class="outcome">rejected C102</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked import</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked import</span></td>
 </tr>
 </tbody>
 </table>
@@ -454,7 +472,7 @@ ul.outputs { padding-left: 18px; }
 <dt>looped</dt><dd>The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.<p>Gives <span class="prop">circular</span>.</p></dd>
 <dt>renamed</dt><dd>Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.<p>Keeps <span class="prop">circular</span>, <span class="prop">dangling</span>.</p></dd>
 </dl>
-<h4>Cases only at <span class="rev">a888bb0f93a8c2673cf065efd8e932d1c769f513</span></h4>
+<h4>Cases only at <span class="rev">e0a70a24a7ac2eab5a1635c2389e68b78e1c6f81</span></h4>
 <dl class="cases">
 <dt><span class="case">sheet/blank</span></dt><dd>A1 is a cell file with nothing in it.</dd>
 </dl>
@@ -465,6 +483,8 @@ ul.outputs { padding-left: 18px; }
 <dt>circular</dt><dd>Some cell&#39;s formula refers back to itself, directly or through other cells.</dd>
 <dt>dangling</dt><dd>Some formula refers to a cell the sheet doesn&#39;t have.</dd>
 <dt>malformed</dt><dd>Some cell holds neither a number nor a formula.</dd>
+<dt>out-of-range</dt><dd>Some field that is not empty lies past the sheet&#39;s last column, XFD, or its last row, 1048576.</dd>
+<dt>stray-quote</dt><dd>Some unquoted field holds a quote, or some quoted field has text after its closing quote.</dd>
 <dt>unterminated</dt><dd>Some quoted field is never closed.</dd>
 </dl>
 </section>

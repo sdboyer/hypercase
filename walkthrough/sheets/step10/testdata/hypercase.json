@@ -24,6 +24,14 @@
       "description": "Some cell holds neither a number nor a formula."
     },
     {
+      "name": "out-of-range",
+      "description": "Some field that is not empty lies past the sheet's last column, XFD, or its last row, 1048576."
+    },
+    {
+      "name": "stray-quote",
+      "description": "Some unquoted field holds a quote, or some quoted field has text after its closing quote."
+    },
+    {
       "name": "unterminated",
       "description": "Some quoted field is never closed."
     }
@@ -88,6 +96,8 @@
         }
       ],
       "rejects": [
+        "out-of-range",
+        "stray-quote",
         "unterminated"
       ]
     },

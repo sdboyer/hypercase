@@ -84,6 +84,8 @@
         }
       ],
       "rejects": [
+        "out-of-range",
+        "stray-quote",
         "unterminated"
       ]
     }

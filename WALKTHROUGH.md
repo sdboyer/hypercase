@@ -2745,7 +2745,7 @@ can't read. White space and format characters are Unicode's White_Space and
 category Cf, so a name of a zero-width space alone breaks the rule.
 
 `walkthrough/sheets/step10/sheetcorpus/types.go` declares the corpus type,
-its property and the lift:
+the three properties `import` rejects, and the lift:
 
 <!-- source: walkthrough/sheets/step10/sheetcorpus/types.go#import -->
 ```go
@@ -2761,6 +2761,16 @@ var Unterminated = decl.Property{
 	Description: "Some quoted field is never closed.",
 }
 
+var StrayQuote = decl.Property{
+	Name:        "stray-quote",
+	Description: "Some unquoted field holds a quote, or some quoted field has text after its closing quote.",
+}
+
+var OutOfRange = decl.Property{
+	Name:        "out-of-range",
+	Description: "Some field that is not empty lies past the sheet's last column, XFD, or its last row, 1048576.",
+}
+
 var Import = decl.Lift[CSV, Sheet]{
 	Name:        "import",
 	Description: "Turns each CSV field into a cell: row 1, field 2 is B1.",
@@ -2770,7 +2780,7 @@ var Import = decl.Lift[CSV, Sheet]{
 	Product: []decl.Output{
 		{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them."},
 	},
-	Rejects: []decl.Property{Unterminated},
+	Rejects: []decl.Property{Unterminated, StrayQuote, OutOfRange},
 	Jenny: jenny.For[CSV]().New("import", func(in CSV) (jenny.Files, error) {
 		var paths []string
 		err := fs.WalkDir(in, ".", func(p string, d fs.DirEntry, err error) error {
@@ -2806,8 +2816,10 @@ var Import = decl.Lift[CSV, Sheet]{
 }
 ```
 
-The root package registers the new type and property, and owns the new
-lift. `walkthrough/sheets/step10/corpus_test.go`:
+The root package registers the new type and properties, and owns the new
+lift. Its `codes` check (step 8) counts the importer's codes,
+`sheet.CSVCodes`, beside the evaluator's, `sheet.Codes`.
+`walkthrough/sheets/step10/corpus_test.go`:
 
 <!-- source: walkthrough/sheets/step10/corpus_test.go#register -->
 ```go
@@ -2816,7 +2828,8 @@ func init() {
 		sheetcorpus.Project,
 		hypercase.Root("step10"),
 		hypercase.RootPackage(),
-		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling, sheetcorpus.Unterminated,
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.Unterminated, sheetcorpus.StrayQuote, sheetcorpus.OutOfRange,
 		sheetcorpus.SheetType, sheetcorpus.CSVType,
 		hypercase.Own(sheetcorpus.Import, sheetcorpus.Parse, sheetcorpus.Resolve, evaluate),
 		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
@@ -2912,6 +2925,23 @@ blocked import
 A jenny's error starts with the jenny's name, so `import`'s `error.txt` starts
 `import: `. `Codes` reaches the importer's error through the jenny and
 `decl.Reject`, so the outcome carries its code.
+
+`testdata/csv/stray-quote.txtar` states `stray-quote`, for a quote inside an
+unquoted field, and `testdata/csv/past-xfd.txtar` states `out-of-range`, for
+a field in column 16385, one past XFD. `import` rejects them as `C102` and
+`C103`, and every column past it is `blocked import`, as for `open-quote`.
+So some CSV reaches each of the importer's codes, and the `codes` check's
+findings, `testdata/checks/codes.txt`, list them beside the evaluator's:
+
+<!-- source: walkthrough/sheets/step10/testdata/checks/codes.txt -->
+```
+C101
+C102
+C103
+S101
+S201
+S202
+```
 
 `testdata/csv/loop.txtar` states `circular`, which `resolve` rejects past
 the lift. Its `error.txt` quotes `sheet/A1` and `sheet/B1`, which only the
@@ -3146,8 +3176,10 @@ lift.
   import shows as a change to `via/import/`, which the report ranks on
   `import`'s cell, and fails `import`'s column alone until the update; the
   columns downstream read the committed sheet.
-- Where a chained input stops: `open-quote` at `import`, with every column
-  past it `blocked import`.
+- Where a chained input stops: `open-quote`, `stray-quote` and `past-xfd`
+  at `import`, with every column past it `blocked import`.
+- Every code the importer defines, reached by some CSV: if no CSV reaches
+  `C102` any more, the `codes` check fails.
 - A CSV and a hand-written sheet with the same cells side by side in the
   matrix, `csv/prices` beside `sheet/prices`.
 

@@ -101,6 +101,16 @@ var Unterminated = decl.Property{
 	Description: "Some quoted field is never closed.",
 }
 
+var StrayQuote = decl.Property{
+	Name:        "stray-quote",
+	Description: "Some unquoted field holds a quote, or some quoted field has text after its closing quote.",
+}
+
+var OutOfRange = decl.Property{
+	Name:        "out-of-range",
+	Description: "Some field that is not empty lies past the sheet's last column, XFD, or its last row, 1048576.",
+}
+
 var Import = decl.Lift[CSV, Sheet]{
 	Name:        "import",
 	Description: "Turns each CSV field into a cell: row 1, field 2 is B1.",
@@ -110,7 +120,7 @@ var Import = decl.Lift[CSV, Sheet]{
 	Product: []decl.Output{
 		{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them."},
 	},
-	Rejects: []decl.Property{Unterminated},
+	Rejects: []decl.Property{Unterminated, StrayQuote, OutOfRange},
 	Jenny: jenny.For[CSV]().New("import", func(in CSV) (jenny.Files, error) {
 		var paths []string
 		err := fs.WalkDir(in, ".", func(p string, d fs.DirEntry, err error) error {

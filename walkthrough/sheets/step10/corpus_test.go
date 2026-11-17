@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -20,7 +21,8 @@ func init() {
 		sheetcorpus.Project,
 		hypercase.Root("step10"),
 		hypercase.RootPackage(),
-		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling, sheetcorpus.Unterminated,
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.Unterminated, sheetcorpus.StrayQuote, sheetcorpus.OutOfRange,
 		sheetcorpus.SheetType, sheetcorpus.CSVType,
 		hypercase.Own(sheetcorpus.Import, sheetcorpus.Parse, sheetcorpus.Resolve, evaluate),
 		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
@@ -53,7 +55,7 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 
 var codes = hypercase.Check{
 	Name:        "codes",
-	Description: "Every code the formula evaluator defines is the code of some rejected cell.",
+	Description: "Every code the formula evaluator and the CSV importer define is the code of some rejected cell.",
 	Run: func(cells []hypercase.Cell) ([]string, error) {
 		seen := map[string]bool{}
 		for _, c := range cells {
@@ -62,7 +64,7 @@ var codes = hypercase.Check{
 			}
 		}
 		var found, missing []string
-		for _, code := range sheet.Codes {
+		for _, code := range slices.Concat(sheet.Codes, sheet.CSVCodes) {
 			if seen[code] {
 				found = append(found, code)
 			} else {
