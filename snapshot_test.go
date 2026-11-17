@@ -244,6 +244,51 @@ func TestSnapshotFailedCreate(t *testing.T) {
 	s.done()
 }
 
+// TestSnapshotUntestedRegistry: a package, b, that registers a corpus type
+// and a lift over it, and no suite, passes its first update with no case
+// yet, and the update writes its registry, so Create then writes a case
+// into the type's directory, testdata/grid/. Once b holds no _test.go
+// file, Create refuses that directory, naming b's registry, and writes
+// nothing. The root-package check still counts the directory as declared:
+// it fails on b's registry, and not on the archive in testdata/grid/, as
+// it does once b's registry is gone.
+func TestSnapshotUntestedRegistry(t *testing.T) {
+	t.Setenv(fixtureUpdate, "")
+	s := newSandbox(t, "")
+	s.registers("ladder")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "give b its tests")
+	s.passes(s.run("b", "grid-lift", true))
+	if !s.exists("b/testdata/hypercase.json") {
+		t.Fatal("b's first update wrote no registry")
+	}
+	trees := map[string]fs.FS{"cells": fstest.MapFS{"A1": {Data: []byte("6\n")}}}
+	path, err := snapshot.Create(s.moduleCorpus(), project, gridType, "six", s.serialize(trees))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rel, _ := filepath.Rel(s.dir, path)
+	rel = filepath.ToSlash(rel)
+	s.note("snapshot.Create wrote %s", rel)
+	s.edit(rel, "a person describes the case", func(a *archive.Archive) {
+		a.Comment = []byte("A grid of one cell.\n")
+	})
+	s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
+	before := s.snapshot()
+	_, err = snapshot.Create(s.moduleCorpus(), project, gridType, "seven", s.serialize(trees))
+	if err == nil {
+		t.Fatal("Create wrote into testdata/grid/, which only a registry in a package with no _test.go file declares")
+	}
+	s.note("snapshot.Create into testdata/grid/ is refused:\n%s", strings.TrimSuffix(s.normalize([]byte(err.Error())), "\n"))
+	s.unchanged(before)
+	undeclared := "testdata/grid/ holds archives, and no registry declares the directory"
+	r := s.normal("ladder")
+	s.fails(r, "b/testdata/hypercase.json is a registry, and b holds no _test.go file")
+	s.lacks(r, undeclared)
+	s.remove("b/testdata/hypercase.json", "delete b's registry")
+	s.fails(s.normal("ladder"), undeclared)
+	s.done()
+}
+
 // mustRel returns target relative to base, which holds it, failing the
 // test if it doesn't.
 func mustRel(t *testing.T, base, target string) string {

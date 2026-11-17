@@ -244,8 +244,9 @@ root with `root.Find`, from its directory and the path the package
 passes, or `.`. `snapshot.Create` writes a case only into a corpus
 directory that a registry of the corpus root declares, in a package with
 tests, so a package's first update, which writes its registry, comes
-before its first case. With no case yet, that update fails, saying each
-suite applies to no case, and writes the registry still.
+before its first case. With no case yet, that update fails for each
+suite the package registers, saying the suite applies to no case, and
+writes the registry still.
 
 <!-- source: walkthrough/sheets/step03/sheetcorpus/project.go -->
 ```go

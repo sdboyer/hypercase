@@ -1,0 +1,51 @@
+# the first update writes the package's registry, which records the corpus root Create writes under, and fails, since no suite has a case yet
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    the suite calc applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+    the suite evaluate applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+    the suite format applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ edit b/corpus_test.go  # give b its tests
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # grid-lift
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/grid
+PASS
+# snapshot.Create wrote testdata/grid/six.txtar
+$ edit testdata/grid/six.txtar  # a person describes the case
+$ rm b/corpus_test.go  # remove b's tests, and leave its registry
+# snapshot.Create into testdata/grid/ is refused:
+the directory grid is declared under the corpus root "." only by registries in packages with no _test.go file, $SANDBOX/b/testdata/hypercase.json, so no test would read the case: the registries in packages with tests declare "script".
+Restore the package's tests, or pass the corpus type a package with tests registers.
+$ go test  # ladder
+    b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+    the suite calc applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+    the suite evaluate applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+    the suite format applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ rm b/testdata/hypercase.json  # delete b's registry
+$ go test  # ladder
+    testdata/grid/ holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.
+        Declare a decl.Type with that Dir, or move or delete the archives.
+    the suite calc applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+    the suite evaluate applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+    the suite format applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]

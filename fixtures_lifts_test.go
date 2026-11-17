@@ -360,6 +360,8 @@ var liftRegistrations = map[string]func(){
 	},
 	"lift-only": func() { hypercase.Register(project, rootPkg, malformed, scriptType, own(parse)) },
 	"calc-only": func() { hypercase.Register(project, rootPkg, malformed, scriptType, own(calc)) },
+	// grid-lift registers a corpus type and a lift over it, and no suite.
+	"grid-lift": func() { hypercase.Register(project, gridType, own(gridParse)) },
 	"lift-nodesc": func() {
 		l := parse
 		l.Description = ""
