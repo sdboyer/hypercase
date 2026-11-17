@@ -337,7 +337,7 @@ $ go test  # chain
         out/evaluate/outcome differs (-golden +got):
         - accepted
         + blocked import
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on evaluate's path, whose outcome and product a normal run reads. Fix what import's cell reports.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on evaluate's path. Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         import: Imports the export as a script, as its import/ tree says.
         import's jenny failed on the case, with an error that is no rejection:
@@ -348,21 +348,21 @@ $ go test  # chain
         out/list/outcome differs (-golden +got):
         - accepted
         + blocked import
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on list's path, whose outcome and product a normal run reads. Fix what import's cell reports.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on list's path. Fix what import's cell reports.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on list's path, whose outcome and product a normal run reads. Fix what import's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on list's path. Fix what import's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.
     export/names: import makes files named as a cell's own files are, which list reads.
         parse: Parses the script, as its parse/ tree says.
         out/parse/outcome differs (-golden +got):
         - accepted
         + blocked import
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for parse: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on parse's path, whose outcome and product a normal run reads. Fix what import's cell reports.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for parse: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on parse's path. Fix what import's cell reports.
     export/names: import makes files named as a cell's own files are, which list reads.
         resolve: Resolves the parsed script, as its resolve/ tree says.
         out/resolve/outcome differs (-golden +got):
         - accepted
         + blocked import
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for resolve: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on resolve's path, whose outcome and product a normal run reads. Fix what import's cell reports.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for resolve: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on resolve's path. Fix what import's cell reports.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".

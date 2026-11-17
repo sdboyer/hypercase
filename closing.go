@@ -197,10 +197,11 @@ type staging struct {
 	declined bool
 
 	told bool
-	// unowned is the last bytes lift on the cell's path that the package
-	// doesn't own, which keeps it from telling: only the package that owns
-	// a bytes lift runs it in a normal run.
-	unowned *lift
+	// last is the last bytes lift on the cell's path, nil where there is
+	// none, and unowned the last there that the package doesn't own, which
+	// keeps it from telling: only the package that owns a bytes lift runs
+	// it in a normal run.
+	last, unowned *lift
 	// f is the cell's fate in the update, and otherwise says whether the
 	// update does otherwise with the cell than this run. reran is the last
 	// bytes lift on the cell's path that the update runs, nil where it runs
@@ -242,6 +243,7 @@ func (st *staging) tell() {
 	}
 	s := st.c.state
 	last, unowned := s.plan.bytesOnPath(st.col.consumes)
+	st.last = last
 	switch {
 	case last == nil && s.made == nil:
 		return
@@ -292,8 +294,7 @@ func (st *staging) close(n note) (string, claims) {
 			// The update reaches no bytes lift on the cell's path, so a lift
 			// before them all blocks the cell there, and this run differs
 			// from it by reading the last one's outcome and product.
-			last, _ := st.c.state.plan.bytesOnPath(st.col.consumes)
-			c.claims.Reads = last.name
+			c.claims.Reads = st.last.name
 		}
 	default:
 		return st.text(n, n.def), n.def.claims
@@ -557,7 +558,15 @@ func (st *staging) does(cl claims) string {
 	case fateSkipped:
 		return fmt.Sprintf("%s skips %s: %s, and %s's probe says the case isn't for it: %s", u, col, how, col, detail)
 	case fateBroken:
-		return fmt.Sprintf("%s writes nothing for %s: %s, and it writes nothing for the cell of the lift %s, on %s's path, whose outcome and product a normal run reads.", u, col, how, cl.Unwritten, col)
+		// The update reruns the lift whose cell it writes nothing for: the
+		// last bytes lift it runs on the cell's path, as Reruns names it. Its
+		// claims name the lift three times, and the sentence names the one
+		// Does does, and says once whose outcome and product a normal run
+		// reads, in how.
+		if cl.Reruns != detail || cl.Unwritten != detail {
+			panic(fmt.Sprintf("hypercase: an update that writes nothing for a cell past the lift %s, whose claims say it reruns %q, and writes nothing for the cell of %q", detail, cl.Reruns, cl.Unwritten))
+		}
+		return fmt.Sprintf("%s writes nothing for %s: %s, and it writes nothing for the cell of the lift %s, on %s's path.", u, col, how, detail, col)
 	case fateBlocked:
 		// The update runs every lift on the cell's path, so a lift that
 		// blocks the cell there failed on the case. One that fails before

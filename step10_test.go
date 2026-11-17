@@ -438,7 +438,7 @@ func TestChainTwiceStaleProduct(t *testing.T) {
 		insert("via/import/quote/Z9", "9\n", "out/")(a)
 	})
 	r = s.normal("chain-twice")
-	s.fails(r, "via/import/quote/Z9 is a file of import's committed product, which this run of import doesn't make.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for import: "+reruns+", and it writes nothing for the cell of the lift export, on import's path, whose outcome and product a normal run reads. Fix what export's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.")
+	s.fails(r, "via/import/quote/Z9 is a file of import's committed product, which this run of import doesn't make.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for import: "+reruns+", and it writes nothing for the cell of the lift export, on import's path. Fix what export's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.")
 	s.lacks(r, "which removes it")
 	before := s.snapshot()
 	s.fails(s.update("chain-twice"), "The cell of the lift export, on import's path")
@@ -666,7 +666,7 @@ func TestChainOutcomeAsUpdate(t *testing.T) {
 		insert("properties", "unterminated\n", "in/")(a)
 		insert("in/import/fail", "the generator's error\n", "via/")(a)
 	})
-	nothing := "FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: " + reruns + ", and it writes nothing for the cell of the lift import, on list's path, whose outcome and product a normal run reads."
+	nothing := "FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: " + reruns + ", and it writes nothing for the cell of the lift import, on list's path."
 	r = s.normal("chain")
 	s.fails(r,
 		"out/list/outcome differs (-golden +got):\n- accepted\n+ blocked import\n"+nothing+" Fix what import's cell reports.",

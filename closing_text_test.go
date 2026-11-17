@@ -62,7 +62,9 @@ type claimAlone struct {
 
 // claimsAlone returns, for each field of a closing's claims, the claims
 // with that field alone set: a string to "x", a bool to true, and Does to
-// each kind of fate, as fateWords words them.
+// each kind of fate, as fateWords words them, with the fields a fate's
+// claims always hold beside it: a broken fate's Reruns and Unwritten name
+// its lift.
 func claimsAlone(t *testing.T) []claimAlone {
 	t.Helper()
 	var out []claimAlone
@@ -91,9 +93,41 @@ func claimsAlone(t *testing.T) []claimAlone {
 			name := f.Name
 			if f.Name == "Does" {
 				name += " " + v.String()
+				if verb, lift, _ := strings.Cut(v.String(), " "); verb == fateBroken {
+					cl.Reruns, cl.Unwritten = lift, lift
+				}
 			}
 			out = append(out, claimAlone{name, cl})
 		}
 	}
 	return out
+}
+
+// TestBrokenClaims: a broken fate's sentence names the lift Does names,
+// which its Reruns and Unwritten name too, as the claims of every broken
+// fate the package tells do, and says once whose outcome and product a
+// normal run reads. Claims that name another lift in either are the
+// package's bug, which does refuses to word.
+func TestBrokenClaims(t *testing.T) {
+	t.Parallel()
+	st := textStaging("FIXTURE_UPDATE_GOLDEN")
+	got := st.does(claims{Does: fateBroken + " l2", Reruns: "l2", Unwritten: "l2"})
+	want := "FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for col: it reruns l2, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift l2, on col's path."
+	if got != want {
+		t.Errorf("a broken fate's sentence is\n%q\nwant\n%q", got, want)
+	}
+	for _, cl := range []claims{
+		{Does: fateBroken + " l2", Reruns: "l1", Unwritten: "l2"},
+		{Does: fateBroken + " l2", Reruns: "l2", Unwritten: "l1"},
+		{Does: fateBroken + " l2"},
+	} {
+		func() {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Errorf("does words the claims %+v, whose lifts disagree", cl)
+				}
+			}()
+			st.does(cl)
+		}()
+	}
 }
