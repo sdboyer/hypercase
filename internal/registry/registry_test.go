@@ -87,13 +87,22 @@ func TestParseAny(t *testing.T) {
 	v4 := strings.Replace(v3, `"format": 3`, `"format": 4`, 1)
 	v4 = strings.Replace(v4, `"goType": "example.com/m.Sheet"}`, `"goType": "example.com/m.Sheet",
 		"transforms": [{"name": "looped", "description": "Loops.", "gives": ["circular"], "keeps": [], "probe": false, "owned": true}]}`, 1)
+	// A format 5 registry, which says whether the project supplies Codes
+	// and gives each suite's classifier, with a lift that says nothing of
+	// bytes or a product's files.
+	v5 := strings.Replace(v4, `"format": 4`, `"format": 5`, 1)
+	v5 = strings.Replace(v5, `"rootPackage": true,`, `"rootPackage": true, "codes": false,`, 1)
+	v5 = strings.Replace(v5, `"rejects": ["circular"]}`, `"rejects": ["circular"], "classifier": null}`, 1)
+	v5 = strings.Replace(v5, `"lifts": []`, `"lifts": [{"name": "parse", "description": "Parses.", "input": "example.com/m.Sheet",
+		"product": "example.com/m.Parsed", "owned": true, "corpora": ["sheet"], "outputs": [], "rejects": []}]`, 1)
 	for _, tt := range []struct {
-		data       string
-		format     int
-		transforms int
+		data              string
+		format            int
+		transforms, lifts int
 	}{
-		{v3, 3, 0},
-		{v4, 4, 1},
+		{v3, 3, 0, 0},
+		{v4, 4, 1, 0},
+		{v5, 5, 1, 1},
 	} {
 		g, err := ParseAny([]byte(tt.data))
 		if err != nil {
@@ -102,14 +111,16 @@ func TestParseAny(t *testing.T) {
 		}
 		if g.Format != tt.format || g.CorpusRoot != "." || !g.RootPackage || len(g.IssueLinks) != 1 ||
 			len(g.Properties) != 1 || len(g.Suites) != 1 || g.Suites[0].Outputs[0].Pattern != "stdout.txt" ||
-			len(g.Types) != 1 || len(g.Types[0].Transforms) != tt.transforms || g.Codes || g.Suites[0].Classifier != nil {
+			len(g.Types) != 1 || len(g.Types[0].Transforms) != tt.transforms || g.Codes || g.Suites[0].Classifier != nil ||
+			len(g.Lifts) != tt.lifts || slices.ContainsFunc(g.Lifts, func(l Lift) bool { return l.Bytes || l.ProductFiles != nil }) {
 			t.Errorf("format %d reads as %+v", tt.format, g)
 		}
 		if _, err := Parse([]byte(tt.data)); !errors.As(err, new(*FormatError)) {
 			t.Errorf("Parse of format %d: got %v, want a FormatError", tt.format, err)
 		}
 	}
-	now := Registry{CorpusRoot: ".", Codes: true, Suites: []Suite{{Name: "evaluate", Classifier: &Classifier{Name: "div-zero", Description: "Divides by zero."}}}}
+	now := Registry{CorpusRoot: ".", Codes: true, Suites: []Suite{{Name: "evaluate", Classifier: &Classifier{Name: "div-zero", Description: "Divides by zero."}}},
+		Lifts: []Lift{{Name: "import", Bytes: true, ProductFiles: []Output{{Pattern: "sheet/*", Description: "A cell."}}}}}
 	if g, err := ParseAny(now.Marshal()); err != nil || !bytes.Equal(g.Marshal(), now.Marshal()) {
 		t.Errorf("format %d: got %+v, %v", Format, g, err)
 	}
@@ -119,6 +130,8 @@ func TestParseAny(t *testing.T) {
 		{strings.Replace(v3, `"rootPackage": true,`, `"rootPackage": true, "codes": false,`, 1), "it is not a registry: it holds format 3, and codes, which format 5 added"},
 		{strings.Replace(v4, `"rootPackage": true,`, `"rootPackage": true, "codes": null,`, 1), "it is not a registry: it holds format 4, and codes, which format 5 added"},
 		{strings.Replace(v4, `"rejects": ["circular"]}`, `"rejects": ["circular"], "classifier": null}`, 1), "it is not a registry: it holds format 4, and suites[].classifier, which format 5 added"},
+		{strings.Replace(v5, `"owned": true, "corpora"`, `"owned": true, "bytes": false, "corpora"`, 1), "it is not a registry: it holds format 5, and lifts[].bytes, which format 6 added"},
+		{strings.Replace(v5, `"rejects": []}]`, `"rejects": [], "productFiles": null}]`, 1), "it is not a registry: it holds format 5, and lifts[].productFiles, which format 6 added"},
 		{strings.Replace(v4, `"rejects": ["circular"]}`, `"rejects": ["circular"], "later": 1}`, 1), `it is not a registry: json: unknown field "later"`},
 		{`{"format": 0}`, "it is not a registry: it holds no format version"},
 		{`[]`, "it is not a registry"},

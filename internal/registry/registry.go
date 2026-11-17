@@ -271,9 +271,10 @@ const OutcomeFormat = 5
 
 // added is what each format version added to the one before it, by the
 // key that holds it, which a registry of an older format doesn't hold.
-// Format 4 added each corpus type's transforms, and format 5 whether the
-// project supplies Codes and each suite's classifier. Neither changed what
-// an earlier key holds.
+// Format 4 added each corpus type's transforms, format 5 whether the
+// project supplies Codes and each suite's classifier, and format 6 whether
+// each lift is a bytes lift and its product's declarations. None changed
+// what an earlier key holds.
 var added = []struct {
 	format int
 	key    string
@@ -286,6 +287,12 @@ var added = []struct {
 	{5, "suites[].classifier", func(p presence) bool {
 		return slices.ContainsFunc(p.Suites, func(s suitePresence) bool { return s.Classifier != nil })
 	}},
+	{6, "lifts[].bytes", func(p presence) bool {
+		return slices.ContainsFunc(p.Lifts, func(l liftPresence) bool { return l.Bytes != nil })
+	}},
+	{6, "lifts[].productFiles", func(p presence) bool {
+		return slices.ContainsFunc(p.Lifts, func(l liftPresence) bool { return l.ProductFiles != nil })
+	}},
 }
 
 // presence records which keys that a later format added a registry
@@ -293,7 +300,13 @@ var added = []struct {
 type presence struct {
 	Codes  json.RawMessage `json:"codes"`
 	Types  []typePresence  `json:"types"`
+	Lifts  []liftPresence  `json:"lifts"`
 	Suites []suitePresence `json:"suites"`
+}
+
+type liftPresence struct {
+	Bytes        json.RawMessage `json:"bytes"`
+	ProductFiles json.RawMessage `json:"productFiles"`
 }
 
 type typePresence struct {
