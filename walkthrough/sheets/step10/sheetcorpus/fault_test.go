@@ -80,8 +80,10 @@ func TestImportFault(t *testing.T) {
 	}
 	// The child fails import's cell, and the tests above it, and nothing
 	// else: any other failure adds lines. Durations and file:line prefixes
-	// are dropped, so the output reads the same wherever the code moves.
-	got := durations.ReplaceAllString(positions.ReplaceAllString(string(out), ""), "")
+	// are dropped, so the output reads the same wherever the code moves, and
+	// so is the coverage line a coverage-built binary prints, as the child
+	// is whenever this test's binary is.
+	got := coverage.ReplaceAllString(durations.ReplaceAllString(positions.ReplaceAllString(string(out), ""), ""), "")
 	if got != importFault {
 		t.Errorf("the update's output:\n%s\nwant:\n%s", got, importFault)
 	}
@@ -95,6 +97,7 @@ func TestImportFault(t *testing.T) {
 var (
 	durations = regexp.MustCompile(` \(\d+\.\d+s\)`)
 	positions = regexp.MustCompile(`\S+\.go:\d+: `)
+	coverage  = regexp.MustCompile(`(?m)^coverage: .*\n`)
 )
 
 // importFault is the child's output, whose one failure is import's cell.
