@@ -245,6 +245,11 @@ func Parse(data []byte) (*Registry, error) {
 	case head.Format != Format:
 		return nil, &FormatError{Format: head.Format}
 	}
+	return decode(data)
+}
+
+// decode decodes a registry, refusing a key its Registry doesn't hold.
+func decode(data []byte) (*Registry, error) {
 	var r Registry
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
@@ -252,6 +257,95 @@ func Parse(data []byte) (*Registry, error) {
 		return nil, fmt.Errorf("it is not a registry: %w", err)
 	}
 	return &r, nil
+}
+
+// Oldest is the oldest format version [ParseAny] reads: the one main held
+// when it first held a registry. Formats 1 and 2 are only at commits of
+// the branch that brought the registry to main, whose merge read neither.
+const Oldest = 3
+
+// OutcomeFormat is the first format version whose revisions commit an
+// outcome file for every cell. Before it, a cell commits only the files
+// its column writes, and none at all when it writes none.
+const OutcomeFormat = 5
+
+// added is what each format version added to the one before it, by the
+// key that holds it, which a registry of an older format doesn't hold.
+// Format 4 added each corpus type's transforms, format 5 whether the
+// project supplies Codes and each suite's classifier, and format 6 whether
+// each lift is a bytes lift and its product's declarations. None changed
+// what an earlier key holds. Each format's keys are in
+// testdata/keys-<N>.txt, which TestFormatKeys checks the table against.
+var added = []struct {
+	format int
+	key    string
+	holds  func(presence) bool
+}{
+	{4, "types[].transforms", func(p presence) bool {
+		return slices.ContainsFunc(p.Types, func(t typePresence) bool { return t.Transforms != nil })
+	}},
+	{5, "codes", func(p presence) bool { return p.Codes != nil }},
+	{5, "suites[].classifier", func(p presence) bool {
+		return slices.ContainsFunc(p.Suites, func(s suitePresence) bool { return s.Classifier != nil })
+	}},
+	{6, "lifts[].bytes", func(p presence) bool {
+		return slices.ContainsFunc(p.Lifts, func(l liftPresence) bool { return l.Bytes != nil })
+	}},
+	{6, "lifts[].productFiles", func(p presence) bool {
+		return slices.ContainsFunc(p.Lifts, func(l liftPresence) bool { return l.ProductFiles != nil })
+	}},
+}
+
+// presence records which keys that a later format added a registry
+// holds. A key given as null is held.
+type presence struct {
+	Codes  json.RawMessage `json:"codes"`
+	Types  []typePresence  `json:"types"`
+	Lifts  []liftPresence  `json:"lifts"`
+	Suites []suitePresence `json:"suites"`
+}
+
+type liftPresence struct {
+	Bytes        json.RawMessage `json:"bytes"`
+	ProductFiles json.RawMessage `json:"productFiles"`
+}
+
+type typePresence struct {
+	Transforms json.RawMessage `json:"transforms"`
+}
+
+type suitePresence struct {
+	Classifier json.RawMessage `json:"classifier"`
+}
+
+// ParseAny parses a registry of any format version from [Oldest] to
+// [Format], as a tool reads the registries that other revisions committed.
+// One of an older format is given in today's form, with its own Format,
+// and is refused as no registry if it holds a key a later format added.
+// A format older than Oldest or newer than Format is a [*FormatError].
+func ParseAny(data []byte) (*Registry, error) {
+	var head struct {
+		Format int `json:"format"`
+	}
+	if err := json.Unmarshal(data, &head); err != nil {
+		return nil, fmt.Errorf("it is not a registry: %w", err)
+	}
+	switch {
+	case head.Format < 1:
+		return nil, errors.New("it is not a registry: it holds no format version")
+	case head.Format < Oldest || head.Format > Format:
+		return nil, &FormatError{Format: head.Format}
+	}
+	var p presence
+	if err := json.Unmarshal(data, &p); err != nil {
+		return nil, fmt.Errorf("it is not a registry: %w", err)
+	}
+	for _, a := range added {
+		if head.Format < a.format && a.holds(p) {
+			return nil, fmt.Errorf("it is not a registry: it holds format %d, and %s, which format %d added", head.Format, a.key, a.format)
+		}
+	}
+	return decode(data)
 }
 
 // RawInput is the type a suite over the raw input view consumes, as

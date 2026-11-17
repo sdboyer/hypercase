@@ -1,0 +1,54 @@
+{
+  "format": 4,
+  "updateVar": "SHEETS_UPDATE_GOLDEN",
+  "corpusRoot": "step06",
+  "rootPackage": false,
+  "issueLinks": [],
+  "properties": [],
+  "types": [
+    {
+      "dir": "sheet",
+      "description": "A spreadsheet: one file per cell under in/sheet/, holding a number or a formula.",
+      "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step06/sheetcorpus.Sheet",
+      "transforms": []
+    }
+  ],
+  "lifts": [
+    {
+      "name": "parse",
+      "description": "Parses every cell.",
+      "input": "github.com/sdboyer/hypercase/walkthrough/sheets/step06/sheetcorpus.Sheet",
+      "product": "*github.com/sdboyer/hypercase/walkthrough/sheets/sheet.Parsed",
+      "owned": false,
+      "corpora": [
+        "sheet"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "The cell that is neither a number nor a formula."
+        }
+      ],
+      "rejects": [
+        "malformed"
+      ]
+    }
+  ],
+  "suites": [
+    {
+      "name": "format",
+      "description": "Prints each formula back in canonical form.",
+      "consumes": "*github.com/sdboyer/hypercase/walkthrough/sheets/sheet.Parsed",
+      "corpora": [
+        "sheet"
+      ],
+      "outputs": [
+        {
+          "pattern": "formulas.txt",
+          "description": "Each formula cell and its formula, in cell order."
+        }
+      ],
+      "rejects": []
+    }
+  ]
+}

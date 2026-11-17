@@ -1,6 +1,7 @@
 package hypercase
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -234,13 +235,14 @@ type caseState struct {
 	// commits for it, as a normal run does.
 	update bool
 	// made is, in a normal run of a transform's variant whose committed
-	// inputs differ from what the transform makes, what it makes: the
-	// input view the update stages the case on. It is nil when the update
-	// stages the case on view.
+	// inputs give another input view than the one the transform makes,
+	// what it makes: the input view the update stages the case on. It is
+	// nil when the update stages the case on view, or on a view that holds
+	// the same files.
 	made fs.FS
 	// asUpdate is, in a normal run, the case staged as the package's
-	// update stages it, made when a cell first asks whether the update
-	// runs it. Its normal is the normal run's state, whose runs it shares
+	// update stages it, made when a cell first asks what the update does
+	// with it. Its normal is the normal run's state, whose runs it shares
 	// for each lift no bytes lift precedes: such a lift's input is the same
 	// in both. A lift past a bytes lift runs once in each. When the update
 	// stages the case on made, no lift's input need be the same in both,
@@ -258,7 +260,7 @@ type liftRun struct {
 	out      *called
 	product  map[string][]byte // a bytes lift's product, by path in its view; nil when it made none
 	view     fs.FS
-	problems []string
+	problems notes
 	verdict  *liftVerdict // a bytes lift's cell's, once judged
 	bare     *liftVerdict // a bytes lift's cell's under a bare Project, once judged
 }
@@ -345,17 +347,55 @@ func (s *caseState) heldBack(l *lift, lr *liftRun, in any, view fs.FS) bool {
 	return !lr.bare.writable
 }
 
-// updateRuns reports, in a normal run, whether the package's update runs
+// An updateFate is what the package's update does with a cell, which a
+// normal run tells by staging the case as the update stages it. The
+// update runs the cell when nothing blocks it and its probe, if it has
+// one, says the case is for it, with no fault.
+type updateFate struct {
+	// block is what blocks the cell in the update, when something does.
+	block *blockage
+	// skip is the reason the cell's probe gives, on the value the update
+	// stages, for saying the case isn't for it, when it gives one an
+	// outcome can hold.
+	skip string
+	// fault says how the cell's probe fails the cell on the value the
+	// update stages, when it does: it panics, or says the case isn't for
+	// it with no reason, or with one an outcome can't hold.
+	fault string
+	// panicked records that the fault is the probe's panic, for which the
+	// update writes the outcome panicked, and the panic in error.txt. For
+	// the other faults, it writes nothing for the cell.
+	panicked bool
+}
+
+// runs reports whether the update runs the cell.
+func (f updateFate) runs() bool { return f.block == nil && f.skip == "" && f.fault == "" }
+
+// same reports whether two fates of a cell are one: both block it by the
+// failure of one lift, skip it for one reason, fail it with one fault of
+// its probe, or run it, on whatever value.
+func (f updateFate) same(g updateFate) bool {
+	if f.block != nil || g.block != nil {
+		return f.block != nil && g.block != nil && !f.block.broken && !g.block.broken && f.block.failed == g.block.failed
+	}
+	return f.skip == g.skip && f.fault == g.fault
+}
+
+// probePanics is the fault of col's probe that panics with v.
+func probePanics(col *column, v any) string {
+	return fmt.Sprintf("%s's probe panics: %v", col.name, v)
+}
+
+// updateFate tells, in a normal run, what the package's update does with
 // col's cell: whether the case, staged as the update stages it, reaches
-// the type col consumes with nothing to block it, and col's probe, if it
-// has one, says the case is for it. The update stages a transform's
-// variant on what the transform makes, where a normal run reads the
-// committed inputs, and runs each bytes lift, where a normal run reads
-// what the archive commits for it. A normal run runs only the bytes lifts
-// the package owns, so only a package that owns every bytes lift on the
-// way asks. A probe that panics leaves the update to run the cell, which
-// reports the panic.
-func (s *caseState) updateRuns(col *column) bool {
+// the type col consumes with nothing to block it, and if it does, what
+// col's probe, if it has one, says of the value it reaches. The update
+// stages a transform's variant on what the transform makes, where a normal
+// run reads the committed inputs, and runs each bytes lift, where a normal
+// run reads what the archive commits for it. A normal run runs only the
+// bytes lifts the package owns, so only a package that owns every bytes
+// lift on the way asks.
+func (s *caseState) updateFate(col *column) updateFate {
 	if s.asUpdate == nil {
 		s.asUpdate = &caseState{
 			r:      s.r,
@@ -374,14 +414,57 @@ func (s *caseState) updateRuns(col *column) bool {
 	}
 	in, _, b := s.asUpdate.stage(col.consumes)
 	if b != nil {
-		return false
+		return updateFate{block: b}
 	}
 	if col.probe == nil {
-		return true
+		return updateFate{}
 	}
+	var why string
 	var ok bool
-	p := call(func(*called) { _, ok = col.probe(in) })
-	return p.panicked || ok
+	p := call(func(*called) { why, ok = col.probe(in) })
+	switch {
+	case p.panicked:
+		return updateFate{fault: probePanics(col, p.panicValue), panicked: true}
+	case ok:
+		return updateFate{}
+	}
+	if fault := probeFault(col, why); fault != "" {
+		return updateFate{fault: fault}
+	}
+	return updateFate{skip: why}
+}
+
+// probeFault says how col's probe, which said the case isn't for it, with
+// the reason why, fails the cell: with no reason, or with one an outcome
+// can't hold. It returns "" for a reason an outcome holds.
+func probeFault(col *column, why string) string {
+	if strings.TrimSpace(why) == "" {
+		return fmt.Sprintf("%s's probe says the case isn't for it, and gives no reason", col.name)
+	}
+	if err := archive.CheckDetail(why); err != nil {
+		return fmt.Sprintf("%s's probe says the case isn't for it, with a reason an outcome can't hold: %v", col.name, err)
+	}
+	return ""
+}
+
+// restages reports, in a normal run, once updateFate says the update runs
+// col's cell, whether the update runs it on another value than this run
+// does. Past a bytes lift, the cell's value comes from the last bytes
+// lift's product alone, so it differs when that lift makes another
+// product than the one the archive commits. With no bytes lift on the
+// path, it differs when the update stages a transform's variant on what
+// the transform makes, whose input view differs from the committed
+// inputs'.
+func (s *caseState) restages(col *column) bool {
+	last, _ := s.plan.bytesOnPath(col.consumes)
+	if last == nil {
+		return s.made != nil
+	}
+	lr, ok := s.asUpdate.runs[last]
+	if !ok && s.asUpdate.normal != nil {
+		lr, ok = s.asUpdate.normal.runs[last]
+	}
+	return !ok || !maps.EqualFunc(lr.product, s.c.product(last), bytes.Equal)
 }
 
 // bytesOnPath returns the last bytes lift on the plan's path to typ, and
@@ -466,7 +549,9 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 		return lr
 	case lr.out.err != nil:
 		lr.out.jennyErr, lr.out.err = lr.out.err, nil
-		lr.problems = []string{fmt.Sprintf("%s's jenny failed on the case, with an error that is no rejection:\n  %s\nIf %s rejects the case, return the error as decl.Reject(err). If not, fix %s's jenny. An update writes nothing for this cell.", l.name, indent(lr.out.jennyErr.Error(), "  "), l.name, l.name)}
+		lr.problems.add(aboutFault,
+			fmt.Sprintf("%s's jenny failed on the case, with an error that is no rejection:\n  %s", l.name, indent(lr.out.jennyErr.Error(), "  ")),
+			fmt.Sprintf("If %s rejects the case, return the error as decl.Reject(err). If not, fix %s's jenny. An update writes nothing for this cell.", l.name, l.name))
 		return lr
 	}
 	lr.product, lr.problems = productOf(l, s.c.prefix, made)
@@ -483,15 +568,17 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 // file outside any tree, or in the tree params; a file that is also a
 // directory; a file no declaration matches, or two do; and a file an
 // archive would read back differently.
-func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, []string) {
+func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, notes) {
 	files := map[string][]byte{}
-	var problems []string
+	var problems notes
 	for _, f := range made.AsFiles() {
 		// A jenny's FS renders each file it adds, and AsFiles gives each
 		// one as Bytes, as for a transform's, so no test reaches this.
 		data, ok := jenny.BytesOf(f)
 		if !ok {
-			problems = append(problems, fmt.Sprintf("%s made %s, which its FS gave as a %T, not as rendered bytes. An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase.", l.name, f.Path(), f))
+			problems.add(aboutFault,
+				fmt.Sprintf("%s made %s, which its FS gave as a %T, not as rendered bytes.", l.name, f.Path(), f),
+				"An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase.")
 			continue
 		}
 		files[f.Path()] = data
@@ -502,24 +589,30 @@ func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, []str
 	var paths []string
 	for _, p := range slices.Sorted(maps.Keys(files)) {
 		if err := archive.HoldsName(dir + p); err != nil {
-			problems = append(problems, fmt.Sprintf("%q can't be held in an archive: %v.\nFix %s's jenny so the file's name can be held. An update writes nothing for this cell.", dir+p, err, l.name))
+			problems.add(aboutFault,
+				fmt.Sprintf("%q can't be held in an archive: %v.", dir+p, err),
+				fmt.Sprintf("Fix %s's jenny so the file's name can be held. An update writes nothing for this cell.", l.name))
 			continue
 		}
 		paths = append(paths, p)
 	}
 	for _, p := range archive.CheckVia(prefix, l.name, paths) {
-		problems = append(problems, fmt.Sprintf("%s.\nFix %s's jenny: what it makes is its product's input view, with the trees as its top-level directories. An update writes nothing for this cell.", p, l.name))
+		problems.add(aboutFault, p.String()+".",
+			fmt.Sprintf("Fix %s's jenny: what it makes is its product's input view, with the trees as its top-level directories. An update writes nothing for this cell.", l.name))
 	}
 	for _, p := range paths {
 		switch hit := l.declaredProduct(p); len(hit) {
 		case 0:
-			problems = append(problems, fmt.Sprintf("%s is not declared.\nDeclare it in %s's Product, with a description, or fix %s's jenny. An update writes nothing for this cell.", dir+p, l.name, l.name))
+			problems.add(aboutFault, fmt.Sprintf("%s is not declared.", dir+p),
+				fmt.Sprintf("Declare it in %s's Product, with a description, or fix %s's jenny. An update writes nothing for this cell.", l.name, l.name))
 		case 1:
 		default:
-			problems = append(problems, fmt.Sprintf("%s matches two of %s's product declarations, %s and %s.\nChange the patterns so that one declaration matches each file. An update writes nothing for this cell.", dir+p, l.name, hit[0], hit[1]))
+			problems.add(aboutFault, fmt.Sprintf("%s matches two of %s's product declarations, %s and %s.", dir+p, l.name, hit[0], hit[1]),
+				"Change the patterns so that one declaration matches each file. An update writes nothing for this cell.")
 		}
 		if err := archive.Holds(files[p]); err != nil {
-			problems = append(problems, fmt.Sprintf("%s can't be held in an archive: %v.\nFix %s's jenny so the file can be held. An update writes nothing for this cell.", dir+p, err, l.name))
+			problems.add(aboutFault, fmt.Sprintf("%s can't be held in an archive: %v.", dir+p, err),
+				fmt.Sprintf("Fix %s's jenny so the file can be held. An update writes nothing for this cell.", l.name))
 		}
 	}
 	return files, problems

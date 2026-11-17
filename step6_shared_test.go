@@ -243,7 +243,7 @@ func TestRootCheckCorpusTypes(t *testing.T) {
 	s := newSandbox(t, "shared-ladder")
 	s.passes(s.update("ladder-a"))
 	s.passes(s.run("b", "ladder-b-grid", true))
-	twoTypes := "the corpus directory script has two different corpus types:\n  .: github.com/sdboyer/hypercase_test.Script: \"Trees of instructions, under in/<tree>/, that the fixtures' columns follow.\"\n  ./b: github.com/sdboyer/hypercase_test.Grid: \"A grid, in the script directory.\"\nAn archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration."
+	twoTypes := "the corpus directory script has two different corpus types:\n  .: github.com/sdboyer/hypercase_test.Script: \"Trees of instructions, under in/<tree>/, that the fixtures' columns follow.\"\n  ./b: github.com/sdboyer/hypercase_test.Grid: \"A grid, in the script directory.\"\nAn archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration." + staleRegistry
 	s.fails(s.normal("ladder-a"), twoTypes)
 	s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
 	s.fails(s.normal("ladder-a"), "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.", twoTypes)

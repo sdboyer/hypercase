@@ -33,11 +33,14 @@ type Repo struct {
 	env    []string
 	prefix string
 
-	mu    sync.Mutex
-	cat   *exec.Cmd
-	in    io.WriteCloser
-	out   *bufio.Reader
-	blobs map[string][]byte
+	mu        sync.Mutex
+	cat       *exec.Cmd
+	catStderr bytes.Buffer // cat's stderr, read once it exits
+	catErr    error        // the failure that stopped cat, which every later read gives
+	in        io.WriteCloser
+	outPipe   io.ReadCloser // cat's stdout, which out reads
+	out       *bufio.Reader
+	blobs     map[string][]byte
 }
 
 // Open opens the repository whose working tree holds dir. Each git
@@ -60,10 +63,16 @@ func Open(dir string, env []string) (*Repo, error) {
 // path relative to the top of the working tree: "." for the top.
 func (r *Repo) Prefix() string { return r.prefix }
 
-// Resolve returns the commit a revision names, such as main or HEAD~2.
+// Resolve returns the commit a revision names, such as main or HEAD~2. A
+// revision git can't resolve names no commit: git rev-parse exits 1,
+// writing nothing on stderr. One that git fails on otherwise is an error
+// that holds rev-parse's stderr.
 func (r *Repo) Resolve(rev string) (string, error) {
-	out, err := r.git("rev-parse", "--verify", "--quiet", "--end-of-options", rev+"^{commit}")
-	if err != nil {
+	out, stderr, err := r.run("rev-parse", "--verify", "--quiet", "--end-of-options", rev+"^{commit}")
+	switch {
+	case err != nil && stderr != "":
+		return "", fmt.Errorf("git rev-parse: %s", stderr)
+	case err != nil:
 		return "", fmt.Errorf("%s names no commit in this repository", rev)
 	}
 	return strings.TrimSpace(string(out)), nil
@@ -117,28 +126,62 @@ func (r *Repo) Close() error {
 	if r.cat == nil {
 		return nil
 	}
+	return r.stopCat()
+}
+
+// stopCat stops the repository's git cat-file, and returns its failure,
+// holding what it wrote on stderr. It closes the pipe cat-file writes to
+// before it waits, so a cat-file blocked writing what no read will take
+// gets a broken pipe, and exits.
+func (r *Repo) stopCat() error {
 	r.in.Close()
+	r.outPipe.Close()
 	err := r.cat.Wait()
 	r.cat = nil
-	return err
+	if err != nil {
+		if msg := strings.TrimSpace(r.catStderr.String()); msg != "" {
+			return fmt.Errorf("git cat-file: %s", msg)
+		}
+		return fmt.Errorf("git cat-file: %w", err)
+	}
+	return nil
+}
+
+// catFailed records that reading from git cat-file failed with err, and
+// returns the error every later read gives: cat-file's own failure, with
+// its stderr, when it exited with one.
+func (r *Repo) catFailed(err error) error {
+	if stop := r.stopCat(); stop != nil {
+		r.catErr = stop
+	} else {
+		r.catErr = fmt.Errorf("git cat-file: %w", err)
+	}
+	return r.catErr
 }
 
 // git runs a git command in the repository's directory, and returns its
 // stdout.
 func (r *Repo) git(args ...string) ([]byte, error) {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = r.dir
-	cmd.Env = r.env
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	out, stderr, err := r.run(args...)
 	if err != nil {
-		if msg := strings.TrimSpace(stderr.String()); msg != "" {
-			return nil, fmt.Errorf("git %s: %s", args[0], msg)
+		if stderr != "" {
+			return nil, fmt.Errorf("git %s: %s", args[0], stderr)
 		}
 		return nil, fmt.Errorf("git %s: %w", args[0], err)
 	}
 	return out, nil
+}
+
+// run runs a git command in the repository's directory, and returns its
+// stdout, and its stderr less the space at either end.
+func (r *Repo) run(args ...string) (stdout []byte, stderr string, err error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = r.dir
+	cmd.Env = r.env
+	var errb bytes.Buffer
+	cmd.Stderr = &errb
+	out, err := cmd.Output()
+	return out, strings.TrimSpace(errb.String()), err
 }
 
 // blob returns an object's bytes, which the caller doesn't modify.
@@ -148,10 +191,15 @@ func (r *Repo) blob(hash string) ([]byte, error) {
 	if data, ok := r.blobs[hash]; ok {
 		return data, nil
 	}
+	if r.catErr != nil {
+		return nil, r.catErr
+	}
 	if r.cat == nil {
 		cmd := exec.Command("git", "cat-file", "--batch")
 		cmd.Dir = r.dir
 		cmd.Env = r.env
+		r.catStderr.Reset()
+		cmd.Stderr = &r.catStderr
 		in, err := cmd.StdinPipe()
 		if err != nil {
 			return nil, err
@@ -163,26 +211,49 @@ func (r *Repo) blob(hash string) ([]byte, error) {
 		if err := cmd.Start(); err != nil {
 			return nil, fmt.Errorf("git cat-file: %w", err)
 		}
-		r.cat, r.in, r.out = cmd, in, bufio.NewReader(out)
+		r.cat, r.in, r.outPipe, r.out = cmd, in, out, bufio.NewReader(out)
 	}
 	if _, err := io.WriteString(r.in, hash+"\n"); err != nil {
-		return nil, fmt.Errorf("git cat-file: %w", err)
+		return nil, r.catFailed(err)
 	}
 	head, err := r.out.ReadString('\n')
 	if err != nil {
-		return nil, fmt.Errorf("git cat-file: %w", err)
+		return nil, r.catFailed(err)
 	}
 	fields := strings.Fields(head)
-	if len(fields) != 3 || fields[0] != hash || fields[1] != "blob" {
-		return nil, fmt.Errorf("git cat-file gave %q for the blob %s", strings.TrimSpace(head), hash)
+	if len(fields) == 2 && fields[0] == hash && fields[1] == "missing" {
+		return nil, fmt.Errorf("git cat-file finds no object %s in the repository", hash)
 	}
-	size, err := strconv.Atoi(fields[2])
-	if err != nil || size < 0 {
-		return nil, fmt.Errorf("git cat-file gave %q for the blob %s", strings.TrimSpace(head), hash)
+	size := -1
+	if len(fields) == 3 && fields[0] == hash {
+		if n, err := strconv.Atoi(fields[2]); err == nil {
+			size = n
+		}
+	}
+	if size < 0 {
+		// The header doesn't say how much content follows it, so no later
+		// read can find its own header: each gives this error, with what
+		// cat-file wrote on stderr, if anything. Stopping cat-file before it
+		// has written what follows may fail it with a broken pipe, so its
+		// exit status is left out.
+		r.stopCat()
+		r.catErr = fmt.Errorf("git cat-file gave %q for the blob %s", strings.TrimSpace(head), hash)
+		if msg := strings.TrimSpace(r.catStderr.String()); msg != "" {
+			r.catErr = fmt.Errorf("%w: %s", r.catErr, msg)
+		}
+		return nil, r.catErr
+	}
+	if fields[1] != "blob" {
+		// Another kind of object, whose content is read past, so that the
+		// next read finds its own header.
+		if _, err := io.CopyN(io.Discard, r.out, int64(size)+1); err != nil {
+			return nil, r.catFailed(err)
+		}
+		return nil, fmt.Errorf("git cat-file gives a %s, not a blob, for %s", fields[1], hash)
 	}
 	data := make([]byte, size+1) // the content, then a newline
 	if _, err := io.ReadFull(r.out, data); err != nil {
-		return nil, fmt.Errorf("git cat-file: %w", err)
+		return nil, r.catFailed(err)
 	}
 	data = data[:size:size]
 	r.blobs[hash] = data

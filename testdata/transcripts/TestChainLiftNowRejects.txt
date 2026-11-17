@@ -337,7 +337,7 @@ $ go test  # chain
     export/names: evaluate is blocked: testdata/export/names.txtar, out/import/outcome, records the lift import's outcome as "rejected".
     export/names: import makes files named as a cell's own files are, which list reads.
         import: Imports the export as a script, as its import/ tree says.
-        via/import/inputs/x is recorded, and import failed on the case, so it has no product.
+        via/import/inputs/x is recorded, and import failed on the case in this run, so this run has no product.
         If it should make one, fix import or the case. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
     export/names: import makes files named as a cell's own files are, which list reads.
         list: Lists the files of the script's input view, with their bytes.

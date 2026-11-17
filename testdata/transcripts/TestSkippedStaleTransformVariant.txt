@@ -1,0 +1,105 @@
+$ rm testdata/script/errs.txtar  # leave twice, whose cases the lifts run on as they should
+$ rm testdata/script/garbled.txtar  # leave twice, whose cases the lifts run on as they should
+$ edit testdata/script/twice.txtar  # evaluate writes a file
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-ladder-eval
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/twice/transform/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/script/twice.txtar, transform/looped/out/resolve/error.txt, records its error.
+    what ran, in order:
+        parse ran on twice
+        resolve ran on twice
+        evaluate's probe ran
+        evaluate ran on twice
+        parse ran on twice
+        resolve ran on twice
+        parse ran on twice
+        resolve ran on twice
+        evaluate's probe ran
+        evaluate ran on twice
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/evaluate
+            --- PASS: TestCorpus/script/twice/parse
+            --- PASS: TestCorpus/script/twice/resolve
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- SKIP: TestCorpus/script/twice/transform/looped/evaluate
+                --- PASS: TestCorpus/script/twice/transform/looped/parse
+                --- PASS: TestCorpus/script/twice/transform/looped/resolve
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/evaluate
+                --- PASS: TestCorpus/script/twice/transform/upper/parse
+                --- PASS: TestCorpus/script/twice/transform/upper/resolve
+PASS
+$ edit testdata/script/twice.txtar  # upper's committed inputs hold an evaluate/probe upper doesn't make
+$ go test  # tr-ladder-eval
+    script/twice/transform/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/script/twice.txtar, transform/looped/out/resolve/error.txt, records its error.
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        upper's variant of the base differs from its committed inputs:
+        transform/upper/in/evaluate/probe is no longer made
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    script/twice/transform/upper: Uppercases every file under do/out/.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        transform/upper/out/evaluate/outcome differs (-golden +got):
+        - accepted
+        + skipped a stale reason
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. What it writes for the cell, if anything, is its run's, not this outcome.
+        transform/upper/out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it: a stale reason
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Delete nothing by hand before it has run.
+    what ran, in order:
+        parse ran on twice
+        resolve ran on twice
+        evaluate's probe ran
+        evaluate ran on twice
+        parse ran on twice
+        resolve ran on twice
+        parse ran on twice
+        resolve ran on twice
+        evaluate's probe ran
+        parse ran on twice
+        resolve ran on twice
+        evaluate's probe ran
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/evaluate
+            --- PASS: TestCorpus/script/twice/parse
+            --- PASS: TestCorpus/script/twice/resolve
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- SKIP: TestCorpus/script/twice/transform/looped/evaluate
+                --- PASS: TestCorpus/script/twice/transform/looped/parse
+                --- PASS: TestCorpus/script/twice/transform/looped/resolve
+            --- FAIL: TestCorpus/script/twice/transform/upper
+                --- FAIL: TestCorpus/script/twice/transform/upper/evaluate
+                --- PASS: TestCorpus/script/twice/transform/upper/parse
+                --- PASS: TestCorpus/script/twice/transform/upper/resolve
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-ladder-eval
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/twice/transform/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/script/twice.txtar, transform/looped/out/resolve/error.txt, records its error.
+    what ran, in order:
+        parse ran on twice
+        resolve ran on twice
+        evaluate's probe ran
+        evaluate ran on twice
+        parse ran on twice
+        resolve ran on twice
+        parse ran on twice
+        resolve ran on twice
+        evaluate's probe ran
+        evaluate ran on twice
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/evaluate
+            --- PASS: TestCorpus/script/twice/parse
+            --- PASS: TestCorpus/script/twice/resolve
+            --- PASS: TestCorpus/script/twice/transform/looped
+                --- SKIP: TestCorpus/script/twice/transform/looped/evaluate
+                --- PASS: TestCorpus/script/twice/transform/looped/parse
+                --- PASS: TestCorpus/script/twice/transform/looped/resolve
+            --- PASS: TestCorpus/script/twice/transform/upper
+                --- PASS: TestCorpus/script/twice/transform/upper/evaluate
+                --- PASS: TestCorpus/script/twice/transform/upper/parse
+                --- PASS: TestCorpus/script/twice/transform/upper/resolve
+PASS

@@ -1,0 +1,11 @@
+Two prices and their total.
+-- in/sheet/A1 --
+4
+-- in/sheet/B1 --
+6
+-- in/sheet/C1 --
+=A1+B1
+-- out/evaluate/values.txt --
+A1 4
+B1 6
+C1 10

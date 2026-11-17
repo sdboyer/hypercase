@@ -1131,7 +1131,9 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 - It reads every registry under the root and every archive in the
   directories they declare, and fails on:
   - a column two packages register;
-  - one property name with two different entries;
+  - one property name with two different entries, which the packages
+    declare differently, or which a stale registry records, as one edited
+    by hand: the update, which rewrites the registries, ends the second;
   - a section no registry claims, such as `out/<suite>/…` after that suite
     was removed;
   - a problem of an archive as a whole: a missing description, a top-level
@@ -1151,7 +1153,8 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
   tested, and the result doesn't depend on the environment the check
   runs in. The check counts none of the registry's columns, lifts or
   transforms (steps 6 and 7) as owned, its lifts as used, or the
-  transforms its corpus types list as needing an owner. The sections of
+  transforms its corpus types list as needing an owner, and compares none
+  of its lifts' entries with other registries' (step 10). The sections of
   its suites, its owned lifts and its listed transforms stay claimed, so
   the registry's own failure is the one that reports them. A lift needs
   an owner when a package with tests uses it, and a transform when a
@@ -1912,13 +1915,42 @@ whether each has a probe, and whether the package owns it.
   rewrite. A cell whose output on those sections differs from what the
   update wrote fails, and the failure shows how the sections differ from
   what the transform makes, and names the module's update.
-- When the committed sections differ from what the transform makes, a
-  cell that a lift blocks on them may be one the update runs. A normal run
-  stages the variant on what the transform makes, as the update does, to
-  tell, and runs the cell's probe, if it has one, on what that reaches.
-  When the update runs the cell, its committed files are no orphans: the
-  normal run says so, and to delete none of them by hand, and, from step 8
-  on, that the update writes the cell's outcome from its run.
+- When the committed sections give another input view than the one the
+  transform makes, the update may do otherwise with a cell than a normal
+  run: run it on another value, or skip, block or fail it otherwise. A
+  normal run stages the variant on what the transform makes, as the update
+  does, to tell, and runs the cell's probe, if it has one, on what that
+  reaches. Where the update does otherwise, every message about the cell
+  ends with what it does: that it runs the cell, on another value than the
+  normal run where the normal run ran it; skips it, and why; blocks it,
+  and by which lift; or fails it, and how its probe fails, a panic among
+  them. What follows depends on what the message is about:
+  - the cell's run, a panic or an error the case doesn't expect among
+    them, a file it makes, or a frozen cell's files: to run the update,
+    fix what it reports, and read the diff before committing;
+  - a probe that says no with no reason, or with one an outcome can't
+    hold, and, from step 8 on, the cell's outcome: what the update writes
+    for the cell. That is its run's, if anything, where it runs the cell;
+    from step 8 on, the outcome it writes where it skips or blocks it; and
+    where its probe fails, `panicked`, with the panic in `error.txt`, for
+    a probe that panics, and nothing for one that says no with no reason,
+    or with one an outcome can't hold. On the outcome, it adds that the
+    probe needs fixing;
+  - a file the cell commits and doesn't produce: where the update runs the
+    cell, to delete nothing by hand before it has run, since its run may
+    still write the file; where it skips or blocks it, to fix the probe,
+    or the lift or the transform's jenny, or to delete the section by
+    hand, which the update leaves in place; where its probe fails, to fix
+    the probe;
+  - a `gaps` line on a cell that runs nothing: where the update skips or
+    blocks it, to remove the line, or fix the probe, or the lift or the
+    transform's jenny; otherwise, to run the update, fix what it reports,
+    and read the diff before committing.
+
+  Only where the update does with the cell what the normal run does is a
+  message's advice its own. Sections that give the same input view, as a
+  `delete` line naming a path the base lacks does, run every cell on the
+  same value in both runs.
 - An update replaces a transform's `in/…` and `delete` whole: a file the
   transform no longer produces is removed, and the removal shows in the diff.
 - When a transform no longer applies to a base, no cell runs on its
@@ -2429,133 +2461,247 @@ whose verdict changed mixed among those whose bytes did.
 A person runs `hypercase report`. The project supplies the patterns that
 link a known gap's text to the issue it waits on.
 
-Proposed: the flags `-root` and `-text`, and `decl.Project`'s `IssueLinks`
-field, a list of `decl.IssueLink`, each a regular expression and a URL
-template.
+The command takes the flags `-root` and `-text`. The patterns are
+`decl.Project`'s `IssueLinks` field, a list of `decl.IssueLink`, each a
+regular expression and a URL template.
 
+`walkthrough/sheets/step09/sheetcorpus/project.go` gives the project its
+`IssueLinks`, for the tracker that `negative`'s `gaps` lines name:
+
+<!-- source: walkthrough/sheets/step09/sheetcorpus/project.go#project -->
 ```go
-// walkthrough/sheets/step09/sheetcorpus/project.go: Project gains
+var Project = decl.Project{
+	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
+	RenderError: renderError,
+	Codes: func(err error) []string {
+		var e *sheet.Error
+		if errors.As(err, &e) {
+			return []string{e.Code}
+		}
+		return nil
+	},
 	IssueLinks: []decl.IssueLink{
 		{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/issues/$1"},
 	},
+}
 ```
 
+On a branch, in the directory of a package whose registry records the
+corpus root:
+
 ```sh
-hypercase report main HEAD > report.html
-hypercase report -text main HEAD
+hypercase report "$(git merge-base main HEAD)" HEAD > report.html
+hypercase report -text "$(git merge-base main HEAD)" HEAD
 ```
 
 ### How the files change
 
 No archive changes. `hypercase.json` gains the link patterns. The report is
-a file the person reads; nothing commits it.
+for the person to read, and a project needn't commit it.
+
+`walkthrough/sheets/step09/report_test.go` runs both commands as a person
+does on a branch. In a scratch repository, it runs the update on the toy at
+step 9 and commits it on `main`, makes a change on a branch, runs the update
+again, commits again, and runs the report in `step09/`. Its commits hold
+what the report reads: `go.mod`, the registries and the archives. The
+change makes three edits:
+
+- `calc` gains a classifier, `warned`, which adds `warned` to the outcome
+  of each cell where calc writes a warning.
+- The archive `blank` is renamed `empty`.
+- The sheet package words a file that is not a cell as
+  `notes: not the name of a cell`, where it said `notes: not a cell name`.
+
+The example commits what the report writes as its test's goldens, so that
+the walkthrough can show it: the plain text, below, and the page,
+`walkthrough/sheets/step09/testdata/report.html`, too long to show here,
+which a browser opens as it is.
 
 The report reads each archive as each revision commits it.
-`testdata/sheet/loop.txtar` holds two of the cells the sample below reports.
-With every other column left out, at `<a>`:
+`testdata/sheet/notes.txtar` holds two of the cells the sample below
+reports. At `<a>`:
 
+<!-- source: walkthrough/sheets/step09/testdata/sheet/notes.txtar -->
 ```
-A1 and B1 refer to each other.
+A note kept beside the cells, in a file that is not a cell.
 -- in/sheet/A1 --
-=B1
--- in/sheet/B1 --
-=A1
+1
+-- in/sheet/notes --
+remember the milk
 -- properties --
-circular
+malformed
 -- out/calc/error.txt --
-A1 -> B1 -> A1: cycle
-  sheet/A1:1: =B1
-  sheet/B1:1: =A1
+notes: not a cell name
+  sheet/notes
 -- out/calc/outcome --
-rejected S201
--- out/resolve/error.txt --
-A1 -> B1 -> A1: cycle
-  sheet/A1:1: =B1
-  sheet/B1:1: =A1
+rejected S101
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/parse/error.txt --
+notes: not a cell name
+  sheet/notes
+-- out/parse/outcome --
+rejected S101
 -- out/resolve/outcome --
-rejected S201
+blocked parse
 ```
 
-and at `<b>`, where a cycle is worded `cycle: A1 -> B1 -> A1`:
-
-```
-A1 and B1 refer to each other.
--- in/sheet/A1 --
-=B1
--- in/sheet/B1 --
-=A1
--- properties --
-circular
--- out/calc/error.txt --
-cycle: A1 -> B1 -> A1
-  sheet/A1:1: =B1
-  sheet/B1:1: =A1
--- out/calc/outcome --
-rejected S201
--- out/resolve/error.txt --
-cycle: A1 -> B1 -> A1
-  sheet/A1:1: =B1
-  sheet/B1:1: =A1
--- out/resolve/outcome --
-rejected S201
-```
+and at `<b>`, each `error.txt` starts `notes: not the name of a cell`, under
+the same outcome.
 
 ### Rules
 
 - `hypercase report <a> <b>`, from `cmd/hypercase`, takes two git revisions,
-  reads both from the repository's object store, and produces a static HTML
-  file, which it writes on stdout (proposed).
-- It reads registries and archives, never Go source. It reads every
-  registry format version up to its own, and refuses a newer one, saying to
-  run the report from the newer revision's hypercase.
-- It works from outcomes alone. It shows the matrix, and ranks changes:
-  changed outcomes first, then cells appearing or disappearing, then bytes
-  changed under the same outcome.
-- Each case's stated properties are shown beside it, and each `gaps` line on
-  the cell it marks, linked to its issue through the patterns the project
-  supplies, one per issue tracker its `gaps` lines name.
-- hypercase's own CI runs the report over the toy.
+  reads both from the repository's object store, never the working tree,
+  and writes one HTML page on stdout. It exits 0 when it writes the report,
+  2 for a usage error, and 1, with the cause on stderr, when it can't build
+  one.
+- Each argument is one revision, which must resolve to a commit. No range is
+  parsed: `A..B` and `A...B` name no commit, and a caller that wants a merge
+  base computes it and passes it. Flags come before the revisions: every
+  argument after `--`, or after the first revision, is a revision, even one
+  that starts with `-`, and none is ever read as a flag of git's.
+- It reads registries and archives, never Go source. At each revision it
+  merges the registries that record the corpus root, so one module can hold
+  several. Only `<a>` may lack them, as a revision from before the project
+  used hypercase does; every cell at `<b>` then appeared. A corpus root that
+  no registry records at `<b>` fails the report: the root is wrong.
+- It reads every registry format from 3 to its own, and refuses any other,
+  naming the revision, the registry and its format: for a newer format,
+  saying to run the report from that revision's hypercase, and for one
+  older than 3, that no hypercase's report reads it. A registry of an older
+  format that holds what a later format added is refused too.
+- A cell exists at a revision when its `outcome` file does, from registry
+  format 5 on. A changed cell takes the first of these ranks that applies:
+  outcome changed, at both revisions; appeared, at `<b>` only; disappeared,
+  at `<a>` only; bytes changed, under the same outcome, when another of its
+  files is added, changed or removed. A change to a case's description,
+  inputs, properties or `gaps` lines alone ranks no cell.
+- Registry formats 3 and 4 predate `outcome` files, and a cell that wrote no
+  file committed none. At a revision whose newest registry is of such a
+  format, every case that runs has a cell under every column the registries
+  claim over its corpus, and every case, whether it runs or not, has one
+  under each column it has files of; the cell's state is unknown. A case
+  runs there when the archive holds a section of it: the base always, and a
+  transform's variant only when a corpus type lists its transform. A cell of
+  unknown state at either revision ranks on its files alone: bytes changed
+  when one is added, changed or removed, and never outcome changed.
+- Cases go by corpus type, then archive, then the base, the hand-written
+  variants by name, and the transforms' variants by transform name; a case's
+  cells by column; names byte by byte. Within a rank, changes go in that
+  order.
+- Each case's stated properties are shown beside it: for a transform's
+  variant, its transform's `Gives`, and each of its `Keeps` that the base
+  states, marked given or kept. Each `gaps` line shows on the cell it marks,
+  linked to its issue through the patterns the project supplies, one per
+  issue tracker its `gaps` lines name.
+- What the report can't show as it is, it lists as a problem at its
+  revision, and doesn't pick: a column two registries claim, whose
+  descriptions it shows neither of; a committed column no registry claims; a
+  stated property no registry lists; a `gaps` line naming a column, or a
+  transform, no registry has; a section it can't place in a case or a cell;
+  a cell with files and no `outcome`, whose files it leaves out; an
+  `outcome` at a revision whose registries predate `outcome` files, which it
+  leaves out unread; a transform's variant whose transform no corpus type
+  lists; and a link pattern at `<b>` that is not a regular expression, which
+  links nothing. A `properties` or `gaps` section it can't parse, an
+  `outcome` section it can't parse at a revision of format 5 or later, and a
+  section an archive holds twice, each fail the report.
+- hypercase's own CI runs the report over the toy on each pull request, from
+  its merge base to its head, once per corpus root, and keeps the pages.
 - Step 11 adds input lines and corpus-check findings.
 
-**Flags** (proposed).
+**Flags.**
 
 - `-root <dir>` names the corpus root, relative to the current directory.
   Without it, the report finds the root as a test does.
-- `-text` writes the ranked changes as plain text instead of the page.
+- `-text` writes the problems and the ranked changes as plain text instead
+  of the page.
 
-**Link patterns** (proposed). Each `decl.IssueLink` is a regular expression
-and a URL template, which may use the expression's groups. The report reads
-them from the registries at `<b>`. Text that matches a pattern, in a `gaps`
-line or a description, links to the URL it makes.
+**Link patterns.** Each `decl.IssueLink` is a regular expression and a URL
+template, which may use the expression's groups. The report reads them from
+the registries at `<b>`. Text that matches a pattern, in a `gaps` line or a
+description, links to the URL it makes.
 
-**The plain-text format** (proposed). One heading per rank that has
+**The page.** One HTML file, which runs no script and loads nothing: its
+styles are inline, and every archive's text is escaped. In order:
+
+- the problems, at `<b>`, then at `<a>`;
+- the changes, ranked, each file of a changed cell with how many lines it
+  adds and removes, and its line diff, folded;
+- a matrix per corpus type at `<b>`, a row per case, a column per column that
+  runs on the type's archives. Each cell shows its state and detail, or that
+  its state is unknown, its rank if it changed, and the `gaps` line that
+  marks it; a marked cell that exists is frozen;
+- the descriptions of each corpus type, column, output declaration,
+  classifier, transform and property, from `<b>`, or from `<a>` for what `<b>`
+  lacks, marked as such; and of each archive and hand-written variant only
+  at `<a>`, from its `about`.
+
+An unchanged cell carries only its state, so the page grows with the change.
+The line diff numbers each distinct line once, so comparing two lines costs
+the same whatever their length. It sets aside the lines both files start
+and end with, then finds the shortest edit script by Myers' algorithm, whose
+cost grows with the length of what is left times the size of its change, up
+to a fixed budget for each attempt. Past that, it aligns the two on the
+lines each holds exactly once, in an order both share, and diffs each
+stretch between them the same way. The whole diff shares one fixed budget,
+which alone pays to look for such lines. Each stretch also has a fixed
+amount of work for each of its lines, which it spends once the shared
+budget is gone. So a short change after a long rewrite is still diffed
+exactly when a line both files hold once lies between them, which puts the
+change in a stretch of its own. A diff's work is at most the budget plus a
+fixed amount for each line, so its cost never grows with the product of
+the files' lengths. A
+stretch with no such line, or that the budget and its own work no longer
+cover, is left unaligned: its diff is one line saying how many lines it
+leaves out of each file, and its file says it is partly unaligned in place
+of counts that would be wrong. The same revisions give the same bytes.
+
+**The plain-text format.** The problems first, when there are any, as
+the page gives them: under the heading `problems`, a line `at <rev>` per
+revision that has them, `<b>` first, and under it one line per problem, its
+place, where it has one, then what it is. Then one heading per rank that has
 changes, in rank order. Under it, one line per cell: its case, its column,
 and its outcome, or the change in it. So `outcome` is never listed as a
 file. Under each cell, one line per other file of the cell that was added,
-changed or removed. For a change that adds the archive `ratio`, whose `C1`
-is `=A1/B1` with `A1` at `6` and `B1` at `2`, and words a cycle as
-`cycle: A1 -> B1 -> A1`, with the transforms' variants left out:
+changed or removed. For the example's change,
+`walkthrough/sheets/step09/testdata/report.txt`:
 
+<!-- source: walkthrough/sheets/step09/testdata/report.txt -->
 ```
+outcome changed
+  sheet/divide calc: accepted -> accepted warned
+  sheet/divide/transform/renamed calc: accepted -> accepted warned
 appeared
-  sheet/ratio calc: accepted
-    stdout.txt added
-  sheet/ratio evaluate: accepted
-    values.txt added
-  sheet/ratio format: accepted
-    formulas.txt added
-  sheet/ratio parse: accepted
-  sheet/ratio resolve: accepted
+  sheet/empty calc: rejected S101
+    error.txt added
+  sheet/empty evaluate: blocked parse
+  sheet/empty format: blocked parse
+  sheet/empty parse: rejected S101
+    error.txt added
+  sheet/empty resolve: blocked parse
+disappeared
+  sheet/blank calc: rejected S101
+    error.txt removed
+  sheet/blank evaluate: blocked parse
+  sheet/blank format: blocked parse
+  sheet/blank parse: rejected S101
+    error.txt removed
+  sheet/blank resolve: blocked parse
 bytes changed
-  sheet/loop calc: rejected S201
+  sheet/notes calc: rejected S101
     error.txt changed
-  sheet/loop resolve: rejected S201
-    error.txt changed
-  sheet/twice/variant/cycle calc: rejected S201
-    error.txt changed
-  sheet/twice/variant/cycle resolve: rejected S201
+  sheet/notes parse: rejected S101
     error.txt changed
 ```
+
+A renamed archive's cells are new cells: the report knows a case by its
+name, so `blank`'s cells disappear and `empty`'s appear, with the same
+files. `blank` states `malformed`, which neither transform gives or keeps,
+so neither makes a variant of it, and only its base's cells move.
 
 ### What can now be seen
 
@@ -2564,6 +2710,10 @@ bytes changed
 - The matrix for each corpus type at `<b>`, each cell with its state and
   frozen cells marked.
 - Each known gap beside its cell, linked to the issue it waits on.
+- The descriptions of everything the change touches, what it removed
+  included.
+- What the registries and archives disagree on, as problems, beside
+  everything the report could place.
 
 ## 10. Chaining
 
@@ -2845,11 +2995,16 @@ lift.
   jenny of its own, and marks that jenny's error, has jenny's faults in it
   recorded as its rejection, so it marks only what it rejects.
 - The walk never calls an error's own `As` or `Is`. An error that reaches
-  the errors it holds through `As`, as go-multierror's does, is a fault
-  however many of them `decl.Reject` marks: when the importer rejects the
-  CSV with such an error, it marks that error whole. An error reached
-  through more than 100 `Unwrap` calls, as in an error whose `Unwrap` leads
-  back to itself, makes the whole error a fault.
+  the errors it holds through `As`, and not through `Unwrap`, is a fault
+  however many of them `decl.Reject` marks. go-multierror's is such an
+  error when it holds two or more: its `Unwrap` gives a chain, and each
+  chain's `Unwrap` gives the chain of the rest, never an error the chain
+  holds, down to the last, which wraps none. Holding one error, its
+  `Unwrap` gives that error, so one marked error is a rejection there.
+  When the importer rejects the CSV with an error that holds others, it
+  marks that error whole. An error reached through more than 100 `Unwrap`
+  calls, as in an error whose `Unwrap` leads back to itself, makes the
+  whole error a fault.
 - In an update, when anything but a `gaps` line keeps a bytes lift's cell
   from being written, such as a fault of the jenny, a product an archive
   can't hold or a `RenderError` that panics, every cell past the lift
@@ -2879,7 +3034,8 @@ lift.
   the removal shows in the diff. A lift that fails on the case or is
   blocked, or whose variant's transform declines the base, has no product,
   and the update removes its `via/<lift>/`. That package's normal run fails
-  on what remains there, and says to run the update.
+  on what remains there, and says to run the update, unless the update
+  runs the lift on another value, past another bytes lift, as below.
 - In an update, the cells past the lift read the product it makes in that
   run, in every package. In a normal run, every package's cells past it
   read the committed `via/` bytes, so churn upstream fails only the
@@ -2888,18 +3044,44 @@ lift.
   committed `outcome`: any outcome but `accepted`, or none, blocks it. A
   lift that is `accepted` with no product files gives its readers an empty
   view.
-- A cell that a normal run finds blocked past a bytes lift, by a committed
-  outcome or by a lift that fails on a committed product, may run in the
-  update, which reruns every lift on its path. Then the cell's committed
-  files, a bytes lift's product among them, are no orphans, and the update
-  writes the outcome of the cell's run. A normal run of a package that owns
-  every bytes lift on the cell's path stages the case as its update does,
-  on what a transform makes for its variant, and runs the cell's probe, if
-  it has one, on what that reaches. It says whether the update runs the
-  cell: if it does, to delete nothing by hand, and that the update writes
-  the cell's outcome from its run. Another package's normal run doesn't run
-  the lifts it doesn't own, so it says to run the update before deleting
-  any of them.
+- A cell past a bytes lift may run in the update on another value than in
+  a normal run, since the update reruns every lift on its path, or be
+  skipped, blocked or failed there otherwise. When the update runs the
+  cell, the cell's committed files, a bytes lift's product among them, are
+  no orphans, and what the update writes for the cell, if anything, is its
+  run's. A normal run of a package that owns every bytes lift on the
+  cell's path stages the case as its update does, on what a transform
+  makes for its variant, and runs the cell's probe, if it has one, on what
+  that reaches. Where the update does otherwise with the cell, every
+  message about the cell ends with what it does, as step 7 gives for a
+  transform's variant, a panic of the cell's run or its probe and a frozen
+  cell's files among them. So does each message about the lift's own cell,
+  a file of its committed product included. When the update writes nothing
+  for the cell of a lift on the cell's path, the message says so, names
+  the lift, and says to fix what that cell reports, and, on a file the cell
+  commits, to delete nothing by hand before the update has run. Another
+  package's normal run doesn't run the bytes lifts it doesn't own, so it
+  can't tell what its update does with a cell past one: every message
+  about such a cell says so, names the lift, says that the update reruns
+  it, and says to run the update, fix what it reports, and read the diff
+  before committing, or, on a file the cell commits, to delete nothing by
+  hand before the update has run.
+- A cell past a bytes lift that runs on a committed product the lift no
+  longer makes, and no longer produces a file it commits, runs on what the
+  lift makes in the update, whose run may still write the file. A normal
+  run of a package that owns every bytes lift on the cell's path tells
+  whether the update runs the cell on another product, and if it does,
+  says to delete nothing by hand before the update has run.
+- A bytes lift past another bytes lift is such a cell too: in a normal run
+  of the package that owns both, it runs on the earlier lift's committed
+  product, and its update reruns it on what the earlier lift makes. A file
+  of its committed product that its normal run doesn't make, because the
+  run made another product or failed on the case, is one the update may
+  still make. The normal run says what the update does with the lift's
+  cell: if it runs the lift, to delete nothing by hand before it has run;
+  if it blocks the lift, that it removes the file; if it writes nothing for
+  the earlier lift's cell, to fix what that cell reports, and delete
+  nothing by hand before the update has run.
 - A bytes lift's frozen cell includes its `via/` product: no update writes
   it, and a product that differs from what the lift makes fails the cell,
   in every run. An update writes the cells past it from what the lift makes
@@ -2921,12 +3103,29 @@ lift.
   that lift's product.
 - The root-package check claims `via/<lift>/…` in a corpus for each bytes
   lift a package owns over it; any other `via/` section is unclaimed.
-- The root-package check fails when the registries that own or use a lift
-  record it differently, any lift: its description, input, product,
-  `bytes`, outputs, `productFiles` or rejects. It names the packages and
-  the field.
+- The root-package check fails when the registries of packages with tests
+  that own or use a lift record it differently, any lift: its
+  description, input, product, `bytes`, outputs, `productFiles` or
+  rejects. It fails once per lift, naming the packages and every field
+  that differs. A registry in a package with no `_test.go` file isn't
+  compared: no test runs what it records, and its own failure says to
+  delete it. When the packages register one declaration already, a
+  registry is stale, and the update, which rewrites the registries, ends
+  the failure. The comparisons of properties and corpus types (steps 5 and
+  6) say so too.
 - A corpus check (step 8) receives a bytes lift's committed product as its
   cell's `Product`, by each file's path under `via/<lift>/`.
+- The report (step 9) shows a bytes lift's product as files of the lift's
+  cell, after the cell's own files, each as `via/<lift>/` and its path in
+  the product: `via/import/sheet/A1`, under the same name in a variant. So
+  a change to the product alone ranks the lift's cell bytes changed, and
+  each cell past the lift ranks on its own files. The lift's product
+  declarations are described with its outputs, each as `via/<lift>/` and
+  its pattern. A `via/<lift>/` section whose lift no registry declares as a
+  bytes lift over its corpus is a problem, which the report leaves out, so
+  it compares no product of the section's cell between the revisions. A
+  product with no `outcome` in its cell is a problem too, as step 9's
+  files with no `outcome` are, named by the cell's `via/<lift>/`.
 - `testdata/sheet/prices.txtar` and `testdata/csv/prices.txtar` both reach
   `evaluate`, the second through `import`. Their cases are `sheet/prices` and
   `csv/prices` (step 3), and their cells' subtests
@@ -2935,8 +3134,9 @@ lift.
 ### What can now be seen
 
 - The sheet a CSV yields, as committed bytes beside the CSV. A change to the
-  import shows as a change to `via/import/`, and fails `import`'s column
-  alone until the update; the columns downstream read the committed sheet.
+  import shows as a change to `via/import/`, which the report ranks on
+  `import`'s cell, and fails `import`'s column alone until the update; the
+  columns downstream read the committed sheet.
 - Where a chained input stops: `open-quote` at `import`, with every column
   past it `blocked import`.
 - A CSV and a hand-written sheet with the same cells side by side in the

@@ -44,11 +44,12 @@ $ go test  # chain-render
           rendered: A1 -> A1: cycle
         -   quote: the product's text
         +   quote: the committed text
-        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
     what ran, in order:
         parse ran on quoted
         resolve ran on quoted
         import ran
+        parse ran on quoted
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/export
         --- FAIL: TestCorpus/export/quoted

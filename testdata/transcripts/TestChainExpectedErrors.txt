@@ -333,7 +333,8 @@ $ go test  # chain
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         import: Imports the export as a script, as its import/ tree says.
         import returned no error, but the variant states unterminated, which import rejects.
-        The variant states what louder gives, and each property it keeps that the base states. Fix the code or louder's jenny, or correct louder's Gives or Keeps, or import's Rejects.
+        The variant states what louder gives, and each property it keeps that the base states.
+        Fix the code or louder's jenny, or correct louder's Gives or Keeps, or import's Rejects.
     what ran, in order:
         parse ran on empty
         resolve ran on empty
@@ -545,6 +546,7 @@ $ go test  # chain
         parse ran on looped
         resolve ran on looped
         import ran
+        parse ran on looped
         parse ran on names
         resolve ran on names
         evaluate's probe ran
@@ -652,6 +654,7 @@ $ go test  # chain
         parse ran on looped
         resolve ran on looped
         import ran
+        parse ran on looped
         parse ran on names
         resolve ran on names
         evaluate's probe ran

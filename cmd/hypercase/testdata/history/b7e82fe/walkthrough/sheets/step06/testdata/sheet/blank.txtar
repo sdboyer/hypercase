@@ -1,0 +1,22 @@
+A1 is a cell file with nothing in it.
+-- in/sheet/A1 --
+-- in/sheet/B1 --
+2
+-- properties --
+malformed
+-- out/calc/error.txt --
+A1: not a number or a formula: ""
+  sheet/A1:1
+-- out/calc/outcome --
+rejected
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/parse/error.txt --
+A1: not a number or a formula: ""
+  sheet/A1:1
+-- out/parse/outcome --
+rejected
+-- out/resolve/outcome --
+blocked parse

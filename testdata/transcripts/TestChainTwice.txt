@@ -53,9 +53,9 @@ $ go test  # chain-twice
         out/import/outcome differs (-golden +got):
         - accepted
         + blocked export
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import, and writes the outcome of its run, not this one: it reruns export, whose outcome and product a normal run reads from the archive.
-        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has no committed outcome, out/export/outcome, which a normal run reads.
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's, not this outcome.
+        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has no committed outcome, out/export/outcome, which a normal run reads, so it has no product in this run.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     what ran, in order:
         export ran
 --- FAIL: TestCorpus
@@ -106,7 +106,7 @@ $ edit testdata/grid/sheet.txtar  # import's product back by hand
 $ go test  # chain-twice
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         import: Imports the export as a script, as its import/ tree says.
-        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome "rejected", in out/export/outcome, so it has no product.
+        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome "rejected", in out/export/outcome, so it has no product in this run.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         list: Lists the files of the script's input view, with their bytes.
@@ -136,12 +136,12 @@ $ go test  # chain-twice
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         import: Imports the export as a script, as its import/ tree says.
-        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome "rejected", in out/export/outcome.
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand.
+        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome "rejected", in out/export/outcome, so it has no product in this run.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         list: Lists the files of the script's input view, with their bytes.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "blocked export", in out/import/outcome.
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     what ran, in order:
         export ran
         import ran

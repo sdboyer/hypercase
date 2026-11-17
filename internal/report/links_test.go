@@ -12,15 +12,15 @@ import (
 // pattern that sorts first. A match of no text links nothing, and a
 // pattern given twice links once.
 func TestLinks(t *testing.T) {
-	l, err := newLinker([]registry.IssueLink{
+	l, bad := newLinker([]registry.IssueLink{
 		{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/$1"},
 		{Pattern: `#(?P<n>\d+)`, URL: "https://example.com/any/${n}"},
 		{Pattern: `sheets#\d+`, URL: "https://example.com/plain"},
 		{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/$1"},
 		{Pattern: `x*`, URL: "https://example.com/empty"},
 	})
-	if err != nil {
-		t.Fatal(err)
+	if bad != nil {
+		t.Fatal(bad)
 	}
 	got := l.text("See sheets#3, and #4.")
 	want := Text{
@@ -39,7 +39,13 @@ func TestLinks(t *testing.T) {
 	if got := l.text(""); got != nil {
 		t.Errorf("got %q for no text", got)
 	}
-	if _, err := newLinker([]registry.IssueLink{{Pattern: `(`, URL: "u"}}); err == nil {
-		t.Error("a pattern that doesn't compile: got no error")
+	// A pattern that isn't a regular expression is left out, and returned
+	// once, however many times it is given; the others still link.
+	l, bad = newLinker([]registry.IssueLink{{Pattern: `(`, URL: "u"}, {Pattern: `(`, URL: "v"}, {Pattern: `sheets#\d+`, URL: "w"}})
+	if len(bad) != 1 || bad[0].pattern != `(` || bad[0].err == nil {
+		t.Errorf("a pattern that doesn't compile: got %v", bad)
+	}
+	if got := l.text("sheets#1 ("); !slices.Equal(got, Text{{Text: "sheets#1", URL: "w"}, {Text: " ("}}) {
+		t.Errorf("with a bad pattern left out, got %q", got)
 	}
 }
