@@ -66,8 +66,9 @@ import (
 //     notes close on their defaults, and each claim one of them makes is
 //     checked as a normal run's is.
 //   - A note of a variant about no one cell closes on its default.
-//   - No note's body says what a closing says: the update command, its
-//     variable, or a run of the words the claims render.
+//   - No note's body mentions the update, which is its closing's to name:
+//     not the update command, its variable, or the word "update", in any
+//     case.
 //
 // In each run, a cell's test fails just where the run gives notes of the
 // cell. What each update record says it wrote is checked against the
@@ -79,7 +80,6 @@ func TestClosings(t *testing.T) {
 	t.Parallel()
 	kinds := hypercase.NoteKinds(t)
 	pairs := closingPairs(t, kinds)
-	markers := hypercase.ClaimMarkers(t)
 	fields := claimFields()
 	var mu sync.Mutex
 	reached := map[closingPair]string{} // each pair, and the scenario first by name that reached it
@@ -115,7 +115,7 @@ func TestClosings(t *testing.T) {
 				t.Parallel()
 				clean := g.clean(t)
 				if g.packed {
-					for name, got := range g.runPacked(t, clean, kinds, markers) {
+					for name, got := range g.runPacked(t, clean, kinds) {
 						record(g.name+"/"+name, got)
 					}
 					return
@@ -123,7 +123,7 @@ func TestClosings(t *testing.T) {
 				for _, sc := range g.scenarios {
 					t.Run(sc.name, func(t *testing.T) {
 						t.Parallel()
-						record(g.name+"/"+sc.name, g.run(t, clean, sc, kinds, markers))
+						record(g.name+"/"+sc.name, g.run(t, clean, sc, kinds))
 					})
 				}
 			})
@@ -359,7 +359,7 @@ type reach struct {
 
 // run runs one scenario, and the runs after it that its closings' claims
 // need, judges it, and returns what its notes reach.
-func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario, kinds map[int]string, markers []string) reach {
+func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario, kinds map[int]string) reach {
 	s := newSandbox(t, "")
 	for _, p := range slices.Sorted(maps.Keys(clean)) {
 		s.write(p, clean[p], "the clean fixture")
@@ -379,7 +379,7 @@ func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario,
 		}
 		return obs
 	}
-	j := &judge{g: g, t: t, kinds: kinds, markers: markers, before: before}
+	j := &judge{g: g, t: t, kinds: kinds, before: before}
 	j.normal = runs("normal", false)
 	j.update = runs("update", true)
 	j.u = &updated{after: archive.Parse(s.read(g.archive)), cells: cells(j.update), lifts: liftRuns(j.update), owners: g.owners(t, s)}
@@ -399,7 +399,7 @@ func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario,
 // their closings' claims need, judges each scenario on the records of its
 // variant, as run judges its one, and returns what the notes of each that
 // ran reach, by its name.
-func (g closingGrid) runPacked(t *testing.T, clean map[string][]byte, kinds map[int]string, markers []string) map[string]reach {
+func (g closingGrid) runPacked(t *testing.T, clean map[string][]byte, kinds map[int]string) map[string]reach {
 	s := newSandbox(t, "")
 	for _, p := range slices.Sorted(maps.Keys(clean)) {
 		s.write(p, clean[p], "the clean fixture")
@@ -435,7 +435,7 @@ func (g closingGrid) runPacked(t *testing.T, clean map[string][]byte, kinds map[
 	post := false
 	for i, sc := range g.scenarios {
 		c := base + "/" + packedPrefix(sc.name)
-		j := &judge{g: g, kinds: kinds, markers: markers, before: before, normal: ofCase(normal, c), update: ofCase(update, c)}
+		j := &judge{g: g, kinds: kinds, before: before, normal: ofCase(normal, c), update: ofCase(update, c)}
 		ju := u
 		ju.cells, ju.lifts = cells(j.update), liftRuns(j.update)
 		j.u = &ju
@@ -544,7 +544,6 @@ type judge struct {
 	g              closingGrid
 	t              *testing.T
 	kinds          map[int]string
-	markers        []string
 	before         *archive.Archive
 	normal, update []hypercase.Observed
 	u              *updated
@@ -650,8 +649,8 @@ func (j *judge) judge() {
 				bad("the note's staging has this run's fate as %q, and the cell's is %q", n.This, this.Fate)
 			}
 		}
-		for _, msg := range j.adviceInBody(n.Body) {
-			bad("the note's body says %s, which is a closing's to say", msg)
+		if how := updateInBody(n.Body); how != "" {
+			bad("the note's body mentions the update, by %s, which is its closing's to name", how)
 		}
 		cl := reflect.ValueOf(c.cl)
 		for _, f := range fields {
@@ -711,25 +710,20 @@ func (j *judge) judge() {
 	j.failedWithNotes()
 }
 
-// adviceInBody says what a note's body says that is a closing's: the
-// update command, or its variable, or a run of the words the claims
-// render, which ClaimMarkers gives.
-func (j *judge) adviceInBody(body string) []string {
-	var out []string
+// updateInBody says how a note's body mentions the update, which is its
+// closing's to name, or "": by the update command, its variable, or the
+// word "update", in any case.
+func updateInBody(body string) string {
 	cmd := fixtureUpdate + "=1 go test ./..."
 	switch {
 	case strings.Contains(body, cmd):
-		out = append(out, fmt.Sprintf("the update command, %s", cmd))
+		return fmt.Sprintf("the update command, %s", cmd)
 	case strings.Contains(body, fixtureUpdate):
-		out = append(out, fmt.Sprintf("the update variable, %s", fixtureUpdate))
+		return fmt.Sprintf("the update variable, %s", fixtureUpdate)
+	case strings.Contains(strings.ToLower(body), "update"):
+		return `the word "update"`
 	}
-	padded := " " + strings.Join(hypercase.MarkerWords(body), " ") + " "
-	for _, m := range j.markers {
-		if strings.Contains(padded, " "+m+" ") {
-			out = append(out, fmt.Sprintf("%q, which a closing's claims render", m))
-		}
-	}
-	return out
+	return ""
 }
 
 // failedWithNotes checks that, in each run, a cell's test fails where the

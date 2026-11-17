@@ -441,7 +441,7 @@ func TestChainTwiceStaleProduct(t *testing.T) {
 	s.fails(r, "via/import/quote/Z9 is a file of import's committed product, which this run of import doesn't make.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for import: "+reruns+", and it writes nothing for the cell of the lift export, on import's path, whose outcome and product a normal run reads. Fix what export's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.")
 	s.lacks(r, "which removes it")
 	before := s.snapshot()
-	s.fails(s.update("chain-twice"), "The update writes nothing for the cell of the lift export, on import's path")
+	s.fails(s.update("chain-twice"), "The cell of the lift export, on import's path")
 	s.unchanged(before)
 	s.done()
 }
@@ -906,7 +906,7 @@ func TestChainHeldBack(t *testing.T) {
 	u := s.update("chain-render")
 	s.fails(u, "The project's RenderError panicked on import's error: the renderer panicked\nFix RenderError. An update writes nothing for this cell.")
 	for _, col := range []string{"evaluate", "parse", "resolve"} {
-		s.fails(u, "The update writes nothing for the cell of the lift import, on "+col+"'s path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.\nFix what import's cell reports.")
+		s.fails(u, "The cell of the lift import, on "+col+"'s path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.\nFix what import's cell reports.")
 	}
 	s.unchanged(before)
 	s.done()
@@ -928,7 +928,7 @@ func TestChainFrozenHeldBack(t *testing.T) {
 	before := s.snapshot()
 	u := s.update("chain-render")
 	s.fails(u, "via/import/resolve/error is no longer produced\nFix the problems above. An update writes nothing for this cell, which a gaps line freezes.",
-		"The update writes nothing for the cell of the lift import, on parse's path")
+		"The cell of the lift import, on parse's path")
 	s.lacks(u, "The cells past import fail in normal runs")
 	s.unchanged(before)
 	s.done()
@@ -980,7 +980,7 @@ func TestChainProductProblems(t *testing.T) {
 
 // listHeldBack is how an update fails names' list, which it holds back
 // when it writes nothing for import's cell.
-const listHeldBack = "export/names: import makes files named as a cell's own files are, which list reads.\nlist: Lists the files of the script's input view, with their bytes.\nThe update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.\nFix what import's cell reports."
+const listHeldBack = "export/names: import makes files named as a cell's own files are, which list reads.\nlist: Lists the files of the script's input view, with their bytes.\nThe cell of the lift import, on list's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.\nFix what import's cell reports."
 
 // TestChainJennyFaults: a bytes lift's jenny rejects a case only by an
 // error decl.Reject marks. Any other error, jenny's own included, is a
@@ -1242,7 +1242,7 @@ func TestChainSharedProjects(t *testing.T) {
 		})
 		s.fails(s.update("chain-a-render"),
 			"The project's RenderError panicked on import's error: the renderer panicked\nFix RenderError. An update writes nothing for this cell.",
-			"The update writes nothing for the cell of the lift import, on parse's path")
+			"The cell of the lift import, on parse's path")
 		s.fails(s.run("b", "chain-b", true), "out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, failed on the case.")
 		s.hasSections(prices, map[string]string{
 			"out/import/outcome":   "accepted\n",
@@ -1282,7 +1282,7 @@ func TestChainSharedProjects(t *testing.T) {
 		s.write("testdata/export/stray.txtar", []byte("import makes a file its Product doesn't declare.\n-- in/import/out/stray/x --\nx\n"), "an export of which import makes an undeclared file")
 		before := s.snapshot()
 		heldBack := func(name, about, col, desc string) string {
-			return "export/" + name + ": " + about + "\n" + col + ": " + desc + "\nThe update writes nothing for the cell of the lift import, on " + col + "'s path: the lift's cell says why, in the package that owns it."
+			return "export/" + name + ": " + about + "\n" + col + ": " + desc + "\nThe cell of the lift import, on " + col + "'s path, has a problem, which that cell reports, in the package that owns it."
 		}
 		const (
 			faultyAbout = "import's jenny fails on the export, with an error decl.Reject doesn't mark."
@@ -1293,7 +1293,7 @@ func TestChainSharedProjects(t *testing.T) {
 		s.fails(s.update("chain-a"),
 			"import's jenny failed on the case, with an error that is no rejection:\n  import: the generator's error",
 			"via/import/stray/x is not declared.",
-			"The update writes nothing for the cell of the lift import, on parse's path")
+			"The cell of the lift import, on parse's path")
 		s.unchanged(before)
 		s.done()
 	})
@@ -1322,7 +1322,7 @@ func TestChainLiftEntries(t *testing.T) {
 		s.write(quoted, []byte("import rejects the export.\n-- properties --\nunterminated\n-- in/import/error --\nline 1: unclosed quote\n"), "an export import rejects")
 		rs := s.parallel(childRun{"", "chain-a", true}, childRun{"b", "chain-b-nooutputs", true})
 		s.passes(rs[0])
-		s.fails(rs[1], "The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it.")
+		s.fails(rs[1], "The cell of the lift import, on list's path, has a problem, which that cell reports, in the package that owns it.")
 		s.hasSections(quoted, map[string]string{"out/import/outcome": "rejected\n"}, "out/list/", "out/evaluate/")
 		s.fails(s.normal("chain-a"), breakage+"outputs:\n  outputs:\n    .: error.txt \"Why the importer rejects the export.\"\n    ./b: none"+fix)
 		s.done()

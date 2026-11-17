@@ -446,7 +446,7 @@ func TestTransformsShared(t *testing.T) {
 	s.edit(twice, "edit upper's input by hand", set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n"))
 	b := s.run("b", "tr-b", false)
 	s.fails(b, "transform/upper/out/copy/values.txt differs (-golden +got):",
-		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n- A1 SEVEN\n+ A1 SIX\nA normal run reads the inputs, and an update what upper makes.\nThe module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper.")
+		"A cell of the variant failed, and the archive's inputs for upper's variant, which a normal run reads, differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n- A1 SEVEN\n+ A1 SIX\nThe module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper.")
 	s.lacks(b, "differs from its committed inputs")
 	// b's update runs the cells on what upper makes, and leaves the inputs
 	// to upper's owner, so b's normal run fails until the owner's update
@@ -481,7 +481,7 @@ func TestTransformJennyChanges(t *testing.T) {
 		"transform/upper/out/copy/values.txt":  "A1 SIX\nA1 SIX\n",
 	})
 	s.fails(s.run("b", "tr-b-jenny", false), "transform/upper/out/copy/values.txt differs (-golden +got):",
-		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n  A1 SIX\n+ A1 SIX\nA normal run reads the inputs, and an update what upper makes.\nThe module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper.")
+		"A cell of the variant failed, and the archive's inputs for upper's variant, which a normal run reads, differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n  A1 SIX\n+ A1 SIX\nThe module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper.")
 	// The rest of the module's update, the owner's, settles it.
 	s.passes(s.update("tr-jenny"))
 	s.hasSections(twice, map[string]string{
@@ -631,12 +631,12 @@ func TestTransformStaleInputs(t *testing.T) {
 
 	s.edit(twice, "add a fatal instruction to upper's input by hand", insert("transform/upper/in/do/fatal", "stop\n", "transform/upper/in/do/out/"))
 	s.fails(s.run("b", "tr-b", false), "The run failed its test, through its testing.TB.\n"+restaged,
-		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/fatal is no longer made\nA normal run reads the inputs, and an update what upper makes.\nThe module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper.")
+		"A cell of the variant failed, and the archive's inputs for upper's variant, which a normal run reads, differ from what upper makes now:\ntransform/upper/in/do/fatal is no longer made\nThe module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper.")
 
 	s.write(twice, settled, "restore the settled archive")
 	s.edit(twice, "add an empty probe instruction to upper's input by hand", insert("transform/upper/in/do/probe", "", "transform/upper/out/"))
 	s.fails(s.run("b", "tr-b-probe", false), "copy's probe said the case isn't for it, and gave no reason.",
-		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/probe is no longer made\nA normal run reads the inputs, and an update what upper makes.\nThe module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper.")
+		"A cell of the variant failed, and the archive's inputs for upper's variant, which a normal run reads, differ from what upper makes now:\ntransform/upper/in/do/probe is no longer made\nThe module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper.")
 
 	// A frozen cell's own note says the update runs it on what upper
 	// makes.
@@ -645,10 +645,10 @@ func TestTransformStaleInputs(t *testing.T) {
 		insert("gaps", "transform/upper copy Waits on sheets#9.\n", "out/")(a)
 		set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n")(a)
 	})
-	const rewrites = "A normal run reads the inputs, and an update what upper makes.\nThe module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, no update rewrites the inputs.\n"
+	const rewrites = "The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, no update rewrites the inputs.\n"
 	r := s.run("b", "tr-b", false)
 	s.fails(r, "The cell is frozen by its known gap, gaps line 1: \"transform/upper copy Waits on sheets#9.\"\nIts committed files record today's behavior, and the run now produces different ones:\ntransform/upper/out/copy/values.txt differs (-committed +got):\n- A1 SIX\n+ A1 SEVEN\n"+restaged,
-		"A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n- A1 SEVEN\n+ A1 SIX\n"+rewrites)
+		"A cell of the variant failed, and the archive's inputs for upper's variant, which a normal run reads, differ from what upper makes now:\ntransform/upper/in/do/out/values.txt differs (-committed +made):\n- A1 SEVEN\n+ A1 SIX\n"+rewrites)
 	s.lacks(r, "frozen ones", "copy's")
 
 	// Only the cells that failed are noted: not a frozen one that passes.
@@ -689,7 +689,7 @@ func TestTransformUnowned(t *testing.T) {
 
 	s.edit(twice, "edit upper's input by hand", set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n"))
 	s.fails(s.run("b", "tr-b", false), "transform/upper/out/copy/values.txt differs (-golden +got):",
-		"A normal run reads the inputs, and an update what upper makes.\nThe module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, no update rewrites the inputs.")
+		"The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, no update rewrites the inputs.")
 	s.passes(s.update("tr-unowned"))
 	s.passes(s.run("b", "tr-b", true))
 	s.hasSections(twice, map[string]string{"transform/upper/in/do/out/values.txt": "A1 SEVEN\n"})

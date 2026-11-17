@@ -33,6 +33,10 @@ import (
 // advice, which is its closing's: no body holds a run of the words of a
 // closing's advice, or of what a closing's claims say. A closing's advice
 // says nothing of what an update does: no constant of it names an update.
+// Nor does a note's body mention the update at all, which is its
+// closing's to name: no constant of a body says "update", in any case, or
+// holds the words updateCmd gives the update command. TestClosings checks
+// every body its grids give for the update's command, variable and name.
 func TestOneClosing(t *testing.T) {
 	s := loadSource(t)
 	sites := s.messageSites(t)
@@ -91,6 +95,30 @@ func TestOneClosing(t *testing.T) {
 		}
 	}
 	advice = append(advice, claimed...)
+	// The constants updateCmd formats the update command with.
+	var cmd []string
+	ast.Inspect(s.funcDecl(t, "runner.updateCmd").Body, func(n ast.Node) bool {
+		if e, ok := n.(ast.Expr); ok {
+			if tv, ok := s.info.Types[e]; ok && tv.Value != nil && tv.Value.Kind() == constant.String {
+				cmd = append(cmd, constant.StringVal(tv.Value))
+				return false
+			}
+		}
+		return true
+	})
+	if len(cmd) == 0 {
+		t.Fatalf("updateCmd formats the update command with no constant")
+	}
+	for _, b := range bodies {
+		if strings.Contains(strings.ToLower(b.text), "update") {
+			t.Errorf("%s: a note's body says %q, which mentions the update.\nA body says what is wrong; what the update does, and that it is the fix, is the closing's to say: say it in a field of claims, or say nothing of it.", b.at, b.text)
+		}
+		for _, c := range cmd {
+			if strings.Contains(b.text, c) {
+				t.Errorf("%s: a note's body says %q, which holds the update command's words, %q.\nA body says what is wrong; what the update does, and that it is the fix, is the closing's to say: say it in a field of claims, or say nothing of it.", b.at, b.text, c)
+			}
+		}
+	}
 	both := map[string]bool{}
 	for _, a := range advice {
 		for _, b := range bodies {

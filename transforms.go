@@ -373,7 +373,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	// However its cells failed, the failures may be the inputs'. Each
 	// cell's notes say what the update does with it.
 	var ns notes
-	ns.add(aboutInputs, fmt.Sprintf("A cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes.", v.name, v.name, diffs, v.name), closing{claims: r.rewritesInputs(v.tr)})
+	ns.add(aboutInputs, fmt.Sprintf("A cell of the variant failed, and the archive's inputs for %s's variant, which a normal run reads, differ from what %s makes now:\n%s", v.name, v.name, diffs), closing{claims: r.rewritesInputs(v.tr)})
 	report(t, c.header(), ns, r.variantStaging(c))
 }
 

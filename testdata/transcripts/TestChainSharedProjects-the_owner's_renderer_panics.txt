@@ -50,11 +50,11 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-a-render
         Fix RenderError. An update writes nothing for this cell.
     export/prices: One export of prices: import makes a script whose quote/ tree list shows.
         parse: Parses the script, as its parse/ tree says.
-        The update writes nothing for the cell of the lift import, on parse's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        The cell of the lift import, on parse's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
         Fix what import's cell reports. An update writes nothing for the cell of the lift import, on parse's path, nor for this cell.
     export/prices: One export of prices: import makes a script whose quote/ tree list shows.
         resolve: Resolves the parsed script, as its resolve/ tree says.
-        The update writes nothing for the cell of the lift import, on resolve's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        The cell of the lift import, on resolve's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
         Fix what import's cell reports. An update writes nothing for the cell of the lift import, on resolve's path, nor for this cell.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         import: Imports the export as a script, as its import/ tree says.
@@ -62,11 +62,11 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-a-render
         Fix RenderError. An update writes nothing for this cell.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         parse: Parses the script, as its parse/ tree says.
-        The update writes nothing for the cell of the lift import, on parse's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        The cell of the lift import, on parse's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
         Fix what import's cell reports. An update writes nothing for the cell of the lift import, on parse's path, nor for this cell.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         resolve: Resolves the parsed script, as its resolve/ tree says.
-        The update writes nothing for the cell of the lift import, on resolve's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        The cell of the lift import, on resolve's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
         Fix what import's cell reports. An update writes nothing for the cell of the lift import, on resolve's path, nor for this cell.
     what ran, in order:
         import ran
