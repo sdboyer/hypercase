@@ -53,10 +53,12 @@ $ go test ./b  # tr-b
     script/twice/transform/upper: Uppercases every file under do/out/.
         copy: Does what the case's do/ tree says.
         The run failed its test, through its testing.TB.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs copy on another value than this run: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
     script/twice/transform/upper: Uppercases every file under do/out/.
         A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:
         transform/upper/in/do/fatal is no longer made
-        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
+        A normal run reads the inputs, and an update what upper makes.
+        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs
@@ -91,7 +93,8 @@ $ go test ./b  # tr-b-probe
     script/twice/transform/upper: Uppercases every file under do/out/.
         A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:
         transform/upper/in/do/probe is no longer made
-        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
+        A normal run reads the inputs, and an update what upper makes.
+        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs
@@ -130,7 +133,8 @@ $ go test ./b  # tr-b
         transform/upper/in/do/out/values.txt differs (-committed +made):
         - A1 SEVEN
         + A1 SIX
-        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, to which an update only adds an outcome they lack, when their other files match the run and nothing keeps the update from writing them. A normal run checks each frozen cell whose files differ, here copy's, again on the rewritten inputs, against its committed files. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
+        A normal run reads the inputs, and an update what upper makes.
+        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs
@@ -193,7 +197,8 @@ $ go test ./b  # tr-b-keep
     script/twice/transform/upper: Uppercases every file under do/out/.
         A cell of the variant failed, and the archive's inputs for upper's variant differ from what upper makes now:
         transform/upper/in/do/probe is no longer made
-        A normal run reads the inputs, and an update what upper makes. The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper, and the variant's cells but the frozen ones, to which an update only adds an outcome they lack, when their other files match the run and nothing keeps the update from writing them. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
+        A normal run reads the inputs, and an update what upper makes.
+        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns upper. If no package owns upper, the root-package check says so, and no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs

@@ -3,6 +3,7 @@ $ go test  # echo
     script/fatal: The run can't set up its fixture, and fails its test.
         echo: Does what the case's do/ tree says.
         The run failed its test, through its testing.TB.
+        Fix the code. An update writes nothing for this cell.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/fatal
@@ -14,7 +15,8 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo
     the fixture's database won't start
     script/fatal: The run can't set up its fixture, and fails its test.
         echo: Does what the case's do/ tree says.
-        The run failed its test, through its testing.TB. The update writes nothing for this cell.
+        The run failed its test, through its testing.TB.
+        Fix the code. An update writes nothing for this cell.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/fatal

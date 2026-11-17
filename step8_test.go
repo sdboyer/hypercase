@@ -87,7 +87,7 @@ func TestOutcomeFailures(t *testing.T) {
 	clPanic := s.read("testdata/script/cl-panic.txtar")
 	s.edit("testdata/script/cl-panic.txtar", "commit a values.txt the run no longer gives", set("out/echo/values.txt", "A1 7\n"))
 	r = s.normal("outcomes")
-	s.fails(r, "script/cl-panic: The classifier panics.\n    echo: Does what the case's do/ tree says.\n    echo's classifier steered panicked: classifier boom\n    Fix the classifier. An update writes nothing for this cell.\n    out/echo/values.txt differs (-golden +got):\n    - A1 7\n    + A1 6\n    An update writes nothing for this cell until the problems above are fixed.")
+	s.fails(r, "script/cl-panic: The classifier panics.\n    echo: Does what the case's do/ tree says.\n    echo's classifier steered panicked: classifier boom\n    Fix the classifier. An update writes nothing for this cell.\n    out/echo/values.txt differs (-golden +got):\n    - A1 7\n    + A1 6\n    Fix the problems above first. An update writes nothing for this cell.")
 	s.lacks(r, "has no golden", "If the change is intended")
 	s.write("testdata/script/cl-panic.txtar", clPanic, "restore the cell")
 
@@ -143,7 +143,7 @@ func TestOutcomeFailures(t *testing.T) {
 	committed = s.read(clError)
 	for _, update := range []bool{false, true} {
 		r := s.run(".", "outcomes", update)
-		s.fails(r, frozen+"    out/echo/values.txt differs (-committed +got):\n    - A1 7\n    + A1 6\n    The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.")
+		s.fails(r, frozen+"    out/echo/values.txt differs (-committed +got):\n    - A1 7\n    + A1 6\n    Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.")
 		s.lacks(r, "the next update writes")
 	}
 	s.same(clError, committed)
@@ -151,7 +151,7 @@ func TestOutcomeFailures(t *testing.T) {
 	committed = s.read(clError)
 	for _, update := range []bool{false, true} {
 		r := s.run(".", "outcomes", update)
-		s.fails(r, frozen+"    out/echo/values.txt is new\n    The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.")
+		s.fails(r, frozen+"    out/echo/values.txt is new\n    Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.")
 		s.lacks(r, "the next update writes")
 	}
 	s.same(clError, committed)
@@ -162,7 +162,7 @@ func TestOutcomeFailures(t *testing.T) {
 	committed = s.read(clError)
 	for _, update := range []bool{false, true} {
 		r := s.run(".", "outcomes", update)
-		s.fails(r, frozen+"    out/echo/g.txt is no longer produced\n    The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.")
+		s.fails(r, frozen+"    out/echo/g.txt is no longer produced\n    Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.")
 		s.lacks(r, "the next update writes")
 	}
 	s.same(clError, committed)
@@ -449,7 +449,7 @@ func TestBlockedStaleTransformVariant(t *testing.T) {
 	r := s.normal("tr-ladder-eval")
 	s.fails(r,
 		"upper's variant of the base differs from its committed inputs:\ntransform/upper/in/resolve/error is no longer made",
-		"transform/upper/out/evaluate/outcome differs (-golden +got):\n- accepted\n+ blocked resolve\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+why+". What it writes for the cell, if anything, is its run's, not this outcome.",
+		"transform/upper/out/evaluate/outcome differs (-golden +got):\n- accepted\n+ blocked resolve\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+why+". What it writes for the cell, if anything, is its run's.",
 		"transform/upper/out/evaluate/values.txt is recorded, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+why+". Delete nothing by hand before it has run.")
 	s.lacks(r, "delete the section by hand")
 	s.passes(s.update("tr-ladder-eval"))
@@ -528,7 +528,7 @@ func TestSkippedStaleTransformVariant(t *testing.T) {
 	r := s.normal("tr-ladder-eval")
 	s.fails(r,
 		"upper's variant of the base differs from its committed inputs:\ntransform/upper/in/evaluate/probe is no longer made",
-		"transform/upper/out/evaluate/outcome differs (-golden +got):\n- accepted\n+ skipped a stale reason\n"+runs+" What it writes for the cell, if anything, is its run's, not this outcome.",
+		"transform/upper/out/evaluate/outcome differs (-golden +got):\n- accepted\n+ skipped a stale reason\n"+runs+" What it writes for the cell, if anything, is its run's.",
 		"transform/upper/out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it: a stale reason\n"+runs+" Delete nothing by hand before it has run.")
 	s.lacks(r, "delete the section by hand")
 	s.passes(s.update("tr-ladder-eval"))

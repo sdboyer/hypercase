@@ -412,7 +412,7 @@ func TestChainTwiceStaleProduct(t *testing.T) {
 		"via/export/import/error is a file of export's committed product, which this run of export doesn't make.\nIf it should, fix export's jenny.",
 		"import returned an error, but the case states no property import rejects:\n  import: stale\n"+another+" Run it, fix what it reports, and read the diff before committing.",
 		"out/import/error.txt has no golden.\n"+another+" Run it, fix what it reports, and read the diff before committing.",
-		"out/import/outcome differs (-golden +got):\n- accepted\n+ rejected\n"+another+" What it writes for the cell, if anything, is its run's, not this outcome.",
+		"out/import/outcome differs (-golden +got):\n- accepted\n+ rejected\n"+another+" What it writes for the cell, if anything, is its run's.",
 		"via/import/quote/A1 is recorded, and import failed on the case in this run, so this run has no product.\n"+another+" Its run may still make the file: delete nothing by hand before it has run.")
 	s.lacks(r, "Fix the code, or state the property", "fix import or the case", "If the change is intended")
 	s.passes(s.update("chain-twice"))
@@ -474,7 +474,7 @@ func TestChainVariantAsUpdate(t *testing.T) {
 		"import returned an error, but the variant states no property import rejects:\n  import: line 1: unclosed quote\nThe variant states what louder gives, and each property it keeps that the base states.\n"+runsImport+" Run it, fix what it reports, and read the diff before committing.",
 		"transform/louder/out/import/error.txt has no golden.\n"+runsImport+" Run it, fix what it reports, and read the diff before committing.",
 		"transform/louder/via/import/quote/A1 is recorded, and import failed on the case in this run, so this run has no product.\n"+runsImport+" Its run may still make the file: delete nothing by hand before it has run.",
-		"transform/louder/out/list/outcome differs (-golden +got):\n- accepted\n+ blocked import\n"+runs+" What it writes for the cell, if anything, is its run's, not this outcome.",
+		"transform/louder/out/list/outcome differs (-golden +got):\n- accepted\n+ blocked import\n"+runs+" What it writes for the cell, if anything, is its run's.",
 		"transform/louder/out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome \"rejected\", in transform/louder/out/import/outcome.\n"+runs+" Delete nothing by hand before it has run.")
 	s.passes(s.update("chain"))
 	s.same(prices, clean)
@@ -608,7 +608,7 @@ func TestChainProbeAsUpdate(t *testing.T) {
 	r = s.normal("chain")
 	s.fails(r,
 		"via/import/evaluate/probe is a file of import's committed product, which this run of import doesn't make.",
-		"out/evaluate/outcome differs (-golden +got):\n- accepted\n+ skipped a stale reason\n"+runs+" What it writes for the cell, if anything, is its run's, not this outcome.",
+		"out/evaluate/outcome differs (-golden +got):\n- accepted\n+ skipped a stale reason\n"+runs+" What it writes for the cell, if anything, is its run's.",
 		"out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it: a stale reason\n"+runs+" Delete nothing by hand before it has run.")
 	s.lacks(r, "delete the section by hand")
 	s.passes(s.update("chain"))
@@ -681,8 +681,8 @@ func TestChainOutcomeAsUpdate(t *testing.T) {
 		set("out/import/outcome", "rejected\n")(a)
 		insert("in/import/out/evaluate/fatal", "evaluate gives up\n", "in/import/out/quote/")(a)
 	})
-	s.fails(s.normal("chain"), "out/evaluate/outcome differs (-golden +got):\n- accepted\n+ blocked import\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+reruns+". What it writes for the cell, if anything, is its run's, not this outcome.")
-	s.fails(s.update("chain"), "The run failed its test, through its testing.TB. The update writes nothing for this cell.")
+	s.fails(s.normal("chain"), "out/evaluate/outcome differs (-golden +got):\n- accepted\n+ blocked import\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+reruns+". What it writes for the cell, if anything, is its run's.")
+	s.fails(s.update("chain"), "The run failed its test, through its testing.TB.\nFix the code. An update writes nothing for this cell.")
 	s.hasSections(prices, map[string]string{"out/import/outcome": "accepted\n", "out/evaluate/outcome": "accepted\n", "out/evaluate/values.txt": "a1 3\nb1 6\n"})
 	s.done()
 }
@@ -927,7 +927,7 @@ func TestChainFrozenHeldBack(t *testing.T) {
 	})
 	before := s.snapshot()
 	u := s.update("chain-render")
-	s.fails(u, "via/import/resolve/error is no longer produced\nThe problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.",
+	s.fails(u, "via/import/resolve/error is no longer produced\nFix the problems above. An update writes nothing for this cell, which a gaps line freezes.",
 		"The update writes nothing for the cell of the lift import, on parse's path")
 	s.lacks(u, "The cells past import fail in normal runs")
 	s.unchanged(before)
