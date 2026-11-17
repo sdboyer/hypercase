@@ -176,7 +176,7 @@ Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again un
 $ rm c/testdata/hypercase.json  # delete c's registry, as its failure says
 $ go test  # strip-a
     testdata/export/prices.txtar: no registry claims via/parse/quote/A1 and variant/doubled/via/parse/quote/A1: no bytes lift named parse runs over the corpus export.
-        If a bytes lift should write them, register it. If not, run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes parse's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+        If a bytes lift should write them, register it. If not, run hypercase strip -root . -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes parse's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         parse: Parses the script, as its parse/ tree says.
         transform/louder/out/parse/outcome has no golden.
@@ -250,7 +250,7 @@ $ go test  # strip-a
         --- FAIL: TestCorpus/checks/cells
 FAIL
 [exit 1]
-$ hypercase strip -column parse
+$ hypercase strip -root . -column parse
 testdata/export/prices.txtar: removed 2 sections
 testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells
 testdata/export/prices.txtar: left the cell variant/doubled/parse, frozen by its known gap, variant/doubled/gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells

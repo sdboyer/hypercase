@@ -1165,8 +1165,11 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
     declare differently, or which a stale registry records, as one edited
     by hand: the update, which rewrites the registries, ends the second;
   - a section no registry claims, such as `out/<suite>/…` after that suite
-    was removed, whose failure names `hypercase strip -column <suite>`,
-    then the update. The failure says the strip reaches the column's
+    was removed, whose failure names `hypercase strip -root <dir> -column
+    <suite>`, to run at the module root, then the update. `-root` names
+    the corpus root, `.` for the module-root corpus: without it, strip
+    takes the root the module root's registry records, which a stale one
+    may record otherwise. The failure says the strip reaches the column's
     sections in every archive under the root, and, since strip leaves a
     cell a `gaps` line marks, it says to remove first a line that marks
     one of theirs;
@@ -1993,8 +1996,9 @@ whether each has a probe, and whether the package owns it.
   its update removes them. What remains under `transform/<name>/out/` is
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
-  root-package check reports them, and names `hypercase strip -transform
-  <name>`, then the update, as it does for a removed suite (step 5).
+  root-package check reports them, and names `hypercase strip -root <dir>
+  -transform <name>`, then the update, as it does for a removed suite
+  (step 5).
 - The root-package check fails on a transform that a package with tests
   lists in a corpus type and no package owns (step 5's rule for packages
   with no tests), and on one that two own.
@@ -3185,8 +3189,8 @@ lift.
   that lift's product.
 - The root-package check claims `via/<lift>/…` in a corpus for each bytes
   lift a package owns over it; any other `via/` section is unclaimed, and
-  its failure names `hypercase strip -column <lift>`, then the update, as
-  it does for a removed suite (step 5). When a `gaps` line marks a cell of
+  its failure names `hypercase strip -root <dir> -column <lift>`, then the
+  update, as it does for a removed suite (step 5). When a `gaps` line marks a cell of
   those sections and the registries disagree on whether the lift is a
   bytes lift, whether strip leaves them turns on that, so the failure
   names no strip: it says to settle the registries first, then run the

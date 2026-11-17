@@ -229,7 +229,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
 PASS
 $ go test  # strip-a
     testdata/export/prices.txtar: no registry claims via/parse/quote/A1: no bytes lift named parse runs over the corpus export.
-        If a bytes lift should write them, register it. If not, run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes parse's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+        If a bytes lift should write them, register it. If not, run hypercase strip -root . -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes parse's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
     what ran, in order:
         import ran
         parse ran on prices
@@ -269,7 +269,7 @@ $ go test  # strip-a
         --- PASS: TestCorpus/checks/cells
 FAIL
 [exit 1]
-$ hypercase strip -column parse
+$ hypercase strip -root . -column parse
 testdata/export/prices.txtar: removed 3 sections
 testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells
 testdata/script/plain.txtar: removed 2 sections

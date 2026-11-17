@@ -1,0 +1,191 @@
+# the update, run until a pass changes nothing; that pass:
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/evaluate
+                --- PASS: TestCorpus/script/plain/variant/more/list
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/products
+PASS
+$ edit testdata/hypercase.json  # the module root's registry, recording another corpus root, step09
+$ edit step09/testdata/export/prices.txtar  # a copy of prices under step09
+$ edit testdata/export/prices.txtar  # a removed column's outcome
+$ edit step09/testdata/export/prices.txtar  # a removed column's outcome
+$ go test  # strip-a
+    testdata/hypercase.json differs from what the package registers (-committed +registered):
+          {
+            "format": 6,
+            "updateVar": "FIXTURE_UPDATE_GOLDEN",
+        -   "corpusRoot": "step09",
+        +   "corpusRoot": ".",
+            "rootPackage": true,
+            "codes": false,
+            "issueLinks": [],
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
+    no registry records a root-package check for the module-root corpus, so nothing reports what no column there owns.
+        Register hypercase.RootPackage() in one package over it, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... to record it in the package's registry.
+    the lift import is used by ./b, and no package owns it, so its error is recorded nowhere.
+        Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
+    the lift parse is used by ./b, and no package owns it, so its error is recorded nowhere.
+        Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
+    the lift resolve is used by ./b, and no package owns it, so its error is recorded nowhere.
+        Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
+    testdata/export/prices.txtar: no registry claims out/import/outcome, variant/doubled/out/import/outcome and transform/louder/out/import/outcome: no column named import runs over the corpus export.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column import at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes import's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+    testdata/export/prices.txtar: no registry claims out/nobody/outcome: no column named nobody runs over the corpus export.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column nobody at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes nobody's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+    testdata/export/prices.txtar: no registry claims out/parse/outcome, variant/doubled/out/parse/outcome and transform/louder/out/parse/outcome: no column named parse runs over the corpus export.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes parse's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+    testdata/export/prices.txtar: no registry claims out/resolve/outcome, variant/doubled/out/resolve/outcome and transform/louder/out/resolve/outcome: no column named resolve runs over the corpus export.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column resolve at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes resolve's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+    testdata/export/prices.txtar: no registry claims via/import/evaluate/out/values.txt, via/import/quote/A1, via/import/quote/B1, variant/doubled/via/import/evaluate/out/values.txt, variant/doubled/via/import/quote/A1, variant/doubled/via/import/quote/B1, transform/louder/via/import/evaluate/out/values.txt, transform/louder/via/import/quote/A1 and transform/louder/via/import/quote/B1: no bytes lift named import runs over the corpus export.
+        If a bytes lift should write them, register it. If not, run hypercase strip -root . -column import at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes import's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+    testdata/script/plain.txtar: no registry claims out/parse/outcome and variant/more/out/parse/outcome: no column named parse runs over the corpus script.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes parse's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+    testdata/script/plain.txtar: no registry claims out/resolve/outcome and variant/more/out/resolve/outcome: no column named resolve runs over the corpus script.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column resolve at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes resolve's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+    testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
+          export/prices evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+        - export/prices import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+          export/prices list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        - export/prices parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+        - export/prices resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          export/prices/transform/louder evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+        - export/prices/transform/louder import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+          export/prices/transform/louder list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        - export/prices/transform/louder parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+        - export/prices/transform/louder resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          export/prices/variant/doubled evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+        - export/prices/variant/doubled import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+          export/prices/variant/doubled list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        - export/prices/variant/doubled parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+        - export/prices/variant/doubled resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          script/plain evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+          script/plain list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        - script/plain parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+        - script/plain resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          script/plain/variant/more evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+          script/plain/variant/more list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        - script/plain/variant/more parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+        - script/plain/variant/more resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/cells
+FAIL
+[exit 1]
+$ hypercase strip -root . -column nobody
+testdata/export/prices.txtar: removed 1 section
+Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -235,9 +236,10 @@ func TestStripRootCheck(t *testing.T) {
 	plain := []childRun{{"", "strip-a-plain", true}, {"b", "strip-b-plain", true}}
 	s.note("louder is dropped from the export type")
 	s.settle(plain...)
-	s.fails(s.normal("strip-a-plain"), "testdata/export/prices.txtar: no registry claims transform/louder/in/import/out/evaluate/out/values.txt, ",
-		": no corpus type of testdata/export/ lists a transform named louder.\nIf a transform should make the variant, list it in its corpus type's Transforms. If not, run hypercase strip -transform louder at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
-	s.passes(s.strip("-transform", "louder"))
+	r := s.normal("strip-a-plain")
+	s.fails(r, "testdata/export/prices.txtar: no registry claims transform/louder/in/import/out/evaluate/out/values.txt, ",
+		": no corpus type of testdata/export/ lists a transform named louder.\nIf a transform should make the variant, list it in its corpus type's Transforms. If not, run hypercase strip -root . -transform louder at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
+	s.passes(s.strip(s.printedStrip(r, "-transform", "louder")...))
 	s.settle(plain...)
 	s.hasSections(prices, nil, "transform/louder/")
 	s.passes(s.normal("strip-a-plain"))
@@ -263,11 +265,13 @@ func TestStripRootCheckVia(t *testing.T) {
 		insert("variant/doubled/via/nobody/quote/A1", "3\n", "variant/doubled/out/")(a)
 	})
 	const update = " at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes "
-	s.fails(s.normal("strip-a"),
-		"testdata/export/prices.txtar: no registry claims via/nobody/quote/A1 and variant/doubled/via/nobody/quote/A1: no bytes lift named nobody runs over the corpus export.\nIf a bytes lift should write them, register it. If not, run hypercase strip -column nobody"+update+"nobody's sections",
-		"testdata/export/prices.txtar: no registry claims via/parse/quote/A1: no bytes lift named parse runs over the corpus export.\nIf a bytes lift should write them, register it. If not, run hypercase strip -column parse"+update+"parse's sections")
-	s.passes(s.strip("-column", "nobody"))
-	r := s.strip("-column", "parse")
+	r := s.normal("strip-a")
+	s.fails(r,
+		"testdata/export/prices.txtar: no registry claims via/nobody/quote/A1 and variant/doubled/via/nobody/quote/A1: no bytes lift named nobody runs over the corpus export.\nIf a bytes lift should write them, register it. If not, run hypercase strip -root . -column nobody"+update+"nobody's sections",
+		"testdata/export/prices.txtar: no registry claims via/parse/quote/A1: no bytes lift named parse runs over the corpus export.\nIf a bytes lift should write them, register it. If not, run hypercase strip -root . -column parse"+update+"parse's sections")
+	parse := s.printedStrip(r, "-column", "parse")
+	s.passes(s.strip(s.printedStrip(r, "-column", "nobody")...))
+	r = s.strip(parse...)
 	s.passes(r)
 	s.contains(r, "testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells\n")
 	for _, r := range s.settle(stripModule...) {
@@ -342,9 +346,9 @@ func TestStripRootCheckViaBytesDisagree(t *testing.T) {
 	s.note("run the update, as the lift's failure says")
 	s.settle(stripModule...)
 	r = s.normal("strip-a")
-	s.fails(r, claims+"run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
+	s.fails(r, claims+"run hypercase strip -root . -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
 	s.lacks(r, "differ in bytes", "first settle", "remove gaps line")
-	r = s.strip("-column", "parse")
+	r = s.strip(s.printedStrip(r, "-column", "parse")...)
 	s.passes(r)
 	s.contains(r, viaLeft)
 	s.hasSections(prices, map[string]string{"gaps": viaGap}, "via/parse/")
@@ -391,9 +395,9 @@ func TestStripRootCheckViaUntested(t *testing.T) {
 
 	s.remove("c/testdata/hypercase.json", "delete c's registry, as its failure says")
 	r = s.normal("strip-a")
-	s.fails(r, claims+"run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
+	s.fails(r, claims+"run hypercase strip -root . -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
 	s.lacks(r, "first settle", "remove gaps line")
-	r = s.strip("-column", "parse")
+	r = s.strip(s.printedStrip(r, "-column", "parse")...)
 	s.passes(r)
 	s.contains(r, viaLeft, variantLeft)
 	s.hasSections(prices, gaps, "via/parse/", "variant/doubled/via/parse/")
@@ -403,5 +407,58 @@ func TestStripRootCheckViaUntested(t *testing.T) {
 	s.hasSections(prices, gaps, "via/parse/", "variant/doubled/via/parse/")
 	s.passes(s.normal("strip-a"))
 	s.passes(s.run("b", "strip-b", false))
+	s.done()
+}
+
+// printedStrip returns the arguments of the hypercase strip command that a
+// root-package check's message in r says to run at the module root, for
+// the sections the flag given selects, as a person pastes it. The tests
+// that read it name roots no shell quotes.
+func (s *sandbox) printedStrip(r result, flag ...string) []string {
+	s.t.Helper()
+	for _, m := range regexp.MustCompile(`run hypercase strip (-[^\n]*?) at the module root`).FindAllStringSubmatch(r.out, -1) {
+		if args := strings.Fields(m[1]); slices.Equal(args[max(len(args)-len(flag), 0):], flag) {
+			return args
+		}
+	}
+	s.t.Fatalf("no message says to run hypercase strip %s at the module root:\n%s", strings.Join(flag, " "), r.out)
+	return nil
+}
+
+// TestStripRootCheckNamesRoot: the module root's registry is stale, and
+// records another corpus root, step09, whose archive holds the same
+// out/nobody/… as the module-root corpus's. A strip at the module root
+// with no -root reads that registry, and strips step09. So the
+// root-package check's strip command names the module-root corpus with
+// -root: run as printed, it strips that corpus's sections, and leaves
+// step09's.
+func TestStripRootCheckNamesRoot(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	s.settle(stripModule...)
+	const (
+		reg     = "testdata/hypercase.json"
+		step09  = "step09/" + prices
+		section = "out/nobody/outcome"
+	)
+	g, err := registry.Parse(s.read(reg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.CorpusRoot = "step09"
+	s.write(reg, g.Marshal(), "the module root's registry, recording another corpus root, step09")
+	s.write(step09, s.read(prices), "a copy of prices under step09")
+	for _, p := range []string{prices, step09} {
+		s.edit(p, "a removed column's outcome", insert(section, "accepted\n", "out/parse/"))
+	}
+	r := s.normal("strip-a")
+	s.fails(r, "testdata/export/prices.txtar: no registry claims out/nobody/outcome: no column named nobody runs over the corpus export.\nIf a column should write them, register the column. If not, run hypercase strip ")
+	s.passes(s.strip(s.printedStrip(r, "-column", "nobody")...))
+	if _, ok := archive.Parse(s.read(prices)).Section(section); ok {
+		t.Errorf("the printed strip left %s in %s:\n%s", section, prices, s.read(prices))
+	}
+	if _, ok := archive.Parse(s.read(step09)).Section(section); !ok {
+		t.Errorf("the printed strip removed %s from %s, under the corpus root the registry records:\n%s", section, step09, s.read(step09))
+	}
 	s.done()
 }

@@ -213,11 +213,11 @@ func (r *runner) updateCmd() string {
 
 // stripCmd is the hypercase strip command, run at the module root, that
 // removes the sections the flag given selects under the corpus root. It
-// quotes the root's path for a shell where the path needs it.
+// names the root with -root, the module-root corpus too: without it,
+// strip takes the root the module root's registry records, which a stale
+// one may record otherwise. It quotes the root's path for a shell where
+// the path needs it.
 func (r *runner) stripCmd(flag string) string {
-	if r.rootRel == "." {
-		return "hypercase strip " + flag
-	}
 	return "hypercase strip -root " + shell.Quote(r.rootRel) + " " + flag
 }
 
