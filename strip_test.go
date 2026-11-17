@@ -238,7 +238,7 @@ func TestStripRootCheck(t *testing.T) {
 	s.settle(plain...)
 	r := s.normal("strip-a-plain")
 	s.fails(r, "testdata/export/prices.txtar: no registry claims transform/louder/in/import/out/evaluate/out/values.txt, ",
-		": no corpus type of testdata/export/ lists a transform named louder.\nIf a transform should make the variant, list it in its corpus type's Transforms. If not, run hypercase strip -root . -transform louder at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
+		": no corpus type of testdata/export/ lists a transform named louder.\nIf a transform should make the variant, list it in its corpus type's Transforms. If not, run hypercase strip -root . -transform louder at the module root.")
 	s.passes(s.strip(s.printedStrip(r, "-transform", "louder")...))
 	s.settle(plain...)
 	s.hasSections(prices, nil, "transform/louder/")
@@ -264,7 +264,7 @@ func TestStripRootCheckVia(t *testing.T) {
 		insert("via/parse/quote/A1", "3\n", "out/")(a)
 		insert("variant/doubled/via/nobody/quote/A1", "3\n", "variant/doubled/out/")(a)
 	})
-	const update = " at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes "
+	const update = " at the module root. It removes "
 	r := s.normal("strip-a")
 	s.fails(r,
 		"testdata/export/prices.txtar: no registry claims via/nobody/quote/A1 and variant/doubled/via/nobody/quote/A1: no bytes lift named nobody runs over the corpus export.\nIf a bytes lift should write them, register it. If not, run hypercase strip -root . -column nobody"+update+"nobody's sections",
@@ -346,7 +346,7 @@ func TestStripRootCheckViaBytesDisagree(t *testing.T) {
 	s.note("run the update, as the lift's failure says")
 	s.settle(stripModule...)
 	r = s.normal("strip-a")
-	s.fails(r, claims+"run hypercase strip -root . -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
+	s.fails(r, claims+"run hypercase strip -root . -column parse at the module root.")
 	s.lacks(r, "differ in bytes", "first settle", "remove gaps line")
 	r = s.strip(s.printedStrip(r, "-column", "parse")...)
 	s.passes(r)
@@ -395,7 +395,7 @@ func TestStripRootCheckViaUntested(t *testing.T) {
 
 	s.remove("c/testdata/hypercase.json", "delete c's registry, as its failure says")
 	r = s.normal("strip-a")
-	s.fails(r, claims+"run hypercase strip -root . -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
+	s.fails(r, claims+"run hypercase strip -root . -column parse at the module root.")
 	s.lacks(r, "first settle", "remove gaps line")
 	r = s.strip(s.printedStrip(r, "-column", "parse")...)
 	s.passes(r)
@@ -500,5 +500,44 @@ func TestStripRootCheckRefusedName(t *testing.T) {
 	})
 	s.passes(s.normal("strip-a"))
 	s.passes(s.run("b", "strip-b", false))
+	s.done()
+}
+
+// TestStripFaultingLift: import's jenny now faults on prices, with an
+// error decl.Reject doesn't mark, and its cell still holds the files it
+// wrote when it accepted the case. No update writes a faulting cell, so
+// the update leaves them. hypercase strip -column import removes them,
+// and the update then writes nothing for import's cell: its outcome and
+// product are gone. The cells past it, whose committed outcomes the strip
+// left, fail: parse's in the update, which writes nothing for them
+// either, and evaluate's and list's in ./b; a normal run finds no
+// committed outcome of import's. This is regeneration as it should be,
+// a case, not a known gap: what an update writes depends only on the
+// inputs and the code, and the code faults.
+func TestStripFaultingLift(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	s.settle(stripModule...)
+	s.edit(prices, "import's jenny now fails on the export, with an error decl.Reject doesn't mark", insert("in/import/fail", "the generator's error\n", "variant/"))
+	stale := map[string]string{"out/import/outcome": "accepted\n", "via/import/quote/A1": "3\n"}
+	s.settle(stripModule...)
+	s.hasSections(prices, stale)
+
+	s.passes(s.strip("-column", "import"))
+	rs := s.settle(stripModule...)
+	a := archive.Parse(s.read(prices))
+	for _, name := range []string{"out/import/outcome", "via/import/quote/A1"} {
+		if _, ok := a.Section(name); ok {
+			t.Errorf("the update wrote %s for import's faulting cell:\n%s", name, s.read(prices))
+		}
+	}
+	s.fails(rs[0], "import's jenny failed on the case, with an error that is no rejection:\n  import: the generator's error\n",
+		"The cell of the lift import, on parse's path, has a problem, which that cell reports, in the package that owns it.")
+	s.fails(rs[1], "The cell of the lift import, on evaluate's path, has a problem", "The cell of the lift import, on list's path, has a problem")
+	s.fails(s.normal("strip-a"), "out/parse/outcome differs (-golden +got):\n- accepted\n+ blocked import\n")
+	s.fails(s.run("b", "strip-b", false),
+		"out/evaluate/outcome differs (-golden +got):\n- accepted\n+ blocked import\n",
+		"out/list/outcome differs (-golden +got):\n- accepted\n+ blocked import\n",
+		"the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.")
 	s.done()
 }

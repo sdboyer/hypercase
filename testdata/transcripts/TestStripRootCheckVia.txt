@@ -88,9 +88,9 @@ PASS
 $ edit testdata/export/prices.txtar  # products no bytes lift makes, and a known gap in parse's cell
 $ go test  # strip-a
     testdata/export/prices.txtar: no registry claims via/nobody/quote/A1 and variant/doubled/via/nobody/quote/A1: no bytes lift named nobody runs over the corpus export.
-        If a bytes lift should write them, register it. If not, run hypercase strip -root . -column nobody at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes nobody's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+        If a bytes lift should write them, register it. If not, run hypercase strip -root . -column nobody at the module root. It removes nobody's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/export/prices.txtar: no registry claims via/parse/quote/A1: no bytes lift named parse runs over the corpus export.
-        If a bytes lift should write them, register it. If not, run hypercase strip -root . -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes parse's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+        If a bytes lift should write them, register it. If not, run hypercase strip -root . -column parse at the module root. It removes parse's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     what ran, in order:
         import ran
         parse ran on prices

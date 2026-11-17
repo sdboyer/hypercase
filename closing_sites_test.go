@@ -589,7 +589,7 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "%s: %s, line %d, names %s, and no registry has a column of that name over the corpus %s. Register the column, or remove the line.", "a gaps line naming no column, in the root-package check"},
 		{"Errorf", "%s: no registry claims %s: %s. If not, delete them by hand; %s leaves them in place.", "sections no registry claims, of a column whose name hypercase strip refuses, in the root-package check"},
 		{"Errorf", "%s: no registry claims %s: %s. If not, first settle whether %s is a bytes lift, on which the registries differ, as the check's failures on them say, then run the check again: until they agree, it can't tell whether %s strip from removing them.", "sections no registry claims, of a lift the registries differ on, in the root-package check"},
-		{"Errorf", "%s: no registry claims %s: %s. If not, %srun %s at the module root, then %s until it changes nothing. The strip removes %s from every archive under %s, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.", "sections no registry claims, in the root-package check"},
+		{"Errorf", "%s: no registry claims %s: %s. If not, %srun %s at the module root. It removes %s from every archive under %s, but a frozen cell's, and lists what it leaves. Then run %s until it changes nothing, and read what it reports.", "sections no registry claims, in the root-package check"},
 	},
 	"runner.checkColumnDescriptions": {
 		{"Errorf", "the %s %s has no description. Add one: it says what the %s does, in prose.", "a column with no description"},

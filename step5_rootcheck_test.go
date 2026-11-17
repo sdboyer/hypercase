@@ -16,7 +16,7 @@ func TestRootCheckRemovedSuite(t *testing.T) {
 	s := newSandbox(t, "shared")
 	before := s.read(twice)
 	s.passes(s.run("b", "pkg-b-gone", true))
-	want := "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root . -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes shout's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults."
+	want := "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root . -column shout at the module root. It removes shout's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports."
 	s.fails(s.normal("pkg-a"), want)
 	s.passes(s.update("pkg-a"))
 	s.same(twice, before)
@@ -43,7 +43,7 @@ func TestRootCheckRemovedSuiteRoot(t *testing.T) {
 	s.write(corp, s.read(twice), "a corpus under the root corp, whose package registers echo alone")
 	s.passes(s.update("corp-a"))
 	r := s.normal("corp-a")
-	s.fails(r, corp+": no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root corp -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
+	s.fails(r, corp+": no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root corp -column shout at the module root.")
 	before := s.read(twice)
 	s.passes(s.strip(s.printedStrip(r, "-column", "shout")...))
 	for _, r := range s.settle(childRun{"", "corp-a", true}) {
@@ -64,7 +64,7 @@ func TestRootCheckRemovedSuiteSpaced(t *testing.T) {
 	corp := "my corp/testdata/script/twice.txtar"
 	s.write(corp, s.read(twice), "a corpus under the root \"my corp\", whose package registers echo alone")
 	s.passes(s.update("spaced-a"))
-	s.fails(s.normal("spaced-a"), corp+": no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root 'my corp' -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
+	s.fails(s.normal("spaced-a"), corp+": no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root 'my corp' -column shout at the module root.")
 	s.done()
 }
 
@@ -79,7 +79,7 @@ func TestRootCheckRemovedSuiteMarked(t *testing.T) {
 	s.passes(s.run("b", "pkg-b-gone", true))
 	s.edit(twice, "a gaps line marks shout's cell", insert("gaps", "shout Prints A1 as SIX. Waits on sheets#15.\n", "out/"))
 	const line = "testdata/script/twice.txtar: gaps, line 1, names shout, and no registry has a column of that name over the corpus script.\nRegister the column, or remove the line."
-	const want = "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -root . -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes shout's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults."
+	const want = "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -root . -column shout at the module root. It removes shout's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports."
 	r := s.normal("pkg-a")
 	s.fails(r, line, want)
 	cmd := s.printedStrip(r, "-column", "shout")
@@ -113,7 +113,7 @@ func TestRootCheckViaMarked(t *testing.T) {
 		insert("via/nobody/script/A1", "3\n", "out/")(a)
 	})
 	const line = "testdata/script/twice.txtar: gaps, line 1, names nobody, and no registry has a column of that name over the corpus script.\nRegister the column, or remove the line."
-	const want = "testdata/script/twice.txtar: no registry claims via/nobody/script/A1: no bytes lift named nobody runs over the corpus script.\nIf a bytes lift should write them, register it. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -root . -column nobody at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing."
+	const want = "testdata/script/twice.txtar: no registry claims via/nobody/script/A1: no bytes lift named nobody runs over the corpus script.\nIf a bytes lift should write them, register it. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -root . -column nobody at the module root."
 	r := s.normal("pkg-a")
 	s.fails(r, line, want)
 	cmd := s.printedStrip(r, "-column", "nobody")

@@ -8,7 +8,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # corp-a
 PASS
 $ go test  # corp-a
     corp/testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
-        If a column should write them, register the column. If not, run hypercase strip -root corp -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes shout's sections from every archive under the corpus root corp, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+        If a column should write them, register the column. If not, run hypercase strip -root corp -column shout at the module root. It removes shout's sections from every archive under the corpus root corp, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/script
         --- PASS: TestCorpus/script/twice
