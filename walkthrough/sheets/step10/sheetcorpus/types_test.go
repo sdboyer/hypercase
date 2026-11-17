@@ -2,11 +2,13 @@ package sheetcorpus_test
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"reflect"
 	"slices"
 	"testing"
 	"testing/fstest"
+	"unicode"
 
 	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
@@ -23,11 +25,12 @@ import (
 // gives the files the input holds.
 func TestImportInput(t *testing.T) {
 	csv := &fstest.MapFile{Data: []byte("4,6\n")}
-	for _, tt := range []struct {
+	type refusal struct {
 		name string
 		in   fstest.MapFS
 		want string // the files the error names
-	}{
+	}
+	refusals := []refusal{
 		{"empty", fstest.MapFS{}, `[]`},
 		{"none", fstest.MapFS{"notes/about": {Data: []byte("no CSV\n")}}, `["notes/about"]`},
 		{"two", fstest.MapFS{"csv/a.csv": csv, "csv/b.csv": csv}, `["csv/a.csv" "csv/b.csv"]`},
@@ -38,14 +41,18 @@ func TestImportInput(t *testing.T) {
 		{"outside", fstest.MapFS{"csv/a.csv": csv, "notes/about": csv}, `["csv/a.csv" "notes/about"]`},
 		{"directory", fstest.MapFS{"csv/x.csv/y": csv}, `["csv/x.csv/y"]`},
 		{"unnamed", fstest.MapFS{"csv/.csv": csv}, `["csv/.csv"]`},
-		{"space", fstest.MapFS{"csv/ .csv": csv}, `["csv/ .csv"]`},
 		{"spaces", fstest.MapFS{"csv/   .csv": csv}, `["csv/   .csv"]`},
-		{"tab", fstest.MapFS{"csv/\t.csv": csv}, `["csv/\t.csv"]`},
-		{"nbsp", fstest.MapFS{"csv/\u00a0.csv": csv}, `["csv/\u00a0.csv"]`},
-		{"zwsp", fstest.MapFS{"csv/\u200b.csv": csv}, `["csv/\u200b.csv"]`},
-		{"bom", fstest.MapFS{"csv/\ufeff.csv": csv}, `["csv/\ufeff.csv"]`},
-		{"joiner", fstest.MapFS{"csv/\u2060.csv": csv}, `["csv/\u2060.csv"]`},
-	} {
+		{"mixed", fstest.MapFS{"csv/ \u200b\t.csv": csv}, `["csv/ \u200b\t.csv"]`},
+	}
+	// A name of one rune is refused for each rune of White_Space and of Cf,
+	// every one taken from Unicode's tables, so none is left out.
+	for _, table := range []*unicode.RangeTable{unicode.White_Space, unicode.Cf} {
+		for _, r := range runes(table) {
+			p := "csv/" + string(r) + ".csv"
+			refusals = append(refusals, refusal{fmt.Sprintf("%U", r), fstest.MapFS{p: csv}, fmt.Sprintf("%q", []string{p})})
+		}
+	}
+	for _, tt := range refusals {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: tt.in})
 			want := "import: the input holds " + tt.want + ", and a CSV export is one file, csv/<name>.csv, with a name holding a character that is neither white space nor a format character"
@@ -88,6 +95,22 @@ func TestImportInput(t *testing.T) {
 			}
 		})
 	}
+}
+
+// runes lists every rune of table, its 16-bit ranges and its 32-bit ones.
+func runes(table *unicode.RangeTable) []rune {
+	var rs []rune
+	for _, r := range table.R16 {
+		for c := rune(r.Lo); c <= rune(r.Hi); c += rune(r.Stride) {
+			rs = append(rs, c)
+		}
+	}
+	for _, r := range table.R32 {
+		for c := rune(r.Lo); c <= rune(r.Hi); c += rune(r.Stride) {
+			rs = append(rs, c)
+		}
+	}
+	return rs
 }
 
 // TestImportReadFault: import rejects a case only with the importer's own
