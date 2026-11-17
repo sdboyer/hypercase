@@ -162,9 +162,9 @@ func firstDiff(got, want []byte) (n int, g, w string) {
 }
 
 // goEnv is the environment of each go command the test runs: this
-// process's, which holds where the toolchain keeps its caches, with the
-// update variable left out and the module system kept offline and off any
-// workspace.
+// process's, which holds where the toolchain keeps its caches, with no
+// GOFLAGS, the module system offline, on this toolchain and off any
+// workspace, and the update variable only as updateVar sets it.
 func goEnv(updateVar string) []string {
 	var env []string
 	for _, kv := range os.Environ() {
