@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -20,10 +21,11 @@ func init() {
 	if os.Getenv(throwaway) == "" {
 		return
 	}
+	// No root-package check: in an update it only says it runs in normal
+	// runs, and the child's output is to be import's fault alone.
 	hypercase.Register(
 		sheetcorpus.Project,
 		hypercase.Root("."),
-		hypercase.RootPackage(),
 		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling, sheetcorpus.Unterminated,
 		sheetcorpus.SheetType, sheetcorpus.CSVType,
 		hypercase.Own(sheetcorpus.Import),
@@ -76,13 +78,12 @@ func TestImportFault(t *testing.T) {
 	case !errors.As(err, &exit):
 		t.Fatalf("running the update: %v\n%s", err, out)
 	}
-	for _, want := range []string{
-		"import's jenny failed on the case, with an error that is no rejection:",
-		`import: the input holds ["csv/a.csv" "csv/b.csv"], and a CSV export is one file, csv/<name>.csv`,
-	} {
-		if !strings.Contains(string(out), want) {
-			t.Errorf("the update's output lacks %q:\n%s", want, out)
-		}
+	// The child fails import's cell, and the tests above it, and nothing
+	// else: any other failure adds lines. Durations and file:line prefixes
+	// are dropped, so the output reads the same wherever the code moves.
+	got := durations.ReplaceAllString(positions.ReplaceAllString(string(out), ""), "")
+	if got != importFault {
+		t.Errorf("the update's output:\n%s\nwant:\n%s", got, importFault)
 	}
 	if got, err := os.ReadFile(filepath.Join(dir, "testdata", "csv", "two.txtar")); err != nil {
 		t.Error(err)
@@ -90,3 +91,21 @@ func TestImportFault(t *testing.T) {
 		t.Errorf("the update wrote the archive:\n%s", got)
 	}
 }
+
+var (
+	durations = regexp.MustCompile(` \(\d+\.\d+s\)`)
+	positions = regexp.MustCompile(`\S+\.go:\d+: `)
+)
+
+// importFault is the child's output, whose one failure is import's cell.
+const importFault = `--- FAIL: TestImportFault
+    --- FAIL: TestImportFault/csv
+        --- FAIL: TestImportFault/csv/two
+            --- FAIL: TestImportFault/csv/two/import
+                csv/two: Two CSVs.
+                    import: Turns each CSV field into a cell: row 1, field 2 is B1.
+                    import's jenny failed on the case, with an error that is no rejection:
+                      import: the input holds ["csv/a.csv" "csv/b.csv"], and a CSV export is one file, csv/<name>.csv
+                    If import rejects the case, return the error as decl.Reject(err). If not, fix import's jenny. An update writes nothing for this cell.
+FAIL
+`
