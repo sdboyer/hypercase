@@ -505,8 +505,10 @@ func TestChainProbeAsUpdate(t *testing.T) {
 // what outcome the update writes. When the update runs the cell, it says
 // that what the update writes is the run's, which may be nothing. Here
 // import's committed outcome is stale, and import now makes a script that
-// resolve rejects; or one whose evaluate fails its test, so the update
-// writes nothing for evaluate's cell.
+// resolve rejects; or import's jenny now fails, so the update writes
+// nothing for import's cell, nor for list's past it; or import makes a
+// script whose evaluate fails its test, so the update writes nothing for
+// evaluate's cell.
 func TestChainOutcomeAsUpdate(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "chain")
@@ -525,6 +527,22 @@ func TestChainOutcomeAsUpdate(t *testing.T) {
 	s.lacks(r, "runs evaluate")
 	s.passes(s.update("chain"))
 	s.hasSections(names, map[string]string{"out/evaluate/outcome": "blocked resolve\n", "out/resolve/outcome": "rejected\n"})
+	s.write(names, clean, "restore it")
+
+	s.edit(names, "import's committed outcome is stale, and import's jenny now fails on names", func(a *archive.Archive) {
+		set("out/import/outcome", "rejected\n")(a)
+		insert("properties", "unterminated\n", "in/")(a)
+		insert("in/import/fail", "the generator's error\n", "via/")(a)
+	})
+	nothing := "FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: " + reruns + ", and it writes nothing for the cell of the lift import, on list's path, whose outcome and product a normal run reads."
+	r = s.normal("chain")
+	s.fails(r,
+		"out/list/outcome differs (-golden +got):\n- accepted\n+ blocked import\n"+nothing,
+		"out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome \"rejected\", in out/import/outcome.\n"+nothing+"\nFix what import's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.")
+	s.lacks(r, "runs list")
+	before := s.snapshot()
+	s.fails(s.update("chain"), listHeldBack)
+	s.unchanged(before)
 	s.write(names, clean, "restore it")
 
 	s.edit(prices, "import's committed outcome is stale, and import now makes a script whose evaluate fails its test", func(a *archive.Archive) {
