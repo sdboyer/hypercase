@@ -4,7 +4,12 @@
   "corpusRoot": "step09",
   "rootPackage": true,
   "codes": true,
-  "issueLinks": [],
+  "issueLinks": [
+    {
+      "pattern": "sheets#(\\d+)",
+      "url": "https://example.com/sheets/issues/$1"
+    }
+  ],
   "properties": [
     {
       "name": "circular",

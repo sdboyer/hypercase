@@ -22,6 +22,9 @@ var Project = decl.Project{
 		}
 		return nil
 	},
+	IssueLinks: []decl.IssueLink{
+		{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/issues/$1"},
+	},
 }
 
 // doc:end project

@@ -14,7 +14,6 @@ import (
 	"github.com/sdboyer/hypercase/walkthrough/sheets/step09/sheetcorpus"
 )
 
-// doc:begin evaluate
 func init() {
 	hypercase.Register(
 		sheetcorpus.Project,
@@ -49,9 +48,6 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 	},
 }
 
-// doc:end evaluate
-
-// doc:begin codes
 var codes = hypercase.Check{
 	Name:        "codes",
 	Description: "Every code the formula evaluator defines is the code of some rejected cell.",
@@ -76,7 +72,5 @@ var codes = hypercase.Check{
 		return found, nil
 	},
 }
-
-// doc:end codes
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }
