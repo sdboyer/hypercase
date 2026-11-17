@@ -429,7 +429,9 @@ func TestChainVariantAsUpdate(t *testing.T) {
 // import now makes evaluate/probe, so the update skips evaluate, and
 // writes that outcome; or evaluate/probe-panic, so the update fails
 // evaluate, whose probe panics. A stale evaluate/probe in the committed
-// product skips evaluate in the normal run, and the update runs it.
+// product skips evaluate in the normal run, and the update runs it; or,
+// where import makes one too, it gives another reason than import's, and
+// the update skips evaluate for import's, and writes that outcome.
 func TestChainProbeAsUpdate(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "chain")
@@ -479,6 +481,22 @@ func TestChainProbeAsUpdate(t *testing.T) {
 	s.lacks(r, "delete the section by hand")
 	s.passes(s.update("chain"))
 	s.same(prices, clean)
+
+	s.edit(prices, "import now makes evaluate/probe, and evaluate's cells have no values.txt", func(a *archive.Archive) {
+		insert("in/import/out/evaluate/probe", "the new reason\n", "in/import/out/quote/")(a)
+		drop("out/evaluate/values.txt")(a)
+		drop("variant/doubled/out/evaluate/values.txt")(a)
+		drop("transform/louder/out/evaluate/values.txt")(a)
+	})
+	s.passes(s.update("chain"))
+	s.hasSections(prices, map[string]string{"out/evaluate/outcome": "skipped the new reason\n", "via/import/evaluate/probe": "the new reason\n"})
+	probed := s.read(prices)
+	s.edit(prices, "import's committed product gives evaluate/probe another reason", set("via/import/evaluate/probe", "a stale reason\n"))
+	r = s.normal("chain")
+	s.fails(r, "out/evaluate/outcome differs (-golden +got):\n- skipped the new reason\n+ skipped a stale reason\nFIXTURE_UPDATE_GOLDEN=1 go test ./... skips evaluate: "+reruns+", and evaluate's probe says the case isn't for it: the new reason\nIt writes the outcome \"skipped the new reason\", not this one.")
+	s.lacks(r, "+ skipped a stale reason\nIf the change is intended")
+	s.passes(s.update("chain"))
+	s.same(prices, probed)
 	s.done()
 }
 
