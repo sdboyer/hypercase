@@ -273,6 +273,8 @@ func TestProducts(t *testing.T) {
 // of a via/<lift>/ section's name leaves the section out, and the report
 // compares no product of its cell with the other revision's, either way
 // round, so a product only one revision places is no change of its cell.
+// The report says so, as a problem at that revision, on the page and in
+// the plain text.
 func TestProductsLeftOut(t *testing.T) {
 	t.Parallel()
 	const x = "A CSV.\n-- in/csv/x.csv --\n4\n-- via/import/sheet/A1 --\nV\n-- out/import/outcome --\naccepted\n"
@@ -291,8 +293,9 @@ func TestProductsLeftOut(t *testing.T) {
 			mods[tt.at]["testdata/hypercase.json"] = string(plain.Marshal())
 			g := gittest.New(t)
 			c := revisions(t, g, mods[0], mods[1])
-			if got := ok(t, g, "", "report", "-text", c[0], c[1]); got != "" {
-				t.Errorf("got:\n%s\nwant no change", got)
+			want := "problems\n  at " + c[tt.at] + "\n    testdata/csv/x.txtar, via/import/sheet/A1: the section is a product of import, and no registry declares a bytes lift of that name over testdata/csv/, so the report leaves it out, and doesn't compare its cell's product.\n"
+			if got := ok(t, g, "", "report", "-text", c[0], c[1]); got != want {
+				t.Errorf("got:\n%s\nwant the problem, and no change:\n%s", got, want)
 			}
 			ps := section(t, ok(t, g, "", "report", c[0], c[1]), `<section id="problems">`, "</section>")
 			holds(t, "the problems", ps, `<h3>At <span class="rev">`+c[tt.at]+`</span></h3>`,

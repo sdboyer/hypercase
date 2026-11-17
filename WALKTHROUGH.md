@@ -2601,7 +2601,8 @@ rejected S201
 
 - `-root <dir>` names the corpus root, relative to the current directory.
   Without it, the report finds the root as a test does.
-- `-text` writes the ranked changes as plain text instead of the page.
+- `-text` writes the problems and the ranked changes as plain text instead
+  of the page.
 
 **Link patterns.** Each `decl.IssueLink` is a regular expression and a URL
 template, which may use the expression's groups. The report reads them from
@@ -2643,7 +2644,10 @@ cover, is left unaligned: its diff is one line saying how many lines it
 leaves out of each file, and its file says it is partly unaligned in place
 of counts that would be wrong. The same revisions give the same bytes.
 
-**The plain-text format.** One heading per rank that has
+**The plain-text format.** The problems first, when there are any, as
+the page gives them: under the heading `problems`, a line `at <rev>` per
+revision that has them, `<b>` first, and under it one line per problem, its
+place, where it has one, then what it is. Then one heading per rank that has
 changes, in rank order. Under it, one line per cell: its case, its column,
 and its outcome, or the change in it. So `outcome` is never listed as a
 file. Under each cell, one line per other file of the cell that was added,
