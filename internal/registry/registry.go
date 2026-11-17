@@ -309,7 +309,8 @@ const OutcomeFormat = 5
 // Format 4 added each corpus type's transforms, format 5 whether the
 // project supplies Codes and each suite's classifier, and format 6 whether
 // each lift is a bytes lift and its product's declarations. None changed
-// what an earlier key holds.
+// what an earlier key holds. Each format's keys are in
+// testdata/keys-<N>.txt, which TestFormatKeys checks the table against.
 var added = []struct {
 	format int
 	key    string

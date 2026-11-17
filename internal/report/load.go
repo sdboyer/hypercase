@@ -42,6 +42,10 @@ type snapshot struct {
 	cells      map[cellKey]*cellAt
 	gaps       map[cellKey]string // the text of the gaps line that marks a cell
 	problems   []Problem
+	// leftOut holds the cells whose product the report leaves out: those
+	// with a via/<lift>/ section whose lift no registry declares as a
+	// bytes lift over the corpus.
+	leftOut map[cellKey]bool
 }
 
 // A column is one that the registries claim: a suite, or a lift its
@@ -232,6 +236,7 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 		props:      map[string]string{},
 		transforms: map[string]map[string]registry.Transform{},
 		bytesLifts: map[string]map[string]bool{},
+		leftOut:    map[cellKey]bool{},
 		cases:      map[caseKey]*caseAt{},
 		cells:      map[cellKey]*cellAt{},
 		gaps:       map[cellKey]string{},
@@ -435,7 +440,8 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 				continue
 			}
 			if !s.bytesLifts[corpus][lift] {
-				s.problem(p+", "+sec.Name, fmt.Sprintf("the section is a product of %s, and no registry declares a bytes lift of that name over testdata/%s/, so the report leaves it out.", lift, corpus))
+				s.problem(p+", "+sec.Name, fmt.Sprintf("the section is a product of %s, and no registry declares a bytes lift of that name over testdata/%s/, so the report leaves it out, and doesn't compare its cell's product.", lift, corpus))
+				s.leftOut[cellKey{c: k, column: lift}] = true
 				continue
 			}
 			place(k)
@@ -488,10 +494,26 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 	}
 	if s.outcomes {
 		for _, ck := range cells {
-			if !s.cells[ck].known {
-				s.problem(p+", "+ck.c.prefix()+archive.Out+"/"+ck.column+"/", "the cell has files and no outcome file. A cell exists where its outcome file does, so the report shows no cell here.")
-				delete(s.cells, ck)
+			c := s.cells[ck]
+			if c.known {
+				continue
 			}
+			// The cell's files are under out/<column>/, and a bytes lift's
+			// product under via/<column>/.
+			var dirs []string
+			has := "files"
+			if len(c.files) > 0 {
+				dirs = append(dirs, ck.c.prefix()+archive.Out+"/"+ck.column+"/")
+			}
+			if len(c.product) > 0 {
+				dirs = append(dirs, ck.c.prefix()+archive.Via+"/"+ck.column+"/")
+				has = "files and its product,"
+				if len(c.files) == 0 {
+					has = "its product"
+				}
+			}
+			s.problem(p+", "+strings.Join(dirs, " and "), "the cell has "+has+" and no outcome file. A cell exists where its outcome file does, so the report shows no cell here.")
+			delete(s.cells, ck)
 		}
 	} else {
 		// Before outcome files, a case runs under every column the

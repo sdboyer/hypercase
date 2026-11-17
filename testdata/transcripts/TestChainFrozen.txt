@@ -532,7 +532,7 @@ $ go test  # chain
         - b1 8
         + a1 3
         + b1 6
-        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         import: Imports the export as a script, as its import/ tree says.
         The cell is frozen by its known gap, gaps line 1: "import The importer reads quoted fields. Waits on sheets#9."
@@ -552,7 +552,7 @@ $ go test  # chain
         + evaluate/out/values.txt "a1 3\nb1 6\n"
           quote/A1 "3\n"
           quote/B1 "=A1*2\n"
-        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: parse is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
@@ -576,6 +576,9 @@ $ go test  # chain
         evaluate's probe ran
         evaluate ran on prices
         import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
         import ran
         parse ran on prices
         resolve ran on prices

@@ -33,6 +33,7 @@ import (
 const (
 	fixtureEnv     = "HYPERCASE_SELFTEST"
 	reverseEnv     = "HYPERCASE_SELFTEST_REVERSE"
+	observeEnv     = "HYPERCASE_SELFTEST_OBSERVE"
 	fixtureUpdate  = "FIXTURE_UPDATE_GOLDEN"
 	transcriptsVar = "HYPERCASE_UPDATE_GOLDEN"
 )
@@ -220,7 +221,7 @@ func (s *sandbox) exec(pkg, registration string, extra []string, args ...string)
 	var env []string
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
-		if k != fixtureEnv && k != reverseEnv && k != fixtureUpdate && k != transcriptsVar && k != "GOFLAGS" && k != "PWD" {
+		if k != fixtureEnv && k != reverseEnv && k != observeEnv && k != fixtureUpdate && k != transcriptsVar && k != "GOFLAGS" && k != "PWD" {
 			env = append(env, kv)
 		}
 	}

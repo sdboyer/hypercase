@@ -14,7 +14,8 @@
 // then files that changed under the same outcome, each file with its line
 // diff; the matrix of each corpus at <b>; and the descriptions of what the
 // registries and archives declare, from <b>, or from <a> for what <b>
-// lacks. With -text it writes the ranked changes as plain text instead.
+// lacks. With -text it writes the problems and the ranked changes as plain
+// text instead.
 //
 // It reads registries of every format from the oldest this hypercase
 // knows to its own, and refuses a newer one, naming the hypercase that

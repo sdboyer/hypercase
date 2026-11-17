@@ -420,8 +420,8 @@ func TestTransformExpectedErrors(t *testing.T) {
 	s := newSandbox(t, "transforms")
 	r := s.update("tr-props")
 	s.fails(r,
-		"script/twice/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.\n    echo: Does what the case's do/ tree says.\n    echo returned an error, but the variant states no property echo rejects:\n      A1 -> A1: cycle\n    The variant states what looped gives, and each property it keeps that the base states. Fix the code or looped's jenny, or give the variant the property, in looped's Gives or Keeps, and list it in echo's Rejects.",
-		"script/twice/transform/upper: Uppercases every file under do/out/.\n    echo: Does what the case's do/ tree says.\n    echo returned no error, but the variant states circular, which echo rejects.\n    The variant states what upper gives, and each property it keeps that the base states. Fix the code or upper's jenny, or correct upper's Gives or Keeps, or echo's Rejects.")
+		"script/twice/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.\n    echo: Does what the case's do/ tree says.\n    echo returned an error, but the variant states no property echo rejects:\n      A1 -> A1: cycle\n    The variant states what looped gives, and each property it keeps that the base states.\n    Fix the code or looped's jenny, or give the variant the property, in looped's Gives or Keeps, and list it in echo's Rejects.",
+		"script/twice/transform/upper: Uppercases every file under do/out/.\n    echo: Does what the case's do/ tree says.\n    echo returned no error, but the variant states circular, which echo rejects.\n    The variant states what upper gives, and each property it keeps that the base states.\n    Fix the code or upper's jenny, or correct upper's Gives or Keeps, or echo's Rejects.")
 	s.lacks(r, "the case's properties", "state the property on the case")
 	s.done()
 }

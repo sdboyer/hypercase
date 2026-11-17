@@ -19,11 +19,12 @@ type Repo struct {
 	Dir string // the top of its working tree
 }
 
-// New makes an empty repository, on the branch main.
+// New makes an empty repository, on the branch main, whose objects are
+// named by SHA-1 whatever git's default object format.
 func New(t testing.TB) *Repo {
 	t.Helper()
 	r := &Repo{t: t, Dir: t.TempDir()}
-	r.Git("init", "-q", "-b", "main")
+	r.Git("init", "-q", "-b", "main", "--object-format=sha1")
 	return r
 }
 

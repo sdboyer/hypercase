@@ -97,7 +97,7 @@ $ go test ./b  # strip-b
         + evaluate/out/values.txt "a1 3\n"
         + quote/A1 "3\n"
         + quote/B1 "=A1*2\n"
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
     what ran, in order:
         parse ran on prices
         resolve ran on prices
@@ -256,7 +256,7 @@ $ go test ./b  # strip-b
         + evaluate/out/values.txt "a1 3\n"
         + quote/A1 "3\n"
         + quote/B1 "=A1*2\n"
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
     what ran, in order:
         parse ran on prices
         resolve ran on prices

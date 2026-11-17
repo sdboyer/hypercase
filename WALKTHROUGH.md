@@ -1949,22 +1949,42 @@ whether each has a probe, and whether the package owns it.
   rewrite. A cell whose output on those sections differs from what the
   update wrote fails, and the failure shows how the sections differ from
   what the transform makes, and names the module's update.
-- When the committed sections differ from what the transform makes, a
-  cell that a lift blocks on them, or whose probe says no on them, may be
-  one the update runs, or skips or blocks otherwise. A normal run stages
-  the variant on what the transform makes, as the update does, to tell,
-  and runs the cell's probe, if it has one, on what that reaches. It says
-  what the update does with the cell. When the update runs the cell, its
-  committed files are no orphans: the normal run says to delete none of
-  them by hand before the update has run, and, from step 8 on, that what
-  the update writes for the cell, if anything, is its run's. When the
-  update skips or blocks the cell otherwise, the normal run says why, and,
-  from step 8 on, which outcome the update writes; when the cell's probe
-  fails there, that the probe needs fixing. A cell that runs on the
-  committed sections, and no longer produces a file it commits, runs on
-  what the transform makes in the update, whose run may still write the
-  file: the normal run says to delete nothing by hand before the update
-  has run.
+- When the committed sections give another input view than the one the
+  transform makes, the update may do otherwise with a cell than a normal
+  run: run it on another value, or skip, block or fail it otherwise. A
+  normal run stages the variant on what the transform makes, as the update
+  does, to tell, and runs the cell's probe, if it has one, on what that
+  reaches. Where the update does otherwise, every message about the cell
+  ends with what it does: that it runs the cell, on another value than the
+  normal run where the normal run ran it; skips it, and why; blocks it,
+  and by which lift; or fails it, and how its probe fails, a panic among
+  them. What follows depends on what the message is about:
+  - the cell's run, a panic or an error the case doesn't expect among
+    them, a file it makes, or a frozen cell's files: to run the update,
+    fix what it reports, and read the diff before committing;
+  - a probe that says no with no reason, or with one an outcome can't
+    hold, and, from step 8 on, the cell's outcome: what the update writes
+    for the cell. That is its run's, if anything, where it runs the cell;
+    from step 8 on, the outcome it writes where it skips or blocks it; and
+    where its probe fails, `panicked`, with the panic in `error.txt`, for
+    a probe that panics, and nothing for one that says no with no reason,
+    or with one an outcome can't hold. On the outcome, it adds that the
+    probe needs fixing;
+  - a file the cell commits and doesn't produce: where the update runs the
+    cell, to delete nothing by hand before it has run, since its run may
+    still write the file; where it skips or blocks it, to fix the probe,
+    or the lift or the transform's jenny, or to delete the section by
+    hand, which the update leaves in place; where its probe fails, to fix
+    the probe;
+  - a `gaps` line on a cell that runs nothing: where the update skips or
+    blocks it, to remove the line, or fix the probe, or the lift or the
+    transform's jenny; otherwise, to run the update, fix what it reports,
+    and read the diff before committing.
+
+  Only where the update does with the cell what the normal run does is a
+  message's advice its own. Sections that give the same input view, as a
+  `delete` line naming a path the base lacks does, run every cell on the
+  same value in both runs.
 - An update replaces a transform's `in/…` and `delete` whole: a file the
   transform no longer produces is removed, and the removal shows in the diff.
 - When a transform no longer applies to a base, no cell runs on its
@@ -2479,15 +2499,29 @@ The command takes the flags `-root` and `-text`. The patterns are
 `decl.Project`'s `IssueLinks` field, a list of `decl.IssueLink`, each a
 regular expression and a URL template.
 
-This step's snippets come from no example yet: no directory under
-`walkthrough/` holds them, and the doc golden checks none of them.
+`walkthrough/sheets/step09/sheetcorpus/project.go` gives the project its
+`IssueLinks`, for the tracker that `negative`'s `gaps` lines name:
 
+<!-- source: walkthrough/sheets/step09/sheetcorpus/project.go#project -->
 ```go
-// sheetcorpus/project.go: Project gains
+var Project = decl.Project{
+	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
+	RenderError: renderError,
+	Codes: func(err error) []string {
+		var e *sheet.Error
+		if errors.As(err, &e) {
+			return []string{e.Code}
+		}
+		return nil
+	},
 	IssueLinks: []decl.IssueLink{
 		{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/issues/$1"},
 	},
+}
 ```
+
+On a branch, in the directory of a package whose registry records the
+corpus root:
 
 ```sh
 hypercase report "$(git merge-base main HEAD)" HEAD > report.html
@@ -2497,57 +2531,59 @@ hypercase report -text "$(git merge-base main HEAD)" HEAD
 ### How the files change
 
 No archive changes. `hypercase.json` gains the link patterns. The report is
-a file the person reads; nothing commits it.
+for the person to read, and a project needn't commit it.
+
+`walkthrough/sheets/step09/report_test.go` runs both commands as a person
+does on a branch. In a scratch repository, it runs the update on the toy at
+step 9 and commits it on `main`, makes a change on a branch, runs the update
+again, commits again, and runs the report in `step09/`. Its commits hold
+what the report reads: `go.mod`, the registries and the archives. The
+change makes three edits:
+
+- `calc` gains a classifier, `warned`, which adds `warned` to the outcome
+  of each cell where calc writes a warning.
+- The archive `blank` is renamed `empty`.
+- The sheet package words a file that is not a cell as
+  `notes: not the name of a cell`, where it said `notes: not a cell name`.
+
+The example commits what the report writes as its test's goldens, so that
+the walkthrough can show it: the plain text, below, and the page,
+`walkthrough/sheets/step09/testdata/report.html`, too long to show here,
+which a browser opens as it is.
 
 The report reads each archive as each revision commits it.
-`testdata/sheet/loop.txtar` holds two of the cells the sample below reports.
-With every other column left out, at `<a>`:
+`testdata/sheet/notes.txtar` holds two of the cells the sample below
+reports. At `<a>`:
 
+<!-- source: walkthrough/sheets/step09/testdata/sheet/notes.txtar -->
 ```
-A1 and B1 refer to each other.
+A note kept beside the cells, in a file that is not a cell.
 -- in/sheet/A1 --
-=B1
--- in/sheet/B1 --
-=A1
+1
+-- in/sheet/notes --
+remember the milk
 -- properties --
-circular
+malformed
 -- out/calc/error.txt --
-A1 -> B1 -> A1: cycle
-  sheet/A1:1: =B1
-  sheet/B1:1: =A1
+notes: not a cell name
+  sheet/notes
 -- out/calc/outcome --
-rejected S201
--- out/resolve/error.txt --
-A1 -> B1 -> A1: cycle
-  sheet/A1:1: =B1
-  sheet/B1:1: =A1
+rejected S101
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/parse/error.txt --
+notes: not a cell name
+  sheet/notes
+-- out/parse/outcome --
+rejected S101
 -- out/resolve/outcome --
-rejected S201
+blocked parse
 ```
 
-and at `<b>`, where a cycle is worded `cycle: A1 -> B1 -> A1`:
-
-```
-A1 and B1 refer to each other.
--- in/sheet/A1 --
-=B1
--- in/sheet/B1 --
-=A1
--- properties --
-circular
--- out/calc/error.txt --
-cycle: A1 -> B1 -> A1
-  sheet/A1:1: =B1
-  sheet/B1:1: =A1
--- out/calc/outcome --
-rejected S201
--- out/resolve/error.txt --
-cycle: A1 -> B1 -> A1
-  sheet/A1:1: =B1
-  sheet/B1:1: =A1
--- out/resolve/outcome --
-rejected S201
-```
+and at `<b>`, each `error.txt` starts `notes: not the name of a cell`, under
+the same outcome.
 
 ### Rules
 
@@ -2615,7 +2651,8 @@ rejected S201
 
 - `-root <dir>` names the corpus root, relative to the current directory.
   Without it, the report finds the root as a test does.
-- `-text` writes the ranked changes as plain text instead of the page.
+- `-text` writes the problems and the ranked changes as plain text instead
+  of the page.
 
 **Link patterns.** Each `decl.IssueLink` is a regular expression and a URL
 template, which may use the expression's groups. The report reads them from
@@ -2657,34 +2694,48 @@ cover, is left unaligned: its diff is one line saying how many lines it
 leaves out of each file, and its file says it is partly unaligned in place
 of counts that would be wrong. The same revisions give the same bytes.
 
-**The plain-text format.** One heading per rank that has
+**The plain-text format.** The problems first, when there are any, as
+the page gives them: under the heading `problems`, a line `at <rev>` per
+revision that has them, `<b>` first, and under it one line per problem, its
+place, where it has one, then what it is. Then one heading per rank that has
 changes, in rank order. Under it, one line per cell: its case, its column,
 and its outcome, or the change in it. So `outcome` is never listed as a
 file. Under each cell, one line per other file of the cell that was added,
-changed or removed. For a change that adds the archive `ratio`, whose `C1`
-is `=A1/B1` with `A1` at `6` and `B1` at `2`, and words a cycle as
-`cycle: A1 -> B1 -> A1`, with the transforms' variants left out:
+changed or removed. For the example's change,
+`walkthrough/sheets/step09/testdata/report.txt`:
 
+<!-- source: walkthrough/sheets/step09/testdata/report.txt -->
 ```
+outcome changed
+  sheet/divide calc: accepted -> accepted warned
+  sheet/divide/transform/renamed calc: accepted -> accepted warned
 appeared
-  sheet/ratio calc: accepted
-    stdout.txt added
-  sheet/ratio evaluate: accepted
-    values.txt added
-  sheet/ratio format: accepted
-    formulas.txt added
-  sheet/ratio parse: accepted
-  sheet/ratio resolve: accepted
+  sheet/empty calc: rejected S101
+    error.txt added
+  sheet/empty evaluate: blocked parse
+  sheet/empty format: blocked parse
+  sheet/empty parse: rejected S101
+    error.txt added
+  sheet/empty resolve: blocked parse
+disappeared
+  sheet/blank calc: rejected S101
+    error.txt removed
+  sheet/blank evaluate: blocked parse
+  sheet/blank format: blocked parse
+  sheet/blank parse: rejected S101
+    error.txt removed
+  sheet/blank resolve: blocked parse
 bytes changed
-  sheet/loop calc: rejected S201
+  sheet/notes calc: rejected S101
     error.txt changed
-  sheet/loop resolve: rejected S201
-    error.txt changed
-  sheet/twice/variant/cycle calc: rejected S201
-    error.txt changed
-  sheet/twice/variant/cycle resolve: rejected S201
+  sheet/notes parse: rejected S101
     error.txt changed
 ```
+
+A renamed archive's cells are new cells: the report knows a case by its
+name, so `blank`'s cells disappear and `empty`'s appear, with the same
+files. `blank` states `malformed`, which neither transform gives or keeps,
+so neither makes a variant of it, and only its base's cells move.
 
 ### What can now be seen
 
@@ -2921,7 +2972,8 @@ lift.
   the removal shows in the diff. A lift that fails on the case or is
   blocked, or whose variant's transform declines the base, has no product,
   and the update removes its `via/<lift>/`. That package's normal run fails
-  on what remains there, and says to run the update.
+  on what remains there, and says to run the update, unless the update
+  runs the lift on another value, past another bytes lift, as below.
 - In an update, the cells past the lift read the product it makes in that
   run, in every package. In a normal run, every package's cells past it
   read the committed `via/` bytes, so churn upstream fails only the
@@ -2930,30 +2982,44 @@ lift.
   committed `outcome`: any outcome but `accepted`, or none, blocks it. A
   lift that is `accepted` with no product files gives its readers an empty
   view.
-- A cell that a normal run finds blocked past a bytes lift, by a committed
-  outcome or by a lift that fails on a committed product, or whose probe
-  says no on a committed product, may run in the update, which reruns
-  every lift on its path, or be skipped or blocked there otherwise. When
-  the update runs the cell, the cell's committed files, a bytes lift's
-  product among them, are no orphans, and what the update writes for the
-  cell, if anything, is its run's. A normal run of a package that owns
-  every bytes lift on the cell's path stages the case as its update does,
-  on what a transform makes for its variant, and runs the cell's probe, if
-  it has one, on what that reaches. It says what the update does with the
-  cell: if it runs the cell, to delete nothing by hand before it has run,
-  and that what it writes for the cell, if anything, is its run's; if it
-  skips or blocks the cell otherwise, why, and which outcome it writes, if
-  any; if the cell's probe fails there, that the probe needs fixing.
-  Another package's normal run doesn't run the lifts it doesn't own, so it
-  says to run the update before deleting any of them.
+- A cell past a bytes lift may run in the update on another value than in
+  a normal run, since the update reruns every lift on its path, or be
+  skipped, blocked or failed there otherwise. When the update runs the
+  cell, the cell's committed files, a bytes lift's product among them, are
+  no orphans, and what the update writes for the cell, if anything, is its
+  run's. A normal run of a package that owns every bytes lift on the
+  cell's path stages the case as its update does, on what a transform
+  makes for its variant, and runs the cell's probe, if it has one, on what
+  that reaches. Where the update does otherwise with the cell, every
+  message about the cell ends with what it does, as step 7 gives for a
+  transform's variant, a panic of the cell's run or its probe and a frozen
+  cell's files among them. So does each message about the lift's own cell,
+  a file of its committed product included. When the update writes nothing
+  for the cell of a lift on the cell's path, the message says so, names
+  the lift, and says to fix what that cell reports, and, on a file the cell
+  commits, to delete nothing by hand before the update has run. Another
+  package's normal run doesn't run the bytes lifts it doesn't own, so it
+  can't tell what its update does with a cell past one: every message
+  about such a cell says so, names the lift, says that the update reruns
+  it, and says to run the update, fix what it reports, and read the diff
+  before committing, or, on a file the cell commits, to delete nothing by
+  hand before the update has run.
 - A cell past a bytes lift that runs on a committed product the lift no
   longer makes, and no longer produces a file it commits, runs on what the
   lift makes in the update, whose run may still write the file. A normal
   run of a package that owns every bytes lift on the cell's path tells
   whether the update runs the cell on another product, and if it does,
-  says to delete nothing by hand before the update has run. Another
-  package's can't tell, and says so, and to run the update before deleting
-  the file.
+  says to delete nothing by hand before the update has run.
+- A bytes lift past another bytes lift is such a cell too: in a normal run
+  of the package that owns both, it runs on the earlier lift's committed
+  product, and its update reruns it on what the earlier lift makes. A file
+  of its committed product that its normal run doesn't make, because the
+  run made another product or failed on the case, is one the update may
+  still make. The normal run says what the update does with the lift's
+  cell: if it runs the lift, to delete nothing by hand before it has run;
+  if it blocks the lift, that it removes the file; if it writes nothing for
+  the earlier lift's cell, to fix what that cell reports, and delete
+  nothing by hand before the update has run.
 - A bytes lift's frozen cell includes its `via/` product: no update writes
   it, and a product that differs from what the lift makes fails the cell,
   in every run. An update writes the cells past it from what the lift makes
@@ -3009,7 +3075,10 @@ lift.
   each cell past the lift ranks on its own files. The lift's product
   declarations are described with its outputs, each as `via/<lift>/` and
   its pattern. A `via/<lift>/` section whose lift no registry declares as a
-  bytes lift over its corpus is a problem, which the report leaves out.
+  bytes lift over its corpus is a problem, which the report leaves out, so
+  it compares no product of the section's cell between the revisions. A
+  product with no `outcome` in its cell is a problem too, as step 9's
+  files with no `outcome` are, named by the cell's `via/<lift>/`.
 - `testdata/sheet/prices.txtar` and `testdata/csv/prices.txtar` both reach
   `evaluate`, the second through `import`. Their cases are `sheet/prices` and
   `csv/prices` (step 3), and their cells' subtests

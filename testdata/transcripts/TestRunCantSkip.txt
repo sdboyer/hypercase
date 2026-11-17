@@ -2,7 +2,8 @@ $ go test  # echo
     not today
     script/skip: The run skips its own cell.
         echo: Does what the case's do/ tree says.
-        The run skipped its cell. A run can't skip a case; a probe decides which cases are for a suite.
+        The run skipped its cell.
+        A run can't skip a case; a probe decides which cases are for a suite.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/skip

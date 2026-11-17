@@ -122,15 +122,16 @@ $ go test  # chain
         import: Imports the export as a script, as its import/ tree says.
         import returned an error, but the variant states no property import rejects:
           import: line 1: unclosed quote
-        The variant states what louder gives, and each property it keeps that the base states. Fix the code or louder's jenny, or give the variant the property, in louder's Gives or Keeps, and list it in import's Rejects.
+        The variant states what louder gives, and each property it keeps that the base states.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
         transform/louder/out/import/error.txt has no golden.
-        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
-        transform/louder/via/import/evaluate/out/values.txt is recorded, and import failed on the case, so it has no product.
-        If it should make one, fix import or louder's jenny, which makes the variant. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
-        transform/louder/via/import/quote/A1 is recorded, and import failed on the case, so it has no product.
-        If it should make one, fix import or louder's jenny, which makes the variant. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
-        transform/louder/via/import/quote/B1 is recorded, and import failed on the case, so it has no product.
-        If it should make one, fix import or louder's jenny, which makes the variant. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
+        transform/louder/via/import/evaluate/out/values.txt is recorded, and import failed on the case in this run, so this run has no product.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Its run may still make the file: delete nothing by hand before it has run.
+        transform/louder/via/import/quote/A1 is recorded, and import failed on the case in this run, so this run has no product.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Its run may still make the file: delete nothing by hand before it has run.
+        transform/louder/via/import/quote/B1 is recorded, and import failed on the case in this run, so this run has no product.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Its run may still make the file: delete nothing by hand before it has run.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         list: Lists the files of the script's input view, with their bytes.
         transform/louder/out/list/outcome differs (-golden +got):
@@ -497,19 +498,20 @@ $ go test  # chain
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         import: Imports the export as a script, as its import/ tree says.
         import returned no error, but the variant states unterminated, which import rejects.
-        The variant states what louder gives, and each property it keeps that the base states. Fix the code or louder's jenny, or correct louder's Gives or Keeps, or import's Rejects.
+        The variant states what louder gives, and each property it keeps that the base states.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
         transform/louder/out/import/outcome differs (-golden +got):
         - rejected
         + accepted
-        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. What it writes for the cell, if anything, is its run's, not this outcome.
         transform/louder/out/import/error.txt records an error, but the run returned none.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Its run may still write the file: delete nothing by hand before it has run.
         transform/louder/via/import/evaluate/out/values.txt has no golden.
-        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
         transform/louder/via/import/quote/A1 has no golden.
-        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
         transform/louder/via/import/quote/B1 has no golden.
-        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         list: Lists the files of the script's input view, with their bytes.
         transform/louder/out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in transform/louder/out/import/outcome.

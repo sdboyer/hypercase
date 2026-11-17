@@ -1,10 +1,37 @@
 package report
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/sdboyer/hypercase/internal/diff"
 )
+
+// TestHTMLChangeGap: a changed cell that a gaps line marks shows the line
+// under the change, marked as a known gap, with its issue linked.
+func TestHTMLChangeGap(t *testing.T) {
+	r := &Report{Changes: []Change{{
+		Rank:   OutcomeChanged,
+		Case:   "sheet/negative",
+		Column: "parse",
+		Before: "rejected S101",
+		After:  "accepted",
+		Gap: Text{
+			{Text: "A negative number is valid. Waits on "},
+			{Text: "sheets#3", URL: "https://example.com/sheets/issues/3"},
+			{Text: "."},
+		},
+	}}}
+	var b strings.Builder
+	if err := r.WriteHTML(&b); err != nil {
+		t.Fatal(err)
+	}
+	const want = `<p class="gap"><span class="badge">known gap</span> A negative number is valid. Waits on <a href="https://example.com/sheets/issues/3">sheets#3</a>.</p>
+</li>`
+	if !strings.Contains(b.String(), want) {
+		t.Errorf("the page doesn't show the change's gap as\n%s\nIt is:\n%s", want, b.String())
+	}
+}
 
 // TestDiffLine: the line for a stretch the diff can't align says how many
 // lines it leaves out of each side, and, as a removed or added line does,

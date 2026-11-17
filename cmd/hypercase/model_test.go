@@ -201,7 +201,7 @@ func TestProblems(t *testing.T) {
 		x + ", properties, line 2</code>: the case states looped, and no registry lists a property of that name.</li>",
 		x + ", gaps, line 1</code>: the line names the column nope, and no registry claims a column of that name over testdata/sheet/.</li>",
 		x + ", gaps, line 2</code>: the line names transform/gone, and no corpus type of testdata/sheet/ lists a transform of that name.</li>",
-		x + ", via/import/sheet/A1</code>: the section is a product of import, and no registry declares a bytes lift of that name over testdata/sheet/, so the report leaves it out.</li>",
+		x + ", via/import/sheet/A1</code>: the section is a product of import, and no registry declares a bytes lift of that name over testdata/sheet/, so the report leaves it out, and doesn&#39;t compare its cell&#39;s product.</li>",
 		x + ", delete</code>: the report can&#39;t place the section",
 		x + ", out/outcome</code>: the report can&#39;t place the section",
 		x + ", variant//out/calc/outcome</code>: the report can&#39;t place the section",
@@ -471,6 +471,6 @@ func TestPageProducts(t *testing.T) {
 			`<li><code>via/import/sheet/*</code>: One file per cell, as a sheet&#39;s in/sheet/ holds them.</li></ul></dd>`)
 
 	holds(t, "the problems", section(t, page, `<section id="problems">`, "</section>"),
-		"<code>testdata/csv/x.txtar, via/calc/sheet/A1</code>: the section is a product of calc, and no registry declares a bytes lift of that name over testdata/csv/, so the report leaves it out.</li>",
-		"<code>testdata/sheet/y.txtar, via/import/sheet/A1</code>: the section is a product of import, and no registry declares a bytes lift of that name over testdata/sheet/, so the report leaves it out.</li>")
+		"<code>testdata/csv/x.txtar, via/calc/sheet/A1</code>: the section is a product of calc, and no registry declares a bytes lift of that name over testdata/csv/, so the report leaves it out, and doesn&#39;t compare its cell&#39;s product.</li>",
+		"<code>testdata/sheet/y.txtar, via/import/sheet/A1</code>: the section is a product of import, and no registry declares a bytes lift of that name over testdata/sheet/, so the report leaves it out, and doesn&#39;t compare its cell&#39;s product.</li>")
 }
