@@ -51,13 +51,22 @@ func TestKeyPaths(t *testing.T) {
 	}
 }
 
-// TestPopulatedRefuses: Populated fails the test, and doesn't panic, on a
-// field encoding/json doesn't write, unexported or tagged "-", through a
-// pointer, a list or a map too, and on a kind a registry can't hold.
+// TestPopulatedRefuses: Populated fails the test, and doesn't panic, on
+// every unexported field, an embedded struct whose exported fields
+// encoding/json writes among them, on a field tagged "-", which it
+// doesn't, through a pointer, a list or a map too, and on a kind a
+// registry can't hold.
 func TestPopulatedRefuses(t *testing.T) {
 	type unexported struct {
 		A string `json:"a"`
 		b string
+	}
+	type embedded struct {
+		E string `json:"e"`
+	}
+	type embedding struct {
+		embedded
+		A string `json:"a"`
 	}
 	type hidden struct {
 		A string `json:"a"`
@@ -82,6 +91,7 @@ func TestPopulatedRefuses(t *testing.T) {
 		want string
 	}{
 		{reflect.TypeFor[unexported](), "the unexported field b of registrytest.unexported: a registry type holds none"},
+		{reflect.TypeFor[embedding](), "the unexported field embedded of registrytest.embedding: a registry type holds none"},
 		{reflect.TypeFor[hidden](), `the field B of registrytest.hidden is tagged json:"-", so encoding/json doesn't write it: a registry type holds none`},
 		{reflect.TypeFor[deep](), `the field B of registrytest.hidden is tagged json:"-", so encoding/json doesn't write it: a registry type holds none`},
 		{reflect.TypeFor[keyed](), "no registry key of map[int]string"},

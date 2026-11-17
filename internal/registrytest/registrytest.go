@@ -55,8 +55,10 @@ func Full(t testing.TB, typ reflect.Type) any {
 // Populated returns a value of type typ with every field set: each string
 // "x", each map's one key "*", each bool true and each number 1, each list
 // and map holding one element, and each pointer pointing at one. It fails
-// the test on a field encoding/json doesn't write, unexported or tagged
-// "-", and on a kind a registry can't hold.
+// the test on every unexported field, an embedded struct among them, whose
+// exported fields encoding/json would write as its parent's: a registry
+// type holds none. It fails it too on a field tagged "-", which
+// encoding/json doesn't write, and on a kind a registry can't hold.
 func Populated(t testing.TB, typ reflect.Type) reflect.Value {
 	t.Helper()
 	v := reflect.New(typ).Elem()
