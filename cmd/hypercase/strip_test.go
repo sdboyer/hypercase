@@ -1240,6 +1240,28 @@ func TestStripFailedFindings(t *testing.T) {
 	sameTree(t, top, strippedModule())
 }
 
+// TestStripUnreadTestdata: a directory under the corpus root's testdata/
+// that can't be read fails strip's walk for archives, and strip exits 1
+// having removed nothing, as reading the corpus root's testdata/ fails.
+func TestStripUnreadTestdata(t *testing.T) {
+	t.Parallel()
+	files := with(stripModule(), map[string]string{"testdata/sheet/old/y.txtar": "A1 is 3.\n"})
+	top := writeTree(t, files)
+	locked := filepath.Join(top, "testdata", "sheet", "old")
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o755) })
+	if _, err := os.ReadDir(locked); err == nil {
+		t.Skip("a directory with no permissions reads here, as it does for root, so no walk fails on it")
+	}
+	stripFails(t, top, "", 1, nil, "hypercase strip: reading testdata failed: ", "permission denied. Nothing was removed.\nFix what failed, then run hypercase strip again.\n")
+	if err := os.Chmod(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sameTree(t, top, files)
+}
+
 // TestStripUnreadFindings: a package whose testdata/checks/ can't be read,
 // a file in its place, keeps its registry, so that strip run again, once
 // it is a directory, removes the findings files in it, and then the
