@@ -17,6 +17,7 @@ import (
 	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/hypercase/internal/root"
 	"github.com/sdboyer/hypercase/internal/shell"
+	"github.com/sdboyer/hypercase/internal/walk"
 	"github.com/sdboyer/hypercase/strip"
 )
 
@@ -197,20 +198,10 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	// roots.
 	td := filepath.Join(corpusRoot, "testdata")
 	var paths []string
-	err = filepath.WalkDir(td, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			if p != td && (others[p] || isFile(filepath.Join(p, "go.mod"))) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
+	err = walk.Testdata(td, others, func(p string, d fs.DirEntry) {
 		if strings.HasSuffix(d.Name(), ".txtar") {
 			paths = append(paths, p)
 		}
-		return nil
 	})
 	if err != nil {
 		return fail("reading %s failed: %v. Nothing was removed.\nFix what failed, then run %s again.", rel(td), err, again)
@@ -452,9 +443,4 @@ func findings(pkg string) ([]string, error) {
 		}
 	}
 	return ps, err
-}
-
-func isFile(p string) bool {
-	fi, err := os.Stat(p)
-	return err == nil && fi.Mode().IsRegular()
 }

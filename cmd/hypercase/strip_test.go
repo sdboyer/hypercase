@@ -18,6 +18,7 @@ import (
 	"github.com/sdboyer/hypercase/internal/hooks"
 	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/hypercase/internal/root"
+	"github.com/sdboyer/hypercase/internal/walk"
 )
 
 // The strip fixture: a module whose corpus root is its root, with three
@@ -1151,7 +1152,7 @@ func TestStripFailedRemoval(t *testing.T) {
 	top := writeTree(t, files)
 	reg := filepath.Join(top, "format", "testdata", "hypercase.json")
 	hooks.Modify = func(step string) {
-		if step != "locked" || !isFile(reg) {
+		if step != "locked" || !walk.IsFile(reg) {
 			return
 		}
 		if err := os.Remove(reg); err != nil {
@@ -1205,7 +1206,7 @@ func TestStripFailedFindings(t *testing.T) {
 	f := filepath.Join(top, "format", "testdata", "checks", "formulas.txt")
 	abc := filepath.Join(top, "a", "b", "c", "testdata", registry.Name)
 	hooks.Modify = func(step string) {
-		if step != "locked" || isFile(abc) || !isFile(f) {
+		if step != "locked" || walk.IsFile(abc) || !walk.IsFile(f) {
 			return
 		}
 		if err := os.Remove(f); err != nil {

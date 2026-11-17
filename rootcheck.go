@@ -14,6 +14,7 @@ import (
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/internal/cells"
 	"github.com/sdboyer/hypercase/internal/registry"
+	"github.com/sdboyer/hypercase/internal/walk"
 )
 
 // rootCheck is the root-package check: it reads every registry over the
@@ -305,37 +306,27 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		t.Errorf("the registries that own or use the lift %s differ in %s:\n%s\nEvery package that owns or uses a lift registers one declaration of it: %s. Declare the lift once, in a package the others import, and register that declaration. %s", name, andList(differ), strings.Join(blocks, "\n"), why, stale)
 	}
 
-	// The archives, and the directories that hold them.
+	// The archives, and the directories that hold them, as hypercase
+	// strip walks them. A corpus root with no testdata/ holds none.
 	td := filepath.Join(r.corpusRoot, "testdata")
 	archives := map[string][]string{} // corpus → archive file names
 	undeclared := map[string]bool{}   // directories, relative to td
-	err := filepath.WalkDir(td, func(p string, d fs.DirEntry, err error) error {
+	if _, err := os.Lstat(td); !errors.Is(err, fs.ErrNotExist) {
+		err := walk.Testdata(td, otherRoots, func(p string, d fs.DirEntry) {
+			dir := filepath.ToSlash(mustRel(td, filepath.Dir(p)))
+			isCorpus := declared[dir]
+			switch {
+			case archive.IsTemp(d.Name()) && isCorpus:
+				t.Errorf("%s is a temp file left by a write that was cut short.\nDelete it.", r.rel(p))
+			case strings.HasSuffix(d.Name(), ".txtar") && isCorpus:
+				archives[dir] = append(archives[dir], d.Name())
+			case strings.HasSuffix(d.Name(), ".txtar"):
+				undeclared[dir] = true
+			}
+		})
 		if err != nil {
-			if p == td && errors.Is(err, fs.ErrNotExist) {
-				return filepath.SkipDir
-			}
-			return err
+			t.Errorf("reading %s: %v", r.rel(td), err)
 		}
-		if d.IsDir() {
-			if p != td && (otherRoots[p] || isFile(filepath.Join(p, "go.mod"))) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		dir := filepath.ToSlash(mustRel(td, filepath.Dir(p)))
-		isCorpus := declared[dir]
-		switch {
-		case archive.IsTemp(d.Name()) && isCorpus:
-			t.Errorf("%s is a temp file left by a write that was cut short.\nDelete it.", r.rel(p))
-		case strings.HasSuffix(d.Name(), ".txtar") && isCorpus:
-			archives[dir] = append(archives[dir], d.Name())
-		case strings.HasSuffix(d.Name(), ".txtar"):
-			undeclared[dir] = true
-		}
-		return nil
-	})
-	if err != nil {
-		t.Errorf("reading %s: %v", r.rel(td), err)
 	}
 	for _, dir := range slices.Sorted(maps.Keys(undeclared)) {
 		rel := r.rel(filepath.Join(td, filepath.FromSlash(dir))) + "/"
@@ -706,11 +697,6 @@ func hasTestFile(dir string) bool {
 		}
 	}
 	return false
-}
-
-func isFile(p string) bool {
-	fi, err := os.Stat(p)
-	return err == nil && fi.Mode().IsRegular()
 }
 
 func mustRel(base, target string) string {
