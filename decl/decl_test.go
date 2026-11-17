@@ -3,6 +3,7 @@ package decl_test
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -15,7 +16,10 @@ import (
 // marks all of it, through every error it wraps or joins, so a rejection
 // joined with a fault, as jenny's Pipeline joins its jennies' errors, is a
 // fault, and a join of rejections, as jenny joins one jenny's error alone,
-// is a rejection. Reject marks no nil error.
+// is a rejection. The walk follows Unwrap alone, so go-multierror's error
+// is a rejection when it holds one rejection, which its Unwrap gives, and
+// a fault when it holds two, which it reaches through As. Reject marks no
+// nil error.
 func TestReject(t *testing.T) {
 	if err := decl.Reject(nil); err != nil {
 		t.Errorf("Reject(nil) = %#v, want nil", err)
@@ -63,6 +67,13 @@ func TestReject(t *testing.T) {
 		// The walk follows Unwrap alone, never an error's own As.
 		{"a chain of two rejections, as go-multierror holds them", chain{rej("unclosed quote"), rej("stray quote")}, false},
 		{"that chain, marked whole", decl.Reject(chain{rej("unclosed quote"), rej("stray quote")}), true},
+		// go-multierror's Unwrap gives a lone error itself, and more than
+		// one as a chain.
+		{"a multiError of one rejection", &multiError{[]error{rej("unclosed quote")}}, true},
+		{"a multiError of one fault", &multiError{[]error{fault}}, false},
+		{"a multiError of two rejections", &multiError{[]error{rej("unclosed quote"), rej("stray quote")}}, false},
+		{"that multiError, marked whole", decl.Reject(&multiError{[]error{rej("unclosed quote"), rej("stray quote")}}), true},
+		{"an empty multiError", &multiError{}, false},
 		{"a rejection reached through 100 Unwrap calls", wraps(100, rej("unclosed quote")), true},
 		{"a rejection reached through 101 Unwrap calls", wraps(101, rej("unclosed quote")), false},
 		{"an error whose Unwrap gives itself", &cyclic{}, false},
@@ -94,6 +105,22 @@ func (c chain) Unwrap() error {
 }
 func (c chain) As(target any) bool   { return errors.As(c[0], target) }
 func (c chain) Is(target error) bool { return errors.Is(c[0], target) }
+
+// multiError is shaped as go-multierror's Error: its Unwrap gives nil when
+// it holds no error, the error itself when it holds one, and a chain of
+// them when it holds more.
+type multiError struct{ errs []error }
+
+func (e *multiError) Error() string { return fmt.Sprintf("%d errors occurred", len(e.errs)) }
+func (e *multiError) Unwrap() error {
+	switch len(e.errs) {
+	case 0:
+		return nil
+	case 1:
+		return e.errs[0]
+	}
+	return chain(slices.Clone(e.errs))
+}
 
 type codedError struct{ code string }
 

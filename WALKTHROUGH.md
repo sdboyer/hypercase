@@ -2754,11 +2754,16 @@ lift.
   jenny of its own, and marks that jenny's error, has jenny's faults in it
   recorded as its rejection, so it marks only what it rejects.
 - The walk never calls an error's own `As` or `Is`. An error that reaches
-  the errors it holds through `As`, as go-multierror's does, is a fault
-  however many of them `decl.Reject` marks: when the importer rejects the
-  CSV with such an error, it marks that error whole. An error reached
-  through more than 100 `Unwrap` calls, as in an error whose `Unwrap` leads
-  back to itself, makes the whole error a fault.
+  the errors it holds through `As`, and not through `Unwrap`, is a fault
+  however many of them `decl.Reject` marks. go-multierror's is such an
+  error when it holds two or more: its `Unwrap` gives a chain, and each
+  chain's `Unwrap` gives the chain of the rest, never an error the chain
+  holds, down to the last, which wraps none. Holding one error, its
+  `Unwrap` gives that error, so one marked error is a rejection there.
+  When the importer rejects the CSV with an error that holds others, it
+  marks that error whole. An error reached through more than 100 `Unwrap`
+  calls, as in an error whose `Unwrap` leads back to itself, makes the
+  whole error a fault.
 - In an update, when anything but a `gaps` line keeps a bytes lift's cell
   from being written, such as a fault of the jenny, a product an archive
   can't hold or a `RenderError` that panics, every cell past the lift
