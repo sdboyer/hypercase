@@ -43,19 +43,20 @@ func TestLinesMinimal(t *testing.T) {
 	for _, a := range inputs {
 		for _, b := range inputs {
 			x, y := chars(a), chars(b)
+			nx, ny, text := number(x, y)
 			var ops []op
-			edits(x, y, &budget{limit: maxWork}, &ops)
+			edits(nx, ny, &budget{shared: maxWork}, &ops)
 			changes := 0
 			var gotA, gotB []string
 			for _, o := range ops {
 				switch o.kind {
 				case ' ':
-					gotA, gotB = append(gotA, o.line), append(gotB, o.line)
+					gotA, gotB = append(gotA, text[o.line]), append(gotB, text[o.line])
 				case '-':
-					gotA = append(gotA, o.line)
+					gotA = append(gotA, text[o.line])
 					changes++
 				case '+':
-					gotB = append(gotB, o.line)
+					gotB = append(gotB, text[o.line])
 					changes++
 				}
 			}
@@ -284,24 +285,25 @@ func chain(k int, filler, first, last string) []byte {
 // TestDiffChain: two files that each pass for unique lines aligns one line
 // of, at its stretch's end, and that no attempt of Myers' algorithm covers,
 // so each pass leaves the next one nearly all of what it had. The whole
-// diff's work, each cell of Myers' trace included, stays within the files'
-// lengths plus maxWork, and so does what it allocates, at 16 bytes a unit
-// of work: a cell of the trace is 8. What is still to align once the work
-// is spent is left unaligned, and Lines shows the start of each side of
-// it under its cap.
+// diff's work, each cell of Myers' trace included, stays within maxWork
+// plus perLine for each line of the files, and so does what it allocates,
+// at 16 bytes a unit of work: a cell of the trace is 8. What is still to
+// align once the work is spent is left unaligned, and Lines shows the
+// start of each side of it under its cap.
 func TestDiffChain(t *testing.T) {
 	const k = 1500
 	a, b := chain(k, "a", "first of a", "end of a"), chain(k, "b", "first of b", "end of b")
 	na, nb := strings.Count(string(a), "\n"), strings.Count(string(b), "\n")
+	most := maxWork + perLine*(na+nb)
 	var before, after runtime.MemStats
 	runtime.ReadMemStats(&before)
 	got, work := Diff(a, b)
 	runtime.ReadMemStats(&after)
-	if work > na+nb+maxWork {
-		t.Errorf("the diff did %d work, want at most %d", work, na+nb+maxWork)
+	if work > most {
+		t.Errorf("the diff did %d work, want at most %d", work, most)
 	}
-	if alloc, most := after.TotalAlloc-before.TotalAlloc, uint64(16*(na+nb+maxWork)); alloc > most {
-		t.Errorf("the diff allocated %d bytes, want at most %d", alloc, most)
+	if alloc := after.TotalAlloc - before.TotalAlloc; alloc > uint64(16*most) {
+		t.Errorf("the diff allocated %d bytes, want at most %d", alloc, 16*most)
 	}
 	n := counts(got)
 	old, new := 0, 0
@@ -318,5 +320,84 @@ func TestDiffChain(t *testing.T) {
 		!strings.Contains(msg, fmt.Sprintf("\n  ... (%d more lines removed, which the diff can't align)\n+ first of b\n", old-maxUnaligned)) ||
 		!strings.Contains(msg, fmt.Sprintf("\n  ... (%d more lines added, which the diff can't align)\n", new-maxUnaligned)) {
 		t.Errorf("Lines gives %d lines:\n%s", lines, msg)
+	}
+}
+
+// rewritten returns regions stretches of size lines, which each side
+// writes its own way and each follows a line both sides hold once, then
+// keys pairs of a key line and a blank line, with the key at change
+// changed.
+func rewritten(side string, regions, size, keys, change int) []byte {
+	var b strings.Builder
+	for r := range regions {
+		fmt.Fprintf(&b, "region %d\n", r)
+		for i := range size {
+			fmt.Fprintf(&b, "%s %d %d\n", side, r, i)
+		}
+	}
+	for i := range keys {
+		if i == change {
+			fmt.Fprintf(&b, "key %d, changed\n\n", i)
+			continue
+		}
+		fmt.Fprintf(&b, "key %d\n\n", i)
+	}
+	return []byte(b.String())
+}
+
+// TestDiffSpent: rewritten stretches early in two files, which no attempt
+// of Myers' algorithm covers, spend maxWork long before the diff reaches
+// the rest. The rest is still aligned exactly, on each stretch's own work:
+// the lines both files hold in the same place, and a line changed among
+// them. So the diff holds each rewritten stretch as one Unaligned line,
+// and the change as it is, whether the files share 10,000 lines after it
+// or 20,000, and its work stays within maxWork plus perLine for each line
+// of the files.
+func TestDiffSpent(t *testing.T) {
+	const regions, size = 8, 1100
+	var want []Line
+	for r := range regions {
+		want = append(want, Line{Kind: ' ', Text: fmt.Sprintf("region %d", r)}, Line{Kind: Unaligned, Old: size, New: size})
+	}
+	want = append(want, Line{Kind: ' ', Text: "key 0"}, Line{Kind: ' '}, Line{Kind: ' ', Text: "key 1"}, Line{Kind: Skip},
+		Line{Kind: ' '}, Line{Kind: ' ', Text: "key 3999"}, Line{Kind: ' '},
+		Line{Kind: '-', Text: "key 4000"}, Line{Kind: '+', Text: "key 4000, changed"},
+		Line{Kind: ' '}, Line{Kind: ' ', Text: "key 4001"}, Line{Kind: ' '})
+	for _, keys := range []int{5000, 10_000} {
+		a, b := rewritten("a", regions, size, keys, -1), rewritten("b", regions, size, keys, 4000)
+		got, work := Diff(a, b)
+		if !slices.Equal(got, want) {
+			n := counts(got)
+			t.Errorf("%d keys: the diff has %d lines, %d removed, %d added and %d unaligned, want:\n%+v", keys, len(got), n['-'], n['+'], n[Unaligned], want)
+		}
+		if most := maxWork + perLine*2*(regions*(size+1)+2*keys); work > most {
+			t.Errorf("%d keys: the diff did %d work, want at most %d", keys, work, most)
+		}
+	}
+}
+
+// TestEditsOwnWork: with maxWork spent, a stretch aligns on its own work.
+// It trims the lines its sides start and end with, a comparison for each
+// and one more where each trim stops, and runs Myers' algorithm on the
+// changed line between them: 6 entries for the furthest point on each
+// diagonal, and 1, 3 and 5 cells for steps 0 to 2. The comparison that
+// fails at step 0 is counted in its cell.
+func TestEditsOwnWork(t *testing.T) {
+	x, y, text := number(chars("abcxdef"), chars("abcydef"))
+	w := &budget{}
+	var ops []op
+	edits(x, y, w, &ops)
+	var got []string
+	for _, o := range ops {
+		got = append(got, string(o.kind)+strings.TrimSuffix(text[o.line], "\n"))
+	}
+	if want := []string{" a", " b", " c", "-x", "+y", " d", " e", " f"}; !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if want := 4 + 4 + 6 + 1 + 3 + 5; w.spent != want {
+		t.Errorf("the stretch did %d work, want %d", w.spent, want)
+	}
+	if _, work := Diff([]byte("a\n"), []byte("b\n")); work != 2+6+1+3+5 {
+		t.Errorf(`Diff("a\n", "b\n") did %d work, want %d`, work, 2+6+1+3+5)
 	}
 }

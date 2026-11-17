@@ -2297,15 +2297,20 @@ styles are inline, and every archive's text is escaped. In order:
   at `<a>`, from its `about`.
 
 An unchanged cell carries only its state, so the page grows with the change.
-The line diff sets aside the lines both files start and end with, then
-finds the shortest edit script by Myers' algorithm, whose cost grows with
-the length of what is left times the size of its change, up to a fixed
-budget for each attempt. Past that, it aligns the two on the lines each
-holds exactly once, in an order both share, and diffs each stretch between
-them the same way. The whole diff's work is capped at the files' lengths
-plus a fixed budget, so its cost never grows with the product of their
-lengths. A stretch with no such line, or that the diff's budget no longer
-covers, is left unaligned: its diff is one line saying how many lines it
+The line diff numbers each distinct line once, so comparing two lines costs
+the same whatever their length. It sets aside the lines both files start
+and end with, then finds the shortest edit script by Myers' algorithm, whose
+cost grows with the length of what is left times the size of its change, up
+to a fixed budget for each attempt. Past that, it aligns the two on the
+lines each holds exactly once, in an order both share, and diffs each
+stretch between them the same way. The whole diff shares one fixed budget,
+which alone pays to look for such lines. Each stretch also has a fixed
+amount of work for each of its lines, which it spends once the shared
+budget is gone, so a short change after a long rewrite is still diffed
+exactly. A diff's work is at most the budget plus a fixed amount for each
+line, so its cost never grows with the product of the files' lengths. A
+stretch with no such line, or that the budget and its own work no longer
+cover, is left unaligned: its diff is one line saying how many lines it
 leaves out of each file, and its file says it is partly unaligned in place
 of counts that would be wrong. The same revisions give the same bytes.
 
