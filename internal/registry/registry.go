@@ -173,11 +173,15 @@ type Output struct {
 // whose via/<column>/… is part of its cell. A column is one when any of
 // their entries for a lift of its name over the corpus, owned or used,
 // records a bytes lift. Every other column they record over the corpus, a
-// suite or a lift, is none. So registries that disagree on a lift, which
-// the root-package check fails on, make it a bytes lift, and a frozen cell
-// keeps its via/. hypercase strip and the root-package check both read the
-// registries through it, so that the check's advice on a frozen cell's
-// via/ is what strip does.
+// suite or a lift, is none. So registries that disagree on a lift make it
+// a bytes lift, and a frozen cell keeps its via/. The root-package check
+// fails on each registry that makes them disagree: on the lift's entries
+// where the registries of packages with tests differ, and on a registry
+// in a package with none by its own failure, since it compares no such
+// registry's entries. hypercase strip and the root-package check both
+// read the registries through it, so that the check's advice on a frozen
+// cell's via/ is what strip does, and while they disagree on a lift, the
+// check's advice on a frozen cell's via/ of the lift waits on them.
 func BytesLifts(regs []*Registry) map[string]map[string]bool {
 	lifts := map[string]map[string]bool{}
 	column := func(name string, bytes bool, corpora []string) {

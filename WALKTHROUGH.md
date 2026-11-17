@@ -2880,7 +2880,10 @@ lift.
   none is part of no cell, so strip removes it even when a `gaps` line
   marks the column's cell. A column they don't name keeps its `via/` with
   its frozen cell, and so does one that any of them says is a bytes lift,
-  where they disagree, which the root-package check fails on.
+  where they disagree. The root-package check fails on each registry that
+  makes them disagree: on the lift, where registries of packages with
+  tests record it differently, and on a registry in a package with no
+  `_test.go` file, by that registry's own failure.
 - The properties a case states hold for every column the case reaches,
   through the lift too. A CSV with a quote that never closes states
   `unterminated`, which `import` rejects, and a CSV whose imported sheet has
@@ -2895,7 +2898,11 @@ lift.
 - The root-package check claims `via/<lift>/…` in a corpus for each bytes
   lift a package owns over it; any other `via/` section is unclaimed, and
   its failure names `hypercase strip -column <lift>`, then the update, as
-  it does for a removed suite (step 5).
+  it does for a removed suite (step 5). When a `gaps` line marks a cell of
+  those sections and the registries disagree on whether the lift is a
+  bytes lift, whether strip leaves them turns on that, so the failure
+  names no strip: it says to settle the registries first, then run the
+  check again.
 - The root-package check fails when the registries of packages with tests
   that own or use a lift record it differently, any lift: its
   description, input, product, `bytes`, outputs, `productFiles` or

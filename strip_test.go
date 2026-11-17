@@ -282,51 +282,125 @@ func TestStripRootCheckVia(t *testing.T) {
 	s.done()
 }
 
-// TestStripRootCheckViaBytesDisagree: a via/parse/… in parse's cell, which
-// a gaps line marks, as in TestStripRootCheckVia, and ./b's registry
-// records parse, which it uses, as a bytes lift, where the root package,
-// its owner, records none. The root-package check fails on the
-// disagreement, and reads the registries as strip does: one that says
+// viaDisputed sets up TestStripRootCheckViaBytesDisagree and
+// TestStripRootCheckViaUntested: a via/parse/… in parse's cell, which a
+// gaps line marks, as in TestStripRootCheckVia, and a registry at reg, a
+// copy of ./b's, that records parse, which ./b uses, as a bytes lift,
+// where the root package, its owner, records none. One registry that says
 // parse is a bytes lift is enough for strip to read the via/ as part of
-// the frozen cell, and leave it. So the message for via/parse/… says to
-// remove the gaps line first, and strip run with the line still there
-// leaves the section. Once the line is gone, strip and the update leave
-// the check passing.
-func TestStripRootCheckViaBytesDisagree(t *testing.T) {
-	t.Parallel()
+// the frozen cell, and leave it.
+func viaDisputed(t *testing.T, reg string) *sandbox {
 	s := newSandbox(t, "strip")
 	s.settle(stripModule...)
-	const reg = "b/testdata/hypercase.json"
-	g, err := registry.Parse(s.read(reg))
+	const b = "b/testdata/hypercase.json"
+	g, err := registry.Parse(s.read(b))
 	if err != nil {
 		t.Fatal(err)
 	}
 	i := slices.IndexFunc(g.Lifts, func(l registry.Lift) bool { return l.Name == "parse" })
 	if i < 0 || g.Lifts[i].Owned || g.Lifts[i].Bytes {
-		t.Fatalf("%s records no parse that b uses and that is no bytes lift:\n%s", reg, s.read(reg))
+		t.Fatalf("%s records no parse that b uses and that is no bytes lift:\n%s", b, s.read(b))
 	}
 	g.Lifts[i].Bytes = true
-	s.write(reg, g.Marshal(), "b's registry records parse as a bytes lift")
+	s.write(reg, g.Marshal(), "a copy of b's registry, recording parse as a bytes lift")
 	s.edit(prices, "a product parse doesn't make, in parse's cell, which a gaps line marks", func(a *archive.Archive) {
-		insert("gaps", "parse Parses every quote. Waits on sheets#2.\n", "via/")(a)
+		insert("gaps", viaGap, "via/")(a)
 		insert("via/parse/quote/A1", "3\n", "out/")(a)
 	})
-	s.fails(s.normal("strip-a"),
-		"the registries that own or use the lift parse differ in bytes:\n  bytes:\n    .: false\n    ./b: true\n",
-		"testdata/export/prices.txtar: no registry claims via/parse/quote/A1: no bytes lift named parse runs over the corpus export.\nIf a bytes lift should write them, register it. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
+	return s
+}
 
-	// Strip, with the line still there, leaves the section.
-	r := s.strip("-column", "parse")
+const (
+	// viaGap is the gaps line that marks parse's cell.
+	viaGap = "parse Parses every quote. Waits on sheets#2.\n"
+	// viaLeft is strip's line for parse's frozen cell, which it leaves,
+	// with its via/ while a registry says parse is a bytes lift.
+	viaLeft = "testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells\n"
+)
+
+// TestStripRootCheckViaBytesDisagree: ./b's registry records parse as a
+// bytes lift (viaDisputed). The root-package check fails on the lift's
+// entries, which differ, and says to run the update. Strip, run then,
+// leaves via/parse/…, so the message for it names no strip: it says to
+// settle the registries first. The update does, and then the message says
+// to strip, and no gaps line keeps strip from the section, since parse is
+// no bytes lift. Strip removes it and leaves parse's frozen cell, gaps
+// line and all, and the update then leaves the check passing.
+func TestStripRootCheckViaBytesDisagree(t *testing.T) {
+	t.Parallel()
+	s := viaDisputed(t, "b/testdata/hypercase.json")
+	const claims = "testdata/export/prices.txtar: no registry claims via/parse/quote/A1: no bytes lift named parse runs over the corpus export.\nIf a bytes lift should write them, register it. If not, "
+	r := s.normal("strip-a")
+	s.fails(r, "the registries that own or use the lift parse differ in bytes:\n  bytes:\n    .: false\n    ./b: true\n",
+		claims+"first settle whether parse is a bytes lift, on which the registries differ, as the check's failures on them say, then run the check again: until they agree, it can't tell whether gaps line 1, which marks a cell of theirs, keeps strip from removing them.")
+	s.lacks(r, "remove gaps line")
+	r = s.strip("-column", "parse")
 	s.passes(r)
-	s.contains(r, "testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells\n")
+	s.contains(r, viaLeft)
 	s.hasSections(prices, map[string]string{"via/parse/quote/A1": "3\n"})
 
-	s.edit(prices, "remove the line, as the message says", drop("gaps"))
-	s.passes(s.strip("-column", "parse"))
+	s.note("run the update, as the lift's failure says")
+	s.settle(stripModule...)
+	r = s.normal("strip-a")
+	s.fails(r, claims+"run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
+	s.lacks(r, "differ in bytes", "first settle", "remove gaps line")
+	r = s.strip("-column", "parse")
+	s.passes(r)
+	s.contains(r, viaLeft)
+	s.hasSections(prices, map[string]string{"gaps": viaGap}, "via/parse/")
 	for _, r := range s.settle(stripModule...) {
 		s.passes(r)
 	}
-	s.hasSections(prices, nil, "via/parse/")
+	s.hasSections(prices, map[string]string{"gaps": viaGap}, "via/parse/")
+	s.passes(s.normal("strip-a"))
+	s.passes(s.run("b", "strip-b", false))
+	s.done()
+}
+
+// TestStripRootCheckViaUntested: c, a package with no tests, holds a
+// registry that records parse as a bytes lift (viaDisputed), and the
+// hand-written variant doubled holds a via/parse/… too, in its parse
+// cell, which its own gaps line marks. The root-package check doesn't
+// compare c's entries, and fails on the registry itself, saying to delete
+// it. Strip reads every registry, c's too, and leaves both via/parse/…,
+// and so does the check, so the message for them names no strip: it says
+// to settle the registries first, naming both lines. With c's registry
+// deleted, the message says to strip, and no gaps line keeps strip from
+// the sections. Strip removes them and leaves both frozen cells, gaps
+// lines and all, and the update then leaves the check passing.
+func TestStripRootCheckViaUntested(t *testing.T) {
+	t.Parallel()
+	s := viaDisputed(t, "c/testdata/hypercase.json")
+	s.edit(prices, "a product parse doesn't make, in the variant's parse cell, which its gaps line marks", func(a *archive.Archive) {
+		insert("variant/doubled/gaps", viaGap, "variant/doubled/via/")(a)
+		insert("variant/doubled/via/parse/quote/A1", "6\n", "variant/doubled/out/")(a)
+	})
+	const (
+		claims      = "testdata/export/prices.txtar: no registry claims via/parse/quote/A1 and variant/doubled/via/parse/quote/A1: no bytes lift named parse runs over the corpus export.\nIf a bytes lift should write them, register it. If not, "
+		variantLeft = "testdata/export/prices.txtar: left the cell variant/doubled/parse, frozen by its known gap, variant/doubled/gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells\n"
+	)
+	gaps := map[string]string{"gaps": viaGap, "variant/doubled/gaps": viaGap}
+	r := s.normal("strip-a")
+	s.fails(r, "c/testdata/hypercase.json is a registry, and c holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests.",
+		claims+"first settle whether parse is a bytes lift, on which the registries differ, as the check's failures on them say, then run the check again: until they agree, it can't tell whether gaps line 1 and variant/doubled/gaps line 1, which mark cells of theirs, keep strip from removing them.")
+	s.lacks(r, "differ in bytes", "remove gaps line")
+	r = s.strip("-column", "parse")
+	s.passes(r)
+	s.contains(r, viaLeft, variantLeft)
+	s.hasSections(prices, map[string]string{"via/parse/quote/A1": "3\n", "variant/doubled/via/parse/quote/A1": "6\n"})
+
+	s.remove("c/testdata/hypercase.json", "delete c's registry, as its failure says")
+	r = s.normal("strip-a")
+	s.fails(r, claims+"run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
+	s.lacks(r, "first settle", "remove gaps line")
+	r = s.strip("-column", "parse")
+	s.passes(r)
+	s.contains(r, viaLeft, variantLeft)
+	s.hasSections(prices, gaps, "via/parse/", "variant/doubled/via/parse/")
+	for _, r := range s.settle(stripModule...) {
+		s.passes(r)
+	}
+	s.hasSections(prices, gaps, "via/parse/", "variant/doubled/via/parse/")
 	s.passes(s.normal("strip-a"))
 	s.passes(s.run("b", "strip-b", false))
 	s.done()
