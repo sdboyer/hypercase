@@ -51,7 +51,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			t.Errorf("%s can't be read: %v.\nRun %s to write it.", rel, err, r.updateCmd())
 			continue
 		}
-		tested := hasTestFile(f.Pkg)
+		tested := registry.HasTestFile(f.Pkg)
 		regs = append(regs, pkgReg{pkg: r.pkgName(f.Pkg), reg: g, tested: tested})
 		if !tested {
 			t.Errorf("%s is a registry, and %s holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests.", rel, r.rel(f.Pkg))
@@ -109,15 +109,17 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
 		}
+		for _, d := range g.reg.Declarations() {
+			entry := rawEntry
+			if d.Type != nil {
+				entry = typeEntry(*d.Type)
+			}
+			declare(d.Dir, entry, g.pkg)
+		}
 		for _, s := range g.reg.Suites {
 			claim(s.Name, s.Corpora)
 			if g.tested {
 				suitePkgs[s.Name] = append(suitePkgs[s.Name], g.pkg)
-			}
-			if s.Consumes == registry.RawInput {
-				for _, dir := range s.Corpora {
-					declare(dir, rawEntry, g.pkg)
-				}
 			}
 		}
 		for _, l := range g.reg.Lifts {
@@ -135,7 +137,6 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 		}
 		for _, ct := range g.reg.Types {
-			declare(ct.Dir, typeEntry(ct), g.pkg)
 			if transforms[ct.Dir] == nil {
 				transforms[ct.Dir] = map[string]bool{}
 			}
@@ -491,23 +492,6 @@ func (r *runner) pkgName(dir string) string {
 		return "./" + rel
 	}
 	return "."
-}
-
-// hasTestFile reports whether dir holds a file whose name ends in
-// _test.go, and doesn't start with _ or ., the names Go ignores. It reads
-// no build constraints, so a file they exclude still counts.
-func hasTestFile(dir string) bool {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return false
-	}
-	for _, e := range entries {
-		name := e.Name()
-		if !e.IsDir() && strings.HasSuffix(name, "_test.go") && !strings.HasPrefix(name, "_") && !strings.HasPrefix(name, ".") {
-			return true
-		}
-	}
-	return false
 }
 
 func isFile(p string) bool {

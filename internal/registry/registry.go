@@ -251,6 +251,34 @@ func Parse(data []byte) (*Registry, error) {
 // Corpora, with no corpus type.
 const RawInput = "io/fs.FS"
 
+// A Declaration is a corpus directory a registry declares, under the
+// corpus root's testdata/.
+type Declaration struct {
+	Dir string
+	// Type is the corpus type whose Dir it is, or nil for the corpus of a
+	// suite over the raw input.
+	Type *Type
+}
+
+// Declarations returns the corpus directories r declares: the corpora of
+// each suite over the raw input, in the suites' order, then each corpus
+// type's Dir, in the types' order. It is the one rule of what a registry
+// declares, which the root-package check and snapshot.Create share.
+func (r *Registry) Declarations() []Declaration {
+	var ds []Declaration
+	for _, s := range r.Suites {
+		if s.Consumes == RawInput {
+			for _, d := range s.Corpora {
+				ds = append(ds, Declaration{Dir: d})
+			}
+		}
+	}
+	for i := range r.Types {
+		ds = append(ds, Declaration{Dir: r.Types[i].Dir, Type: &r.Types[i]})
+	}
+	return ds
+}
+
 // A Head is what every format of a registry holds, read without its
 // format's version.
 type Head struct {
@@ -299,6 +327,24 @@ func Find(moduleRoot string) ([]Found, error) {
 		found = append(found, Found{Path: filepath.Join(dir, "testdata", Name), Pkg: dir})
 	}
 	return found, err
+}
+
+// HasTestFile reports whether dir holds a file whose name ends in
+// _test.go, and doesn't start with _ or ., the names Go ignores. It reads
+// no build constraints, so a file they exclude still counts. A registry in
+// a package with no such file records what no test runs.
+func HasTestFile(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if !e.IsDir() && strings.HasSuffix(name, "_test.go") && !strings.HasPrefix(name, "_") && !strings.HasPrefix(name, ".") {
+			return true
+		}
+	}
+	return false
 }
 
 // FindFS is [Find] over a file system whose root is the module root, such

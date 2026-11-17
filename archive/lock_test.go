@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/rogpeppe/go-internal/lockedfile"
+	"github.com/sdboyer/hypercase/internal/hooks"
 )
 
 // modifyFixture writes the well-formed archive in a temp dir, and returns
@@ -24,7 +25,7 @@ func modifyFixture(t *testing.T) (name, lock string) {
 	return name, filepath.Join(dir, LockFile)
 }
 
-func scaled(a *Archive) (*Archive, error) {
+func scaled(a *Archive, _ []byte) (*Archive, error) {
 	a.Sections[1].Data = []byte("serves: 8\n")
 	return a, nil
 }
@@ -44,7 +45,7 @@ func TestModifyHoldsTheLockAcrossTheRename(t *testing.T) {
 		mu.Unlock()
 	}
 	held := make(chan *lockedfile.File, 1)
-	modifyHook = func(step string) {
+	hooks.Modify = func(step string) {
 		record("A " + step)
 		if step == "read" {
 			go func() {
@@ -58,7 +59,7 @@ func TestModifyHoldsTheLockAcrossTheRename(t *testing.T) {
 		}
 	}
 	err := Modify(lock, name, scaled)
-	modifyHook = nil
+	hooks.Modify = nil
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +71,7 @@ func TestModifyHoldsTheLockAcrossTheRename(t *testing.T) {
 	mu.Lock()
 	got := slices.Clone(steps)
 	mu.Unlock()
-	if want := []string{"A locked", "A read", "A renamed", "A unlock", "B locked"}; !slices.Equal(got, want) {
+	if want := []string{"A lock", "A locked", "A read", "A renamed", "A unlock", "B locked"}; !slices.Equal(got, want) {
 		t.Errorf("the steps ran in the order %q, not %q", got, want)
 	}
 	holds, err := f.Stat()
@@ -94,9 +95,9 @@ func TestModifyHoldsTheLockAcrossTheRename(t *testing.T) {
 // so the next update completes.
 func TestModifyFailedWrite(t *testing.T) {
 	name, lock := modifyFixture(t)
-	afterTemp = func(string) error { return errors.New("disk full") }
+	hooks.AfterTemp = func(string) error { return errors.New("disk full") }
 	err := Modify(lock, name, scaled)
-	afterTemp = nil
+	hooks.AfterTemp = nil
 	if err == nil {
 		t.Fatal("Modify succeeded, and its write failed")
 	}
@@ -121,19 +122,19 @@ func TestModifyFailedWrite(t *testing.T) {
 // error, or the bytes it read.
 func TestModifyWritesNothing(t *testing.T) {
 	name, lock := modifyFixture(t)
-	afterTemp = func(string) error {
+	hooks.AfterTemp = func(string) error {
 		t.Error("Modify wrote a temp file")
 		return nil
 	}
-	defer func() { afterTemp = nil }()
-	if err := Modify(lock, name, func(*Archive) (*Archive, error) { return nil, nil }); err != nil {
+	defer func() { hooks.AfterTemp = nil }()
+	if err := Modify(lock, name, func(*Archive, []byte) (*Archive, error) { return nil, nil }); err != nil {
 		t.Error(err)
 	}
 	refused := errors.New("refused")
-	if err := Modify(lock, name, func(*Archive) (*Archive, error) { return nil, refused }); !errors.Is(err, refused) {
+	if err := Modify(lock, name, func(*Archive, []byte) (*Archive, error) { return nil, refused }); !errors.Is(err, refused) {
 		t.Errorf("Modify returned %v, not fn's error", err)
 	}
-	if err := Modify(lock, name, func(a *Archive) (*Archive, error) { return a, nil }); err != nil {
+	if err := Modify(lock, name, func(a *Archive, _ []byte) (*Archive, error) { return a, nil }); err != nil {
 		t.Error(err)
 	}
 }

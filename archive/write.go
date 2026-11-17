@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/sdboyer/hypercase/internal/hooks"
 )
 
 // tempPrefix starts the name of every temp file a write creates. A temp file
@@ -21,21 +23,46 @@ func IsTemp(name string) bool {
 	return strings.HasPrefix(filepath.Base(name), tempPrefix)
 }
 
-// afterTemp, when set, runs once a write's temp file is written and before
-// it is renamed. Tests set it to make a write fail at that point.
-var afterTemp func(tmp string) error
-
 // WriteFile writes data to the named file through a temp file in the same
 // directory, synced and renamed over it, so a reader sees the old file or
 // the new one, never part of one. The file keeps its mode; a new one is
 // 0644. A failed write leaves the file as it was and removes the temp file.
-func WriteFile(name string, data []byte) (err error) {
+func WriteFile(name string, data []byte) error {
 	mode := fs.FileMode(0o644)
 	if fi, err := os.Stat(name); err == nil {
 		mode = fi.Mode().Perm()
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
+	return viaTemp(name, data, mode, func(tmp string) error { return os.Rename(tmp, name) })
+}
+
+// CreateFile writes data as the named file, which doesn't exist yet,
+// through a temp file in the same directory, synced and then linked to the
+// name, so a reader sees no file or the whole one, never part of one, and
+// a write cut short leaves only a temp file. The link refuses a name that
+// exists, even one another process creates during the write: then the
+// error is fs.ErrExist, and that file is as it was. The new file's mode is
+// 0644. The temp file is removed, whether the write fails or not.
+func CreateFile(name string, data []byte) error {
+	var tmp string
+	err := viaTemp(name, data, 0o644, func(t string) error {
+		tmp = t
+		return os.Link(t, name)
+	})
+	if err == nil {
+		// The file is created. A temp file this leaves, the root-package
+		// check reports.
+		os.Remove(tmp)
+	}
+	return err
+}
+
+// viaTemp writes data, with the given mode, to a temp file beside the
+// named file, syncs and closes it, and calls finish with the temp file's
+// path, to put it in the file's place. When any step fails, it removes
+// the temp file.
+func viaTemp(name string, data []byte, mode fs.FileMode, finish func(tmp string) error) (err error) {
 	f, err := os.CreateTemp(filepath.Dir(name), tempPrefix+filepath.Base(name)+"-*")
 	if err != nil {
 		return err
@@ -61,12 +88,12 @@ func WriteFile(name string, data []byte) (err error) {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	if afterTemp != nil {
-		if err := afterTemp(tmp); err != nil {
+	if hooks.AfterTemp != nil {
+		if err := hooks.AfterTemp(tmp); err != nil {
 			return err
 		}
 	}
-	return os.Rename(tmp, name)
+	return finish(tmp)
 }
 
 // Write formats the archive and writes it to the named file with
@@ -74,11 +101,24 @@ func WriteFile(name string, data []byte) (err error) {
 // compares each section with what it meant to write, so no section is ever
 // written in a form that reads back differently.
 func Write(name string, a *Archive) error {
-	data := a.Format()
-	if err := readsBack(a, data); err != nil {
+	data, err := a.ReadBack()
+	if err != nil {
 		return fmt.Errorf("%s: %w", name, err)
 	}
 	return WriteFile(name, data)
+}
+
+// ReadBack formats the archive, reads the bytes back, and compares the
+// comment and each section, its name and its data, with what it meant to
+// write. It returns the bytes when every part reads back as meant, and
+// otherwise why not, naming the first section that doesn't. It is the
+// check every write makes before it writes.
+func (a *Archive) ReadBack() ([]byte, error) {
+	data := a.Format()
+	if err := readsBack(a, data); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func readsBack(a *Archive, data []byte) error {

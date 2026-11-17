@@ -15,7 +15,7 @@ import (
 	"github.com/sdboyer/hypercase"
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
-	"github.com/sdboyer/hypercase/internal/root"
+	"github.com/sdboyer/hypercase/root"
 )
 
 // The fixtures' declarations. The child registers one set, chosen by name.
@@ -160,11 +160,11 @@ func editArchive(t testing.TB, archiveName, instruction string) {
 		line = "edited"
 	}
 	line += "\n"
-	mod, err := root.Module(".")
+	corpus, err := root.Find(".", ".")
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := filepath.Join(mod, "testdata", "script", archiveName+".txtar")
+	p := filepath.Join(corpus.Dir(), "testdata", "script", archiveName+".txtar")
 	data, err := os.ReadFile(p)
 	if err != nil {
 		t.Fatal(err)

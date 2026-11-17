@@ -1,0 +1,77 @@
+# the first update writes the package's registry, which records the corpus root Create writes under, and fails, since no suite has a case yet
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    the suite calc applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+    the suite evaluate applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+    the suite format applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+# snapshot.Create under the corpus root corp, which the registry doesn't record, is refused:
+no registry under the module root $SANDBOX records the corpus root "corp", so no package's tests would read the case: its registries record ".".
+Pass root.Find the path a package passes to hypercase.Root, or . for one that passes none. A new package's first update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., writes its registry: with no case yet, it fails for each suite the package registers, which applies to no case, and writes the registry still.
+# root.Find, from cmd/snapshot, found the corpus root .
+# snapshot.Create wrote testdata/script/six.txtar
+$ cat testdata/script/six.txtar
+-- in/calc/out/values.txt --
+6
+$ edit testdata/script/six.txtar  # a person describes the case
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        calc ran on six
+        parse ran on six
+        resolve ran on six
+        evaluate's probe ran
+        evaluate ran on six
+        format's probe ran
+        format ran on six
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/six
+            --- PASS: TestCorpus/script/six/calc
+            --- PASS: TestCorpus/script/six/evaluate
+            --- PASS: TestCorpus/script/six/format
+            --- PASS: TestCorpus/script/six/parse
+            --- PASS: TestCorpus/script/six/resolve
+PASS
+$ cat testdata/script/six.txtar
+The script gives 6.
+-- in/calc/out/values.txt --
+6
+-- out/calc/outcome --
+accepted
+-- out/calc/values.txt --
+6
+-- out/evaluate/outcome --
+accepted
+-- out/format/outcome --
+accepted
+-- out/format/trail.txt --
+parse
+-- out/parse/outcome --
+accepted
+-- out/resolve/outcome --
+accepted
+$ go test  # ladder
+    what ran, in order:
+        calc ran on six
+        parse ran on six
+        resolve ran on six
+        evaluate's probe ran
+        evaluate ran on six
+        format's probe ran
+        format ran on six
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/six
+            --- PASS: TestCorpus/script/six/calc
+            --- PASS: TestCorpus/script/six/evaluate
+            --- PASS: TestCorpus/script/six/format
+            --- PASS: TestCorpus/script/six/parse
+            --- PASS: TestCorpus/script/six/resolve
+PASS

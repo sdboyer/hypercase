@@ -239,7 +239,14 @@ The corpus root is the module root unless a package passes another with
 `hypercase.Root`. The walkthrough's examples pass their own directory, so
 each step's corpus stands alone. A project with one corpus at its module
 root passes nothing. One package per corpus root registers
-`hypercase.RootPackage()`.
+`hypercase.RootPackage()`. A project's own command finds the same corpus
+root with `root.Find`, from its directory and the path the package
+passes, or `.`. `snapshot.Create` writes a case only into a corpus
+directory that a registry of the corpus root declares, in a package with
+tests, so a package's first update, which writes its registry, comes
+before its first case. With no case yet, that update fails for each
+suite the package registers, saying the suite applies to no case, and
+writes the registry still.
 
 <!-- source: walkthrough/sheets/step03/sheetcorpus/project.go -->
 ```go
@@ -422,8 +429,10 @@ Its `.gitignore` names the corpus root's lock, which an update takes
 | the comment, `in/**`, `properties`, `gaps` | `out/**`, `via/**` |
 
 - Step 7 adds the variants' sections.
-- No update changes `in/…`. The snapshot primitives (#12), which rewrite a
-  case's inputs from a project's own code, refuse to run during an update.
+- No update changes `in/…`. Of the snapshot primitives (#12), the two that
+  write a case's inputs from a project's own code, `Create` and
+  `RewriteInputs`, refuse to run during an update. `Serialize`, `Load` and
+  `Extract` write no archive.
 
 **Section order.** One total rule places every section.
 

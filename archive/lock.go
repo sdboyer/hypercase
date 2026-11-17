@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/rogpeppe/go-internal/lockedfile"
+	"github.com/sdboyer/hypercase/internal/hooks"
 )
 
 // LockFile is the name of a corpus root's lock file, in the root's
@@ -13,20 +14,18 @@ import (
 // ignores it.
 const LockFile = ".hypercase.lock"
 
-// modifyHook, when set, is called at each step of [Modify]: "locked",
-// "read", "renamed" and "unlock", which comes just before the lock is
-// released. Tests sequence the steps through it.
-var modifyHook func(step string)
-
+// hook calls hooks.Modify, through which tests sequence the steps of
+// [Modify].
 func hook(step string) {
-	if modifyHook != nil {
-		modifyHook(step)
+	if hooks.Modify != nil {
+		hooks.Modify(step)
 	}
 }
 
 // Modify is a read-modify-write of the archive at path, under the lock on
 // the file at lockPath: it takes the lock, re-reads the archive, and calls
-// fn with what it read. It writes the archive fn returns with [Write], by
+// fn with what it read, parsed and as the bytes it was parsed from. It
+// writes the archive fn returns with [Write], by
 // temp file and rename, and only then releases the lock. When fn returns
 // nil, or an archive whose bytes are those read, nothing is written. An
 // error from fn is returned, and nothing is written.
@@ -35,7 +34,8 @@ func hook(step string) {
 // process exits, however it exits. It is taken on a file of its own, never
 // on the archive, because the rename replaces the archive's file: a waiter
 // holding the old file would take a lock nobody else waits on.
-func Modify(lockPath, path string, fn func(current *Archive) (*Archive, error)) error {
+func Modify(lockPath, path string, fn func(current *Archive, read []byte) (*Archive, error)) error {
+	hook("lock")
 	unlock, err := lockedfile.MutexAt(lockPath).Lock()
 	if err != nil {
 		return err
@@ -50,7 +50,7 @@ func Modify(lockPath, path string, fn func(current *Archive) (*Archive, error)) 
 		return err
 	}
 	hook("read")
-	next, err := fn(Parse(data))
+	next, err := fn(Parse(data), data)
 	if err != nil || next == nil {
 		return err
 	}

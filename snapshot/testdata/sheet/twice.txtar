@@ -1,0 +1,39 @@
+A1 is twice B1, and D1 refers to Z9, a cell the sheet doesn't have.
+-- in/sheet/A1 --
+=B1*2
+-- in/sheet/B1 --
+3
+-- in/sheet/D1 --
+=Z9
+-- properties --
+dangling
+-- gaps --
+calc A reference to a missing cell prints as #REF!. Waits on sheets#9.
+-- out/calc/error.txt --
+D1: Z9 doesn't exist
+-- out/resolve/error.txt --
+D1: Z9 doesn't exist
+-- variant/cycle/about --
+B1 refers back to A1, C1 refers to B1, and D1 is gone, so the sheet has a cycle.
+-- variant/cycle/properties --
+circular
+-- variant/cycle/in/sheet/B1 --
+=A1
+-- variant/cycle/in/sheet/C1 --
+=B1
+-- variant/cycle/delete --
+sheet/D1
+-- variant/cycle/out/resolve/error.txt --
+A1 -> B1 -> A1: cycle
+-- variant/missing/about --
+B1 is gone too, so A1 refers to a cell that doesn't exist.
+-- variant/missing/properties --
+dangling
+-- variant/missing/delete --
+sheet/B1
+-- variant/missing/out/resolve/error.txt --
+A1: B1 doesn't exist
+-- transform/looped/in/sheet/A1 --
+=A1
+-- transform/looped/out/resolve/error.txt --
+A1 -> A1: cycle

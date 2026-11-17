@@ -1,0 +1,318 @@
+package snapshot
+
+import (
+	"bytes"
+	"errors"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/rogpeppe/go-internal/lockedfile"
+	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/decl"
+	"github.com/sdboyer/hypercase/internal/hooks"
+	"github.com/sdboyer/hypercase/root"
+)
+
+func section(name, data string) []archive.Section {
+	return []archive.Section{{Name: name, Data: []byte(data)}}
+}
+
+// replaced returns twice with one section's bytes replaced, as text.
+func replaced(t *testing.T, name, old, new string) []byte {
+	t.Helper()
+	marker := "-- " + name + " --\n"
+	data := string(twice(t))
+	if !strings.Contains(data, marker+old) {
+		t.Fatalf("twice has no %s holding %q", name, old)
+	}
+	return []byte(strings.Replace(data, marker+old, marker+new, 1))
+}
+
+// TestRewriteBase: RewriteInputs replaces a base section, and every other
+// byte of the archive is as it was: the comment, the properties and gaps
+// sections, the other inputs, the variants, the transform's sections and
+// the outputs, each in its place.
+func TestRewriteBase(t *testing.T) {
+	corp, path := corpus(t)
+	if err := RewriteInputs(corp, project, path, "", section("in/sheet/B1", "4\n")); err != nil {
+		t.Fatal(err)
+	}
+	same(t, path, replaced(t, "in/sheet/B1", "3\n", "4\n"))
+}
+
+// TestRewriteVariant: RewriteInputs on cycle replaces
+// variant/cycle/in/sheet/B1, passed as in/sheet/B1, and the base's
+// in/sheet/B1 is as it was.
+func TestRewriteVariant(t *testing.T) {
+	corp, path := corpus(t)
+	if err := RewriteInputs(corp, project, path, "cycle", section("in/sheet/B1", "=C1\n")); err != nil {
+		t.Fatal(err)
+	}
+	same(t, path, replaced(t, "variant/cycle/in/sheet/B1", "=A1\n", "=C1\n"))
+}
+
+// TestRewriteRefuses: a name the archive lacks, one outside in/, one
+// passed twice, a variant the archive lacks, a transform's variant,
+// content holding a line shaped like a section marker, a rewrite that
+// leaves the archive with a problem of form, no sections, an archive
+// outside the corpus root, the path and the variant swapped either way,
+// and no corpus root: each fails, naming it, and the archive is
+// byte-identical.
+func TestRewriteRefuses(t *testing.T) {
+	corp, path := corpus(t)
+	before := readFile(t, path)
+	other := newCorpus(t)
+	for _, c := range []struct {
+		corp     root.Corpus
+		variant  string
+		sections []archive.Section
+		want     string
+	}{
+		{corp, "", section("in/sheet/C1", "1\n"), path + " has no section in/sheet/C1"},
+		{corp, "cycle", section("in/sheet/A1", "1\n"), path + " has no section variant/cycle/in/sheet/A1"},
+		{corp, "", section("properties", "circular\n"), "the section properties isn't under in/"},
+		{corp, "cycle", section("variant/cycle/in/sheet/B1", "1\n"), "the section variant/cycle/in/sheet/B1 isn't under in/"},
+		{corp, "", append(section("in/sheet/B1", "4\n"), section("in/sheet/B1", "5\n")...), "the section in/sheet/B1 is passed twice"},
+		{corp, "gone", section("in/sheet/B1", "1\n"), path + " has no variant/gone/"},
+		{corp, "looped", section("in/sheet/A1", "=B1\n"), path + " has no variant/looped/, only transform/looped/"},
+		{corp, "", section("in/sheet/B1", "3\n-- in/sheet/C1 --\n4\n"), "the section in/sheet/B1 can't be held in an archive: its line 2 is shaped like a section marker"},
+		{corp, "", section("in/sheet/B1", "3"), "the section in/sheet/B1 can't be held in an archive: it has no final newline"},
+		{corp, "", nil, "there are no sections to rewrite in " + path},
+		{other, "", section("in/sheet/B1", "4\n"), path + " isn't in a corpus's directory under"},
+	} {
+		fails(t, RewriteInputs(c.corp, project, path, c.variant, c.sections), c.want)
+		same(t, path, before)
+	}
+	// The path and the variant swapped: no variant's name is an archive's
+	// path.
+	fails(t, RewriteInputs(corp, project, "cycle", path, section("in/sheet/B1", "1\n")), "cycle isn't an archive")
+	same(t, path, before)
+	fails(t, RewriteInputs(corp, project, "", path, section("in/sheet/B1", "1\n")), "the archive's path is empty.\nPass the path of the case's archive.")
+	same(t, path, before)
+	fails(t, RewriteInputs(root.Corpus{}, project, path, "", section("in/sheet/B1", "4\n")), "RewriteInputs was given no corpus root.\nFind it with root.Find")
+	same(t, path, before)
+
+	// A variant that only replaces B1, rewritten to hold the base's B1,
+	// has the base's input view.
+	four := filepath.Join(corp.Dir(), "testdata", "sheet", "four.txtar")
+	data := []byte("A1 is twice B1.\n-- in/sheet/A1 --\n=B1*2\n-- in/sheet/B1 --\n3\n-- variant/four/about --\nB1 is 4.\n-- variant/four/in/sheet/B1 --\n4\n")
+	writeFile(t, four, data)
+	fails(t, RewriteInputs(corp, project, four, "four", section("in/sheet/B1", "3\n")), four+" would have problems of form once rewritten", "variant/four: the variant's input view equals the base's")
+	same(t, four, data)
+}
+
+// TestRewriteRefusesUnplaced: an archive that isn't in the form an update
+// writes, such as one with no final newline, is refused, since the rewrite
+// would change its other bytes too, and it is byte-identical.
+func TestRewriteRefusesUnplaced(t *testing.T) {
+	corp, path := corpus(t)
+	before := bytes.TrimSuffix(twice(t), []byte("\n"))
+	writeFile(t, path, before)
+	fails(t, RewriteInputs(corp, project, path, "", section("in/sheet/B1", "4\n")), path+" isn't in the form an update writes", "Run the update, "+updateVar+"=1 go test ./..., then rewrite the inputs.")
+	same(t, path, before)
+
+	bad := filepath.Join(corp.Dir(), "testdata", "sheet", "typo.txtar")
+	writeFile(t, bad, []byte("A typo.\n-- ni/sheet/A1 --\n1\n"))
+	fails(t, RewriteInputs(corp, project, bad, "", section("in/sheet/A1", "2\n")), bad+" has problems of form")
+}
+
+// TestRewriteLocks: observed through the archive's hooks, RewriteInputs
+// takes the corpus root's lock before it re-reads the archive, and
+// releases it after the rename: another update that asks for the lock at
+// the re-read gets it only once RewriteInputs has released it.
+// TestRewriteRereadsUnderTheLock shows the re-read is what it writes from.
+func TestRewriteLocks(t *testing.T) {
+	corp, path := corpus(t)
+	lock := filepath.Join(corp.Dir(), "testdata", archive.LockFile)
+	var (
+		mu    sync.Mutex
+		steps []string
+	)
+	record := func(s string) {
+		mu.Lock()
+		steps = append(steps, s)
+		mu.Unlock()
+	}
+	held := make(chan *lockedfile.File, 1)
+	hooks.Modify = func(step string) {
+		record("rewrite " + step)
+		if step == "read" {
+			go func() {
+				f, err := lockedfile.OpenFile(lock, os.O_RDWR|os.O_CREATE, 0o666)
+				if err != nil {
+					t.Error(err)
+				}
+				record("update locked")
+				held <- f
+			}()
+		}
+	}
+	err := RewriteInputs(corp, project, path, "", section("in/sheet/B1", "4\n"))
+	hooks.Modify = nil
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := <-held; f != nil {
+		f.Close()
+	}
+	mu.Lock()
+	got := slices.Clone(steps)
+	mu.Unlock()
+	if want := []string{"rewrite lock", "rewrite locked", "rewrite read", "rewrite renamed", "rewrite unlock", "update locked"}; !slices.Equal(got, want) {
+		t.Errorf("the steps ran in the order %q, not %q", got, want)
+	}
+}
+
+// TestRewriteRereads: a command reads the archive, an update writes it,
+// then the command's RewriteInputs runs: the update's sections survive,
+// since RewriteInputs replaces sections of the archive it re-reads.
+func TestRewriteRereads(t *testing.T) {
+	corp, path := corpus(t)
+	if _, err := Load(sheetType, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := missingZ9(corp.Dir(), path); err != nil {
+		t.Fatal(err)
+	}
+	if err := RewriteInputs(corp, project, path, "", section("in/sheet/B1", "4\n")); err != nil {
+		t.Fatal(err)
+	}
+	same(t, path, rewrittenAndUpdated(t))
+}
+
+// missingZ9 is an update of twice under the corpus root's lock: it
+// rewrites the resolve cell's error.
+func missingZ9(dir, path string) error {
+	return archive.Modify(filepath.Join(dir, "testdata", archive.LockFile), path, func(a *archive.Archive, _ []byte) (*archive.Archive, error) {
+		for i, s := range a.Sections {
+			if s.Name == "out/resolve/error.txt" {
+				a.Sections[i].Data = []byte("D1: Z9 is missing\n")
+			}
+		}
+		return a, nil
+	})
+}
+
+// rewrittenAndUpdated is twice with in/sheet/B1 rewritten to 4, and the
+// error missingZ9 writes.
+func rewrittenAndUpdated(t *testing.T) []byte {
+	t.Helper()
+	want := replaced(t, "in/sheet/B1", "3\n", "4\n")
+	return bytes.Replace(want, []byte("-- out/resolve/error.txt --\nD1: Z9 doesn't exist\n"), []byte("-- out/resolve/error.txt --\nD1: Z9 is missing\n"), 1)
+}
+
+// TestRewriteRereadsUnderTheLock: an update that writes the archive once
+// RewriteInputs has been called, and just before it takes the lock, keeps
+// its sections, since RewriteInputs writes from what it reads under the
+// lock, never from a read before it.
+func TestRewriteRereadsUnderTheLock(t *testing.T) {
+	corp, path := corpus(t)
+	var updated bool
+	var uerr error
+	hooks.Modify = func(step string) {
+		if step == "lock" && !updated {
+			updated = true
+			uerr = missingZ9(corp.Dir(), path)
+		}
+	}
+	err := RewriteInputs(corp, project, path, "", section("in/sheet/B1", "4\n"))
+	hooks.Modify = nil
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !updated || uerr != nil {
+		t.Fatalf("the update didn't run before the lock: ran %v, %v", updated, uerr)
+	}
+	same(t, path, rewrittenAndUpdated(t))
+}
+
+// TestRewriteJudgesWhatItRead: RewriteInputs judges the form of the bytes
+// it parsed the archive from. An archive not in the form an update writes
+// when it is read under the lock is refused, though a writer that takes no
+// lock puts the update's form back before the judging.
+func TestRewriteJudgesWhatItRead(t *testing.T) {
+	corp, path := corpus(t)
+	writeFile(t, path, bytes.TrimSuffix(twice(t), []byte("\n")))
+	hooks.Modify = func(step string) {
+		if step == "read" {
+			writeFile(t, path, twice(t))
+		}
+	}
+	err := RewriteInputs(corp, project, path, "", section("in/sheet/B1", "4\n"))
+	hooks.Modify = nil
+	fails(t, err, path+" isn't in the form an update writes")
+	same(t, path, twice(t))
+}
+
+// TestRewriteDuringUpdate: while the variable the project's UpdateVar
+// names is set, RewriteInputs fails, naming it, takes no lock, and leaves
+// the archive byte-identical. With it unset, the same call replaces the
+// section, with no registry under the corpus root. A project with no
+// UpdateVar fails, and the archive is byte-identical.
+func TestRewriteDuringUpdate(t *testing.T) {
+	corp, path := corpus(t)
+	before := readFile(t, path)
+	var steps []string
+	hooks.Modify = func(step string) { steps = append(steps, step) }
+	defer func() { hooks.Modify = nil }()
+
+	t.Setenv(updateVar, "1")
+	fails(t, RewriteInputs(corp, project, path, "", section("in/sheet/B1", "4\n")), updateVar+" is set, so this may be an update")
+	same(t, path, before)
+	absent(t, filepath.Join(corp.Dir(), "testdata", archive.LockFile))
+	if len(steps) > 0 {
+		t.Errorf("RewriteInputs took steps %q during an update", steps)
+	}
+
+	fails(t, RewriteInputs(corp, decl.Project{}, path, "", section("in/sheet/B1", "4\n")), "RewriteInputs has no update variable to check: the project's UpdateVar is empty")
+	same(t, path, before)
+
+	os.Unsetenv(updateVar)
+	if err := RewriteInputs(corp, project, path, "", section("in/sheet/B1", "4\n")); err != nil {
+		t.Fatal(err)
+	}
+	same(t, path, replaced(t, "in/sheet/B1", "3\n", "4\n"))
+	for _, reg := range []string{"hypercase.json", filepath.Join("sheet", "hypercase.json")} {
+		absent(t, filepath.Join(corp.Dir(), "testdata", reg))
+	}
+}
+
+// TestRewriteNoRegistry: RewriteInputs reads no registry, so it rewrites
+// a case in a module that has none, as before a project's first update.
+func TestRewriteNoRegistry(t *testing.T) {
+	mod := newBareModule(t)
+	path := filepath.Join(mod, "corp", "testdata", "sheet", "twice.txtar")
+	writeFile(t, path, twice(t))
+	if err := RewriteInputs(corpusIn(t, mod, "corp"), project, path, "", section("in/sheet/B1", "4\n")); err != nil {
+		t.Fatal(err)
+	}
+	same(t, path, replaced(t, "in/sheet/B1", "3\n", "4\n"))
+}
+
+// TestRewriteFailedWrite: a RewriteInputs whose write fails after the
+// temp file is written leaves the archive as it was, with no temp file
+// left over, and releases the lock, so the next rewrite completes.
+func TestRewriteFailedWrite(t *testing.T) {
+	corp, path := corpus(t)
+	before := readFile(t, path)
+	var temp string
+	hooks.AfterTemp = func(tmp string) error {
+		temp = tmp
+		return errors.New("the disk is full")
+	}
+	err := RewriteInputs(corp, project, path, "", section("in/sheet/B1", "4\n"))
+	hooks.AfterTemp = nil
+	fails(t, err, "rewriting "+path+": the disk is full.\nThe archive is as it was.")
+	same(t, path, before)
+	if temp == "" {
+		t.Fatal("the write made no temp file")
+	}
+	absent(t, temp)
+	if err := RewriteInputs(corp, project, path, "", section("in/sheet/B1", "4\n")); err != nil {
+		t.Errorf("the next rewrite failed: %v", err)
+	}
+}

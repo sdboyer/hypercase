@@ -1,0 +1,100 @@
+# the first update writes the package's registry, which records the corpus root Create writes under, and fails, since no suite has a case yet
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    the suite calc applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+    the suite evaluate applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+    the suite format applies to no case: its corpus, testdata/script/, holds no archive whose cells run.
+        A suite that applies to no case checks nothing. Add a case it applies to.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+# snapshot.Create wrote testdata/script/cycle.txtar
+$ cat testdata/script/cycle.txtar
+-- in/resolve/error --
+A1 -> B1 -> A1: cycle
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/cycle: evaluate is blocked: the lift resolve failed on the case, and testdata/script/cycle.txtar, out/resolve/error.txt, records its error.
+    script/cycle: 
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        resolve returned an error, but the case states no property resolve rejects:
+          A1 -> B1 -> A1: cycle
+        Fix the code, or state the property on the case and in resolve's Rejects.
+    what ran, in order:
+        calc ran on cycle
+        parse ran on cycle
+        resolve ran on cycle
+        format's probe ran
+        format ran on cycle
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/cycle
+            --- PASS: TestCorpus/script/cycle/calc
+            --- SKIP: TestCorpus/script/cycle/evaluate
+            --- PASS: TestCorpus/script/cycle/format
+            --- PASS: TestCorpus/script/cycle/parse
+            --- FAIL: TestCorpus/script/cycle/resolve
+FAIL
+[exit 1]
+$ cat testdata/script/cycle.txtar
+-- in/resolve/error --
+A1 -> B1 -> A1: cycle
+-- out/calc/outcome --
+accepted
+-- out/evaluate/outcome --
+blocked resolve
+-- out/format/outcome --
+accepted
+-- out/format/trail.txt --
+parse
+-- out/parse/outcome --
+accepted
+-- out/resolve/error.txt --
+A1 -> B1 -> A1: cycle
+-- out/resolve/outcome --
+rejected
+$ edit testdata/script/cycle.txtar  # a person describes the case
+$ go test  # ladder
+    script/cycle: evaluate is blocked: the lift resolve failed on the case, and testdata/script/cycle.txtar, out/resolve/error.txt, records its error.
+    script/cycle: resolve meets a cycle.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        resolve returned an error, but the case states no property resolve rejects:
+          A1 -> B1 -> A1: cycle
+        Fix the code, or state the property on the case and in resolve's Rejects.
+    what ran, in order:
+        calc ran on cycle
+        parse ran on cycle
+        resolve ran on cycle
+        format's probe ran
+        format ran on cycle
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/cycle
+            --- PASS: TestCorpus/script/cycle/calc
+            --- SKIP: TestCorpus/script/cycle/evaluate
+            --- PASS: TestCorpus/script/cycle/format
+            --- PASS: TestCorpus/script/cycle/parse
+            --- FAIL: TestCorpus/script/cycle/resolve
+FAIL
+[exit 1]
+$ edit testdata/script/cycle.txtar  # a person states circular
+$ go test  # ladder
+    script/cycle: evaluate is blocked: the lift resolve failed on the case, and testdata/script/cycle.txtar, out/resolve/error.txt, records its error.
+    what ran, in order:
+        calc ran on cycle
+        parse ran on cycle
+        resolve ran on cycle
+        format's probe ran
+        format ran on cycle
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/cycle
+            --- PASS: TestCorpus/script/cycle/calc
+            --- SKIP: TestCorpus/script/cycle/evaluate
+            --- PASS: TestCorpus/script/cycle/format
+            --- PASS: TestCorpus/script/cycle/parse
+            --- PASS: TestCorpus/script/cycle/resolve
+PASS

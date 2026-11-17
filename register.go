@@ -234,7 +234,7 @@ func (r *registrations) addColumn(c *column) {
 		refuse(fmt.Sprintf("the suite %s consumes fs.FS and names no Corpus. Name the directory of the archives it runs over, testdata/<corpus>/ under the corpus root, or consume a corpus type.", c.name))
 	case c.corpus != "" && !validName(c.corpus):
 		refuse(fmt.Sprintf("the suite %s names the corpus %q, which breaks the naming rule: %s. Rename the corpus's directory.", c.name, c.corpus, nameRule))
-	case c.corpus == checksDir:
+	case c.corpus == archive.ChecksDir:
 		refuse(fmt.Sprintf("the suite %s names the corpus %s, a name reserved for the findings of corpus checks. Name another directory.", c.name, c.corpus))
 	}
 	for _, t := range r.types {
@@ -338,10 +338,6 @@ func checkPatterns(kind, name string, outputs []decl.Output) {
 	}
 }
 
-// checksDir is the directory name that holds corpus check findings, which
-// no corpus type declares.
-const checksDir = "checks"
-
 func (r *registrations) addType(e *erase.Type) {
 	t := &corpusType{dir: e.Dir, description: e.Description, goType: e.GoType, new: e.New}
 	for _, tr := range e.Transforms {
@@ -350,7 +346,7 @@ func (r *registrations) addType(e *erase.Type) {
 	switch {
 	case !validName(t.dir):
 		refuse(fmt.Sprintf("the corpus type %s declares the directory %q, which breaks the naming rule: %s. Rename the directory.", t.goType, t.dir, nameRule))
-	case t.dir == checksDir:
+	case t.dir == archive.ChecksDir:
 		refuse(fmt.Sprintf("the corpus type %s declares the directory %s, a name reserved for the findings of corpus checks. Name another directory.", t.goType, t.dir))
 	}
 	for _, o := range r.types {
