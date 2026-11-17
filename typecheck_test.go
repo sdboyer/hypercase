@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -39,19 +40,22 @@ var (
 // uses the go command and the standard library alone, so the module needs
 // no loader: golang.org/x/tools/go/packages would bring in
 // golang.org/x/mod, a module hypercase doesn't otherwise require. It
-// fails on a file of the package that build constraints exclude here,
-// which it can't read, so no check of the source misses one.
+// fails on a non-test file of the package that build constraints exclude
+// here, which it can't read, so no check of the source misses one.
 func loadSource(t *testing.T) *source {
 	t.Helper()
-	loadedOnce.Do(func() { loaded, loadErr = typeCheck() })
+	loadedOnce.Do(func() { loaded, loadErr = typeCheck(".") })
 	if loadErr != nil {
 		t.Fatalf("type-checking the package: %v", loadErr)
 	}
 	return loaded
 }
 
-func typeCheck() (*source, error) {
+// typeCheck type-checks the non-test source of the package in dir, as
+// loadSource does.
+func typeCheck(dir string) (*source, error) {
 	cmd := exec.Command("go", "list", "-export", "-deps", "-json=ImportPath,Dir,GoFiles,IgnoredGoFiles,Export,DepOnly", ".")
+	cmd.Dir = dir
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -81,8 +85,16 @@ func typeCheck() (*source, error) {
 	if self == nil {
 		return nil, errors.New("go list gave no package for .")
 	}
-	if len(self.IgnoredGoFiles) > 0 {
-		return nil, fmt.Errorf("build constraints exclude %v from the package on this platform, so the type check can't read them, and a check of the source would miss what they hold. Keep every file of the package in every build, or check it on each platform", self.IgnoredGoFiles)
+	// The check reads the non-test source alone, so a test file the build
+	// excludes misses nothing.
+	var ignored []string
+	for _, name := range self.IgnoredGoFiles {
+		if !strings.HasSuffix(name, "_test.go") {
+			ignored = append(ignored, name)
+		}
+	}
+	if len(ignored) > 0 {
+		return nil, fmt.Errorf("build constraints exclude %v from the package on this platform, so the type check can't read them, and a check of the source would miss what they hold. Keep every file of the package in every build, or check it on each platform", ignored)
 	}
 	s := &source{fset: token.NewFileSet()}
 	for _, name := range self.GoFiles {
@@ -182,4 +194,35 @@ func (s *source) stringsUsedIn(t *testing.T, name string) []string {
 		return true
 	})
 	return out
+}
+
+// TestTypeCheckIgnored: the type check reads a package's non-test source,
+// so it refuses a non-test file that build constraints exclude, which it
+// can't read, and type-checks a package whose excluded files are tests.
+func TestTypeCheckIgnored(t *testing.T) {
+	t.Parallel()
+	excluded := "//go:build never\n\npackage p\n"
+	dir := tempPackage(t, map[string]string{"p.go": "package p\n", "q_test.go": excluded})
+	if _, err := typeCheck(dir); err != nil {
+		t.Errorf("type-checking a package whose one excluded file is a test: %v", err)
+	}
+	dir = tempPackage(t, map[string]string{"p.go": "package p\n", "q.go": excluded, "r_test.go": excluded})
+	_, err := typeCheck(dir)
+	if err == nil || !strings.Contains(err.Error(), "exclude [q.go] from the package") {
+		t.Errorf("type-checking a package with an excluded non-test file, q.go, beside an excluded test, gives %v", err)
+	}
+}
+
+// tempPackage writes a module of one package, example.com/p, with the
+// files given, by name, and returns its directory.
+func tempPackage(t *testing.T, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	files["go.mod"] = "module example.com/p\n\ngo 1.22\n"
+	for name, data := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
 }
