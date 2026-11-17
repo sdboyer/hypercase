@@ -174,26 +174,33 @@ func cellCase(c hypercase.Cell) string {
 
 // pathsCheck lists the path of each column from each corpus, as each of
 // its cells gives it, so a cell whose path differs from its column's
-// others' adds a finding, and each lift on a cell's path that has no cell
-// of the case.
+// others' adds a finding. So does each lift on a cell's path that has no
+// cell of the case, and a nearest lift whose cell of the case is built
+// through other lifts than the rest of the cell's path, so it isn't the
+// cell the cell is built through.
 var pathsCheck = hypercase.Check{
 	Name:        "paths",
-	Description: "Lists the lifts each column's cells are built through, from each corpus, and each lift on a cell's path with no cell of the case.",
+	Description: "Lists the lifts each column's cells are built through, from each corpus, each lift on a cell's path with no cell of the case, and each nearest lift whose cell is built otherwise.",
 	Run: func(cells []hypercase.Cell) ([]string, error) {
-		have := map[string]bool{} // "<case> <column>", for each cell
+		paths := map[string][]string{} // "<case> <column>" → its cell's path
 		for _, c := range cells {
-			have[cellCase(c)+" "+c.Column] = true
+			paths[cellCase(c)+" "+c.Column] = c.Path
+		}
+		show := func(path []string) string {
+			if len(path) == 0 {
+				return "no lift"
+			}
+			return strings.Join(path, ", ")
 		}
 		var findings []string
 		for _, c := range cells {
-			through := "no lift"
-			if len(c.Path) > 0 {
-				through = strings.Join(c.Path, ", ")
-			}
-			findings = append(findings, fmt.Sprintf("%s %s: through %s", c.Type, c.Column, through))
-			for _, l := range c.Path {
-				if !have[cellCase(c)+" "+l] {
+			findings = append(findings, fmt.Sprintf("%s %s: through %s", c.Type, c.Column, show(c.Path)))
+			for i, l := range c.Path {
+				switch p, ok := paths[cellCase(c)+" "+l]; {
+				case !ok:
 					findings = append(findings, fmt.Sprintf("%s %s: %s has no cell of %s", c.Type, c.Column, l, cellCase(c)))
+				case i == 0 && !slices.Equal(p, c.Path[1:]):
+					findings = append(findings, fmt.Sprintf("%s %s: %s's cell of %s is built through %s, and the cell through %s past it", c.Type, c.Column, l, cellCase(c), show(p), show(c.Path[1:])))
 				}
 			}
 		}

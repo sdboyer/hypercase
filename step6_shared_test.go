@@ -1,6 +1,7 @@
 package hypercase_test
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -58,26 +59,46 @@ func TestRootCheckLifts(t *testing.T) {
 // resolve, and ./b uses resolve, and reaches it through parse2, a copy of
 // parse it owns, so the cells of resolve that ./b's cells past it are
 // built through are cells no package writes, and the root-package check
-// fails. Each lift on a cell's path has a cell of the case, resolve's, so
-// the paths check finds no lift without one.
+// fails. The paths check finds resolve's cell of the case built through
+// parse, where ./b's evaluate cell is built through parse2. The message
+// gives two fixes, and following either, step by step, makes every run
+// pass.
 func TestRootCheckUsedPath(t *testing.T) {
 	t.Parallel()
-	s := newSandbox(t, "shared-ladder")
-	s.passes(s.run("b", "ladder-b-producer", true))
-	s.passes(s.update("ladder-a-paths"))
-	s.cat("testdata/checks/paths.txt")
-	s.fails(s.normal("ladder-a-paths"), "the lift resolve is used by ./b on the path testdata/script/ → parse2 → resolve, and ., which owns it, runs it on the path testdata/script/ → parse → resolve, so no package writes the cells of resolve that ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does. Register the same lifts between testdata/script/ and resolve in . and ./b, owning each in one package and using it in the other. If they do already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
-	s.passes(s.run("b", "ladder-b-producer", false))
+	for _, tt := range []struct {
+		name, a, b, drop string
+	}{
+		{"b gives up parse2", "ladder-a-paths", "ladder-b-shared-producer", "out/parse2/"},
+		{"a gives up parse", "ladder-a-uses-producer", "ladder-b-producer", "out/parse/"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := newSandbox(t, "shared-ladder")
+			s.passes(s.run("b", "ladder-b-producer", true))
+			s.passes(s.update("ladder-a-paths"))
+			s.cat("testdata/checks/paths.txt")
+			// A check that reads the cells sees the break, whatever the
+			// root-package check says.
+			const built = "script evaluate: resolve's cell of script/x is built through parse, and the cell through parse2 past it\n"
+			if !strings.Contains(string(s.read("testdata/checks/paths.txt")), built) {
+				t.Errorf("the paths check finds no cell built otherwise than the cell past it")
+			}
+			r := s.normal("ladder-a-paths")
+			s.fails(r, "the lift resolve is used by ./b on the path testdata/script/ → parse2 → resolve, and ., which owns it, runs it on the path testdata/script/ → parse → resolve, so no package writes the cells of resolve that ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does. Either in ./b, give parse to hypercase.Use in place of parse2, and delete parse2's cells, under out/parse2/ in the archives, which no package writes then, or in ., give parse2 to hypercase.Use in place of parse, and delete parse's cells, under out/parse/ in the archives, which no package writes then. If they reach it alike already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
+			if n := strings.Count(string(r.out), " used by "); n != 1 {
+				t.Errorf("the root-package check fails %d times on lifts used otherwise than their owner reaches them, and should fail once", n)
+			}
+			s.passes(s.run("b", "ladder-b-producer", false))
 
-	// ./b uses parse, as the message says, and a person removes parse2's
-	// cell, which no package writes now.
-	s.edit("testdata/script/x.txtar", "remove parse2's cell", drop("out/parse2/"))
-	s.passes(s.run("b", "ladder-b-shared-producer", true))
-	s.passes(s.update("ladder-a-paths"))
-	s.cat("testdata/checks/paths.txt")
-	s.passes(s.normal("ladder-a-paths"))
-	s.passes(s.run("b", "ladder-b-shared-producer", false))
-	s.done()
+			s.edit("testdata/script/x.txtar", "delete the cells no package writes now", drop(tt.drop))
+			s.passes(s.run("b", tt.b, true))
+			s.passes(s.update(tt.a))
+			s.cat("testdata/checks/paths.txt")
+			s.passes(s.normal(tt.a))
+			s.passes(s.run("b", tt.b, false))
+			s.done()
+		})
+	}
 }
 
 // TestRootCheckLiftOwnerUntested: a registry in a package with no _test.go

@@ -39,13 +39,17 @@ func TestParse(t *testing.T) {
 			{Name: "looped", Description: "Loops.", Gives: []string{"circular"}, Owned: true},
 		}}},
 		Suites: []Suite{{
-			Name: "calc", Description: "Runs calc.", Consumes: RawInput, Corpora: []string{"sheet"},
+			Name: "calc", Description: "Runs calc.", Consumes: RawInput, Corpora: []string{"sheet"}, Paths: []Path{{Corpus: "sheet"}},
 			Outputs: []Output{{Pattern: "stdout.txt", Description: "What it prints."}}, Rejects: []string{"circular"},
 		}, {
 			Name: "evaluate", Description: "Evaluates.", Consumes: "*example.com/m.Graph", Corpora: []string{"sheet", "csv"},
 			Paths: []Path{{Corpus: "sheet", Lifts: []string{"resolve", "parse"}}, {Corpus: "csv", Lifts: []string{"resolve", "parse", "import"}}},
 		}},
-		Lifts: []Lift{{Name: "parse", Corpora: []string{"sheet"}, Paths: []Path{{Corpus: "sheet"}}}},
+		Lifts: []Lift{
+			{Name: "parse", Corpora: []string{"sheet"}, Paths: []Path{{Corpus: "sheet"}}},
+			{Name: "resolve", Corpora: []string{"sheet"}, Paths: []Path{{Corpus: "sheet", Lifts: []string{"parse"}}}},
+			{Name: "import", Corpora: []string{"csv"}, Paths: []Path{{Corpus: "csv"}}},
+		},
 	}
 	got, err := Parse(now.Marshal())
 	if err != nil {
@@ -62,9 +66,37 @@ func TestParse(t *testing.T) {
 	if ps := got.Suites[1].Paths; !reflect.DeepEqual(ps, wantPaths) {
 		t.Errorf("evaluate's paths are written as %+v, want %+v", ps, wantPaths)
 	}
-	if ps := got.Lifts[0].Paths; len(ps) != 1 || ps[0].Lifts == nil || !bytes.Contains(now.Marshal(), []byte(`"corpus": "sheet",
+	if ps := got.Lifts[1].Paths; len(ps) != 1 || ps[0].Lifts == nil || !bytes.Contains(now.Marshal(), []byte(`"corpus": "sheet",
           "lifts": []`)) {
 		t.Errorf("parse's path is written as %+v, and the registry as\n%s", ps, now.Marshal())
+	}
+
+	// A registry whose paths the update couldn't have written is refused,
+	// as written by hand, which Marshal, which sorts, doesn't do.
+	for _, tt := range []struct {
+		edit func(r *Registry)
+		want string
+	}{
+		{func(r *Registry) { r.Suites[1].Paths = r.Suites[1].Paths[1:] }, "the suite evaluate runs over testdata/csv/ and testdata/sheet/, and has paths from testdata/sheet/, where a registry gives each column one path from each corpus it runs over, in the same order"},
+		{func(r *Registry) { slices.Reverse(r.Suites[1].Paths) }, "the suite evaluate runs over testdata/csv/ and testdata/sheet/, and has paths from testdata/sheet/ and testdata/csv/,"},
+		{func(r *Registry) { r.Suites[1].Paths = append(r.Suites[1].Paths, r.Suites[1].Paths[1]) }, "has paths from testdata/csv/, testdata/sheet/ and testdata/sheet/,"},
+		{func(r *Registry) { r.Suites[0].Paths = nil }, "the suite calc runs over testdata/sheet/, and has paths from none,"},
+		{func(r *Registry) { r.Lifts[2].Paths = nil }, "the lift resolve runs over testdata/sheet/, and has paths from none,"},
+		{func(r *Registry) { r.Suites[1].Paths[0].Lifts[2] = "nosuch" }, "the suite evaluate's path from testdata/csv/ names nosuch, and the registry lists no lift of that name, where every lift on a column's path is one its package registers"},
+		{func(r *Registry) { r.Lifts[2].Paths[0].Lifts = []string{"resolve"} }, "the lift resolve's path from testdata/sheet/ names the lift itself, where a column's path names the lifts before it"},
+	} {
+		r, err := Parse(now.Marshal())
+		if err != nil {
+			t.Fatal(err)
+		}
+		tt.edit(r)
+		data, err := json.MarshalIndent(r, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Parse(data); err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("a registry edited by hand: got %v, want %q", err, tt.want)
+		}
 	}
 
 	for _, data := range []string{olderData, fmt.Sprintf(`{"format": %d}`, Format+1)} {

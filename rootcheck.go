@@ -76,6 +76,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	needOwner := map[string]map[string]bool{}       // directory → the transforms its corpus types list in packages with tests
 	trPkgs := map[trKey][]string{}                  // transform → the packages that own it
 	untestedTrs := map[trKey][]string{}             // transform → the packages with no _test.go file whose registries own it
+	testedRegs := map[string]*registry.Registry{}   // package → its registry, for the packages with tests
 	var rootPkgs []string
 	claim := func(name string, corpora []string) {
 		for _, corpus := range corpora {
@@ -112,6 +113,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		// declares differently, still fails.
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
+		}
+		if g.tested {
+			testedRegs[g.pkg] = g.reg
 		}
 		for _, s := range g.reg.Suites {
 			claim(s.Name, s.Corpora)
@@ -303,39 +307,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 		t.Errorf("the registries that own or use the lift %s differ in %s:\n%s\nEvery package that owns or uses a lift registers one declaration of it: %s. Declare the lift once, in a package the others import, and register that declaration. %s", name, andList(differ), strings.Join(blocks, "\n"), why, stale)
 	}
-	// A package that uses a lift reaches it from each corpus by the path
-	// the lift's owner records, so that the lift's cells the owner writes
-	// are the ones the user's cells past it are built through, as a corpus
-	// check reads them on a cell's Path. A lift with no owner, or two, has
-	// no one path to compare with, and fails above.
-	for _, name := range slices.Sorted(maps.Keys(liftEntries)) {
-		var owners, users []liftEntry
-		for _, e := range liftEntries[name] {
-			if e.lift.Owned {
-				owners = append(owners, e)
-			} else {
-				users = append(users, e)
-			}
-		}
-		if len(owners) != 1 {
-			continue
-		}
-		owner := owners[0]
-		owned := map[string][]string{} // corpus → the owner's path from it
-		for _, p := range owner.lift.Paths {
-			owned[p.Corpus] = p.Lifts
-		}
-		for _, u := range users {
-			for _, p := range u.lift.Paths {
-				switch lifts, ok := owned[p.Corpus]; {
-				case !ok:
-					t.Errorf("the lift %s is used by %s on the path %s, and %s, which owns it, doesn't run it over testdata/%s/, so no package writes its cells of that corpus's cases, which %s's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does. Register in %s the corpus type of testdata/%s/ and the lifts on the path, each with hypercase.Own or hypercase.Use. If %s does already, a registry is stale: run %s, which rewrites the registry of every package with tests.", name, u.pkg, route(p.Corpus, p.Lifts, name), owner.pkg, p.Corpus, u.pkg, owner.pkg, p.Corpus, owner.pkg, r.updateCmd())
-				case !slices.Equal(lifts, p.Lifts):
-					t.Errorf("the lift %s is used by %s on the path %s, and %s, which owns it, runs it on the path %s, so no package writes the cells of %s that %s's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does. Register the same lifts between testdata/%s/ and %s in %s and %s, owning each in one package and using it in the other. If they do already, a registry is stale: run %s, which rewrites the registry of every package with tests.", name, u.pkg, route(p.Corpus, p.Lifts, name), owner.pkg, route(p.Corpus, lifts, name), name, u.pkg, p.Corpus, name, owner.pkg, u.pkg, r.updateCmd())
-				}
-			}
-		}
-	}
+	r.usedPaths(t, testedRegs, liftEntries, liftPkgs)
 
 	// The archives, and the directories that hold them.
 	td := filepath.Join(r.corpusRoot, "testdata")
@@ -468,14 +440,319 @@ type liftEntry struct {
 	lift registry.Lift
 }
 
-// route shows a lift's path from a corpus, as a registry records it, from
-// the corpus to the lift: testdata/export/ → import → parse.
+// route shows a lift's path from a corpus, from the corpus to the lift:
+// testdata/export/ → import → parse. lifts run from the corpus.
 func route(corpus string, lifts []string, lift string) string {
 	s := "testdata/" + corpus + "/"
-	for _, l := range slices.Backward(lifts) {
+	for _, l := range lifts {
 		s += " → " + l
 	}
 	return s + " → " + lift
+}
+
+// usedPaths fails where a package that uses a lift reaches it from a
+// corpus otherwise than the lift's owner does, so that the lift's cells
+// the owner writes are the ones the user's cells past it are built
+// through, as a corpus check reads them on a cell's Path. A lift with no
+// owner, or two, has no one path to compare with, and rootCheck fails on
+// it otherwise. regs are the registries of the packages with tests, by
+// package, entries each lift's entries in them, and owners each lift's
+// owners among them.
+//
+// It fails once for each divergence: a user, a corpus, and where the
+// user's path from the corpus leaves the owner's, or that the owner
+// doesn't run the lift over the corpus at all. The lifts past one
+// divergence that the user uses share it, and the failure names them, and
+// the paths to the nearest.
+func (r *runner) usedPaths(t *testing.T, regs map[string]*registry.Registry, entries map[string][]liftEntry, owners map[string][]string) {
+	t.Helper()
+	// A divergence is where a user's path from a corpus leaves its owner's:
+	// from the corpus, both take the lifts of prefix, then the user takes
+	// mine and the owner theirs, and both go on alike. missing marks an
+	// owner that doesn't run the lifts over the corpus.
+	type divergence struct {
+		user, owner, corpus  string
+		missing              bool
+		prefix, mine, theirs string // lift names, joined by spaces
+	}
+	type used struct {
+		lift                  string
+		route, theirs         []string        // the user's and the owner's lifts, from the corpus
+		userPaths, ownerPaths []registry.Path // the user's and the owner's entries' paths
+	}
+	groups := map[divergence][]used{}
+	var order []divergence
+	for _, name := range slices.Sorted(maps.Keys(entries)) {
+		var owner *liftEntry
+		var users []liftEntry
+		for _, e := range entries[name] {
+			if !e.lift.Owned {
+				users = append(users, e)
+			} else if len(owners[name]) == 1 {
+				owner = &e
+			}
+		}
+		if owner == nil {
+			continue
+		}
+		owned := map[string][]string{} // corpus → the owner's lifts from it
+		for _, p := range owner.lift.Paths {
+			owned[p.Corpus] = reversed(p.Lifts)
+		}
+		for _, u := range users {
+			for _, p := range u.lift.Paths {
+				mine := reversed(p.Lifts)
+				theirs, ok := owned[p.Corpus]
+				if ok && slices.Equal(mine, theirs) {
+					continue
+				}
+				d := divergence{user: u.pkg, owner: owner.pkg, corpus: p.Corpus, missing: !ok}
+				if ok {
+					i := 0
+					for i < len(mine) && i < len(theirs) && mine[i] == theirs[i] {
+						i++
+					}
+					j := 0
+					for j < len(mine)-i && j < len(theirs)-i && mine[len(mine)-1-j] == theirs[len(theirs)-1-j] {
+						j++
+					}
+					d.prefix = strings.Join(mine[:i], " ")
+					d.mine = strings.Join(mine[i:len(mine)-j], " ")
+					d.theirs = strings.Join(theirs[i:len(theirs)-j], " ")
+				}
+				if groups[d] == nil {
+					order = append(order, d)
+				}
+				groups[d] = append(groups[d], used{name, mine, theirs, u.lift.Paths, owner.lift.Paths})
+			}
+		}
+	}
+	typeDirs := map[string]string{} // Go type → its corpus directory
+	for _, g := range regs {
+		for _, ct := range g.Types {
+			typeDirs[ct.GoType] = ct.Dir
+		}
+	}
+	for _, d := range order {
+		us := groups[d]
+		slices.SortStableFunc(us, func(a, b used) int { return len(a.route) - len(b.route) })
+		var names []string
+		for _, u := range us {
+			names = append(names, u.lift)
+		}
+		near := us[0]
+		lifts, it, its, past := "lift "+names[0]+" is", "it", "its", ""
+		if len(us) > 1 {
+			lifts, it, its, past = "lifts "+andList(names)+" are", "them", "their", " and past it"
+		}
+		if d.missing {
+			// The owner takes the user's lifts from the corpus only as far
+			// as a corpus both run the lift over: past it, its own lifts
+			// take it on, and where the user's differ, the failure from
+			// that corpus says so.
+			userRuns, both := corpusSet(near.userPaths), map[string]bool{}
+			for c := range corpusSet(near.ownerPaths) {
+				both[c] = userRuns[c]
+			}
+			need := r.missingRegistrations(regs[d.owner], regs[d.user], d.corpus, near.route, both, typeDirs, owners)
+			if need.empty() {
+				t.Errorf("the %s used by %s on the path %s%s, and %s, which owns %s, doesn't run %s over testdata/%s/, so no package writes %s cells of that corpus's cases, which %s's cells past %s are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does, and the registry of %s records the corpus type of testdata/%s/ and the lifts on %s's path from it, so a registry is stale: run %s, which rewrites the registry of every package with tests.",
+					lifts, d.user, route(d.corpus, near.route, near.lift), past, d.owner, it, it, d.corpus, its, d.user, it,
+					d.owner, d.corpus, d.user, r.updateCmd())
+				continue
+			}
+			t.Errorf("the %s used by %s on the path %s%s, and %s, which owns %s, doesn't run %s over testdata/%s/, so no package writes %s cells of that corpus's cases, which %s's cells past %s are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does. In %s, %s, so %s runs %s over testdata/%s/ too. If %s registers them already, or %s doesn't reach %s from testdata/%s/, a registry is stale: run %s, which rewrites the registry of every package with tests.",
+				lifts, d.user, route(d.corpus, near.route, near.lift), past, d.owner, it, it, d.corpus, its, d.user, it,
+				d.owner, need, d.owner, it, d.corpus, d.owner, d.user, it, d.corpus, r.updateCmd())
+			continue
+		}
+		mine, theirs := strings.Fields(d.mine), strings.Fields(d.theirs)
+		tail := near.route[len(strings.Fields(d.prefix))+len(mine):]
+		replace := func(pkg string, add, drop []string, paths []registry.Path) string {
+			return replaceLifts(pkg, add, drop, regs[pkg]) + r.adoptRegistrations(pkg, add, drop, tail, paths, regs, entries, owners, typeDirs)
+		}
+		t.Errorf("the %s used by %s on the path %s%s, and %s, which owns %s, runs %s on the path %s%s, so no package writes the cells of %s that %s's cells past %s are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does. Either %s, or %s. If they reach %s alike already, a registry is stale: run %s, which rewrites the registry of every package with tests.",
+			lifts, d.user, route(d.corpus, near.route, near.lift), past, d.owner, it, it, route(d.corpus, near.theirs, near.lift), past, andList(names), d.user, it,
+			replace(d.user, theirs, mine, near.userPaths), replace(d.owner, mine, theirs, near.ownerPaths), it, r.updateCmd())
+	}
+}
+
+// corpusSet is the set of the corpora paths start from.
+func corpusSet(paths []registry.Path) map[string]bool {
+	set := map[string]bool{}
+	for _, p := range paths {
+		set[p.Corpus] = true
+	}
+	return set
+}
+
+// needed is what a package registers to reach a lift from a corpus as
+// another package does: the corpus types of dirs, the lifts of use, with
+// hypercase.Use, each owned by a package, and the lifts of own, with
+// hypercase.Own, owned by none.
+type needed struct{ dirs, use, own []string }
+
+func (g needed) empty() bool { return len(g.dirs)+len(g.use)+len(g.own) == 0 }
+
+// and adds what o names to g, each once.
+func (g *needed) and(o needed) {
+	add := func(to *[]string, from []string) {
+		for _, x := range from {
+			if !slices.Contains(*to, x) {
+				*to = append(*to, x)
+			}
+		}
+	}
+	add(&g.dirs, o.dirs)
+	add(&g.use, o.use)
+	add(&g.own, o.own)
+}
+
+func (g needed) String() string {
+	var parts []string
+	switch len(g.dirs) {
+	case 0:
+	case 1:
+		parts = append(parts, "register the corpus type of "+dirList(g.dirs))
+	default:
+		parts = append(parts, "register the corpus types of "+dirList(g.dirs))
+	}
+	if len(g.use) > 0 {
+		parts = append(parts, "give "+andList(g.use)+" to hypercase.Use")
+	}
+	if len(g.own) > 0 {
+		parts = append(parts, "give "+andList(g.own)+" to hypercase.Own")
+	}
+	return strings.Join(parts, ", and ")
+}
+
+// missingRegistrations is what the package of the registry own lacks to
+// reach a lift from corpus by the lifts of route, from the corpus, as the
+// package of the registry user does, as far as the product of a bytes lift
+// on route whose corpus is one of reached: the corpus types of the corpus
+// and of each bytes lift's product before it, and those lifts, each with
+// hypercase.Use where a package owns it, and hypercase.Own where none
+// does.
+func (r *runner) missingRegistrations(own, user *registry.Registry, corpus string, route []string, reached map[string]bool, typeDirs map[string]string, owners map[string][]string) needed {
+	has := map[string]bool{}
+	for _, ct := range own.Types {
+		has["dir "+ct.Dir] = true
+	}
+	for _, l := range own.Lifts {
+		has["lift "+l.Name] = true
+	}
+	entry := map[string]registry.Lift{}
+	for _, l := range user.Lifts {
+		entry[l.Name] = l
+	}
+	var need needed
+	dirs := []string{corpus}
+	for _, name := range route {
+		switch {
+		case has["lift "+name]:
+		case len(owners[name]) > 0:
+			need.use = append(need.use, name)
+		default:
+			need.own = append(need.own, name)
+		}
+		if l := entry[name]; l.Bytes {
+			d := typeDirs[l.Product]
+			if reached[d] {
+				break
+			}
+			dirs = append(dirs, d)
+		}
+	}
+	for _, d := range dirs {
+		if !has["dir "+d] && !slices.Contains(need.dirs, d) {
+			need.dirs = append(need.dirs, d)
+		}
+	}
+	return need
+}
+
+// adoptRegistrations words the rest of one way to end a divergence, in
+// which the package pkg gives add to hypercase.Use in place of drop.
+// paths are pkg's paths of the lift, and those that reach it through drop,
+// then tail, start from the corpora pkg reaches add from then. Where the
+// owner of add's first lift doesn't run it over such a corpus, the owner
+// registers what it lacks to, as missingRegistrations words it, as far as
+// a corpus both run the lifts over, so that the way is whole: following
+// it ends the failure, even where another failure names the same
+// registrations.
+func (r *runner) adoptRegistrations(pkg string, add, drop, tail []string, paths []registry.Path, regs map[string]*registry.Registry, entries map[string][]liftEntry, owners map[string][]string, typeDirs map[string]string) string {
+	if len(add) == 0 || len(owners[add[0]]) != 1 || owners[add[0]][0] == pkg {
+		return ""
+	}
+	owner := owners[add[0]][0]
+	var runs map[string]bool
+	for _, e := range entries[add[0]] {
+		if e.pkg == owner && e.lift.Owned {
+			runs = corpusSet(e.lift.Paths)
+		}
+	}
+	reaches := corpusSet(paths)
+	both := map[string]bool{}
+	for c := range runs {
+		both[c] = reaches[c]
+	}
+	after := append(slices.Clone(drop), tail...)
+	var need needed
+	for _, p := range paths {
+		route := reversed(p.Lifts)
+		if runs[p.Corpus] || len(route) < len(after) || !slices.Equal(route[len(route)-len(after):], after) {
+			continue
+		}
+		need.and(r.missingRegistrations(regs[owner], regs[pkg], p.Corpus, route[:len(route)-len(after)], both, typeDirs, owners))
+	}
+	if need.empty() {
+		return ""
+	}
+	return ", and in " + owner + ", " + need.String()
+}
+
+// replaceLifts words one way to end a divergence: the package pkg, whose
+// registry is reg, registers add, with hypercase.Use, in place of drop,
+// and the cells of each lift of drop it owns, which no package writes
+// then, are deleted.
+func replaceLifts(pkg string, add, drop []string, reg *registry.Registry) string {
+	s := "in " + pkg + ", give " + andList(add) + " to hypercase.Use"
+	if len(add) == 0 {
+		s = "in " + pkg + ", remove " + andList(drop)
+	} else if len(drop) > 0 {
+		s += " in place of " + andList(drop)
+	}
+	var owned, dirs []string
+	for _, l := range reg.Lifts {
+		if l.Owned && slices.Contains(drop, l.Name) {
+			owned = append(owned, l.Name)
+			dirs = append(dirs, "out/"+l.Name+"/")
+		}
+	}
+	switch len(owned) {
+	case 0:
+	case 1:
+		s += ", and delete " + owned[0] + "'s cells, under " + dirs[0] + " in the archives, which no package writes then"
+	default:
+		s += ", and delete the cells of " + andList(owned) + ", under " + andList(dirs) + " in the archives, which no package writes then"
+	}
+	return s
+}
+
+// reversed returns a reversed copy of s.
+func reversed(s []string) []string {
+	out := slices.Clone(s)
+	slices.Reverse(out)
+	return out
+}
+
+// dirList names corpus directories, as testdata/<dir>/ each, in prose.
+func dirList(dirs []string) string {
+	var names []string
+	for _, d := range dirs {
+		names = append(names, "testdata/"+d+"/")
+	}
+	return andList(names)
 }
 
 // liftFields are the fields of a lift's registry entry that every registry

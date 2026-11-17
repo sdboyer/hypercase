@@ -1,0 +1,87 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # used-unowned-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+    --- PASS: TestCorpus/script
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # used-fewer-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ go test  # used-fewer-a
+    the lift import is used by ./b, and no package owns it, so its error is recorded nowhere.
+        Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
+    the lifts parse and resolve are used by ./b on the path testdata/export/ → import → parse and past it, and ., which owns them, doesn't run them over testdata/export/, so no package writes their cells of that corpus's cases, which ./b's cells past them are built through.
+        A package that uses a lift reaches it from each corpus by the path the lift's owner does. In ., register the corpus type of testdata/export/, and give import to hypercase.Own, so . runs them over testdata/export/ too. If . registers them already, or ./b doesn't reach them from testdata/export/, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # used-unowned-a-fixed
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # used-unowned-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+    --- PASS: TestCorpus/script
+PASS
+$ go test  # used-unowned-a-fixed
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ go test ./b  # used-unowned-b
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+    --- PASS: TestCorpus/script
+PASS

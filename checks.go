@@ -138,7 +138,12 @@ func (r *runner) runChecks(t *testing.T, found []registry.Found) {
 	t.Run(checksDir, func(t *testing.T) {
 		for _, c := range r.checks {
 			t.Run(c.Name, func(t *testing.T) {
-				if err != nil {
+				var reg *unreadableRegistry
+				switch {
+				case errors.As(err, &reg):
+					t.Errorf("the corpus check %s can't read its cells: %s can't be read: %v.\nRun %s to write it. No check runs, and an update writes no findings.", c.Name, reg.path, reg.err, r.updateCmd())
+					return
+				case err != nil:
 					t.Errorf("the corpus check %s can't read its cells: %v\nFix what the message names. No check runs, and an update writes no findings.", c.Name, err)
 					return
 				}
@@ -236,10 +241,9 @@ func (r *runner) orphanFindings(t *testing.T) {
 // then case, the base first, then its hand-written variants in the order
 // written, then its transforms' by name, then column. A registry or an
 // archive that can't be read, or a cell's outcome, is an error, and so is
-// a column whose registry entry doesn't give one path from each of its
-// corpora, or names on a path a lift the registry doesn't list, and a
-// transform's variant whose properties can't be known: one no corpus type
-// lists, or one its transform declines.
+// a transform's variant whose properties can't be known: one no corpus
+// type lists, or one its transform declines. A registry that registry.Parse
+// refuses is an *unreadableRegistry.
 func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 	// A col is a column over one corpus, and its path from the corpus.
 	type col struct {
@@ -259,47 +263,29 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 		}
 		g, err := registry.Parse(data)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", r.rel(f.Path), err)
+			return nil, &unreadableRegistry{r.rel(f.Path), err}
 		}
 		pkg := r.pkgName(f.Pkg)
-		stale := fmt.Sprintf("The registry is stale, or edited by hand: run %s, which rewrites the registry of every package with tests", r.updateCmd())
-		lifts := map[string]bool{}
-		for _, l := range g.Lifts {
-			lifts[l.Name] = true
-		}
-		add := func(e Entry, corpora []string, paths []registry.Path) error {
-			if from := pathCorpora(paths); !slices.Equal(from, corpora) {
-				return fmt.Errorf("%s: the %s %s runs over %s, and has paths from %s, where a registry gives each column one path from each corpus it runs over, in the same order. %s", r.rel(f.Path), e.Kind, e.Name, dirList(corpora), dirList(from), stale)
-			}
-			for _, p := range paths {
-				for _, name := range p.Lifts {
-					if !lifts[name] {
-						return fmt.Errorf("%s: the %s %s's path from testdata/%s/ names %s, which the registry lists no lift of, where every lift on a column's path is one its package registers. %s", r.rel(f.Path), e.Kind, e.Name, p.Corpus, name, stale)
-					}
-				}
-			}
+		// Parse refuses paths that aren't one from each corpus, so each
+		// corpus has its path at its index.
+		add := func(e Entry, corpora []string, paths []registry.Path) {
 			for i, corpus := range corpora {
 				columns[corpus] = append(columns[corpus], col{e, paths[i].Lifts})
 			}
-			return nil
 		}
 		for _, s := range g.Suites {
 			e := Entry{Kind: "suite", Name: s.Name, Description: s.Description, Package: pkg, Rejects: s.Rejects}
 			if s.Classifier != nil {
 				e.Classifier = s.Classifier.Name
 			}
-			if err := add(e, s.Corpora, s.Paths); err != nil {
-				return nil, err
-			}
+			add(e, s.Corpora, s.Paths)
 		}
 		for _, l := range g.Lifts {
 			if !l.Owned {
 				continue
 			}
 			products[l.Name] = l.Bytes
-			if err := add(Entry{Kind: "lift", Name: l.Name, Description: l.Description, Package: pkg, Rejects: l.Rejects}, l.Corpora, l.Paths); err != nil {
-				return nil, err
-			}
+			add(Entry{Kind: "lift", Name: l.Name, Description: l.Description, Package: pkg, Rejects: l.Rejects}, l.Corpora, l.Paths)
 		}
 		for _, ct := range g.Types {
 			if transforms[ct.Dir] == nil {
@@ -400,26 +386,14 @@ func gapTexts(transform string, gaps []archive.Gap) map[string]string {
 	return m
 }
 
-// pathCorpora gives the corpus of each of a column's paths, in their order.
-func pathCorpora(paths []registry.Path) []string {
-	from := []string{}
-	for _, p := range paths {
-		from = append(from, p.Corpus)
-	}
-	return from
+// An unreadableRegistry is a registry readCells can't read, by its path
+// relative to the module root, and why.
+type unreadableRegistry struct {
+	path string
+	err  error
 }
 
-// dirList names corpus directories, as testdata/<dir>/ each, or none.
-func dirList(dirs []string) string {
-	if len(dirs) == 0 {
-		return "none"
-	}
-	var names []string
-	for _, d := range dirs {
-		names = append(names, "testdata/"+d+"/")
-	}
-	return andList(names)
-}
+func (e *unreadableRegistry) Error() string { return e.path + ": " + e.err.Error() }
 
 // cloneCells copies cells deeply, so no check sees what another changed.
 func cloneCells(cells []Cell) []Cell {

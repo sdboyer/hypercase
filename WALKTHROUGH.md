@@ -1540,8 +1540,23 @@ package owns every column it registers.
   on a lift a package uses from a corpus its owner doesn't run it over,
   and on one a package reaches by other lifts than its owner, as a copy of
   `parse` under another name, owned by the package that uses `resolve`,
-  would. Each failure names both paths, or the corpus, and the lifts to
-  register.
+  would. It fails once for each package, corpus and place where the paths
+  part, naming every lift the package uses past it.
+  - Over a corpus the owner doesn't run the lift over, the failure names
+    the user's path, and what the owner registers to reach the lift from
+    the corpus as the user does, as far as a corpus both run it over: the
+    corpus types it lacks, and the lifts, each given to `Use`, or to `Own`
+    where no package owns it.
+  - Over a path that parts from the owner's, it names both paths and two
+    ways to end it: the user gives the owner's lifts to `Use` in place of
+    its own, or the owner gives the user's lifts to `Use` in place of its
+    own. Each way names the cells to delete, those of the lifts it gives
+    up, which no package writes then, and what the owner of the lifts it
+    takes registers to run them over each corpus the package reaches them
+    from.
+  - Where the registries record what a failure names already, a registry
+    is stale, and the failure says so. The update, which rewrites the
+    registries, ends it.
 
 **Blocked cells.**
 
@@ -2453,9 +2468,11 @@ S202
   transform. An archive that can't be read fails every check of the
   package, and an update writes no findings. So does a transform's variant
   whose properties can't be known: one no corpus type lists, or one its
-  transform declines. So does a registry that doesn't give a column one
-  path from each corpus it runs over, in their order, or that names on a
-  path a lift it doesn't list.
+  transform declines. So does a registry that doesn't give each column,
+  a lift the package uses included, one path from each corpus it runs
+  over, in their order, or whose path names the column itself or a lift
+  the registry doesn't list. The root-package check fails on such a
+  registry too.
 - A check reads the cells as they are committed when it runs. The module's
   update runs packages at once, so a check can run before another package
   writes its cells: its findings can take a second update to settle, and a

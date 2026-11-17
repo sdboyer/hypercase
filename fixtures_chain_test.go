@@ -351,7 +351,14 @@ var chainRegistrations = map[string]func(){
 	"used-fewer-b": func() {
 		hypercase.Register(append([]any{project, scriptType, plainExportType, own(importLift, evaluate), hypercase.Use(parse, resolve)}, chainProps...)...)
 	},
-	"chain-b-render": func() { chainB(projectRender) },
+	// used-unowned-b is used-fewer-b using import, which no package owns,
+	// and used-unowned-a-fixed reaches parse and resolve from export as
+	// ./b does, by owning import.
+	"used-unowned-b": func() {
+		hypercase.Register(append([]any{project, scriptType, plainExportType, own(evaluate), hypercase.Use(importLift, parse, resolve)}, chainProps...)...)
+	},
+	"used-unowned-a-fixed": func() { chain(project, plainExportType, own(importLift, parse, resolve, pathsCheck)) },
+	"chain-b-render":       func() { chainB(projectRender) },
 	// chain-b-nooutputs is chain-b with a copy of import that declares no
 	// outputs.
 	"chain-b-nooutputs": func() {

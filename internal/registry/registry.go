@@ -263,7 +263,11 @@ func (e *FormatError) Error() string {
 }
 
 // Parse parses a registry. One of another format version is a
-// [*FormatError].
+// [*FormatError]. So that every reader of today's registries reads the
+// paths the update writes, Parse refuses one whose paths the update
+// couldn't have written: a column's paths are one from each of its
+// corpora, in their order, and name only lifts the registry lists, never
+// the column itself.
 func Parse(data []byte) (*Registry, error) {
 	var head struct {
 		Format int `json:"format"`
@@ -277,7 +281,70 @@ func Parse(data []byte) (*Registry, error) {
 	case head.Format != Format:
 		return nil, &FormatError{Format: head.Format}
 	}
-	return decode(data)
+	r, err := decode(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.checkPaths(); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+// checkPaths reports the first column, suite or lift, owned or used,
+// whose paths the update couldn't have written.
+func (r *Registry) checkPaths() error {
+	lifts := map[string]bool{}
+	for _, l := range r.Lifts {
+		lifts[l.Name] = true
+	}
+	check := func(kind, name string, corpora []string, paths []Path) error {
+		from := []string{}
+		for _, p := range paths {
+			from = append(from, p.Corpus)
+		}
+		if !slices.Equal(from, corpora) {
+			return fmt.Errorf("the %s %s runs over %s, and has paths from %s, where a registry gives each column one path from each corpus it runs over, in the same order", kind, name, dirList(corpora), dirList(from))
+		}
+		for _, p := range paths {
+			for _, l := range p.Lifts {
+				switch {
+				case l == name:
+					return fmt.Errorf("the %s %s's path from testdata/%s/ names the %s itself, where a column's path names the lifts before it", kind, name, p.Corpus, kind)
+				case !lifts[l]:
+					return fmt.Errorf("the %s %s's path from testdata/%s/ names %s, and the registry lists no lift of that name, where every lift on a column's path is one its package registers", kind, name, p.Corpus, l)
+				}
+			}
+		}
+		return nil
+	}
+	for _, s := range r.Suites {
+		if err := check("suite", s.Name, s.Corpora, s.Paths); err != nil {
+			return err
+		}
+	}
+	for _, l := range r.Lifts {
+		if err := check("lift", l.Name, l.Corpora, l.Paths); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// dirList names corpus directories, as testdata/<dir>/ each, in prose,
+// or none.
+func dirList(dirs []string) string {
+	if len(dirs) == 0 {
+		return "none"
+	}
+	var names []string
+	for _, d := range dirs {
+		names = append(names, "testdata/"+d+"/")
+	}
+	if len(names) == 1 {
+		return names[0]
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }
 
 // decode decodes a registry, refusing a key its Registry doesn't hold.

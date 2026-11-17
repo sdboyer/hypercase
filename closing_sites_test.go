@@ -655,8 +655,6 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "the transform %s, of testdata/%s/, is owned by %s. One package owns each transform. Own it in one of them.", "a transform two packages own, in the root-package check"},
 		{"Errorf", "the property %s has two different entries: %s Declare the property once, in a package the others import, and register that declaration. %s", "a property's differing entries, in the root-package check"},
 		{"Errorf", "the registries that own or use the lift %s differ in %s: %s Every package that owns or uses a lift registers one declaration of it: %s. Declare the lift once, in a package the others import, and register that declaration. %s", "a lift's differing registry entries, in the root-package check"},
-		{"Errorf", "the lift %s is used by %s on the path %s, and %s, which owns it, doesn't run it over testdata/%s/, so no package writes its cells of that corpus's cases, which %s's cells past it are built through. A package that uses a lift reaches it from each corpus by the path the lift's owner does. Register in %s the corpus type of testdata/%s/ and the lifts on the path, each with hypercase.Own or hypercase.Use. If %s does already, a registry is stale: run %s, which rewrites the registry of every package with tests.", "a lift used from a corpus its owner doesn't run it over, in the root-package check"},
-		{"Errorf", "the lift %s is used by %s on the path %s, and %s, which owns it, runs it on the path %s, so no package writes the cells of %s that %s's cells past it are built through. A package that uses a lift reaches it from each corpus by the path the lift's owner does. Register the same lifts between testdata/%s/ and %s in %s and %s, owning each in one package and using it in the other. If they do already, a registry is stale: run %s, which rewrites the registry of every package with tests.", "a lift used by a path other than its owner's, in the root-package check"},
 		{"Errorf", "%s is a temp file left by a write that was cut short. Delete it.", "a registry temp file a write left, in the root-package check"},
 		{"Errorf", "reading %s: %v", "testdata/, which can't be read, in the root-package check"},
 		{"Errorf", "%s holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/. Move the archives into one.", "archives directly under testdata/, in the root-package check"},
@@ -678,6 +676,7 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "%s, the corpus check %s's findings, differs (-golden +got): %s If the change is intended, run %s and read the diff before committing.", "a corpus check's findings that differ from their golden"},
 	},
 	"runner.runChecks": {
+		{"Errorf", "the corpus check %s can't read its cells: %s can't be read: %v. Run %s to write it. No check runs, and an update writes no findings.", "a corpus check that can't read a registry"},
 		{"Errorf", "the corpus check %s can't read its cells: %v Fix what the message names. No check runs, and an update writes no findings.", "a corpus check that can't read its cells"},
 	},
 	"runner.runVariant": {
@@ -685,6 +684,11 @@ var messageSites = map[string][]messageSite{
 	},
 	"runner.skipped": {
 		{"Skipf", "%s: %s's probe says the case isn't for it: %s", "a cell whose probe says the case isn't for it, with no note, which it skips: it fails nothing"},
+	},
+	"runner.usedPaths": {
+		{"Errorf", "the %s used by %s on the path %s%s, and %s, which owns %s, doesn't run %s over testdata/%s/, so no package writes %s cells of that corpus's cases, which %s's cells past %s are built through. A package that uses a lift reaches it from each corpus by the path the lift's owner does. In %s, %s, so %s runs %s over testdata/%s/ too. If %s registers them already, or %s doesn't reach %s from testdata/%s/, a registry is stale: run %s, which rewrites the registry of every package with tests.", "lifts used from a corpus their owner doesn't run them over, in the root-package check"},
+		{"Errorf", "the %s used by %s on the path %s%s, and %s, which owns %s, doesn't run %s over testdata/%s/, so no package writes %s cells of that corpus's cases, which %s's cells past %s are built through. A package that uses a lift reaches it from each corpus by the path the lift's owner does, and the registry of %s records the corpus type of testdata/%s/ and the lifts on %s's path from it, so a registry is stale: run %s, which rewrites the registry of every package with tests.", "lifts used from a corpus their owner's registry records all it takes to run them over, and doesn't, in the root-package check"},
+		{"Errorf", "the %s used by %s on the path %s%s, and %s, which owns %s, runs %s on the path %s%s, so no package writes the cells of %s that %s's cells past %s are built through. A package that uses a lift reaches it from each corpus by the path the lift's owner does. Either %s, or %s. If they reach %s alike already, a registry is stale: run %s, which rewrites the registry of every package with tests.", "lifts used by a path other than their owner's, in the root-package check"},
 	},
 	"runner.write": {
 		{"Errorf", "%s changed while the update ran: its comment or hand-written sections differ from those its cells ran on, so the update wrote nothing to it. Run %s again.", "an archive that changed while the update ran, which it doesn't write"},
