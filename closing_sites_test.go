@@ -22,17 +22,18 @@ import (
 // one, or any type that implements testing.TB. Each use is a site but as
 // the receiver of a method quietMethods lists, which neither writes a
 // message nor ends a test, or as an argument to a function the package
-// declares, whose parameter has the value's own type, and whose body the
-// check reads. A site is a message method, called or taken as a method
-// value or a method expression, also through an interface that may hold a
-// testing value; or the value passed to another function, assigned,
-// converted, returned or made part of a composite literal, and any other
-// use. Each is report's one t.Errorf, or a site messageSites lists for its
-// function by what it is and its message, saying what it reports, which is
-// no cell's note: each listed site is one use. And no note's body gives
-// advice, which is its closing's: no body holds a run of the words of a
-// closing's advice, or of what a closing's claims say. A closing's advice
-// says nothing of what an update does: no constant of it names an update.
+// declares, whose parameter, as the function declares it, has the value's
+// own type, and whose body the check reads. A site is a message method,
+// called or taken as a method value or a method expression, also through
+// an interface that may hold a testing value; or the value passed to
+// another function, assigned, converted, returned or made part of a
+// composite literal, and any other use. Each is report's one t.Errorf, or
+// a site messageSites lists for its function by what it is and its
+// message, saying what it reports, which is no cell's note: each listed
+// site is one use. And no note's body gives advice, which is its
+// closing's: no body holds a run of the words of a closing's advice, or of
+// what a closing's claims say. A closing's advice says nothing of what an
+// update does: no constant of it names an update.
 // Nor does a note's body mention the update at all, which is its
 // closing's to name: no constant of a body says "update", in any case, or
 // holds the words updateCmd gives the update command. TestClosings checks
@@ -235,8 +236,11 @@ func (s *source) messageSites(t *testing.T) map[string][]site {
 	isTesting := func(typ types.Type) bool { return typ != nil && types.Implements(typ, tb) }
 	// followed reports whether the argument i of a call is one the check
 	// follows into its callee: the callee is a function the package
-	// declares, whose body the check reads, and its parameter has the
-	// argument's own type.
+	// declares, whose body the check reads, and its parameter, as the
+	// callee declares it, has the argument's own type. A parameter whose
+	// declared type is a type parameter isn't followed, whatever a call
+	// instantiates it with: the body takes the value as the type
+	// parameter.
 	followed := func(call *ast.CallExpr, i int, arg ast.Expr) bool {
 		fun := ast.Unparen(call.Fun)
 		switch f := fun.(type) {
@@ -246,12 +250,13 @@ func (s *source) messageSites(t *testing.T) map[string][]site {
 			fun = f.X
 		}
 		var obj types.Object
+		methodExpr := false
 		switch f := fun.(type) {
 		case *ast.Ident:
 			obj = s.info.Uses[f]
 		case *ast.SelectorExpr:
 			if sel := s.info.Selections[f]; sel != nil {
-				obj = sel.Obj()
+				obj, methodExpr = sel.Obj(), sel.Kind() == types.MethodExpr
 			} else {
 				obj = s.info.Uses[f.Sel]
 			}
@@ -260,23 +265,29 @@ func (s *source) messageSites(t *testing.T) map[string][]site {
 		if !ok || fn.Pkg() != s.pkg {
 			return false
 		}
-		if recv := fn.Signature().Recv(); recv != nil && types.IsInterface(recv.Type()) {
-			return false
-		}
-		sig, ok := s.info.TypeOf(call.Fun).(*types.Signature)
-		if !ok {
+		sig := fn.Origin().Signature()
+		if recv := sig.Recv(); recv != nil && types.IsInterface(recv.Type()) {
 			return false
 		}
 		ps := sig.Params()
 		var pt types.Type
 		switch {
-		case sig.Variadic() && i >= ps.Len()-1:
-			pt = ps.At(ps.Len() - 1).Type()
-			if !call.Ellipsis.IsValid() {
-				pt = pt.(*types.Slice).Elem()
+		case methodExpr && i == 0:
+			// A method expression's first argument is its receiver.
+			pt = sig.Recv().Type()
+		case methodExpr:
+			i--
+			fallthrough
+		default:
+			switch {
+			case sig.Variadic() && i >= ps.Len()-1:
+				pt = ps.At(ps.Len() - 1).Type()
+				if !call.Ellipsis.IsValid() {
+					pt = pt.(*types.Slice).Elem()
+				}
+			case i < ps.Len():
+				pt = ps.At(i).Type()
 			}
-		case i < ps.Len():
-			pt = ps.At(i).Type()
 		}
 		return pt != nil && types.Identical(pt, s.info.TypeOf(arg))
 	}
@@ -389,6 +400,54 @@ func (s *source) messageSites(t *testing.T) map[string][]site {
 		}
 	}
 	return found
+}
+
+// TestMessageSitesFollowed: messageSites follows a testing value into a
+// function the package declares only where the parameter, as the
+// function declares it, has the value's type: a function's, or a method's
+// called through a method expression, whose first argument is its
+// receiver. Passed to a parameter whose declared type is a type
+// parameter, the value is a site, whatever the call instantiates it with.
+func TestMessageSitesFollowed(t *testing.T) {
+	t.Parallel()
+	dir := tempPackage(t, map[string]string{"p.go": `package p
+
+import "testing"
+
+var held any
+
+func keep[T any](x T) { held = x }
+
+func take(t *testing.T) { t.Log("taken") }
+
+type r struct{}
+
+func (r) take(t *testing.T) { t.Log("taken by r") }
+
+func generic(t *testing.T) { keep(t) }
+
+func plain(t *testing.T) { take(t) }
+
+func method(t *testing.T) { r.take(r{}, t) }
+`})
+	s, err := typeCheck(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string][]string{}
+	for name, sites := range s.messageSites(t) {
+		for _, st := range sites {
+			got[name] = append(got[name], st.what+" "+st.msg)
+		}
+	}
+	want := map[string][]string{
+		"generic": {"pass keep"},
+		"take":    {"Log taken"},
+		"r.take":  {"Log taken by r"},
+	}
+	if !maps.EqualFunc(got, want, slices.Equal) {
+		t.Errorf("the sites, by function, are %v, want %v", got, want)
+	}
 }
 
 // message is a message method's message, as messageSites names it: its
