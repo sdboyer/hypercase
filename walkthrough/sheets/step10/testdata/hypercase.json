@@ -31,7 +31,7 @@
   "types": [
     {
       "dir": "csv",
-      "description": "A CSV export: one file, in/csv/<name>.csv, with a name holding a character that is neither white space nor a format character; one row of the sheet per line.",
+      "description": "A CSV export: one file, in/csv/<name>.csv, with a name holding a character that is neither white space nor a format character; one row of the sheet per record, where a quoted field may hold a newline.",
       "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.CSV",
       "transforms": []
     },

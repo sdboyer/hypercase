@@ -2753,7 +2753,7 @@ type CSV struct{ fs.FS } // in/csv/<name>.csv
 
 var CSVType = decl.Type[CSV]{
 	Dir:         "csv",
-	Description: "A CSV export: one file, in/csv/<name>.csv, with a name holding a character that is neither white space nor a format character; one row of the sheet per line.",
+	Description: "A CSV export: one file, in/csv/<name>.csv, with a name holding a character that is neither white space nor a format character; one row of the sheet per record, where a quoted field may hold a newline.",
 }
 
 var Unterminated = decl.Property{

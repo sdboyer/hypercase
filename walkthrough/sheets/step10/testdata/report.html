@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>hypercase report: ebc8feb9ae4740871c4d4d323c718817b268c7b4 to HEAD</title>
+<title>hypercase report: a888bb0f93a8c2673cf065efd8e932d1c769f513 to HEAD</title>
 <style>
 :root {
   color-scheme: light dark;
@@ -94,7 +94,7 @@ ul.outputs { padding-left: 18px; }
 <body>
 <header>
 <h1>hypercase report</h1>
-<p class="revs"><span class="rev">ebc8feb9ae4740871c4d4d323c718817b268c7b4</span> <code>ebc8feb9ae47</code> to <span class="rev">HEAD</span> <code>18ffef9824d1</code>, over the corpus root <code>step10</code></p>
+<p class="revs"><span class="rev">a888bb0f93a8c2673cf065efd8e932d1c769f513</span> <code>a888bb0f93a8</code> to <span class="rev">HEAD</span> <code>45cbe6e41efe</code>, over the corpus root <code>step10</code></p>
 </header>
 <main>
 <section id="changes">
@@ -180,7 +180,7 @@ ul.outputs { padding-left: 18px; }
 </section>
 <section class="matrix" id="corpus-csv">
 <h2>csv</h2>
-<p class="desc">A CSV export: one file, in/csv/&lt;name&gt;.csv, with a name holding a character that is neither white space nor a format character; one row of the sheet per line.</p>
+<p class="desc">A CSV export: one file, in/csv/&lt;name&gt;.csv, with a name holding a character that is neither white space nor a format character; one row of the sheet per record, where a quoted field may hold a newline.</p>
 <div class="scroll">
 <table>
 <thead>
@@ -427,7 +427,7 @@ ul.outputs { padding-left: 18px; }
 <h2>Descriptions</h2>
 <section class="corpus" id="describe-csv">
 <h3>csv</h3>
-<p>A CSV export: one file, in/csv/&lt;name&gt;.csv, with a name holding a character that is neither white space nor a format character; one row of the sheet per line.</p>
+<p>A CSV export: one file, in/csv/&lt;name&gt;.csv, with a name holding a character that is neither white space nor a format character; one row of the sheet per record, where a quoted field may hold a newline.</p>
 <h4>Columns</h4>
 <dl class="columns">
 <dt>calc</dt><dd>Runs the calc command on the sheet.<ul class="outputs"><li><code>error.txt</code>: Why calc failed.</li><li><code>stderr.txt</code>: A warning for each cell that divides by zero.</li><li><code>stdout.txt</code>: The sheet&#39;s values as CSV, one row per line.</li></ul><p class="classifier">Its classifier, <code>warned</code>: Adds warned when calc writes a warning.</p></dd>
@@ -454,7 +454,7 @@ ul.outputs { padding-left: 18px; }
 <dt>looped</dt><dd>The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.<p>Gives <span class="prop">circular</span>.</p></dd>
 <dt>renamed</dt><dd>Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.<p>Keeps <span class="prop">circular</span>, <span class="prop">dangling</span>.</p></dd>
 </dl>
-<h4>Cases only at <span class="rev">ebc8feb9ae4740871c4d4d323c718817b268c7b4</span></h4>
+<h4>Cases only at <span class="rev">a888bb0f93a8c2673cf065efd8e932d1c769f513</span></h4>
 <dl class="cases">
 <dt><span class="case">sheet/blank</span></dt><dd>A1 is a cell file with nothing in it.</dd>
 </dl>
