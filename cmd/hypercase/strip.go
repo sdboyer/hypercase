@@ -273,8 +273,8 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 		// A registry goes only once its package's findings files have, so
 		// that a strip run again finds those left, and only once no
 		// *.txtar file is left as it was, so that a strip run again, once
-		// it is fixed or moved into a corpus's directory, reads the
-		// registries as this one did.
+		// it is fixed, moved into a corpus's directory or deleted, reads
+		// the registries as this one did.
 		lock := filepath.Join(td, archive.LockFile)
 		for _, g := range own {
 			left := false
@@ -294,7 +294,7 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 				add(g.path, "left in place, so that strip run again finds the findings files of its package that this run left.", false)
 				continue
 			case leftArchive:
-				add(g.path, "left in place while an archive this run left is still to strip, so that strip run again reads it as this run did.", false)
+				add(g.path, "left in place, since this run left a *.txtar file as it was, so that strip, run again as that file's line says, reads the registry as this run did.", false)
 				continue
 			}
 			if err := archive.RemoveFile(lock, g.path); err != nil {

@@ -17,7 +17,7 @@ $ go test ./b  # pkg-b
 PASS
 $ go test  # pkg-a
     testdata/ holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.
-        Move the archives into one.
+        Move the archives into one, or delete them.
     testdata/renamed/ holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.
         Declare a decl.Type with that Dir, or move or delete the archives.
     testdata/script/old/ holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.

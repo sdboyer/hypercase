@@ -269,7 +269,7 @@ func TestRefusals(t *testing.T) {
 	for _, tt := range []struct{ path, want string }{
 		{"sheet/notes.txtar", "the archive has problems of form, so no update writes it: variant/cycle/notes: notes is not one of a hand-written variant's sections: about, in, delete, properties, gaps, via and out. Fix the archive by hand"},
 		{"sheet/twice.txtar", "the archive has problems of form, so no update writes it: out/evaluate/outcome: the section appears twice."},
-		{"x.txtar", "an archive belongs in a corpus's directory, testdata/<corpus>/, and this one is directly in testdata/. Move it into one"},
+		{"x.txtar", "an archive belongs in a corpus's directory, testdata/<corpus>/, and this one is directly in testdata/. Move it into one, or delete it"},
 		{"sheet/old/y.txtar", "an archive belongs directly in a corpus's directory, testdata/<corpus>/, and this one is below testdata/sheet/, so it is no case."},
 		{"checks/z.txtar", "testdata/checks/ holds corpus checks' findings, so no corpus has the directory."},
 		{"Sheet/a.txtar", `the directory's name, "Sheet", breaks the naming rule`},

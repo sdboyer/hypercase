@@ -776,13 +776,13 @@ func TestStripProblems(t *testing.T) {
 	})
 	top := writeTree(t, files)
 	r := stripIn(t, top, "")
-	const kept = ": left in place while an archive this run left is still to strip, so that strip run again reads it as this run did.\n"
+	const kept = ": left in place, since this run left a *.txtar file as it was, so that strip, run again as that file's line says, reads the registry as this run did.\n"
 	want := "a/b/c/testdata/hypercase.json" + kept + "format/testdata/hypercase.json" + kept + fmt.Sprintf(`testdata/csv/prices.txtar: removed %d sections
 testdata/hypercase.json`+kept+`testdata/sheet/notes.txtar: left as it was: the archive has problems of form, so no update writes it: variant/cycle/notes: notes is not one of a hand-written variant's sections: about, in, delete, properties, gaps, via and out. Fix the archive by hand, then run hypercase strip again.
 testdata/sheet/old/y.txtar: left as it was: an archive belongs directly in a corpus's directory, testdata/<corpus>/, and this one is below testdata/sheet/, so it is no case. Move it into a corpus's directory, or delete it, then run hypercase strip again.
 testdata/sheet/twice.txtar: removed %d sections
 testdata/sheet/twin.txtar: left as it was: the archive has problems of form, so no update writes it: out/evaluate/outcome: the section appears twice. Fix the archive by hand, then run hypercase strip again.
-testdata/x.txtar: left as it was: an archive belongs in a corpus's directory, testdata/<corpus>/, and this one is directly in testdata/. Move it into one, then run hypercase strip again.
+testdata/x.txtar: left as it was: an archive belongs in a corpus's directory, testdata/<corpus>/, and this one is directly in testdata/. Move it into one, or delete it, then run hypercase strip again.
 `, sectionCount(pricesFull)-sectionCount(pricesHand), sectionCount(twiceFull)-sectionCount(twiceHand)) + nextLine
 	if r.code != 1 || r.stderr != "" || r.stdout != want {
 		t.Errorf("strip exited %d, with stderr %q, and printed (-want +got):\n%s", r.code, r.stderr, diff.Lines([]byte(want), []byte(r.stdout)))
@@ -1038,7 +1038,7 @@ func TestStripFailedWrite(t *testing.T) {
 	if len(temps) != 2 || !strings.HasPrefix(temps[0], ".hypercase-tmp-prices.txtar-") {
 		t.Errorf("the writes' temp files were %q, not prices's and then twice's", temps)
 	}
-	const kept = ": left in place while an archive this run left is still to strip, so that strip run again reads it as this run did.\n"
+	const kept = ": left in place, since this run left a *.txtar file as it was, so that strip, run again as that file's line says, reads the registry as this run did.\n"
 	want := "a/b/c/testdata/hypercase.json" + kept + "format/testdata/hypercase.json" + kept +
 		"testdata/csv/prices.txtar: left as it was: stripping it failed, and the archive is as it was: disk full. Fix what failed, then run hypercase strip again.\n" +
 		"testdata/hypercase.json" + kept +
@@ -1113,7 +1113,7 @@ func TestStripMisplacedRerun(t *testing.T) {
 
 	top := writeTree(t, with(files, map[string]string{"testdata/sheet/twice.txtar": "", "testdata/sheet/old/twice.txtar": resolveViaTwice()}))
 	r := stripIn(t, top, "")
-	const kept = ": left in place while an archive this run left is still to strip, so that strip run again reads it as this run did.\n"
+	const kept = ": left in place, since this run left a *.txtar file as it was, so that strip, run again as that file's line says, reads the registry as this run did.\n"
 	for _, reg := range []string{"testdata/hypercase.json", "format/testdata/hypercase.json", "a/b/c/testdata/hypercase.json"} {
 		if !strings.Contains(r.stdout, reg+kept) {
 			t.Errorf("strip printed no line keeping %s:\n%s", reg, r.stdout)

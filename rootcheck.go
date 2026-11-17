@@ -340,7 +340,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	for _, dir := range slices.Sorted(maps.Keys(undeclared)) {
 		rel := r.rel(filepath.Join(td, filepath.FromSlash(dir))) + "/"
 		if dir == "." {
-			t.Errorf("%s holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.\nMove the archives into one.", rel)
+			t.Errorf("%s holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.\nMove the archives into one, or delete them.", rel)
 			continue
 		}
 		t.Errorf("%s holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.\nDeclare a decl.Type with that Dir, or move or delete the archives.", rel)

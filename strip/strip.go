@@ -299,7 +299,7 @@ func CheckPath(root, path string) error {
 	case !isArchive:
 		return fmt.Errorf("an archive's file name ends in .txtar, and %s doesn't. Name an archive of the corpus root, testdata/<corpus>/<archive>.txtar under it", file)
 	case len(parts) == 2:
-		return errors.New("an archive belongs in a corpus's directory, testdata/<corpus>/, and this one is directly in testdata/. Move it into one")
+		return errors.New("an archive belongs in a corpus's directory, testdata/<corpus>/, and this one is directly in testdata/. Move it into one, or delete it")
 	case len(parts) > 3:
 		return fmt.Errorf("an archive belongs directly in a corpus's directory, testdata/<corpus>/, and this one is below testdata/%s/, so it is no case. Move it into a corpus's directory, or delete it", parts[1])
 	case parts[1] == archive.ChecksDir:
