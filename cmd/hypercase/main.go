@@ -6,11 +6,19 @@
 //	hypercase strip [-root dir] [-column name] [-transform name] [-frozen]
 //
 // report compares two git revisions of a corpus root, read from the
-// repository's object store, never the working tree. It writes a static
-// HTML page on stdout: the cells that changed, ranked, with changed
-// outcomes first, then cells that appeared or disappeared, then files that
-// changed under the same outcome; and the matrix of each corpus at <b>.
-// With -text it writes the ranked changes as plain text instead.
+// repository's object store, never the working tree. A cell exists at a
+// revision when its outcome file does. The report writes one HTML page on
+// stdout, which runs no script and loads nothing: the problems it found
+// and doesn't pick between; the cells that changed, ranked, with changed
+// outcomes first, then cells that appeared, then cells that disappeared,
+// then files that changed under the same outcome, each file with its line
+// diff; the matrix of each corpus at <b>; and the descriptions of what the
+// registries and archives declare, from <b>, or from <a> for what <b>
+// lacks. With -text it writes the ranked changes as plain text instead.
+//
+// It reads registries of every format from the oldest this hypercase
+// knows to its own, and refuses a newer one, naming the hypercase that
+// reads it.
 //
 // strip removes update-written sections from the archives of a corpus
 // root, telling them from hand-written ones by name alone, and leaves every

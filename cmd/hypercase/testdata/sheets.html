@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hypercase report: 5f87987845d742d43a6cdc787e0c13c34e93b040 to cd0326af997b8ceac976168341f96d4723372246</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fdfdfc; --fg: #1d1d1b; --muted: #6b6b66; --line: #deddd8; --head: #f3f2ee;
+  --accepted: #e3f1e4; --rejected: #fbecd6; --panicked: #f8dcdc; --blocked: #e9e4f3; --skipped: #ecebe8;
+  --changed: #c0392b; --appeared: #1f7a3f; --bytes: #9a6b00; --link: #1f5fa8;
+  --add: #e3f1e4; --del: #f8dcdc;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171716; --fg: #e8e7e3; --muted: #a09f99; --line: #3a3936; --head: #22221f;
+    --accepted: #1f3a24; --rejected: #44341a; --panicked: #4a2222; --blocked: #322b45; --skipped: #2b2a27;
+    --changed: #ff7b6b; --appeared: #6fd08f; --bytes: #e0b24a; --link: #8cbcff;
+    --add: #1f3a24; --del: #4a2222;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 0 16px 48px; background: var(--bg); color: var(--fg);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header, main { max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 1.5rem; margin: 24px 0 4px; }
+h2 { font-size: 1.2rem; margin: 32px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+h3 { font-size: 1rem; margin: 20px 0 6px; }
+h4 { font-size: 0.95rem; margin: 12px 0 4px; color: var(--muted); }
+code, pre, .case, .col, .outcome, .prop { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+a { color: var(--link); }
+.revs { color: var(--muted); margin: 0; }
+.rev { font-weight: 600; }
+.count { color: var(--muted); font-weight: normal; }
+ul.problems { padding-left: 20px; }
+ul.problems li { margin: 2px 0; overflow-wrap: anywhere; }
+.rank.outcome-changed { color: var(--changed); }
+.rank.appeared, .rank.disappeared { color: var(--appeared); }
+.rank.bytes-changed { color: var(--bytes); }
+ul.changes { list-style: none; padding: 0; margin: 0; }
+li.change { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.line { overflow-wrap: anywhere; }
+.col { font-weight: 600; }
+.outcome { padding: 1px 6px; border-radius: 4px; background: var(--head); }
+.s-accepted .outcome, .outcome.s-accepted { background: var(--accepted); }
+.s-rejected .outcome, .outcome.s-rejected { background: var(--rejected); }
+.s-panicked .outcome, .outcome.s-panicked { background: var(--panicked); }
+.s-blocked .outcome, .outcome.s-blocked { background: var(--blocked); }
+.s-skipped .outcome, .outcome.s-skipped { background: var(--skipped); }
+.outcome.s-unknown { font-style: italic; color: var(--muted); }
+.arrow { color: var(--muted); }
+ul.files { list-style: none; margin: 4px 0 0 20px; padding: 0; color: var(--muted); }
+summary { cursor: pointer; }
+.stat .add { color: var(--appeared); }
+.stat .del { color: var(--changed); }
+pre.diff { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
+pre.diff span { display: block; padding: 0 8px; white-space: pre; }
+pre.diff .add { background: var(--add); }
+pre.diff .del { background: var(--del); }
+pre.diff .skip, pre.diff .unaligned { color: var(--muted); }
+.props { margin-left: 6px; }
+.prop { display: inline-block; margin: 0 4px 0 0; padding: 0 6px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); }
+.prop.kept { border-style: dashed; }
+.how { font-size: 0.85em; font-style: italic; }
+.badge { display: inline-block; padding: 0 6px; border-radius: 10px; font-size: 0.8em; font-weight: normal; background: var(--head); color: var(--muted); border: 1px solid var(--line); }
+.gap { margin: 4px 0 0; font-size: 0.9em; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; min-width: 100%; }
+th, td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; text-align: left; }
+thead th { background: var(--head); white-space: nowrap; }
+tbody th { font-weight: normal; min-width: 220px; }
+.desc { color: var(--muted); font-size: 0.9em; margin-top: 2px; }
+td.cell { min-width: 120px; }
+td.s-accepted { background: var(--accepted); }
+td.s-rejected { background: var(--rejected); }
+td.s-panicked { background: var(--panicked); }
+td.s-blocked { background: var(--blocked); }
+td.s-skipped { background: var(--skipped); }
+td.s-unknown .outcome { font-style: italic; color: var(--muted); }
+td.cell .outcome { background: transparent; padding: 0; }
+td.outcome-changed { box-shadow: inset 0 0 0 2px var(--changed); }
+td.appeared { box-shadow: inset 0 0 0 2px var(--appeared); }
+td.bytes-changed { box-shadow: inset 0 0 0 2px var(--bytes); }
+td.frozen { background-image: repeating-linear-gradient(135deg, transparent 0 8px, rgba(127,127,127,0.12) 8px 16px); }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 4px 0 0; }
+dt { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 600; }
+dd { margin: 0; color: var(--muted); }
+dd p, dd ul { margin: 2px 0 0; }
+ul.outputs { padding-left: 18px; }
+.none { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+<h1>hypercase report</h1>
+<p class="revs"><span class="rev">5f87987845d742d43a6cdc787e0c13c34e93b040</span> <code>5f87987845d7</code> to <span class="rev">cd0326af997b8ceac976168341f96d4723372246</span> <code>cd0326af997b</code>, over the corpus root <code>step09</code></p>
+</header>
+<main>
+<section id="changes">
+<h2>Changes</h2>
+<h3 class="rank outcome-changed">outcome changed <span class="count">2</span></h3>
+<ul class="changes">
+<li class="change outcome-changed">
+<div class="line"><span class="case">sheet/div</span> <span class="col">calc</span> <span class="outcome s-accepted">accepted</span> <span class="arrow">to</span> <span class="outcome s-rejected">rejected S202</span></div>
+<ul class="files">
+<li class="added"><details><summary><code>error.txt</code> added <span class="stat"><span class="add">+1</span> <span class="del">-0</span></span></summary>
+<pre class="diff"><span class="add">&#43; C1: division by zero</span></pre></details></li>
+<li class="removed"><details><summary><code>stdout.txt</code> removed <span class="stat"><span class="add">+0</span> <span class="del">-1</span></span></summary>
+<pre class="diff"><span class="del">- 1,0,#DIV/0!</span></pre></details></li>
+</ul>
+</li>
+<li class="change outcome-changed">
+<div class="line"><span class="case">sheet/div</span> <span class="col">evaluate</span> <span class="outcome s-accepted">accepted</span> <span class="arrow">to</span> <span class="outcome s-accepted">accepted div-zero</span></div>
+</li>
+</ul>
+<h3 class="rank appeared">appeared <span class="count">5</span></h3>
+<ul class="changes">
+<li class="change appeared">
+<div class="line"><span class="case">sheet/ratio</span> <span class="col">calc</span> <span class="outcome s-accepted">accepted</span></div>
+<ul class="files">
+<li class="added"><details><summary><code>stdout.txt</code> added <span class="stat"><span class="add">+1</span> <span class="del">-0</span></span></summary>
+<pre class="diff"><span class="add">&#43; 0.25,1,4</span></pre></details></li>
+</ul>
+</li>
+<li class="change appeared">
+<div class="line"><span class="case">sheet/ratio</span> <span class="col">evaluate</span> <span class="outcome s-accepted">accepted</span></div>
+<ul class="files">
+<li class="added"><details><summary><code>values.txt</code> added <span class="stat"><span class="add">+3</span> <span class="del">-0</span></span></summary>
+<pre class="diff"><span class="add">&#43; A1 0.25</span><span class="add">&#43; B1 1</span><span class="add">&#43; C1 4</span></pre></details></li>
+</ul>
+</li>
+<li class="change appeared">
+<div class="line"><span class="case">sheet/ratio</span> <span class="col">format</span> <span class="outcome s-accepted">accepted</span></div>
+<ul class="files">
+<li class="added"><details><summary><code>formulas.txt</code> added <span class="stat"><span class="add">+1</span> <span class="del">-0</span></span></summary>
+<pre class="diff"><span class="add">&#43; A1 =B1 / C1</span></pre></details></li>
+</ul>
+</li>
+<li class="change appeared">
+<div class="line"><span class="case">sheet/ratio</span> <span class="col">parse</span> <span class="outcome s-accepted">accepted</span></div>
+</li>
+<li class="change appeared">
+<div class="line"><span class="case">sheet/ratio</span> <span class="col">resolve</span> <span class="outcome s-accepted">accepted</span></div>
+</li>
+</ul>
+<h3 class="rank disappeared">disappeared <span class="count">2</span></h3>
+<ul class="changes">
+<li class="change disappeared">
+<div class="line"><span class="case">sheet/blank</span> <span class="col">format</span> <span class="outcome s-skipped">skipped no formulas</span></div>
+</li>
+<li class="change disappeared">
+<div class="line"><span class="case">sheet/blank</span> <span class="col">parse</span> <span class="outcome s-accepted">accepted</span></div>
+</li>
+</ul>
+<h3 class="rank bytes-changed">bytes changed <span class="count">4</span></h3>
+<ul class="changes">
+<li class="change bytes-changed">
+<div class="line"><span class="case">sheet/loop</span> <span class="col">calc</span> <span class="outcome s-rejected">rejected S201</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span></div>
+<ul class="files">
+<li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
+<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details></li>
+</ul>
+</li>
+<li class="change bytes-changed">
+<div class="line"><span class="case">sheet/loop</span> <span class="col">resolve</span> <span class="outcome s-rejected">rejected S201</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span></div>
+<ul class="files">
+<li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
+<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details></li>
+</ul>
+</li>
+<li class="change bytes-changed">
+<div class="line"><span class="case">sheet/twice/variant/cycle</span> <span class="col">calc</span> <span class="outcome s-rejected">rejected S201</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span></div>
+<ul class="files">
+<li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
+<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1*2</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details></li>
+</ul>
+</li>
+<li class="change bytes-changed">
+<div class="line"><span class="case">sheet/twice/variant/cycle</span> <span class="col">resolve</span> <span class="outcome s-rejected">rejected S201</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span></div>
+<ul class="files">
+<li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
+<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1*2</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details></li>
+</ul>
+</li>
+</ul>
+</section>
+<section class="matrix" id="corpus-sheet">
+<h2>sheet</h2>
+<p class="desc">A sheet: one file per cell, under sheet/, named for the cell.</p>
+<div class="scroll">
+<table>
+<thead>
+<tr><th scope="col">case</th><th scope="col" title="Runs the calc command on the sheet; see sheets#12.">calc</th><th scope="col" title="Evaluates every cell of the sheet.">evaluate</th><th scope="col" title="Prints each formula back in canonical form.">format</th><th scope="col" title="Parses every cell.">parse</th><th scope="col" title="Orders the cells so that each comes after the cells it refers to.">resolve</th></tr>
+</thead>
+<tbody>
+<tr>
+<th scope="row"><span class="case">sheet/div</span><div class="desc">C1 divides A1 by B1, which is zero.</div></th>
+<td class="cell s-rejected outcome-changed"><span class="outcome">rejected S202</span> <span class="badge">outcome changed</span></td>
+<td class="cell s-accepted outcome-changed"><span class="outcome">accepted div-zero</span> <span class="badge">outcome changed</span></td>
+<td class="cell s-empty"></td>
+<td class="cell s-empty"></td>
+<td class="cell s-empty"></td>
+</tr>
+<tr>
+<th scope="row"><span class="case">sheet/loop</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span><div class="desc">A1 and B1 refer to each other.</div></th>
+<td class="cell s-rejected bytes-changed"><span class="outcome">rejected S201</span> <span class="badge">bytes changed</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked resolve</span></td>
+<td class="cell s-accepted"><span class="outcome">accepted</span></td>
+<td class="cell s-accepted"><span class="outcome">accepted</span></td>
+<td class="cell s-rejected bytes-changed"><span class="outcome">rejected S201</span> <span class="badge">bytes changed</span></td>
+</tr>
+<tr>
+<th scope="row"><span class="case">sheet/negative</span><div class="desc">A1 is a negative number, which <a href="https://example.com/sheets/issues/3">sheets#3</a> is about.</div></th>
+<td class="cell s-empty"><div class="gap">A negative number is valid. Waits on <a href="https://example.com/sheets/issues/3">sheets#3</a>.</div></td>
+<td class="cell s-rejected frozen"><span class="outcome">rejected S101</span> <span class="badge">frozen</span><div class="gap">A negative number is valid, and evaluates to itself. Waits on <a href="https://example.com/sheets/issues/3">sheets#3</a>.</div></td>
+<td class="cell s-empty"></td>
+<td class="cell s-empty"></td>
+<td class="cell s-empty"></td>
+</tr>
+<tr>
+<th scope="row"><span class="case">sheet/negative/variant/positive</span><div class="desc">A1 is 3, which every column reads.</div></th>
+<td class="cell s-panicked"><span class="outcome">panicked</span></td>
+<td class="cell s-accepted"><span class="outcome">accepted</span></td>
+<td class="cell s-skipped"><span class="outcome">skipped no formulas</span></td>
+<td class="cell s-empty"></td>
+<td class="cell s-empty"></td>
+</tr>
+<tr>
+<th scope="row"><span class="case">sheet/ratio</span><div class="desc">A1 over B1, a ratio &lt;1.</div></th>
+<td class="cell s-accepted appeared"><span class="outcome">accepted</span> <span class="badge">appeared</span></td>
+<td class="cell s-accepted appeared"><span class="outcome">accepted</span> <span class="badge">appeared</span></td>
+<td class="cell s-accepted appeared"><span class="outcome">accepted</span> <span class="badge">appeared</span></td>
+<td class="cell s-accepted appeared"><span class="outcome">accepted</span> <span class="badge">appeared</span></td>
+<td class="cell s-accepted appeared"><span class="outcome">accepted</span> <span class="badge">appeared</span></td>
+</tr>
+<tr>
+<th scope="row"><span class="case">sheet/twice</span><div class="desc">A1 is twice B1.</div></th>
+<td class="cell s-accepted"><span class="outcome">accepted</span></td>
+<td class="cell s-accepted"><span class="outcome">accepted</span></td>
+<td class="cell s-accepted"><span class="outcome">accepted</span></td>
+<td class="cell s-accepted"><span class="outcome">accepted</span></td>
+<td class="cell s-accepted"><span class="outcome">accepted</span></td>
+</tr>
+<tr>
+<th scope="row"><span class="case">sheet/twice/variant/cycle</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span><div class="desc">B1 refers back to A1, so the sheet has a cycle.</div></th>
+<td class="cell s-rejected bytes-changed"><span class="outcome">rejected S201</span> <span class="badge">bytes changed</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked resolve</span></td>
+<td class="cell s-accepted"><span class="outcome">accepted</span></td>
+<td class="cell s-accepted"><span class="outcome">accepted</span></td>
+<td class="cell s-rejected bytes-changed"><span class="outcome">rejected S201</span> <span class="badge">bytes changed</span></td>
+</tr>
+<tr>
+<th scope="row"><span class="case">sheet/twice/transform/looped</span> <span class="props"><span class="prop given" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular <span class="how">given</span></span></span></th>
+<td class="cell s-empty"></td>
+<td class="cell s-empty"></td>
+<td class="cell s-accepted frozen"><span class="outcome">accepted</span> <span class="badge">frozen</span><div class="gap">Prints the reference to itself as =A1. Waits on <a href="https://example.com/sheets/issues/7">sheets#7</a>.</div></td>
+<td class="cell s-empty"></td>
+<td class="cell s-rejected"><span class="outcome">rejected S201</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="descriptions">
+<h2>Descriptions</h2>
+<section class="corpus" id="describe-sheet">
+<h3>sheet</h3>
+<p>A sheet: one file per cell, under sheet/, named for the cell.</p>
+<h4>Columns</h4>
+<dl class="columns">
+<dt>calc</dt><dd>Runs the calc command on the sheet; see <a href="https://example.com/sheets/issues/12">sheets#12</a>.<ul class="outputs"><li><code>stdout.txt</code>: What calc prints: each cell&#39;s value, as one CSV line.</li></ul></dd>
+<dt>evaluate</dt><dd>Evaluates every cell of the sheet.<ul class="outputs"><li><code>values.txt</code>: Each cell&#39;s value, one per line, in cell order.</li></ul><p class="classifier">Its classifier, <code>div-zero</code>: Adds div-zero when some cell divides by zero.</p></dd>
+<dt>format</dt><dd>Prints each formula back in canonical form.<ul class="outputs"><li><code>formulas.txt</code>: Each formula, in canonical form, one per line.</li></ul></dd>
+<dt>parse</dt><dd>Parses every cell.<ul class="outputs"><li><code>error.txt</code>: The error, and each line it points at.</li></ul></dd>
+<dt>resolve</dt><dd>Orders the cells so that each comes after the cells it refers to.<ul class="outputs"><li><code>error.txt</code>: The error, and each line it points at.</li></ul></dd>
+</dl>
+<h4>Transforms</h4>
+<dl class="transforms">
+<dt>looped</dt><dd>Makes A1 refer to itself, so the sheet has a cycle.<p>Gives <span class="prop">circular</span>.</p></dd>
+</dl>
+<h4>Cases only at <span class="rev">5f87987845d742d43a6cdc787e0c13c34e93b040</span></h4>
+<dl class="cases">
+<dt><span class="case">sheet/blank</span></dt><dd>A1 is empty.</dd>
+</dl>
+</section>
+<section class="properties" id="describe-properties">
+<h3>Properties</h3>
+<dl class="properties">
+<dt>circular</dt><dd>Some cell&#39;s formula refers back to itself, directly or through other cells.</dd>
+<dt>dangling</dt><dd>Some formula refers to a cell the sheet doesn&#39;t have.</dd>
+<dt>malformed</dt><dd>Some cell holds neither a number nor a formula.</dd>
+</dl>
+</section>
+</section>
+</main>
+</body>
+</html>

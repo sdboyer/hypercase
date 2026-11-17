@@ -1,0 +1,54 @@
+{
+  "format": 5,
+  "updateVar": "SHEETS_UPDATE_GOLDEN",
+  "corpusRoot": "step05",
+  "rootPackage": false,
+  "codes": false,
+  "issueLinks": [],
+  "properties": [
+    {
+      "name": "circular",
+      "description": "Some cell's formula refers back to itself, directly or through other cells."
+    },
+    {
+      "name": "dangling",
+      "description": "Some formula refers to a cell the sheet doesn't have."
+    },
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    }
+  ],
+  "types": [],
+  "lifts": [],
+  "suites": [
+    {
+      "name": "calc",
+      "description": "Runs the calc command on the sheet.",
+      "consumes": "io/fs.FS",
+      "corpora": [
+        "sheet"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why calc failed."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "A warning for each cell that divides by zero."
+        },
+        {
+          "pattern": "stdout.txt",
+          "description": "The sheet's values as CSV, one row per line."
+        }
+      ],
+      "rejects": [
+        "circular",
+        "dangling",
+        "malformed"
+      ],
+      "classifier": null
+    }
+  ]
+}

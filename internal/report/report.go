@@ -2,11 +2,14 @@
 // between two git revisions, read from the repository's object store.
 //
 // It reads registries and archives, never Go source, and works from the
-// cells' committed outcomes alone. It ranks the changes: changed outcomes
-// first, then cells that appeared, then cells that disappeared, then cells
-// whose files changed under the same outcome. And it shows the matrix of
-// each corpus at the second revision, each case with the properties it
-// states and each known gap on the cell it marks, linked to its issue.
+// cells' committed outcomes alone: a cell exists at a revision when its
+// outcome file does. It ranks the changes: changed outcomes first, then
+// cells that appeared, then cells that disappeared, then cells whose files
+// changed under the same outcome, each with a line diff of its files. It
+// shows the matrix of each corpus at the second revision, each case with
+// the properties it states and each known gap on the cell it marks, linked
+// to its issue; the descriptions of what the registries and archives
+// declare; and the problems it found, where it doesn't pick.
 package report
 
 import (
@@ -20,6 +23,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/internal/diff"
 	"github.com/sdboyer/hypercase/internal/gitfs"
 	"github.com/sdboyer/hypercase/internal/registry"
 )
@@ -49,11 +54,28 @@ type Report struct {
 	// Root is the corpus root, as a slash path from the top of the
 	// repository.
 	Root string
+	// Problems are what the report found that it can't show as it is: at
+	// B, then at A.
+	Problems []Problem
 	// Changes are the cells that changed, in rank order, and within a rank
 	// by case, then column.
 	Changes []Change
 	// Matrices are the corpora at B, by name.
 	Matrices []Matrix
+	// Corpora describe each corpus at B or at A, by name, and Properties
+	// each property, by name.
+	Corpora    []Corpus
+	Properties []Described
+}
+
+// A Problem is what the report found at one revision that it can't show
+// as it is. The report shows the problem, and doesn't pick.
+type Problem struct {
+	At string // the revision's name
+	// Where is the file, then the section and line in it, from the top of
+	// the repository, or "" for the corpus root as a whole.
+	Where string
+	Msg   string
 }
 
 // A Rank is a class of change to a cell.
@@ -76,10 +98,11 @@ type Change struct {
 	Case   string
 	Column string
 	// Before and After are the outcome at A and at B, as the outcome file
-	// holds it less its newline, or "" where the cell isn't.
+	// holds it less its newline, Unknown where the cell's state is, or ""
+	// where the cell isn't.
 	Before, After string
 	// Files are the cell's other files that were added, changed or removed,
-	// by path.
+	// by path, then, for a bytes lift's cell, its product's, by path.
 	Files []FileChange
 	// Properties are what the case states, at B, or at A for a cell that
 	// disappeared.
@@ -90,19 +113,33 @@ type Change struct {
 }
 
 // A FileChange is one file of a cell that changed, by its path under the
-// column's directory.
+// column's directory, or, for a file of a bytes lift's product, by its
+// path from the case's via/, as via/<lift>/<path>, with a line diff from A
+// to B.
 type FileChange struct {
 	Path string
 	How  string // added, changed or removed
+	// Diff is the line diff, and Added and Removed count its lines only at
+	// B and only at A. Unaligned records that the diff left out a stretch
+	// it can't align, so Added and Removed don't count the file's change.
+	Diff           []diff.Line
+	Added, Removed int
+	Unaligned      bool
 }
 
-// A Property is a property a case states.
+// A Property is a property a case states, with its description at B, or
+// at A for a property B lacks. How is "" for what the case's own
+// properties section states, and Given or Kept for what a transform's
+// variant states.
 type Property struct {
 	Name        string
 	Description Text
+	How         string
 }
 
-// Build reads both revisions and compares them.
+// Build reads both revisions and compares them. It reads every registry
+// of the corpus root at both, and refuses one of a format it doesn't read,
+// before it reads anything else.
 func Build(opts Options) (*Report, error) {
 	repo, err := gitfs.Open(opts.Dir, opts.Env)
 	if err != nil {
@@ -125,24 +162,46 @@ func Build(opts Options) (*Report, error) {
 	if err != nil {
 		return nil, err
 	}
+	var regs [2][]found
+	for i := range revs {
+		if mod, ok := findModule(trees[i], root); ok {
+			if regs[i], err = readRegistries(revs[i], trees[i], mod, root); err != nil {
+				return nil, err
+			}
+		}
+	}
+	const advice = "Name the corpus root with -root, relative to the current directory, or run the report from the directory of a package that registers it"
+	switch {
+	case len(regs[0]) == 0 && len(regs[1]) == 0:
+		return nil, fmt.Errorf("no registry records the corpus root %s, at %s or at %s.\n%s", root, revs[0].Name, revs[1].Name, advice)
+	case len(regs[1]) == 0:
+		return nil, fmt.Errorf("no registry records the corpus root %s at %s, though some do at %s, and the report shows the corpus at its second revision.\n%s", root, revs[1].Name, revs[0].Name, advice)
+	}
 	var snaps [2]*snapshot
 	for i := range revs {
-		mod, _ := findModule(trees[i], root)
-		if snaps[i], err = load(revs[i], trees[i], mod, root); err != nil {
+		if snaps[i], err = load(revs[i], trees[i], root, regs[i]); err != nil {
 			return nil, err
 		}
 	}
 	a, b := snaps[0], snaps[1]
-	if a.regs == 0 && b.regs == 0 {
-		return nil, fmt.Errorf("no registry records the corpus root %s, at %s or at %s.\nName the corpus root with -root, relative to the current directory, or run the report from the directory of a package that registers it", root, a.rev.Name, b.rev.Name)
-	}
-	links, err := newLinker(b.links)
-	if err != nil {
-		return nil, fmt.Errorf("the registries at %s: %w", b.rev.Name, err)
+	links, bad := newLinker(b.links)
+	for _, bl := range bad {
+		regs := b.linkRegs[bl.pattern]
+		verb := "gives"
+		if len(regs) > 1 {
+			verb = "give"
+		}
+		b.problem("", fmt.Sprintf("%s %s the issue link pattern %q, which is not a regular expression (%v), so the report links no text through it.", andList(regs), verb, bl.pattern, bl.err))
 	}
 	r := &Report{A: a.rev, B: b.rev, Root: root}
-	r.Changes = changes(a, b, links)
-	r.Matrices = matrices(b, r.Changes, links)
+	r.Problems = append(slices.Clone(b.problems), a.problems...)
+	// A property's description is B's, or A's where B lists no property of
+	// its name.
+	props := maps.Clone(a.props)
+	maps.Copy(props, b.props)
+	r.Changes = changes(a, b, props, links)
+	r.Matrices = matrices(b, r.Changes, props, links)
+	r.Corpora, r.Properties = describe(a, b, links)
 	return r, nil
 }
 
@@ -199,8 +258,10 @@ func findModule(tree fs.FS, dir string) (string, bool) {
 }
 
 // changes compares every cell of the two snapshots, and ranks those that
-// changed.
-func changes(a, b *snapshot, links *linker) []Change {
+// changed. A cell whose state is unknown at either revision has no outcome
+// to compare, so it ranks on its files alone when it is at both. props
+// holds each property's description.
+func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 	keys := map[cellKey]bool{}
 	for k := range a.cells {
 		keys[k] = true
@@ -208,11 +269,7 @@ func changes(a, b *snapshot, links *linker) []Change {
 	for k := range b.cells {
 		keys[k] = true
 	}
-	sorted := make([]cellKey, 0, len(keys))
-	for k := range keys {
-		sorted = append(sorted, k)
-	}
-	slices.SortFunc(sorted, cellKey.compare)
+	sorted := slices.SortedFunc(maps.Keys(keys), cellKey.compare)
 
 	var out []Change
 	for _, k := range sorted {
@@ -221,20 +278,20 @@ func changes(a, b *snapshot, links *linker) []Change {
 		at := b
 		switch {
 		case ca == nil:
-			ch.Rank, ch.After = Appeared, cb.outcomeLine()
+			ch.Rank, ch.After = Appeared, cb.line
 		case cb == nil:
-			ch.Rank, ch.Before = Disappeared, ca.outcomeLine()
+			ch.Rank, ch.Before = Disappeared, ca.line
 			at = a
-		case !bytes.Equal(ca.outcome, cb.outcome):
-			ch.Rank, ch.Before, ch.After = OutcomeChanged, ca.outcomeLine(), cb.outcomeLine()
+		case ca.known && cb.known && ca.line != cb.line:
+			ch.Rank, ch.Before, ch.After = OutcomeChanged, ca.line, cb.line
 		default:
-			ch.Rank, ch.Before, ch.After = BytesChanged, ca.outcomeLine(), cb.outcomeLine()
+			ch.Rank, ch.Before, ch.After = BytesChanged, ca.line, cb.line
 		}
-		ch.Files = fileChanges(ca, cb)
+		ch.Files = fileChanges(ca, cb, k.column)
 		if ch.Rank == BytesChanged && len(ch.Files) == 0 {
 			continue
 		}
-		ch.Properties = at.properties(k.c, links)
+		ch.Properties = at.properties(k.c, props, links)
 		if text, ok := at.gaps[k]; ok {
 			ch.Gap = links.text(text)
 		}
@@ -245,15 +302,23 @@ func changes(a, b *snapshot, links *linker) []Change {
 }
 
 // fileChanges returns a cell's files, other than its outcome, that differ
-// between two revisions, by path. Either cell may be nil.
-func fileChanges(a, b *cellAt) []FileChange {
-	var fa, fb map[string][]byte
+// between two revisions, by path, then its product's, by path, each with
+// its diff. Either cell may be nil.
+func fileChanges(a, b *cellAt, column string) []FileChange {
+	var fa, fb, pa, pb map[string][]byte
 	if a != nil {
-		fa = a.files
+		fa, pa = a.files, a.product
 	}
 	if b != nil {
-		fb = b.files
+		fb, pb = b.files, b.product
 	}
+	return append(changedFiles(fa, fb, ""), changedFiles(pa, pb, archive.Via+"/"+column+"/")...)
+}
+
+// changedFiles returns the files that differ between two revisions' sets
+// of a cell's files, by path, each with its diff, and each path after the
+// prefix.
+func changedFiles(fa, fb map[string][]byte, prefix string) []FileChange {
 	paths := map[string]bool{}
 	for p := range fa {
 		paths[p] = true
@@ -265,27 +330,43 @@ func fileChanges(a, b *cellAt) []FileChange {
 	for _, p := range slices.Sorted(maps.Keys(paths)) {
 		da, inA := fa[p]
 		db, inB := fb[p]
+		fc := FileChange{Path: prefix + p}
 		switch {
 		case !inA:
-			out = append(out, FileChange{Path: p, How: "added"})
+			fc.How = "added"
 		case !inB:
-			out = append(out, FileChange{Path: p, How: "removed"})
+			fc.How = "removed"
 		case !bytes.Equal(da, db):
-			out = append(out, FileChange{Path: p, How: "changed"})
+			fc.How = "changed"
+		default:
+			continue
 		}
+		fc.Diff, _ = diff.Diff(da, db)
+		for _, l := range fc.Diff {
+			switch l.Kind {
+			case '+':
+				fc.Added++
+			case '-':
+				fc.Removed++
+			case diff.Unaligned:
+				fc.Unaligned = true
+			}
+		}
+		out = append(out, fc)
 	}
 	return out
 }
 
-// properties returns what a case states, each with its description.
-func (s *snapshot) properties(k caseKey, links *linker) []Property {
+// properties returns what a case states, each with its description from
+// props.
+func (s *snapshot) properties(k caseKey, props map[string]string, links *linker) []Property {
 	c := s.cases[k]
 	if c == nil {
 		return nil
 	}
 	var out []Property
-	for _, name := range c.properties {
-		out = append(out, Property{Name: name, Description: links.text(s.props[name])})
+	for _, st := range c.properties {
+		out = append(out, Property{Name: st.name, Description: links.text(props[st.name]), How: st.how})
 	}
 	return out
 }

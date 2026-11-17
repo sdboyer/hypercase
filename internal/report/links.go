@@ -2,7 +2,6 @@ package report
 
 import (
 	"cmp"
-	"fmt"
 	"regexp"
 	"slices"
 
@@ -31,22 +30,33 @@ type link struct {
 
 // newLinker compiles link patterns, each once, sorted by pattern and then
 // URL, which is the order that breaks a tie between two matches of one
-// length at one place.
-func newLinker(links []registry.IssueLink) (*linker, error) {
+// length at one place. It leaves out each pattern that isn't a regular
+// expression, and returns it, with its error.
+func newLinker(links []registry.IssueLink) (*linker, []badLink) {
 	links = slices.Clone(links)
 	slices.SortFunc(links, func(a, b registry.IssueLink) int {
 		return cmp.Or(cmp.Compare(a.Pattern, b.Pattern), cmp.Compare(a.URL, b.URL))
 	})
 	links = slices.Compact(links)
 	l := &linker{}
+	var bad []badLink
 	for _, il := range links {
 		re, err := regexp.Compile(il.Pattern)
 		if err != nil {
-			return nil, fmt.Errorf("the issue link pattern %q is not a regular expression: %v", il.Pattern, err)
+			if len(bad) == 0 || bad[len(bad)-1].pattern != il.Pattern {
+				bad = append(bad, badLink{pattern: il.Pattern, err: err})
+			}
+			continue
 		}
 		l.links = append(l.links, link{re: re, url: il.URL})
 	}
-	return l, nil
+	return l, bad
+}
+
+// A badLink is a link pattern that isn't a regular expression.
+type badLink struct {
+	pattern string
+	err     error
 }
 
 // text links each match in s to the URL its pattern's template makes from
