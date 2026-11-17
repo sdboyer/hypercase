@@ -435,26 +435,31 @@ func TestGitInit(t *testing.T) {
 
 // copyDir copies the files under from to the same paths under to. In the
 // module's update, another package can be writing them, each through a temp
-// file that it renames over the file it replaces. So copyDir skips temp
-// files, and a file that is gone by the time it reads it, and copies each
-// file as it was before such a write or after it.
+// file that it renames over the file it replaces, so each file is as it was
+// before such a write or after it. A listed temp file can be renamed away
+// before it is read, and one copied is refused by the scratch update's root
+// check, so copyDir skips temp files. It refuses what is neither a
+// directory nor a regular file, a symlink among them, which the toy holds
+// none of.
 func copyDir(t *testing.T, from, to string) {
 	t.Helper()
-	if err := copyTree(from, to, os.ReadFile); err != nil {
+	if err := copyTree(from, to); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// copyTree is copyDir, reading each file with read.
-func copyTree(from, to string, read func(string) ([]byte, error)) error {
+// copyTree is copyDir, returning the error it fails on.
+func copyTree(from, to string) error {
 	return filepath.WalkDir(from, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || archive.IsTemp(d.Name()) {
+		switch {
+		case err != nil:
 			return err
-		}
-		data, err := read(p)
-		if errors.Is(err, fs.ErrNotExist) {
+		case d.IsDir() || archive.IsTemp(d.Name()):
 			return nil
+		case !d.Type().IsRegular():
+			return fmt.Errorf("%s is not a regular file, and the copy refuses it", p)
 		}
+		data, err := os.ReadFile(p)
 		if err != nil {
 			return err
 		}
@@ -466,29 +471,21 @@ func copyTree(from, to string, read func(string) ([]byte, error)) error {
 	})
 }
 
-// TestCopyTree: the copy leaves out a temp file of a write, and a file that
-// is gone by the time it is read, and copies the rest.
+// TestCopyTree: the copy leaves out a temp file of a write and copies the
+// rest, and refuses a symlink, whether to a file, to a directory or to
+// nothing.
 func TestCopyTree(t *testing.T) {
 	from, to := t.TempDir(), t.TempDir()
 	tmp := filepath.Join("sheet", ".hypercase-tmp-divide.txtar-123")
 	if !archive.IsTemp(tmp) {
 		t.Fatalf("%s is not the name of a temp file", tmp)
 	}
-	gone := filepath.Join("sheet", "blank.txtar")
-	for _, name := range []string{"hypercase.json", filepath.Join("sheet", "divide.txtar"), tmp, gone} {
+	for _, name := range []string{"hypercase.json", filepath.Join("sheet", "divide.txtar"), tmp} {
 		if err := writeFile(filepath.Join(from, name), []byte(name)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	read := func(p string) ([]byte, error) {
-		if p == filepath.Join(from, gone) {
-			if err := os.Remove(p); err != nil {
-				return nil, err
-			}
-		}
-		return os.ReadFile(p)
-	}
-	if err := copyTree(from, to, read); err != nil {
+	if err := copyTree(from, to); err != nil {
 		t.Fatal(err)
 	}
 	got := map[string]string{}
@@ -496,13 +493,16 @@ func TestCopyTree(t *testing.T) {
 		if err != nil || d.IsDir() {
 			return err
 		}
+		rel, err := filepath.Rel(to, p)
+		if err != nil {
+			return err
+		}
 		data, err := os.ReadFile(p)
 		if err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(to, p)
 		got[rel] = string(data)
-		return err
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -513,6 +513,21 @@ func TestCopyTree(t *testing.T) {
 	}
 	if !maps.Equal(got, want) {
 		t.Errorf("copied %v, want %v", got, want)
+	}
+
+	for _, target := range []string{"divide.txtar", ".", "gone.txtar"} {
+		from := t.TempDir()
+		if err := writeFile(filepath.Join(from, "sheet", "divide.txtar"), []byte("divide\n")); err != nil {
+			t.Fatal(err)
+		}
+		link := filepath.Join(from, "sheet", "link")
+		if err := os.Symlink(target, link); err != nil {
+			t.Fatal(err)
+		}
+		err := copyTree(from, t.TempDir())
+		if want := link + " is not a regular file"; err == nil || !strings.HasPrefix(err.Error(), want) {
+			t.Errorf("copying a symlink to %s: got %v, want an error that starts %q", target, err, want)
+		}
 	}
 }
 
