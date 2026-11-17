@@ -2850,7 +2850,8 @@ lift.
   which columns are bytes lifts: a `via/<column>/…` of a column they say is
   none is part of no cell, so strip removes it even when a `gaps` line
   marks the column's cell. A column they don't name keeps its `via/` with
-  its frozen cell.
+  its frozen cell, and so does one that any of them says is a bytes lift,
+  where they disagree, which the root-package check fails on.
 - The properties a case states hold for every column the case reaches,
   through the lift too. A CSV with a quote that never closes states
   `unterminated`, which `import` rejects, and a CSV whose imported sheet has

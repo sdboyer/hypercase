@@ -702,8 +702,10 @@ func liftsRegistry() string {
 // no cell, and -column resolve removes it while it leaves the frozen
 // out/resolve/…. Where no registry says, it may be a bytes lift's, and is
 // left with the cell: the registries record no column, or one of them is
-// of another format. A registry that names the corpus root and can't be
-// read fails strip, and nothing is written.
+// of another format. Where they disagree, which the root-package check
+// fails on, one saying it is a bytes lift is enough to leave it. A
+// registry that names the corpus root and can't be read fails strip, and
+// nothing is written.
 func TestStripFrozenVia(t *testing.T) {
 	t.Parallel()
 	twice := resolveViaTwice()
@@ -712,19 +714,25 @@ func TestStripFrozenVia(t *testing.T) {
 	if older == lifts {
 		t.Fatal("the registry holds no format 6")
 	}
+	bytesResolve := string(registry.Registry{UpdateVar: sheetsVar, CorpusRoot: ".", Lifts: []registry.Lift{{Name: "resolve", Bytes: true, Corpora: []string{"sheet"}}}}.Marshal())
 	const frozen = "testdata/sheet/twice.txtar: left the cell resolve, frozen by its known gap, gaps line 1; hypercase strip -column resolve -frozen strips it, and resolve's other frozen cells\n"
 	for _, tt := range []struct {
-		name, registry string
-		out            string
-		removed        []string
+		name, registry, format string
+		out                    string
+		removed                []string
 	}{
-		{"known", lifts, "testdata/sheet/twice.txtar: removed 6 sections\n" + frozen + nextLine, []string{"via/resolve/sheet/A1"}},
-		{"unknown", stripRegistry(".", sheetsVar), "testdata/sheet/twice.txtar: removed 5 sections\n" + frozen + nextLine, nil},
-		{"older", older, "testdata/sheet/twice.txtar: removed 5 sections\n" + frozen + nextLine, nil},
+		{"known", lifts, "", "testdata/sheet/twice.txtar: removed 6 sections\n" + frozen + nextLine, []string{"via/resolve/sheet/A1"}},
+		{"unknown", stripRegistry(".", sheetsVar), "", "testdata/sheet/twice.txtar: removed 5 sections\n" + frozen + nextLine, nil},
+		{"older", older, "", "testdata/sheet/twice.txtar: removed 5 sections\n" + frozen + nextLine, nil},
+		{"disagreeing", lifts, bytesResolve, "testdata/sheet/twice.txtar: removed 5 sections\n" + frozen + nextLine, nil},
+		{"disagreeing the other way", bytesResolve, lifts, "testdata/sheet/twice.txtar: removed 5 sections\n" + frozen + nextLine, nil},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			files := with(stripModule(), map[string]string{"testdata/hypercase.json": tt.registry, "testdata/sheet/twice.txtar": twice})
+			if tt.format != "" {
+				files["format/testdata/hypercase.json"] = tt.format
+			}
 			top := writeTree(t, files)
 			stripOK(t, top, "", tt.out, "-column", "resolve")
 			got := archive.Parse([]byte(tree(t, top)["testdata/sheet/twice.txtar"]))
