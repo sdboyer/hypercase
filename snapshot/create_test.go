@@ -514,31 +514,39 @@ func TestCreateFailsBesideAnother(t *testing.T) {
 // testdata/sheet/ then, and B couldn't open its temp file. A's hook stops
 // waiting for B once B returns, or after a timeout, so a B that returns
 // before its own hook runs, or never reaches it, fails the test, naming
-// which, and doesn't hang it.
+// which, and doesn't hang it. Only B's AfterMkdir calls wait, those made
+// once A's hook has started B, and only B's first, for a bounded time, so
+// a Create that calls the hook more than once hangs neither.
 func TestCreateBesideARemoval(t *testing.T) {
 	t.Cleanup(func() { hooks.AfterMkdir, hooks.AfterTemp = nil, nil })
 	const timeout = 30 * time.Second
 	corp := newCorpus(t)
 	ss := serialize(t, cells)
-	var calls atomic.Int32
+	var started atomic.Bool // A's hook has started B, so later AfterMkdir calls are B's
+	var calls atomic.Int32  // B's AfterMkdir calls
+	var gaveUp atomic.Bool  // B's hook stopped waiting for A to fail
 	bFound := make(chan struct{})
 	aFailed := make(chan struct{})
 	hooks.AfterMkdir = func(string) {
-		if calls.Add(1) == 2 { // B's, since A makes the directory first
-			close(bFound)
-			<-aFailed
+		if !started.Load() || calls.Add(1) != 1 {
+			return
+		}
+		close(bFound)
+		select {
+		case <-aFailed:
+		case <-time.After(timeout):
+			gaveUp.Store(true)
 		}
 	}
 	var bPath string
 	var bErr error
 	bDone := make(chan struct{}) // closed once B has returned, and set bPath and bErr
-	started := false             // A's hook started B
 	stopped := ""                // why A's hook stopped waiting, when B never found the directory
 	hooks.AfterTemp = func(tmp string) error {
 		if !strings.HasPrefix(filepath.Base(tmp), ".hypercase-tmp-first.txtar-") {
 			return nil
 		}
-		started = true
+		started.Store(true)
 		go func() {
 			defer close(bDone)
 			bPath, bErr = Create(corp, project, sheetType, "second", ss)
@@ -554,7 +562,7 @@ func TestCreateBesideARemoval(t *testing.T) {
 	}
 	_, err := Create(corp, project, sheetType, "first", ss)
 	close(aFailed)
-	if !started {
+	if !started.Load() {
 		t.Fatalf("A failed before its temp file was written, so B never ran: %v", err)
 	}
 	select {
@@ -564,6 +572,9 @@ func TestCreateBesideARemoval(t *testing.T) {
 	}
 	if stopped != "" {
 		t.Fatalf("%s: B returned %q, %v", stopped, bPath, bErr)
+	}
+	if gaveUp.Load() {
+		t.Fatalf("B's AfterMkdir hook gave up waiting for A to fail after %v", timeout)
 	}
 	dir := filepath.Join(corp.Dir(), "testdata", "sheet")
 	fails(t, err, "creating "+filepath.Join(dir, "first.txtar")+": the disk is full.")
