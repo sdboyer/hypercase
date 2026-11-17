@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -371,26 +370,21 @@ func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario,
 	before := archive.Parse(s.read(g.archive))
 	dir := t.TempDir()
 	var logs []string
-	runs := func(name string, update bool) ([]hypercase.Observed, []result) {
+	runs := func(name string, update bool) []hypercase.Observed {
 		rs := g.runAll(s, update, filepath.Join(dir, name))
 		var obs []hypercase.Observed
 		for i, r := range rs {
 			logs = append(logs, fmt.Sprintf("the %s run of %s:\n%s", name, g.pkgs[i].registration, r.out))
 			obs = append(obs, readObserved(t, filepath.Join(dir, fmt.Sprintf("%s-%d.jsonl", name, i)))...)
 		}
-		return obs, rs
+		return obs
 	}
 	j := &judge{g: g, t: t, kinds: kinds, markers: markers, before: before}
-	var normal []result
-	j.normal, normal = runs("normal", false)
-	for _, r := range normal {
-		j.normalOut = append(j.normalOut, r.out)
-	}
-	j.update, _ = runs("update", true)
+	j.normal = runs("normal", false)
+	j.update = runs("update", true)
 	j.u = &updated{after: archive.Parse(s.read(g.archive)), cells: cells(j.update), lifts: liftRuns(j.update), owners: g.owners(t, s)}
 	if j.needsPost() {
-		obs, _ := runs("post", false)
-		j.u.post = cells(obs)
+		j.u.post = cells(runs("post", false))
 	}
 	j.judge()
 	if t.Failed() {
@@ -553,7 +547,6 @@ type judge struct {
 	markers        []string
 	before         *archive.Archive
 	normal, update []hypercase.Observed
-	normalOut      []string // each package's normal run's output
 	u              *updated
 	reach          reach
 }
@@ -637,7 +630,7 @@ func (j *judge) judge() {
 		}
 		key := cellKey{n.Pkg, n.Case, n.Prefix, n.Column}
 		u := *j.u
-		c := &noteCheck{g: j.g, n: n, cl: *n.Claims, kind: j.kinds[n.Kind], before: j.before, normalOut: j.normalOut}
+		c := &noteCheck{g: j.g, n: n, cl: *n.Claims, kind: j.kinds[n.Kind], before: j.before}
 		bad := func(format string, args ...any) {
 			t.Errorf("%s, %s, in %s, in the %s: %s\nthe note: %s\n%s\nits claims: %+v\nthe normal run's cell: %+v\nthe update's: %+v", n.Case, n.Column, n.Pkg, runName(n.Update), fmt.Sprintf(format, args...), n.Body, n.Closing, *n.Claims, c.nr, u.cell)
 		}
@@ -772,19 +765,18 @@ func runName(update bool) string {
 
 // A noteCheck is what a claim's check reads of the run that gave the
 // note: the note, what its closing claims, the note's kind, as NoteKinds
-// names it, the archive before the runs, each package's normal run's
-// output, and, for a note of a cell, the cell's record in the normal run.
+// names it, the archive before the runs, and, for a note of a cell, the
+// cell's record in the normal run.
 // What the update did is the check's other argument, so a check that
 // observes nothing of it names no such argument.
 type noteCheck struct {
-	g         closingGrid
-	n         hypercase.Observed
-	cl        hypercase.Claims
-	kind      string
-	cell      bool
-	nr        hypercase.Observed
-	before    *archive.Archive
-	normalOut []string
+	g      closingGrid
+	n      hypercase.Observed
+	cl     hypercase.Claims
+	kind   string
+	cell   bool
+	nr     hypercase.Observed
+	before *archive.Archive
 }
 
 // staged reports whether the closing says what the update does, or that
@@ -1147,8 +1139,8 @@ var claimChecks = map[string]claimCheck{
 	}},
 	// In a package that doesn't own the transform, the closing says the
 	// owner's update rewrites the inputs, and, if no package owns it, that
-	// the root-package check says so, and no update rewrites them: which
-	// holds is what the registries the update wrote record.
+	// no update rewrites them: which holds is what the registries the
+	// update wrote record.
 	"OwnerRewritesInputs": {check: func(c *noteCheck, u *updated) string {
 		tr := c.cl.OwnerRewritesInputs
 		if tr == "" {
@@ -1163,13 +1155,7 @@ var claimChecks = map[string]claimCheck{
 		case !same:
 			return fmt.Sprintf("the closing says that if no package owns %s, no update rewrites its inputs, and no registry records a package owns it, and the update changed them", tr)
 		}
-		says := regexp.MustCompile(regexp.QuoteMeta("the transform "+tr+", of testdata/") + `\S*, is owned by no package`)
-		for _, out := range c.normalOut {
-			if says.MatchString(out) {
-				return ""
-			}
-		}
-		return fmt.Sprintf("the closing says that if no package owns %s, the root-package check says so, and no normal run says %q", tr, says)
+		return ""
 	}},
 }
 
@@ -1619,10 +1605,16 @@ func closingGrids() []closingGrid {
 		},
 		pkgs: []childRun{{pkg: "", registration: "tr-unowned"}, {pkg: "b", registration: "tr-b"}},
 	}
-	add("transforms-unowned", unowned, cross([]gridEdit{
+	inputsEdits := []gridEdit{
 		{"W0 none", func(*archive.Archive) {}},
 		{"W1 inputs values stale", set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n")},
 		{"W2 inputs delete empty", insert("transform/upper/delete", "", "transform/upper/out/")},
-	}))
+	}
+	add("transforms-unowned", unowned, cross(inputsEdits))
+	// transforms-unowned-noroot: transforms-unowned, where no package
+	// declares the root package, so no root-package check runs.
+	noroot := unowned
+	noroot.pkgs = []childRun{{pkg: "", registration: "tr-unowned-noroot"}, {pkg: "b", registration: "tr-b"}}
+	add("transforms-unowned-noroot", noroot, cross(inputsEdits))
 	return gs
 }

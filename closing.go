@@ -479,10 +479,9 @@ func (st *staging) text(n note, c closing) string {
 		says = append(says, said{fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s.", u, cl.RewritesInputs), fmt.Sprintf("the module's update, %s, rewrites them, in the package that owns %s.", u, cl.RewritesInputs)})
 	}
 	if cl.OwnerRewritesInputs != "" {
-		// This package can't know some package owns the transform, and the
-		// root-package check reports one no package owns.
+		// This package can't know some package owns the transform.
 		tr := cl.OwnerRewritesInputs
-		says = append(says, said{fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s. If no package owns %s, the root-package check says so, and no update rewrites the inputs.", u, tr, tr), fmt.Sprintf("the module's update, %s, rewrites them, in the package that owns %s. If no package owns %s, the root-package check says so, and no update rewrites the inputs.", u, tr, tr)})
+		says = append(says, said{fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s. If no package owns %s, no update rewrites the inputs.", u, tr, tr), fmt.Sprintf("the module's update, %s, rewrites them, in the package that owns %s. If no package owns %s, no update rewrites the inputs.", u, tr, tr)})
 	}
 	var rest []string
 	if c.advice != "" {
