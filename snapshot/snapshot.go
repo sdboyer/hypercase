@@ -124,11 +124,13 @@ func noCorpus(fn string) error {
 // package's tests read the case: the path a package passes to
 // hypercase.Root and the one a command passes to root.Find are written
 // apart, and Create checks one against the other. Every update writes the
-// package's registry, its first included: with no case yet, that update
-// fails, since each of the package's suites applies to no case, and it
-// writes the registry still, so Create works once it has run. Create
-// reads every registry under the module root, and writes nothing while
-// one can't be read. project is the project's
+// package's registry, so Create works once the package's first update has
+// run. With no case yet, that update fails for each suite the package
+// registers, since the suite applies to no case, and writes the registry
+// still. Create reads the head of every registry under the module root,
+// which names its corpus root, and the whole of each registry of c, in a
+// package with a _test.go file or not, and writes nothing while one of
+// those reads fails. project is the project's
 // declaration, as the project registers it: no update creates a case, so
 // while the variable its UpdateVar names is set, Create fails, naming it,
 // and writes nothing.
@@ -209,56 +211,81 @@ func Create[T ~struct{ fs.FS }](c root.Corpus, project decl.Project, typ decl.Ty
 // recorded refuses a corpus root that no registry under its module root,
 // in a package with a _test.go file, records as its package's corpus
 // root, and a corpus directory, dir, that none of those registries
-// declares, as the root-package check counts a directory declared: a
-// corpus type's, or the corpus of a suite over the raw input. Each refusal
-// names what the registries do record, or declare. A registry in a
-// package with no _test.go file records what no test runs, so it counts
-// for neither. Every registry is read first, and one that can't be read
-// fails Create before it writes anything.
+// declares, as a corpus type's directory or the corpus of a suite over the
+// raw input. A registry in a package with no _test.go file records what no
+// test runs, so it counts for neither. Those are the kinds of declaration
+// the root-package check counts, and Create is the stricter: the check
+// counts what every registry of the corpus root declares, those in
+// packages with no _test.go file included, and Create counts only what
+// those in packages with one declare. Each refusal names what the
+// registries do record, or declare, and the registries in packages with
+// no _test.go file that alone record the root, or declare dir.
+//
+// It reads the head of every registry under the module root, which names
+// the registry's corpus root, and parses each registry of c, whether its
+// package has a _test.go file or not. One it can't read fails Create
+// before it writes anything.
 func recorded(c root.Corpus, dir, updateVar string) error {
 	found, err := registry.Find(c.Module())
 	if err != nil {
 		return fmt.Errorf("finding the registries under the module root %s: %v.\nFix what stopped the walk, and create the case again.", c.Module(), err)
 	}
-	unreadable := func(path string, err error) error {
-		return fmt.Errorf("%s can't be read: %v, and Create writes nothing while a registry under the module root can't be read.\nRun the update, %s=1 go test ./..., to write it again.", path, err, updateVar)
+	unreadable := func(path string, tested bool, err error) error {
+		fix := fmt.Sprintf("Run the update, %s=1 go test ./..., to write it again.", updateVar)
+		if !tested {
+			fix = fmt.Sprintf("Its package holds no _test.go file: delete it, or restore the package's tests and run the update, %s=1 go test ./..., to write it again.", updateVar)
+		}
+		return fmt.Errorf("%s can't be read: %v, and Create writes nothing while a registry under the module root can't be read.\n%s", path, err, fix)
 	}
-	roots := map[string]bool{}    // the corpus roots tested packages' registries record
-	declared := map[string]bool{} // the directories the root's tested registries declare
-	var stale []string            // the root's registries in packages with no _test.go file
+	roots := map[string]bool{}         // the corpus roots tested packages' registries record
+	declared := map[string]bool{}      // the directories the root's tested registries declare
+	var stale []string                 // the root's registries in packages with no _test.go file
+	staleDirs := map[string][]string{} // directory → those of stale that declare it
 	for _, f := range found {
 		data, err := os.ReadFile(f.Path)
 		if err != nil {
 			return fmt.Errorf("reading %s: %v.\nFix what stopped the read, and create the case again.", f.Path, err)
 		}
+		tested := registry.HasTestFile(f.Pkg)
 		h, err := registry.Peek(data)
 		if err != nil {
-			return unreadable(f.Path, err)
+			return unreadable(f.Path, tested, err)
 		}
-		if !registry.HasTestFile(f.Pkg) {
-			if h.CorpusRoot == c.Rel() {
-				stale = append(stale, f.Path)
-			}
-			continue
+		if tested {
+			roots[h.CorpusRoot] = true
 		}
-		roots[h.CorpusRoot] = true
 		if h.CorpusRoot != c.Rel() {
 			continue
 		}
 		g, err := registry.Parse(data)
 		if err != nil {
-			return unreadable(f.Path, err)
+			return unreadable(f.Path, tested, err)
 		}
+		dirs := map[string]bool{}
 		for _, t := range g.Types {
-			declared[t.Dir] = true
+			dirs[t.Dir] = true
 		}
 		for _, s := range g.Suites {
 			if s.Consumes == registry.RawInput {
 				for _, d := range s.Corpora {
-					declared[d] = true
+					dirs[d] = true
 				}
 			}
 		}
+		if !tested {
+			stale = append(stale, f.Path)
+		}
+		for d := range dirs {
+			if tested {
+				declared[d] = true
+			} else {
+				staleDirs[d] = append(staleDirs[d], f.Path)
+			}
+		}
+	}
+	testedDeclare := "the registries in packages with tests declare none"
+	if len(declared) > 0 {
+		testedDeclare = "the registries in packages with tests declare " + quotedList(declared)
 	}
 	switch {
 	case !roots[c.Rel()] && len(stale) > 0:
@@ -268,13 +295,11 @@ func recorded(c root.Corpus, dir, updateVar string) error {
 		if len(roots) > 0 {
 			have = "its registries record " + quotedList(roots)
 		}
-		return fmt.Errorf("no registry under the module root %s records the corpus root %q, so no package's tests would read the case: %s.\nPass root.Find the path a package passes to hypercase.Root, or . for one that passes none. A new package's first update, %s=1 go test ./..., writes its registry: it fails, since the package's suites apply to no case yet, and writes the registry still.", c.Module(), c.Rel(), have, updateVar)
+		return fmt.Errorf("no registry under the module root %s records the corpus root %q, so no package's tests would read the case: %s.\nPass root.Find the path a package passes to hypercase.Root, or . for one that passes none. A new package's first update, %s=1 go test ./..., writes its registry: with no case yet, it fails for each suite the package registers, which applies to no case, and writes the registry still.", c.Module(), c.Rel(), have, updateVar)
+	case !declared[dir] && len(staleDirs[dir]) > 0:
+		return fmt.Errorf("the directory %s is declared under the corpus root %q only by registries in packages with no _test.go file, %s, so no test would read the case: %s.\nRestore the package's tests, or pass the corpus type a package with tests registers.", dir, c.Rel(), strings.Join(staleDirs[dir], ", "), testedDeclare)
 	case !declared[dir]:
-		have := "they declare none"
-		if len(declared) > 0 {
-			have = "they declare " + quotedList(declared)
-		}
-		return fmt.Errorf("no registry of the corpus root %q declares the directory %s, as a corpus type's directory or the corpus of a suite over the raw input, so no package's tests would read the case: %s.\nPass the corpus type a package of the corpus root registers.", c.Rel(), dir, have)
+		return fmt.Errorf("no registry of the corpus root %q declares the directory %s, as a corpus type's directory or the corpus of a suite over the raw input, so no package's tests would read the case: %s.\nPass the corpus type a package of the corpus root registers.", c.Rel(), dir, testedDeclare)
 	}
 	return nil
 }
