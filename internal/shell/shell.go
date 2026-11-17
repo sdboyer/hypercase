@@ -11,6 +11,10 @@ import "strings"
 // single quotes, with each single quote in it written as
 //
 //	'\''
+//
+// It quotes for a shell with its default options. zsh with
+// magicequalsubst set, which is off by default, reads x==ls, which Quote
+// leaves as it is, as x= and the path of ls.
 func Quote(s string) string {
 	if s != "" && s[0] != '=' && strings.IndexFunc(s, special) < 0 {
 		return s
