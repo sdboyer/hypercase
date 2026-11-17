@@ -234,8 +234,28 @@ func scratch(t *testing.T, repo string) (modfile string) {
 	}
 	copyFile(t, filepath.Join(module, "go.sum"), filepath.Join(build, "go.sum"))
 
-	git(t, repo, "init", "-q", "-b", "main")
+	git(t, repo, gitInit...)
 	return modfile
+}
+
+// gitInit makes the scratch repository, on main, with its objects named by
+// SHA-1 whatever git's default, so that the page's commits are the same
+// wherever the test runs.
+var gitInit = []string{"init", "-q", "-b", "main", "--object-format=sha1"}
+
+// TestGitInit: the scratch repository names its objects by SHA-1 where
+// git's default is SHA-256.
+func TestGitInit(t *testing.T) {
+	repo := t.TempDir()
+	cmd := exec.Command("git", gitInit...)
+	cmd.Dir = repo
+	cmd.Env = append(gitEnv(), "GIT_DEFAULT_HASH=sha256")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %s: %v\n%s", strings.Join(gitInit, " "), err, out)
+	}
+	if got := git(t, repo, "rev-parse", "--show-object-format"); got != "sha1\n" {
+		t.Errorf("the repository's object format is %q, not sha1", strings.TrimSpace(got))
+	}
 }
 
 func copyDir(t *testing.T, from, to string) {
@@ -294,7 +314,7 @@ func commit(t *testing.T, repo, msg string) {
 // which the report doesn't read, and the report's own goldens.
 func TestCommit(t *testing.T) {
 	repo := t.TempDir()
-	git(t, repo, "init", "-q", "-b", "main")
+	git(t, repo, gitInit...)
 	for _, name := range []string{
 		"go.mod",
 		"sheet/sheet.go",
