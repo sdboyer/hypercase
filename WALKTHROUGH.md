@@ -2581,9 +2581,9 @@ not by the archive's name. `view` gives each file of the sheet that
 `sheet.ImportCSV` returns as one of the jenny's files. `decl.Reject` marks
 the jenny's error as the lift's rejection of the case: the importer's own
 error, a `*sheet.Error`, is one. Any other error is no rejection, so it
-fails the cell: an input that is not one file, `csv/<name>.csv`, with a
-name that isn't empty or only white space; an input the jenny can't walk;
-and a CSV it can't read.
+fails the cell: an input that breaks the corpus type's rule (one file,
+`csv/<name>.csv`, with a name that isn't empty or only white space); an
+input the jenny can't walk; and a CSV it can't read.
 
 `walkthrough/sheets/step10/sheetcorpus/types.go` declares the corpus type,
 its property and the lift:

@@ -14,9 +14,9 @@ import (
 )
 
 // TestImportInput: import finds its CSV by its tree, and errs on an input
-// that is not one file, csv/<name>.csv, with a name that isn't empty or
-// only white space. The error is its own, not the importer's, so it
-// carries no code, and no mark of decl.Reject.
+// that breaks the corpus type's rule (one file, csv/<name>.csv, with a name
+// that isn't empty or only white space). The error is its own, not the
+// importer's, so it carries no code, and no mark of decl.Reject.
 func TestImportInput(t *testing.T) {
 	csv := &fstest.MapFile{Data: []byte("4,6\n")}
 	for _, tt := range []struct {
