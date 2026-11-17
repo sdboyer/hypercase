@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/sdboyer/hypercase"
@@ -64,12 +63,10 @@ func TestImportFault(t *testing.T) {
 	}
 	cmd := exec.Command(exe, "-test.run=^TestImportFault$", "-test.count=1")
 	cmd.Dir = dir
-	for _, kv := range os.Environ() {
-		if k, _, _ := strings.Cut(kv, "="); k != throwaway && k != sheetcorpus.Project.UpdateVar && k != "PWD" {
-			cmd.Env = append(cmd.Env, kv)
-		}
-	}
-	cmd.Env = append(cmd.Env, throwaway+"=1", sheetcorpus.Project.UpdateVar+"=1")
+	// The child's environment is these two variables alone. It needs no
+	// other, and any other could change the output compared below, as
+	// GODEBUG=inittrace=1 does.
+	cmd.Env = []string{throwaway + "=1", sheetcorpus.Project.UpdateVar + "=1"}
 	out, err := cmd.CombinedOutput()
 	var exit *exec.ExitError
 	switch {
