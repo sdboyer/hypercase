@@ -15,7 +15,7 @@ import (
 
 // TestImportInput: import finds its CSV by its tree, and errs on an input
 // that is not one file, csv/<name>.csv, with an error of its own, not the
-// importer's, so the error carries no code, and is no rejection.
+// importer's, so the error carries no code, and no mark of decl.Reject.
 func TestImportInput(t *testing.T) {
 	csv := &fstest.MapFile{Data: []byte("4,6\n")}
 	for _, tt := range []struct {
@@ -43,8 +43,8 @@ func TestImportInput(t *testing.T) {
 			if errors.As(err, &e) {
 				t.Errorf("the error carries the importer's code %s", e.Code)
 			}
-			if rejected(err) {
-				t.Errorf("import rejects the case: %v", err)
+			if marked(err) {
+				t.Errorf("the error carries decl.Reject's mark: %v", err)
 			}
 		})
 	}
@@ -76,8 +76,8 @@ func TestImportReadFault(t *testing.T) {
 			if !errors.Is(err, fs.ErrPermission) {
 				t.Fatalf("got %v, want the open's error", err)
 			}
-			if rejected(err) {
-				t.Errorf("import rejects the case with a read error: %v", err)
+			if marked(err) {
+				t.Errorf("the read's error carries decl.Reject's mark: %v", err)
 			}
 		})
 	}
@@ -97,9 +97,12 @@ func (u unopenable) Open(name string) (fs.File, error) {
 	return u.files.Open(name)
 }
 
-// rejected reports whether err carries decl.Reject's mark. The mark's type
-// is decl's own, so it is taken from a mark Reject makes.
-func rejected(err error) bool {
+// marked reports whether some error in err's tree is one decl.Reject made.
+// An error with no mark anywhere is no rejection, which needs a mark on
+// every path through the tree, so a test that wants no rejection wants no
+// mark. The mark's type is decl's own, so it is taken from a mark Reject
+// makes.
+func marked(err error) bool {
 	mark := reflect.New(reflect.TypeOf(decl.Reject(errors.New("a rejection"))))
 	return errors.As(err, mark.Interface())
 }
