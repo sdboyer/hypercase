@@ -56,21 +56,23 @@ func TestImportInput(t *testing.T) {
 	// Only a name that is empty or white space alone is refused: one dot is
 	// a name, and so is a letter between spaces.
 	for _, p := range []string{"csv/one.csv", "csv/..csv", "csv/ a .csv"} {
-		files, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: fstest.MapFS{p: csv}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		var got []string
-		for _, f := range files {
-			data, err := f.Render()
+		t.Run(p, func(t *testing.T) {
+			files, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: fstest.MapFS{p: csv}})
 			if err != nil {
 				t.Fatal(err)
 			}
-			got = append(got, f.Path()+"="+string(data))
-		}
-		if want := []string{"sheet/A1=4\n", "sheet/B1=6\n"}; !slices.Equal(got, want) {
-			t.Errorf("%s: got %q, want %q", p, got, want)
-		}
+			var got []string
+			for _, f := range files {
+				data, err := f.Render()
+				if err != nil {
+					t.Fatalf("rendering %s: %v", f.Path(), err)
+				}
+				got = append(got, f.Path()+"="+string(data))
+			}
+			if want := []string{"sheet/A1=4\n", "sheet/B1=6\n"}; !slices.Equal(got, want) {
+				t.Errorf("got %q, want %q", got, want)
+			}
+		})
 	}
 }
 
