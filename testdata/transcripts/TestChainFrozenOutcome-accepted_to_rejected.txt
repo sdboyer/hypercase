@@ -205,7 +205,7 @@ $ go test  # chain
         - accepted
         + rejected
         The cells past import fail in normal runs until the frozen cell is resolved: an update writes them from what import makes now, and leaves the cell's committed outcome and product in place, which a normal run reads.
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/.
     export/empty/transform/louder: louder declines the base: the export makes no output of evaluate
     export/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/export/looped.txtar, out/resolve/error.txt, records its error.
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
@@ -315,7 +315,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
         - accepted
         + rejected
         The cells past import fail in normal runs until the frozen cell is resolved: an update writes them from what import makes now, and leaves the cell's committed outcome and product in place, which a normal run reads.
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/.
     export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
         list: Lists the files of the script's input view, with their bytes.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, failed on the case.
@@ -431,7 +431,7 @@ $ go test  # chain
         - accepted
         + rejected
         The cells past import fail in normal runs until the frozen cell is resolved: an update writes them from what import makes now, and leaves the cell's committed outcome and product in place, which a normal run reads.
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/.
     export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
         list: Lists the files of the script's input view, with their bytes.
         out/list/outcome differs (-golden +got):

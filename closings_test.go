@@ -1036,6 +1036,14 @@ func closingGrids() []closingGrid {
 		frozenF = append(frozenF, gapOn(col))
 	}
 	add("frozen", chain, cross(frozenF, editsOf(chainF, "F0", "F1", "F2", "F3", "F5", "F8", "F9", "F12"), editsOf(chainC, "C0", "C1", "C4", "C5", "C8", "C10", "C11")))
+	// chain-render: import rejects quoted, and the project's RenderError
+	// panics on its error, so the update writes nothing for import's cell,
+	// and holds back the cells past it.
+	render := closingGrid{fixture: "chain-render", archive: "testdata/export/quoted.txtar", pkgs: []childRun{{pkg: "", registration: "chain-render"}}}
+	add("chain-render", render, cross([]gridEdit{
+		{"R0 none", func(*archive.Archive) {}},
+		{"R1 import rejects, and the renderer panics", seq(set("properties", "circular\nunterminated\n"), insert("in/import/error", "line 1: unclosed quote\n", "in/quote/"), insert("in/render/panic", "the renderer panicked\n", "via/"))},
+	}))
 	// chain-twice: export, then import, two bytes lifts in sequence.
 	add("chain-twice", twice, cross(twiceF, twiceC))
 	add("chain-twice-frozen", twice, cross([]gridEdit{gapOn("export"), gapOn("import"), gapOn("list")}, editsOf(twiceF, "T0", "T1", "T3", "T7"), editsOf(twiceC, "D0", "D1", "D2", "D5", "D7", "D11")))

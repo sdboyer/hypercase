@@ -31,7 +31,7 @@ $ go test  # transforms
         transform/upper/out/echo/values.txt differs (-committed +got):
         - partial
         + PARTIAL
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
     script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
     script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
 --- FAIL: TestCorpus
@@ -63,7 +63,7 @@ $ go test  # transforms
         transform/upper/out/echo/values.txt differs (-committed +got):
         - partial
         + PARTIAL
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
     script/garbled/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.
         gaps, line 1, marks the cell of transform/looped echo, and looped declines the base: the base states malformed, which looped neither gives nor keeps
         Remove the line, or fix the transform.

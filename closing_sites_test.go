@@ -31,7 +31,8 @@ import (
 // function by what it is and its message, saying what it reports, which is
 // no cell's note: each listed site is one use. And no note's body gives
 // advice, which is its closing's: no body holds a run of the words of a
-// closing's advice, or of what a closing's claims say.
+// closing's advice, or of what a closing's claims say. A closing's advice
+// says nothing of what an update does: no constant of it names an update.
 func TestOneClosing(t *testing.T) {
 	s := loadSource(t)
 	sites := s.messageSites(t)
@@ -76,7 +77,20 @@ func TestOneClosing(t *testing.T) {
 	// one of two, counting the words that hold a letter. A constant that
 	// both reach, as from a helper that names what both refer to, is
 	// neither's own.
-	advice, bodies := s.closingWords(t)
+	advice, claimed, bodies := s.closingWords(t)
+	// A closing's advice says what to do, and what an update does is its
+	// claims' to say, which TestClosings checks: no constant of its advice
+	// names an update. It runs the update only as the command, which it
+	// formats in.
+	for _, a := range advice {
+		for _, w := range strings.FieldsFunc(strings.ToLower(a.text), func(r rune) bool { return !unicode.IsLetter(r) && r != '\'' }) {
+			if strings.TrimSuffix(w, "'s") == "update" || w == "updates" {
+				t.Errorf("%s: a closing's advice says %q, which names an update.\nWhat an update does is the closing's claims' to say, which TestClosings checks against what it does: say it in a field of claims, or say nothing of it.", a.at, a.text)
+				break
+			}
+		}
+	}
+	advice = append(advice, claimed...)
 	both := map[string]bool{}
 	for _, a := range advice {
 		for _, b := range bodies {
@@ -530,12 +544,12 @@ var messageSites = map[string][]messageSite{
 type text struct{ text, at string }
 
 // closingWords returns the constant strings that make the advice of the
-// package's closings, and what their claims say, and those that make its
-// notes' bodies, however an expression gives them: in a note's or a
+// package's closings, those of what their claims say, and those that make
+// its notes' bodies, however an expression gives them: in a note's or a
 // closing's literal or an assignment to its field, or in what is assigned
 // to a variable, a field or a parameter they take, or what a function of
 // the package they call returns, followed to the constants.
-func (s *source) closingWords(t *testing.T) (advice, bodies []text) {
+func (s *source) closingWords(t *testing.T) (advice, claimed, bodies []text) {
 	t.Helper()
 	field := func(typeName, name string) *types.Var {
 		st := s.pkg.Scope().Lookup(typeName).Type().Underlying().(*types.Struct)
@@ -688,11 +702,11 @@ func (s *source) closingWords(t *testing.T) (advice, bodies []text) {
 	advice = flows(field("closing", "advice"))
 	// What claims say is the words of the functions that render them.
 	for _, name := range []string{"staging.text", "staging.does", "staged"} {
-		advice = append(advice, in(s.funcDecl(t, name).Body)...)
+		claimed = append(claimed, in(s.funcDecl(t, name).Body)...)
 	}
 	clear(seen)
 	bodies = flows(field("note", "body"))
-	return advice, bodies
+	return advice, claimed, bodies
 }
 
 // words counts a sentence's words that hold a letter.

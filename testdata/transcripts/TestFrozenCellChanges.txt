@@ -11,7 +11,7 @@ $ go test -run=TestCorpus/script/(negative|div-zero|accepted-loop)/  # rejects
         The cell is frozen by its known gap, gaps line 1: "echo A cycle is an error. Waits on sheets#4."
         Its committed files record today's behavior, and the run now produces different ones:
         out/echo/c.txt is new
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
     script/div-zero: A1 divides by zero, and the code prints a number.
         echo: Does what the case's do/ tree says.
         The cell is frozen by its known gap, gaps line 1: "echo A division by zero evaluates to #DIV/0!. Waits on sheets#5."
@@ -19,7 +19,7 @@ $ go test -run=TestCorpus/script/(negative|div-zero|accepted-loop)/  # rejects
         out/echo/values.txt differs (-committed +got):
         - A1 0
         + A1 0.0
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
     script/negative: A1 is a negative number, which the code wrongly rejects.
         echo: Does what the case's do/ tree says.
         The cell is frozen by its known gap, gaps line 1: "echo A negative number is valid, and evaluates to itself. Waits on sheets#3."
@@ -27,7 +27,7 @@ $ go test -run=TestCorpus/script/(negative|div-zero|accepted-loop)/  # rejects
         out/echo/error.txt differs (-committed +got):
         - A1: unexpected "-"
         + A1: bad number
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/accepted-loop
@@ -45,7 +45,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/script/(negative|div-zero|acce
         The cell is frozen by its known gap, gaps line 1: "echo A cycle is an error. Waits on sheets#4."
         Its committed files record today's behavior, and the run now produces different ones:
         out/echo/c.txt is new
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
     script/div-zero: A1 divides by zero, and the code prints a number.
         echo: Does what the case's do/ tree says.
         The cell is frozen by its known gap, gaps line 1: "echo A division by zero evaluates to #DIV/0!. Waits on sheets#5."
@@ -53,7 +53,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/script/(negative|div-zero|acce
         out/echo/values.txt differs (-committed +got):
         - A1 0
         + A1 0.0
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
     script/negative: A1 is a negative number, which the code wrongly rejects.
         echo: Does what the case's do/ tree says.
         The cell is frozen by its known gap, gaps line 1: "echo A negative number is valid, and evaluates to itself. Waits on sheets#3."
@@ -61,7 +61,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/script/(negative|div-zero|acce
         out/echo/error.txt differs (-committed +got):
         - A1: unexpected "-"
         + A1: bad number
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/accepted-loop
@@ -84,7 +84,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/script/negative/  # rejects
         - rejected
         + accepted
         out/echo/error.txt is no longer produced
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/negative

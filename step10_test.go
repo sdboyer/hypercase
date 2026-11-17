@@ -780,7 +780,7 @@ func TestChainFrozen(t *testing.T) {
 	s.same(prices, frozen)
 
 	s.edit(prices, "import makes other values", set("in/import/out/evaluate/out/values.txt", "a1 4\nb1 8\n"))
-	changed := "The cell is frozen by its known gap, gaps line 1: \"import The importer reads quoted fields. Waits on sheets#9.\"\nIts committed files record today's behavior, and the run now produces different ones:\nvia/import/evaluate/out/values.txt differs (-committed +got):\n- a1 3\n- b1 6\n+ a1 4\n+ b1 8\nThe cells past import fail in normal runs until the frozen cell is resolved: an update writes them from what import makes now, and leaves the cell's committed outcome and product in place, which a normal run reads.\nIf the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/, and the next update writes them."
+	changed := "The cell is frozen by its known gap, gaps line 1: \"import The importer reads quoted fields. Waits on sheets#9.\"\nIts committed files record today's behavior, and the run now produces different ones:\nvia/import/evaluate/out/values.txt differs (-committed +got):\n- a1 3\n- b1 6\n+ a1 4\n+ b1 8\nThe cells past import fail in normal runs until the frozen cell is resolved: an update writes them from what import makes now, and leaves the cell's committed outcome and product in place, which a normal run reads.\nIf the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files and its product, under out/import/ and via/import/."
 	n := s.normal("chain")
 	s.fails(n, changed)
 	s.contains(n, "--- PASS: TestCorpus/export/prices/evaluate")
