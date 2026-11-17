@@ -725,7 +725,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			var ns notes
 			ns.add(aboutFault,
 				fmt.Sprintf("The update writes nothing for the cell of the lift %s, on %s's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for %s, so the update writes nothing for this cell either, and the cell runs nothing.", by.lift.name, col.name, by.lift.name),
-				closing{advice: fmt.Sprintf("Fix what %s's cell reports.", by.lift.name)})
+				closing{advice: fmt.Sprintf("Fix what %s's cell reports.", by.lift.name), claims: claims{Unwritten: by.lift.name}})
 			report(t, header, ns, r.staging(c, col, res.fate, false, cf.frozen(marked), nil))
 			return
 		}

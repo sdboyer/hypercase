@@ -119,6 +119,10 @@ type claims struct {
 	// the cell by a lift before every bytes lift there, so it reaches none
 	// of them, and stages no variant.
 	Reads string `json:"reads,omitempty"`
+	// Unwritten names the bytes lift on the cell's path whose cell the
+	// update writes nothing for, as a problem of the cell keeps it from
+	// being written, so the update writes nothing for the cell either.
+	Unwritten string `json:"unwritten,omitempty"`
 	// CantTell names the bytes lift on the cell's path that the package
 	// doesn't own, so it can't tell what the update does with the cell: a
 	// normal run of the package reads the lift's outcome and product from
@@ -279,6 +283,9 @@ func (st *staging) close(n note) (string, claims) {
 	case st.otherwise:
 		c = st.tail(n)
 		c.claims.Does, c.claims.Another = fateWords(st.f), st.f.runs() && st.ran
+		if b := st.f.block; b != nil && b.broken {
+			c.claims.Unwritten = b.lift.name
+		}
 		if st.reran != nil {
 			c.claims.Reruns = st.reran.name
 		} else if st.c.state.made == nil {
@@ -443,6 +450,12 @@ func (st *staging) text(n note, c closing) string {
 		}
 		says = append(says, s.then("."))
 	}
+	if cl.Unwritten != "" && !staged {
+		// Where the closing says what the update does with the cell, its
+		// fate's sentence says it.
+		l, col := cl.Unwritten, st.col.name
+		says = append(says, said{fmt.Sprintf("An update writes nothing for the cell of the lift %s, on %s's path, nor for this cell.", l, col), fmt.Sprintf("an update writes nothing for the cell of the lift %s, on %s's path, nor for this cell.", l, col)})
+	}
 	if cl.Nothing {
 		s := said{"An update writes nothing for this cell", "an update writes nothing for this cell"}
 		if staged {
@@ -544,7 +557,7 @@ func (st *staging) does(cl claims) string {
 	case fateSkipped:
 		return fmt.Sprintf("%s skips %s: %s, and %s's probe says the case isn't for it: %s", u, col, how, col, detail)
 	case fateBroken:
-		return fmt.Sprintf("%s writes nothing for %s: %s, and it writes nothing for the cell of the lift %s, on %s's path, whose outcome and product a normal run reads.", u, col, how, detail, col)
+		return fmt.Sprintf("%s writes nothing for %s: %s, and it writes nothing for the cell of the lift %s, on %s's path, whose outcome and product a normal run reads.", u, col, how, cl.Unwritten, col)
 	case fateBlocked:
 		// The update runs every lift on the cell's path, so a lift that
 		// blocks the cell there failed on the case. One that fails before

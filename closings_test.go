@@ -910,6 +910,46 @@ var claimChecks = map[string]claimCheck{
 		}
 		return ""
 	}},
+	// Where the update writes nothing for a cell past a bytes lift whose
+	// cell it writes nothing for, its fate there, a closing that says what
+	// the update does with the cell names the lift, as does the update's
+	// own note of the cell. The update wrote neither cell, as each of its
+	// records of them, in every package, says, and the archive holds both
+	// as they were.
+	"Unwritten": {check: func(c *noteCheck, u *updated) string {
+		var want string
+		if l, ok := strings.CutPrefix(u.cell.Fate, "broken "); ok && c.cell && (c.n.Update || c.cl.Does != "") {
+			want = l
+		}
+		switch {
+		case c.cl.Unwritten != want:
+			return fmt.Sprintf("the closing says the update writes nothing for the cell of the lift %q, and the lift whose cell the update's fate of the cell, %q, says it writes nothing for is %q", c.cl.Unwritten, u.cell.Fate, want)
+		case want == "":
+			return ""
+		}
+		var recs []cellKey
+		for _, k := range slices.SortedFunc(maps.Keys(u.cells), compareCells) {
+			if k.c == c.n.Case && k.prefix == c.n.Prefix && (k.col == want || k.col == c.n.Column && k.pkg == c.n.Pkg) {
+				recs = append(recs, k)
+			}
+		}
+		var lift bool
+		for _, k := range recs {
+			lift = lift || k.col == want
+			if o := u.cells[k]; o.Ran && o.Writable {
+				return fmt.Sprintf("the closing says the update writes nothing for the cell of the lift %s, nor for %s, and the update of %s wrote %s's", want, c.n.Column, k.pkg, k.col)
+			}
+		}
+		for _, col := range []string{want, c.n.Column} {
+			if !maps.Equal(cellSections(c.before, c.n.Prefix, col), cellSections(u.after, c.n.Prefix, col)) {
+				return fmt.Sprintf("the closing says the update writes nothing for the cell of the lift %s, nor for %s, and %s's changed", want, c.n.Column, col)
+			}
+		}
+		if !lift {
+			return fmt.Sprintf("the closing says the update writes nothing for the cell of the lift %s, and no package's update records the cell", want)
+		}
+		return ""
+	}},
 	"CantTell": {check: func(c *noteCheck, _ *updated) string {
 		var want string
 		if c.cell && !c.n.Update {

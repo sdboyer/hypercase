@@ -33,11 +33,11 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-b-nooutputs
     export/quoted: import rejects the export.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
         The update writes nothing for the cell of the lift import, on evaluate's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
-        Fix what import's cell reports.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on evaluate's path, nor for this cell.
     export/quoted: import rejects the export.
         list: Lists the files of the script's input view, with their bytes.
         The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
-        Fix what import's cell reports.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on list's path, nor for this cell.
     export/quoted/transform/louder: louder declines the base: the export makes no output of evaluate
     what ran, in order:
         import ran
