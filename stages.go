@@ -235,9 +235,10 @@ type caseState struct {
 	// commits for it, as a normal run does.
 	update bool
 	// made is, in a normal run of a transform's variant whose committed
-	// inputs differ from what the transform makes, what it makes: the
-	// input view the update stages the case on. It is nil when the update
-	// stages the case on view.
+	// inputs give another input view than the one the transform makes,
+	// what it makes: the input view the update stages the case on. It is
+	// nil when the update stages the case on view, or on a view that holds
+	// the same files.
 	made fs.FS
 	// asUpdate is, in a normal run, the case staged as the package's
 	// update stages it, made when a cell first asks what the update does
@@ -361,6 +362,10 @@ type updateFate struct {
 	// update stages, when it does: it panics, or says the case isn't for
 	// it with no reason, or with one an outcome can't hold.
 	fault string
+	// panicked records that the fault is the probe's panic, for which the
+	// update writes the outcome panicked, and the panic in error.txt. For
+	// the other faults, it writes nothing for the cell.
+	panicked bool
 }
 
 // runs reports whether the update runs the cell.
@@ -404,16 +409,27 @@ func (s *caseState) updateFate(col *column) updateFate {
 	p := call(func(*called) { why, ok = col.probe(in) })
 	switch {
 	case p.panicked:
-		return updateFate{fault: fmt.Sprintf("%s's probe panics: %v", col.name, p.panicValue)}
+		return updateFate{fault: fmt.Sprintf("%s's probe panics: %v", col.name, p.panicValue), panicked: true}
 	case ok:
 		return updateFate{}
-	case strings.TrimSpace(why) == "":
-		return updateFate{fault: fmt.Sprintf("%s's probe says the case isn't for it, and gives no reason", col.name)}
 	}
-	if err := archive.CheckDetail(why); err != nil {
-		return updateFate{fault: fmt.Sprintf("%s's probe says the case isn't for it, with a reason an outcome can't hold: %v", col.name, err)}
+	if fault := probeFault(col, why); fault != "" {
+		return updateFate{fault: fault}
 	}
 	return updateFate{skip: why}
+}
+
+// probeFault says how col's probe, which said the case isn't for it, with
+// the reason why, fails the cell: with no reason, or with one an outcome
+// can't hold. It returns "" for a reason an outcome holds.
+func probeFault(col *column, why string) string {
+	if strings.TrimSpace(why) == "" {
+		return fmt.Sprintf("%s's probe says the case isn't for it, and gives no reason", col.name)
+	}
+	if err := archive.CheckDetail(why); err != nil {
+		return fmt.Sprintf("%s's probe says the case isn't for it, with a reason an outcome can't hold: %v", col.name, err)
+	}
+	return ""
 }
 
 // restages reports, in a normal run, once updateFate says the update runs
@@ -422,7 +438,8 @@ func (s *caseState) updateFate(col *column) updateFate {
 // lift's product alone, so it differs when that lift makes another
 // product than the one the archive commits. With no bytes lift on the
 // path, it differs when the update stages a transform's variant on what
-// the transform makes.
+// the transform makes, whose input view differs from the committed
+// inputs'.
 func (s *caseState) restages(col *column) bool {
 	last, _ := s.plan.bytesOnPath(col.consumes)
 	if last == nil {

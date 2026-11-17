@@ -732,14 +732,10 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		case p.panicked:
 			p.inProbe = true
 			out = p
-		case !ok && strings.TrimSpace(why) == "":
-			st.applied++
-			t.Errorf("%s\n%s's probe said the case isn't for it, and gave no reason.\nFix the probe: when it says no, it says why.", header, col.name)
-			return
 		case !ok:
-			if err := archive.CheckDetail(why); err != nil {
+			if probeFault(col, why) != "" {
 				st.applied++
-				t.Errorf("%s\n%s's probe said the case isn't for it, with a reason an outcome can't hold: %v.\nFix the probe. An update writes nothing for this cell.", header, col.name, err)
+				r.probeFailed(t, c, header, col, why, goldens)
 				return
 			}
 			r.skipped(t, c, header, col, why, gap, marked, goldens, res)
@@ -794,9 +790,18 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		product, held = lr.product, len(lr.problems) == 0
 	}
 	frozen := cf.frozen(marked)
+	// What the update does with the cell, which a normal run asks once,
+	// when a message first needs it.
+	var stg *staging
+	staged := func() *staging {
+		if stg == nil {
+			stg = r.ranStaged(c, col)
+		}
+		return stg
+	}
 
 	if !marked {
-		r.expectedError(m, c, col, out)
+		r.expectedError(m, c, col, out, staged)
 	}
 	if frozen {
 		// The known gap freezes the cell: its committed files record
@@ -846,9 +851,9 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			m.add("The cell is frozen by its known gap, %s line %d: %q\nIts committed files match the run, and it has no %s, which every cell has.\nRun %s to add it. The update adds the outcome and changes nothing else.", c.gapsAt, gap.Line, gap.Raw, c.out(col.name, outcomeFile), r.updateCmd())
 		}
 	} else {
-		r.compare(m, c, col, files, goldens, unjudged, writable)
+		r.compare(m, c, col, files, goldens, unjudged, writable, staged)
 		if bytesLift && held {
-			r.compareProduct(m, c, col.lift, out, product, cf.product, writable)
+			r.compareProduct(m, c, col.lift, out, product, cf.product, writable, staged)
 		}
 	}
 	if !m.empty() {
@@ -1061,19 +1066,21 @@ func (r *runner) asks(goldens map[string][]byte, product int, frozen bool, o arc
 
 // advice is what a normal run says of a cell that ran nothing, when the
 // update does otherwise with it: of the cell's files under out/<column>/,
-// of a bytes lift's committed product, and of the cell's outcome. Each is
-// "" where the run's own words hold.
-type advice struct{ files, product, outcome string }
+// of a bytes lift's committed product, and of the cell's outcome; and,
+// for a cell whose probe failed on the case, which has no outcome, what
+// the update writes for it. Each is "" where the run's own words hold.
+type advice struct{ files, product, outcome, fault string }
 
 // asUpdate words, in a normal run, what the package's update does with a
-// cell this run finds blocked or skipped, when the update may stage the
-// case otherwise: on what a transform makes, where this run reads a
-// variant's committed inputs, or running each bytes lift on the cell's
-// path, where this run reads what the archive commits for it. same says
-// whether the update does with the cell what this run does, so that the
-// run's own words hold. Only the package that owns a bytes lift runs it in
-// a normal run, so a package that doesn't own every bytes lift on the
-// cell's path can't tell, and says so of the cell's files.
+// cell this run finds blocked or skipped, or whose probe fails on the case,
+// when the update may stage the case otherwise: on what a transform makes,
+// where this run reads a variant's committed inputs, or running each bytes
+// lift on the cell's path, where this run reads what the archive commits
+// for it. same says whether the update does with the cell what this run
+// does, so that the run's own words hold. Only the package that owns a
+// bytes lift runs it in a normal run, so a package that doesn't own every
+// bytes lift on the cell's path can't tell, and says so of the cell's
+// files, and of what the update writes for a cell whose probe failed.
 func (r *runner) asUpdate(c *aCase, col *column, same func(updateFate) bool) advice {
 	u := r.updateCmd()
 	last, unowned := c.state.plan.bytesOnPath(col.consumes)
@@ -1082,45 +1089,106 @@ func (r *runner) asUpdate(c *aCase, col *column, same func(updateFate) bool) adv
 		return advice{}
 	case unowned != nil:
 		files := fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell whether an update runs %s. Run %s, which reruns %s, and delete nothing by hand before it has.", unowned.name, col.name, u, unowned.name)
-		return advice{files: files, product: files}
+		fault := fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell what an update writes for the cell. Run %s, which reruns %s.", unowned.name, u, unowned.name)
+		return advice{files: files, product: files, fault: fault}
 	}
 	f := c.state.updateFate(col)
 	if same(f) {
 		return advice{}
 	}
-	staged := c.staged(last)
-	writes := func(o archive.Outcome) string {
-		return fmt.Sprintf("It writes the outcome %q, not this one.", strings.TrimSuffix(string(o.Format()), "\n"))
-	}
+	does := r.does(col, f, c.staged(last), false)
+	outcome := writesOutcome(f, does)
 	switch {
 	case f.runs():
-		keep := fmt.Sprintf("%s runs %s: %s. Delete nothing by hand before it has run.", u, col.name, staged)
-		return advice{
-			files:   keep,
-			product: keep,
-			outcome: fmt.Sprintf("%s runs %s: %s. What it writes for the cell, if anything, is its run's, not this outcome.", u, col.name, staged),
-		}
+		keep := does + " Delete nothing by hand before it has run."
+		return advice{files: keep, product: keep, outcome: outcome, fault: does + " What it writes for the cell, if anything, is its run's."}
 	case f.fault != "":
-		says := fmt.Sprintf("%s fails %s: %s, and %s.\nFix the probe.", u, col.name, staged, f.fault)
-		return advice{files: says, outcome: says}
+		return advice{files: does + "\nFix the probe.", outcome: outcome, fault: does + " " + faultWrites(f, false)}
 	case f.skip != "":
-		says := fmt.Sprintf("%s skips %s: %s, and %s's probe says the case isn't for it: %s", u, col.name, staged, col.name, f.skip)
 		return advice{
-			files:   says + fmt.Sprintf("\nIf the suite should run on the case, fix the probe. If not, delete the section by hand; %s leaves it in place.", u),
-			outcome: says + "\n" + writes(archive.Outcome{State: archive.Skipped, Detail: f.skip}),
+			files:   does + fmt.Sprintf("\nIf the suite should run on the case, fix the probe. If not, delete the section by hand; %s leaves it in place.", u),
+			outcome: outcome,
+			fault:   does + "\n" + fmt.Sprintf("It writes the outcome %q.", outcomeLine(archive.Outcome{State: archive.Skipped, Detail: f.skip})),
 		}
 	case f.block.broken:
-		says := fmt.Sprintf("%s writes nothing for %s: %s, and it writes nothing for the cell of the lift %s, on %s's path, whose outcome and product a normal run reads.", u, col.name, staged, f.block.lift.name, col.name)
-		keep := says + fmt.Sprintf("\nFix what %s's cell reports, and delete nothing by hand before %s has run.", f.block.lift.name, u)
-		return advice{files: keep, product: keep, outcome: says}
+		keep := does + fmt.Sprintf("\nFix what %s's cell reports, and delete nothing by hand before %s has run.", f.block.lift.name, u)
+		return advice{files: keep, product: keep, outcome: outcome, fault: does}
 	}
 	// The update blocks the cell, by another lift than this run does, and
 	// removes a blocked bytes lift's product, as this run's words say.
-	says := fmt.Sprintf("%s blocks %s: %s, and %s.", u, col.name, staged, f.block.why(col))
 	return advice{
-		files:   says + fmt.Sprintf("\nIf the cell should run, fix the lift or %s. If not, delete the section by hand; %s leaves it in place.", c.inputsAt(), u),
-		outcome: says + " " + writes(archive.Outcome{State: archive.Blocked, Detail: f.block.failed}),
+		files:   does + fmt.Sprintf("\nIf the cell should run, fix the lift or %s. If not, delete the section by hand; %s leaves it in place.", c.inputsAt(), u),
+		outcome: outcome,
+		fault:   does + " " + fmt.Sprintf("It writes the outcome %q.", outcomeLine(archive.Outcome{State: archive.Blocked, Detail: f.block.failed})),
 	}
+}
+
+// does words what the package's update does with col's cell, whose fate
+// there is f, where staged says how the update stages the case otherwise
+// than this normal run. ran says whether this run ran the cell, so that
+// the update's run of it is on another value. A skip's sentence ends with
+// the probe's reason, so what follows it starts a line.
+func (r *runner) does(col *column, f updateFate, staged string, ran bool) string {
+	u := r.updateCmd()
+	switch {
+	case f.runs() && ran:
+		return fmt.Sprintf("%s runs %s on another value than this run: %s.", u, col.name, staged)
+	case f.runs():
+		return fmt.Sprintf("%s runs %s: %s.", u, col.name, staged)
+	case f.fault != "":
+		return fmt.Sprintf("%s fails %s: %s, and %s.", u, col.name, staged, f.fault)
+	case f.skip != "":
+		return fmt.Sprintf("%s skips %s: %s, and %s's probe says the case isn't for it: %s", u, col.name, staged, col.name, f.skip)
+	case f.block.broken:
+		return fmt.Sprintf("%s writes nothing for %s: %s, and it writes nothing for the cell of the lift %s, on %s's path, whose outcome and product a normal run reads.", u, col.name, staged, f.block.lift.name, col.name)
+	}
+	return fmt.Sprintf("%s blocks %s: %s, and %s.", u, col.name, staged, f.block.why(col))
+}
+
+// writesOutcome words what the update writes for a cell's outcome, after
+// does, which says what the update does with the cell, whose fate there
+// is f: against the outcome this normal run gives it.
+func writesOutcome(f updateFate, does string) string {
+	switch {
+	case f.runs():
+		return does + " What it writes for the cell, if anything, is its run's, not this outcome."
+	case f.fault != "":
+		return does + "\nFix the probe. " + faultWrites(f, true)
+	case f.skip != "":
+		return does + "\n" + fmt.Sprintf("It writes the outcome %q, not this one.", outcomeLine(archive.Outcome{State: archive.Skipped, Detail: f.skip}))
+	case f.block.broken:
+		return does
+	}
+	return does + " " + fmt.Sprintf("It writes the outcome %q, not this one.", outcomeLine(archive.Outcome{State: archive.Blocked, Detail: f.block.failed}))
+}
+
+// faultWrites says what the update writes for a cell whose probe fails
+// there, as f says: for a panic, the outcome panicked, against this run's
+// when against is set, and the panic in error.txt; for any other fault,
+// nothing.
+func faultWrites(f updateFate, against bool) string {
+	if !f.panicked {
+		return "It writes nothing for the cell."
+	}
+	o := outcomeLine(archive.Outcome{State: archive.Panicked})
+	if against {
+		return fmt.Sprintf("It writes the outcome %q, not this one, and the panic in %s.", o, errorFile)
+	}
+	return fmt.Sprintf("It writes the outcome %q, and the panic in %s.", o, errorFile)
+}
+
+// outcomeLine is an outcome as its file holds it, less its newline.
+func outcomeLine(o archive.Outcome) string {
+	return strings.TrimSuffix(string(o.Format()), "\n")
+}
+
+// then joins what follows a sentence of does, which says what the update
+// does with a cell whose fate there is f.
+func then(f updateFate, does, more string) string {
+	if f.skip != "" {
+		return does + "\n" + more
+	}
+	return does + " " + more
 }
 
 // staged says how the update stages a case otherwise than a normal run,
@@ -1136,27 +1204,143 @@ func (c *aCase) staged(last *lift) string {
 	return strings.Join(how, ", and ")
 }
 
-// mayStillWrite words, in a normal run, the advice for a file that a
-// cell's committed files hold and its run no longer produces, when the
-// update runs the cell on another value than this run, as it may past a
-// bytes lift, or on a transform's variant whose committed inputs differ
-// from what the transform makes: the update's run may still write the
-// file. It returns "" when the update runs the cell on this run's value,
-// or doesn't run it, and the file is the update's orphan too. A package
-// that doesn't own every bytes lift on the cell's path can't tell, and
-// says so.
-func (r *runner) mayStillWrite(c *aCase, col *column) string {
-	u := r.updateCmd()
+// A staging is, in a normal run, what the package's update does with a
+// cell this run ran, when the update may stage the case otherwise: on what
+// a transform makes, where this run reads a variant's committed inputs, or
+// rerunning each bytes lift on the cell's path, where this run reads what
+// the archive commits for it. Then the value this run ran the cell on is
+// stale, and what it reports of the cell may not be what the update finds.
+type staging struct {
+	// f is the cell's fate in the update, and does says it. does is ""
+	// when the update runs the cell on this run's value, so that the run's
+	// own words hold, and when the package can't tell.
+	f    updateFate
+	does string
+	// unowned is the last bytes lift on the cell's path that the package
+	// doesn't own, which keeps it from telling: only the package that owns
+	// a bytes lift runs it in a normal run.
+	unowned *lift
+}
+
+// ranStaged tells, in a normal run, what the package's update does with a
+// cell this run ran. In an update, it tells nothing.
+func (r *runner) ranStaged(c *aCase, col *column) *staging {
+	st := &staging{}
+	if r.update {
+		return st
+	}
 	last, unowned := c.state.plan.bytesOnPath(col.consumes)
 	switch {
 	case last == nil && c.state.made == nil:
-		return ""
+		return st
 	case unowned != nil:
-		return fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell whether an update's run of %s still writes it. Run %s, which reruns %s, and delete nothing by hand before it has.", unowned.name, col.name, u, unowned.name)
-	case !c.state.updateFate(col).runs() || !c.state.restages(col):
+		st.unowned = unowned
+		return st
+	}
+	st.f = c.state.updateFate(col)
+	if st.f.runs() && !c.state.restages(col) {
+		return st
+	}
+	st.does = r.does(col, st.f, c.staged(last), true)
+	return st
+}
+
+// closing is the end of a message about one of a cell's files, or about
+// its error, when the update does otherwise with the cell than this
+// normal run: for the outcome, what the update writes for it, and for
+// anything else, to run the update, fix what it reports, and read the diff
+// before committing. It is "" where the run's own words hold.
+func (st *staging) closing(p string) string {
+	switch {
+	case st.does == "":
+		return ""
+	case p == outcomeFile:
+		return writesOutcome(st.f, st.does)
+	}
+	return then(st.f, st.does, "Run it, fix what it reports, and read the diff before committing.")
+}
+
+// mayStillWrite words, in a normal run, the advice for a file that a
+// cell's committed files hold and its run no longer produces, when the
+// update runs the cell on another value than this run, as it may past a
+// bytes lift, or on a transform's variant whose committed inputs give
+// another input view than the one the transform makes: the update's run
+// may still write the file. It returns "" when the update runs the cell on
+// this run's value, or doesn't run it, and the file is the update's orphan
+// too. A package that doesn't own every bytes lift on the cell's path
+// can't tell, and says so.
+func (r *runner) mayStillWrite(col *column, st *staging) string {
+	switch {
+	case st.unowned != nil:
+		u := r.updateCmd()
+		return fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell whether an update's run of %s still writes it. Run %s, which reruns %s, and delete nothing by hand before it has.", st.unowned.name, col.name, u, st.unowned.name)
+	case st.does == "" || !st.f.runs():
 		return ""
 	}
-	return fmt.Sprintf("%s runs %s on another value than this run: %s. Its run may still write the file: delete nothing by hand before it has run.", u, col.name, c.staged(last))
+	return st.does + " Its run may still write the file: delete nothing by hand before it has run."
+}
+
+// productOrphan words, in a normal run, the advice for a file of a bytes
+// lift's committed product that the lift's run doesn't make, as the update
+// stages the case: it may run the lift on another value, whose product
+// may still hold the file; block the lift, and remove the product; or
+// write nothing for the lift's cell, and leave the product. It returns ""
+// when the update runs the lift on this run's value, and the file is an
+// orphan there too, which the update removes. A package that doesn't own
+// every bytes lift on the lift's path can't tell, and says so.
+func (r *runner) productOrphan(l *lift, st *staging) string {
+	u := r.updateCmd()
+	switch {
+	case st.unowned != nil:
+		return fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell whether an update's run of %s still makes it. Run %s, which reruns %s, and delete nothing by hand before it has.", st.unowned.name, l.name, u, st.unowned.name)
+	case st.does == "":
+		return ""
+	case st.f.runs():
+		return st.does + " Its run may still make the file: delete nothing by hand before it has run."
+	case st.f.block != nil && st.f.block.broken:
+		return st.does + fmt.Sprintf("\nFix what %s's cell reports, and delete nothing by hand before %s has run.", st.f.block.lift.name, u)
+	case st.f.block != nil:
+		return st.does + " It removes the file: read the diff before committing."
+	}
+	return then(st.f, st.does, "Run it, fix what it reports, and read the diff before committing.")
+}
+
+// probeFailed finishes a cell whose probe said the case isn't for its
+// column with no reason, or with one an outcome can't hold. The cell has
+// no outcome, and an update writes nothing for it, unless the update does
+// otherwise with the cell, as it may past a bytes lift, or on a
+// transform's variant whose committed inputs give another input view than
+// the one the transform makes: there the probe reads another value in the
+// update. A normal run then says what the update does with the cell, and
+// of its committed files.
+func (r *runner) probeFailed(t *testing.T, c *aCase, header string, col *column, why string, goldens map[string][]byte) {
+	fault := probeFault(col, why)
+	var adv advice
+	if !r.update {
+		adv = r.asUpdate(c, col, func(f updateFate) bool { return f.fault == fault })
+	}
+	m := &msg{}
+	if strings.TrimSpace(why) == "" {
+		closing := "Fix the probe: when it says no, it says why."
+		if adv.fault != "" {
+			closing += "\n" + adv.fault
+		}
+		m.add("%s's probe said the case isn't for it, and gave no reason.\n%s", col.name, closing)
+	} else {
+		note := "An update writes nothing for this cell."
+		if adv.fault != "" {
+			note = adv.fault
+		}
+		m.add("%s's probe said the case isn't for it, with a reason an outcome can't hold: %v.\nFix the probe. %s", col.name, archive.CheckDetail(why), note)
+	}
+	if adv.files != "" {
+		for _, p := range slices.Sorted(maps.Keys(goldens)) {
+			if p != outcomeFile {
+				m.add("%s is recorded, and %s.\n%s", c.out(col.name, p), fault, adv.files)
+			}
+		}
+	}
+	t.Errorf("%s\n%s", header, m)
 }
 
 // blocked finishes a cell that a lift on its path blocked, by failing on
@@ -1460,9 +1644,18 @@ func holds(p string) string {
 
 // expectedError is the expected-error check: a cell is expected to err
 // exactly when its case states a property its column rejects. A panic is
-// never an expected error.
-func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
+// never an expected error. When the update does otherwise with the cell,
+// running it on another value than this normal run among them, the error,
+// or its absence, may be this run's value's, so the message says what the
+// update does, as staged tells, in place of what to fix.
+func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called, staged func() *staging) {
 	hit := col.rejectsAny(c.properties)
+	fix := func(fix string) string {
+		if s := staged().closing(errorFile); s != "" {
+			return s
+		}
+		return fix
+	}
 	switch {
 	case out.panicked && out.inProbe:
 		m.add("%s's probe panicked: %v\nFix the probe. A panic is never an expected error.", col.name, out.panicValue)
@@ -1470,32 +1663,31 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 		m.add("%s panicked: %v\nFix the code. A panic is never an expected error.", col.name, out.panicValue)
 	case out.noProduct || out.jennyErr != nil:
 	case out.err != nil && len(hit) == 0 && c.tr != nil:
-		m.add("%s returned an error, but the variant states no property %s rejects:\n  %s\n%s Fix the code or %s's jenny, or give the variant the property, in %s's Gives or Keeps, and list it in %s's Rejects.", col.name, col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "), c.tr.states(), c.tr.name, c.tr.name, col.name)
+		m.add("%s returned an error, but the variant states no property %s rejects:\n  %s\n%s %s", col.name, col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "), c.tr.states(), fix(fmt.Sprintf("Fix the code or %s's jenny, or give the variant the property, in %s's Gives or Keeps, and list it in %s's Rejects.", c.tr.name, c.tr.name, col.name)))
 	case out.err != nil && len(hit) == 0:
-		m.add("%s returned an error, but the case states no property %s rejects:\n  %s\nFix the code, or state the property on the case and in %s's Rejects.", col.name, col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "), col.name)
+		m.add("%s returned an error, but the case states no property %s rejects:\n  %s\n%s", col.name, col.name, indent(strings.TrimSuffix(out.err.Error(), "\n"), "  "), fix(fmt.Sprintf("Fix the code, or state the property on the case and in %s's Rejects.", col.name)))
 	case out.err == nil && len(hit) > 0 && c.tr != nil:
-		m.add("%s returned no error, but the variant states %s, which %s rejects.\n%s Fix the code or %s's jenny, or correct %s's Gives or Keeps, or %s's Rejects.", col.name, andList(hit), col.name, c.tr.states(), c.tr.name, c.tr.name, col.name)
+		m.add("%s returned no error, but the variant states %s, which %s rejects.\n%s %s", col.name, andList(hit), col.name, c.tr.states(), fix(fmt.Sprintf("Fix the code or %s's jenny, or correct %s's Gives or Keeps, or %s's Rejects.", c.tr.name, c.tr.name, col.name)))
 	case out.err == nil && len(hit) > 0:
-		m.add("%s returned no error, but the case states %s, which %s rejects.\nFix the code, or correct the case's properties or %s's Rejects.", col.name, andList(hit), col.name, col.name)
+		m.add("%s returned no error, but the case states %s, which %s rejects.\n%s", col.name, andList(hit), col.name, fix(fmt.Sprintf("Fix the code, or correct the case's properties or %s's Rejects.", col.name)))
 	}
 }
 
 // compare compares a cell's files with its goldens, and reports orphans.
 // In a cell no update writes, a file with no golden isn't reported, and
-// one that differs says the cell's problems come first. A normal run that
-// finds an orphan asks once whether the update runs the cell on another
-// value, whose run may still write it.
-func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[string][]byte, unjudged map[string]bool, writable bool) {
+// one that differs says the cell's problems come first. When a normal run
+// finds a file to write or an orphan, staged tells whether the update does
+// otherwise with the cell, running it on another value among them, whose
+// run may write the file, or not, or still write the orphan.
+func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[string][]byte, unjudged map[string]bool, writable bool, staged func() *staging) {
 	if !r.update {
 		for _, p := range slices.Sorted(maps.Keys(files)) {
 			if !unjudged[p] {
 				g, ok := goldens[p]
-				r.compareFile(m, c.out(col.name, p), g, ok, files[p], writable)
+				r.compareFile(m, c.out(col.name, p), g, ok, files[p], writable, func() string { return staged().closing(p) })
 			}
 		}
 	}
-	asked := false
-	var keep string
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		if _, ok := files[p]; ok || unjudged[p] {
 			continue
@@ -1511,13 +1703,11 @@ func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[strin
 		default:
 			what = "is an output the run no longer produces"
 		}
-		if !r.update && !asked {
-			asked = true
-			keep = r.mayStillWrite(c, col)
-		}
-		if keep != "" {
-			m.add("%s %s.\n%s", c.out(col.name, p), what, keep)
-			continue
+		if !r.update {
+			if keep := r.mayStillWrite(col, staged()); keep != "" {
+				m.add("%s %s.\n%s", c.out(col.name, p), what, keep)
+				continue
+			}
 		}
 		m.add("%s %s.\nIf the run should still write it, fix the code. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), what, r.updateCmd())
 	}
@@ -1527,15 +1717,24 @@ func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[strin
 // run: name is its section, and ok says whether the case commits it. In a
 // cell no update writes, a file with no golden isn't one to write, so it
 // isn't reported, and one that differs says the cell's problems come
-// first.
-func (r *runner) compareFile(m *msg, name string, golden []byte, ok bool, got []byte, writable bool) {
+// first. Otherwise staged gives the message's end when the update does
+// otherwise with the cell than this run, or "".
+func (r *runner) compareFile(m *msg, name string, golden []byte, ok bool, got []byte, writable bool, staged func() string) {
 	switch {
 	case !ok && !writable:
 	case !ok:
+		if s := staged(); s != "" {
+			m.add("%s has no golden.\n%s", name, s)
+			return
+		}
 		m.add("%s has no golden.\nRun %s to write it, and read it before committing.", name, r.updateCmd())
 	case !bytes.Equal(golden, got) && !writable:
 		m.add("%s differs (-golden +got):\n%s\nAn update writes nothing for this cell until the problems above are fixed.", name, strings.TrimSuffix(diff.Lines(golden, got), "\n"))
 	case !bytes.Equal(golden, got):
+		if s := staged(); s != "" {
+			m.add("%s differs (-golden +got):\n%s\n%s", name, strings.TrimSuffix(diff.Lines(golden, got), "\n"), s)
+			return
+		}
 		m.add("%s differs (-golden +got):\n%s\nIf the change is intended, run %s and read the diff before committing.", name, strings.TrimSuffix(diff.Lines(golden, got), "\n"), r.updateCmd())
 	}
 }
@@ -1544,29 +1743,37 @@ func (r *runner) compareFile(m *msg, name string, golden []byte, ok bool, got []
 // commits, under via/<lift>/, in a normal run, as compare does a cell's
 // files with its goldens. An update replaces the committed product whole,
 // so a committed file the lift doesn't make is no orphan: the update
-// removes it.
-func (r *runner) compareProduct(m *msg, c *aCase, l *lift, out *called, product, committed map[string][]byte, writable bool) {
+// removes it, unless it does otherwise with the lift's cell than this
+// run, as staged tells.
+func (r *runner) compareProduct(m *msg, c *aCase, l *lift, out *called, product, committed map[string][]byte, writable bool, staged func() *staging) {
 	if r.update {
 		return
 	}
 	dir := l.viaDir(c.prefix)
 	for _, p := range slices.Sorted(maps.Keys(product)) {
 		g, ok := committed[p]
-		r.compareFile(m, dir+p, g, ok, product[p], writable)
+		r.compareFile(m, dir+p, g, ok, product[p], writable, func() string { return staged().closing(archive.Via + "/" + p) })
 	}
 	closing := fmt.Sprintf("If not, run %s, which removes it, and read the diff before committing.", r.updateCmd())
 	if !writable {
 		closing = "If not, an update removes it, once the problems above are fixed."
 	}
+	failed := out.panicked || out.err != nil
 	for _, p := range slices.Sorted(maps.Keys(committed)) {
 		if _, ok := product[p]; ok {
 			continue
 		}
-		if out.panicked || out.err != nil {
+		adv := r.productOrphan(l, staged())
+		switch {
+		case adv != "" && failed:
+			m.add("%s is recorded, and %s failed on the case in this run, so this run has no product.\n%s", dir+p, l.name, adv)
+		case adv != "":
+			m.add("%s is a file of %s's committed product, which this run of %s doesn't make.\n%s", dir+p, l.name, l.name, adv)
+		case failed:
 			m.add("%s is recorded, and %s failed on the case, so it has no product.\nIf it should make one, fix %s or %s. %s", dir+p, l.name, l.name, c.inputsAt(), closing)
-			continue
+		default:
+			m.add("%s is a file of %s's product, which %s no longer makes.\nIf it should, fix %s's jenny. %s", dir+p, l.name, l.name, l.name, closing)
 		}
-		m.add("%s is a file of %s's product, which %s no longer makes.\nIf it should, fix %s's jenny. %s", dir+p, l.name, l.name, l.name, closing)
 	}
 }
 

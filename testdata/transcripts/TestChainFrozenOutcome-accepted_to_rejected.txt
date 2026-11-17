@@ -421,7 +421,7 @@ $ go test  # chain
         out/evaluate/outcome differs (-golden +got):
         - blocked import
         + accepted
-        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... blocks evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and the lift import, on evaluate's path, failed on the case. It writes the outcome "blocked import", not this one.
     export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
         import: Imports the export as a script, as its import/ tree says.
         The cell is frozen by its known gap, gaps line 1: "import The importer reads quoted fields. Waits on sheets#9."
@@ -437,19 +437,19 @@ $ go test  # chain
         out/list/outcome differs (-golden +got):
         - blocked import
         + accepted
-        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... blocks list: it reruns import, whose outcome and product a normal run reads from the archive, and the lift import, on list's path, failed on the case. It writes the outcome "blocked import", not this one.
     export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
         parse: Parses the script, as its parse/ tree says.
         out/parse/outcome differs (-golden +got):
         - blocked import
         + accepted
-        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... blocks parse: it reruns import, whose outcome and product a normal run reads from the archive, and the lift import, on parse's path, failed on the case. It writes the outcome "blocked import", not this one.
     export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
         resolve: Resolves the parsed script, as its resolve/ tree says.
         out/resolve/outcome differs (-golden +got):
         - blocked import
         + accepted
-        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... blocks resolve: it reruns import, whose outcome and product a normal run reads from the archive, and the lift import, on resolve's path, failed on the case. It writes the outcome "blocked import", not this one.
     export/empty/transform/louder: louder declines the base: the export makes no output of evaluate
     export/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/export/looped.txtar, out/resolve/error.txt, records its error.
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps

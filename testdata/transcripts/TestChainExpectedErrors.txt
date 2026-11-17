@@ -545,6 +545,7 @@ $ go test  # chain
         parse ran on looped
         resolve ran on looped
         import ran
+        parse ran on looped
         parse ran on names
         resolve ran on names
         evaluate's probe ran
@@ -652,6 +653,7 @@ $ go test  # chain
         parse ran on looped
         resolve ran on looped
         import ran
+        parse ran on looped
         parse ran on names
         resolve ran on names
         evaluate's probe ran

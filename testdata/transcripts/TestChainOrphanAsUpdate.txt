@@ -118,7 +118,7 @@ $ go test  # chain
         + 2 files
           quote/A1 "3\n"
           quote/B1 "=A1*2\n"
-        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: parse is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".

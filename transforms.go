@@ -353,8 +353,10 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		stale = !owner
 		c.setView(r, p, view)
 		// A cell the inputs block may be one the update, which stages the
-		// variant on what the transform makes, runs.
-		if diffs = v.inputDiffs(pc.a); !diffs.empty() {
+		// variant on what the transform makes, runs. Inputs that differ
+		// only in a delete line naming a path the base lacks give the same
+		// view, on which the update runs each cell as this run does.
+		if diffs = v.inputDiffs(pc.a); !diffs.empty() && !holdsExactly(view, v.made) {
 			c.state.made = archive.NewFS(v.made)
 		}
 	}
@@ -424,6 +426,22 @@ func (v *plannedVariant) inputDiffs(a *archive.Archive) *msg {
 		m.add("%s is no longer made", name)
 	}
 	return m
+}
+
+// holdsExactly reports whether an input view holds files, and no other
+// file.
+func holdsExactly(view fs.FS, files map[string][]byte) bool {
+	paths, err := archive.Paths(view)
+	if err != nil || len(paths) != len(files) {
+		return false
+	}
+	for _, p := range paths {
+		data, err := fs.ReadFile(view, p)
+		if want, ok := files[p]; err != nil || !ok || !bytes.Equal(data, want) {
+			return false
+		}
+	}
+	return true
 }
 
 // judgeInputs compares a transform's committed inputs with those it made,

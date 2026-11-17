@@ -481,6 +481,34 @@ func TestOrphanStaleTransformVariant(t *testing.T) {
 	s.done()
 }
 
+// TestOrphanSameViewTransformVariant: committed inputs that differ from
+// what the transform makes only in a delete line naming a path the base
+// lacks give the input view the transform makes, so the update runs each
+// cell on the value the normal run does, and a file the cell no longer
+// produces is its orphan in both. Here such a delete line sits beside a
+// stray file in evaluate's cell of upper's variant.
+func TestOrphanSameViewTransformVariant(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.remove("testdata/script/errs.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.remove("testdata/script/garbled.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.edit(twice, "evaluate writes a file", set("in/evaluate/out/values.txt", "a1 six\n"))
+	s.passes(s.update("tr-ladder-eval"))
+	s.edit(twice, "upper's committed inputs delete a path the base lacks, and evaluate's cell of upper's variant commits a stray file", func(a *archive.Archive) {
+		insert("transform/upper/delete", "nothing/here\n", "transform/upper/out/")(a)
+		insert("transform/upper/out/evaluate/stray.txt", "a stray\n", "transform/upper/out/evaluate/values.txt")(a)
+	})
+	orphan := "transform/upper/out/evaluate/stray.txt is an output the run no longer produces.\nIf the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place."
+	r := s.normal("tr-ladder-eval")
+	s.fails(r,
+		"upper's variant of the base differs from its committed inputs:\ntransform/upper/delete is no longer made",
+		orphan)
+	s.lacks(r, "on another value")
+	s.fails(s.update("tr-ladder-eval"), orphan)
+	s.hasSections(twice, map[string]string{"transform/upper/out/evaluate/stray.txt": "a stray\n"}, "transform/upper/delete")
+	s.done()
+}
+
 // TestSkippedStaleTransformVariant: as TestBlockedStaleTransformVariant,
 // for a cell whose probe says no on the committed inputs, where the
 // update's probe reads what the transform makes. Here upper's committed
