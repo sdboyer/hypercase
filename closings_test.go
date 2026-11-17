@@ -4,13 +4,18 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/token"
+	"go/types"
+	"io"
 	"io/fs"
 	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -789,7 +794,7 @@ func (c *noteCheck) out(p string) string { return c.n.Prefix + "out/" + c.n.Colu
 // A claimCheck checks one field of a closing's claims against what the
 // update did, u, and returns what is wrong, or "". unobserved says why
 // the check observes nothing the update did, where it doesn't, and only
-// there: TestClaimChecks requires it of a check whose u goes unused.
+// there: TestClaimChecks requires it of a check that never reads u.
 type claimCheck struct {
 	check      func(c *noteCheck, u *updated) string
 	unobserved string
@@ -1251,9 +1256,9 @@ func viewFiles(view fs.FS) (map[string]string, error) {
 
 // TestClaimChecks: claimChecks checks each field of a closing's claims,
 // and names no other. A check observes what the update did through its
-// second argument alone, so one that names it _, or never uses it, observes
-// nothing the update did: it, and only it, says why in unobserved. The
-// checks' source is read from this file.
+// second argument alone, so one that names it _, or never reads it, as
+// reads tells, observes nothing the update did: it, and only it, says why
+// in unobserved. The type checker reads the checks' source in this file.
 func TestClaimChecks(t *testing.T) {
 	var fields []string
 	for f := range reflect.TypeFor[hypercase.Claims]().Fields() {
@@ -1275,68 +1280,244 @@ func TestClaimChecks(t *testing.T) {
 		case !ok:
 			t.Errorf("claimChecks' check of %s is no func literal in claimChecks' source, so TestClaimChecks can't tell what it observes", name)
 		case !o && unobserved == "":
-			t.Errorf("claimChecks' check of %s observes nothing the update did: it never uses its second argument.\nCheck the claim against what the update did, or say in unobserved why no observation of the update can check it.", name)
+			t.Errorf("claimChecks' check of %s observes nothing the update did: it never reads its second argument.\nCheck the claim against what the update did, or say in unobserved why no observation of the update can check it.", name)
 		case o && unobserved != "":
-			t.Errorf("claimChecks' check of %s says it observes nothing the update did, and uses its second argument", name)
+			t.Errorf("claimChecks' check of %s says it observes nothing the update did, and reads its second argument", name)
 		}
 	}
 }
 
 // checksObserving reports, for each check of claimChecks, by its field,
-// whether its func literal uses its second parameter, what the update did,
-// reading claimChecks' source in this file.
+// whether its func literal reads its second parameter, what the update
+// did, as reads tells, in claimChecks' source in this file, which the type
+// checker reads with the rest of this package.
 func checksObserving(t *testing.T) map[string]bool {
 	t.Helper()
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, "closings_test.go", nil, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tf := xtestTypes(t)
 	out := map[string]bool{}
-	for _, d := range f.Decls {
-		gd, ok := d.(*ast.GenDecl)
-		if !ok || gd.Tok != token.VAR {
+	for _, f := range tf.files {
+		if filepath.Base(tf.fset.Position(f.Pos()).Filename) != "closings_test.go" {
 			continue
 		}
-		for _, sp := range gd.Specs {
-			vs := sp.(*ast.ValueSpec)
-			if len(vs.Names) != 1 || vs.Names[0].Name != "claimChecks" || len(vs.Values) != 1 {
+		for _, d := range f.Decls {
+			gd, ok := d.(*ast.GenDecl)
+			if !ok || gd.Tok != token.VAR {
 				continue
 			}
-			for _, el := range vs.Values[0].(*ast.CompositeLit).Elts {
-				kv := el.(*ast.KeyValueExpr)
-				name, err := strconv.Unquote(kv.Key.(*ast.BasicLit).Value)
-				if err != nil {
-					t.Fatal(err)
+			for _, sp := range gd.Specs {
+				vs := sp.(*ast.ValueSpec)
+				if len(vs.Names) != 1 || vs.Names[0].Name != "claimChecks" || len(vs.Values) != 1 {
+					continue
 				}
-				for _, fel := range kv.Value.(*ast.CompositeLit).Elts {
-					fkv, ok := fel.(*ast.KeyValueExpr)
-					if !ok || fkv.Key.(*ast.Ident).Name != "check" {
-						continue
+				for _, el := range vs.Values[0].(*ast.CompositeLit).Elts {
+					kv := el.(*ast.KeyValueExpr)
+					name, err := strconv.Unquote(kv.Key.(*ast.BasicLit).Value)
+					if err != nil {
+						t.Fatal(err)
 					}
-					lit, ok := fkv.Value.(*ast.FuncLit)
-					if !ok {
-						continue
+					for _, fel := range kv.Value.(*ast.CompositeLit).Elts {
+						fkv, ok := fel.(*ast.KeyValueExpr)
+						if !ok || fkv.Key.(*ast.Ident).Name != "check" {
+							continue
+						}
+						if lit, ok := fkv.Value.(*ast.FuncLit); ok {
+							out[name] = readsParam(tf.info, lit, 1)
+						}
 					}
-					var params []*ast.Ident
-					for _, p := range lit.Type.Params.List {
-						params = append(params, p.Names...)
-					}
-					used := false
-					if len(params) == 2 && params[1].Name != "_" {
-						ast.Inspect(lit.Body, func(n ast.Node) bool {
-							if id, ok := n.(*ast.Ident); ok && id.Name == params[1].Name {
-								used = true
-							}
-							return true
-						})
-					}
-					out[name] = used
 				}
 			}
 		}
 	}
 	return out
+}
+
+// readsParam reports whether a func literal's body reads its parameter i,
+// as reads tells. A parameter with no name, or named _, is read nowhere.
+func readsParam(info *types.Info, lit *ast.FuncLit, i int) bool {
+	var params []*ast.Ident
+	for _, p := range lit.Type.Params.List {
+		params = append(params, p.Names...)
+	}
+	if i >= len(params) || params[i].Name == "_" {
+		return false
+	}
+	return reads(info, lit.Body, info.Defs[params[i]])
+}
+
+// reads reports whether body reads the object v, as the type checker
+// resolves each name in it, so a name that shadows v is another object:
+// whether it names v otherwise than as what an assignment assigns to,
+// directly or through its fields, elements or pointer, and otherwise than
+// in what an assignment to blank identifiers alone assigns, which keeps
+// nothing it reads.
+func reads(info *types.Info, body ast.Node, v types.Object) bool {
+	read := false
+	var stack []ast.Node
+	ast.Inspect(body, func(n ast.Node) bool {
+		if n == nil {
+			stack = stack[:len(stack)-1]
+			return true
+		}
+		if id, ok := n.(*ast.Ident); ok && info.Uses[id] == v && !discarded(stack, id) {
+			read = true
+		}
+		stack = append(stack, n)
+		return true
+	})
+	return read
+}
+
+// discarded reports whether an identifier, under the nodes of stack,
+// outermost first, is what an assignment assigns to, or what it reaches
+// through, or is in what an assignment to blank identifiers alone
+// assigns.
+func discarded(stack []ast.Node, id *ast.Ident) bool {
+	var child ast.Node = id
+	target := true // child is id, or what id reaches into
+	for i := len(stack) - 1; i >= 0; i-- {
+		switch p := stack[i].(type) {
+		case *ast.AssignStmt:
+			if target && slices.Contains(p.Lhs, child.(ast.Expr)) {
+				return true
+			}
+			return slices.IndexFunc(p.Lhs, func(e ast.Expr) bool { return !isBlank(e) }) < 0 && slices.Contains(p.Rhs, child.(ast.Expr))
+		case *ast.IncDecStmt:
+			return target
+		case *ast.ValueSpec:
+			return slices.IndexFunc(p.Names, func(n *ast.Ident) bool { return n.Name != "_" }) < 0
+		case *ast.SelectorExpr:
+			target = target && p.X == child
+		case *ast.IndexExpr:
+			target = target && p.X == child
+		case *ast.StarExpr, *ast.ParenExpr:
+		default:
+			target = false
+		}
+		child = stack[i]
+	}
+	return false
+}
+
+func isBlank(e ast.Expr) bool {
+	id, ok := ast.Unparen(e).(*ast.Ident)
+	return ok && id.Name == "_"
+}
+
+// TestReads: whether a claim's check observes what the update did is
+// whether its func literal reads its second parameter, which reads tells:
+// a name that shadows the parameter is another object, and an assignment
+// to it, or to blank identifiers alone, reads nothing it keeps.
+func TestReads(t *testing.T) {
+	t.Parallel()
+	const src = `package p
+
+type updated struct{ n int }
+
+var sink int
+
+var checks = map[string]func(c int, u *updated) string{
+	"a field":        func(c int, u *updated) string { sink = u.n; return "" },
+	"an index":       func(c int, u *updated) string { var m map[int]int; m[u.n] = c; return "" },
+	"a target's":     func(c int, u *updated) string { var m map[int]int; m[c] = u.n; return "" },
+	"nothing":        func(c int, u *updated) string { return "" },
+	"blank":          func(c int, u *updated) string { _ = u; return "" },
+	"blank field":    func(c int, u *updated) string { _, _ = u.n, c; return "" },
+	"blank var":      func(c int, u *updated) string { var _ = u.n; return "" },
+	"shadowed":       func(c int, u *updated) string { if c > 0 { u := &updated{}; sink = u.n }; return "" },
+	"a literal's":    func(c int, u *updated) string { return func(u *updated) string { sink = u.n; return "" }(nil) },
+	"assigned":       func(c int, u *updated) string { u = nil; return "" },
+	"field assigned": func(c int, u *updated) string { u.n = c; return "" },
+	"incremented":    func(c int, u *updated) string { u.n++; return "" },
+}
+`
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "p.go", src, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info := &types.Info{Defs: map[*ast.Ident]types.Object{}, Uses: map[*ast.Ident]types.Object{}}
+	if _, err := (&types.Config{}).Check("p", fset, []*ast.File{f}, info); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"a field": true, "an index": true, "a target's": true}
+	got := map[string]bool{}
+	ast.Inspect(f, func(n ast.Node) bool {
+		if kv, ok := n.(*ast.KeyValueExpr); ok {
+			name, _ := strconv.Unquote(kv.Key.(*ast.BasicLit).Value)
+			if readsParam(info, kv.Value.(*ast.FuncLit), 1) {
+				got[name] = true
+			}
+		}
+		return true
+	})
+	if !maps.Equal(got, want) {
+		t.Errorf("the checks that read u are %v, want %v", slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(want)))
+	}
+}
+
+// typedFiles are a package's files, as the type checker reads them.
+type typedFiles struct {
+	fset  *token.FileSet
+	files []*ast.File
+	info  *types.Info
+}
+
+// xtestTypes type-checks this package, the external tests, against its
+// imports' export data, which go list builds, the package's own test
+// build among them, as the package's tests type-check its source.
+func xtestTypes(t *testing.T) typedFiles {
+	t.Helper()
+	cmd := exec.Command("go", "list", "-test", "-export", "-deps", "-json=ImportPath,Name,Dir,GoFiles,Export,ImportMap,ForTest", ".")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go list: %v\n%s", err, stderr.Bytes())
+	}
+	type listed struct {
+		ImportPath, Name, Dir, Export, ForTest string
+		GoFiles                                []string
+		ImportMap                              map[string]string
+	}
+	exports := map[string]string{}
+	var self *listed
+	dec := json.NewDecoder(bytes.NewReader(out))
+	for {
+		var p listed
+		if err := dec.Decode(&p); errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		exports[p.ImportPath] = p.Export
+		if p.Name == "hypercase_test" && p.ForTest != "" {
+			self = &p
+		}
+	}
+	if self == nil {
+		t.Fatal("go list gave no external test package")
+	}
+	tf := typedFiles{fset: token.NewFileSet(), info: &types.Info{Defs: map[*ast.Ident]types.Object{}, Uses: map[*ast.Ident]types.Object{}}}
+	for _, name := range self.GoFiles {
+		f, err := parser.ParseFile(tf.fset, filepath.Join(self.Dir, name), nil, parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tf.files = append(tf.files, f)
+	}
+	imp := importer.ForCompiler(tf.fset, "gc", func(path string) (io.ReadCloser, error) {
+		if m, ok := self.ImportMap[path]; ok {
+			path = m
+		}
+		if exports[path] == "" {
+			return nil, fmt.Errorf("go list gave no export data for %s", path)
+		}
+		return os.Open(exports[path])
+	})
+	if _, err := (&types.Config{Importer: imp}).Check(self.ImportPath, tf.fset, tf.files, tf.info); err != nil {
+		t.Fatalf("type-checking the external tests: %v", err)
+	}
+	return tf
 }
 
 // sameCell reports whether the update did with a cell what the normal run
