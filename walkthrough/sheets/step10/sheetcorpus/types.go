@@ -121,8 +121,12 @@ var Import = decl.Lift[CSV, Sheet]{
 		if err != nil {
 			return nil, err
 		}
-		if len(paths) != 1 || path.Dir(paths[0]) != "csv" || path.Ext(paths[0]) != ".csv" ||
-			strings.TrimSpace(strings.TrimSuffix(path.Base(paths[0]), ".csv")) == "" {
+		var name string
+		ok := len(paths) == 1 && path.Dir(paths[0]) == "csv"
+		if ok {
+			name, ok = strings.CutSuffix(path.Base(paths[0]), ".csv")
+		}
+		if !ok || strings.TrimSpace(name) == "" {
 			return nil, fmt.Errorf("the input holds %q, and a CSV export is one file, csv/<name>.csv, with a name that isn't empty or only white space", paths)
 		}
 		s, err := sheet.ImportCSV(in, paths[0])
