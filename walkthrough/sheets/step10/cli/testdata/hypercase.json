@@ -1,0 +1,124 @@
+{
+  "format": 6,
+  "updateVar": "SHEETS_UPDATE_GOLDEN",
+  "corpusRoot": "step10",
+  "rootPackage": false,
+  "codes": true,
+  "issueLinks": [
+    {
+      "pattern": "sheets#(\\d+)",
+      "url": "https://example.com/sheets/issues/$1"
+    }
+  ],
+  "properties": [
+    {
+      "name": "circular",
+      "description": "Some cell's formula refers back to itself, directly or through other cells."
+    },
+    {
+      "name": "dangling",
+      "description": "Some formula refers to a cell the sheet doesn't have."
+    },
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    }
+  ],
+  "types": [
+    {
+      "dir": "csv",
+      "description": "A CSV export: one file, in/csv/<name>.csv, with a name holding a character that is neither white space nor a format character; one row of the sheet per record, where a quoted field may hold a newline.",
+      "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.CSV",
+      "transforms": []
+    },
+    {
+      "dir": "sheet",
+      "description": "A spreadsheet: one file per cell under in/sheet/, holding a number or a formula.",
+      "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.Sheet",
+      "transforms": [
+        {
+          "name": "looped",
+          "description": "The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.",
+          "gives": [
+            "circular"
+          ],
+          "keeps": [],
+          "probe": true,
+          "owned": false
+        },
+        {
+          "name": "renamed",
+          "description": "Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.",
+          "gives": [],
+          "keeps": [
+            "circular",
+            "dangling"
+          ],
+          "probe": true,
+          "owned": false
+        }
+      ]
+    }
+  ],
+  "lifts": [
+    {
+      "name": "import",
+      "description": "Turns each CSV field into a cell: row 1, field 2 is B1.",
+      "input": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.CSV",
+      "product": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.Sheet",
+      "owned": false,
+      "bytes": true,
+      "corpora": [
+        "csv"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "The line the importer can't read, and why."
+        }
+      ],
+      "productFiles": [
+        {
+          "pattern": "sheet/*",
+          "description": "One file per cell, as a sheet's in/sheet/ holds them."
+        }
+      ],
+      "rejects": [
+        "out-of-range",
+        "stray-quote",
+        "unterminated"
+      ]
+    }
+  ],
+  "suites": [
+    {
+      "name": "calc",
+      "description": "Runs the calc command on the sheet.",
+      "consumes": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.Sheet",
+      "corpora": [
+        "csv",
+        "sheet"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why calc failed."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "A warning for each cell that divides by zero."
+        },
+        {
+          "pattern": "stdout.txt",
+          "description": "The sheet's values as CSV, one row per line."
+        }
+      ],
+      "rejects": [
+        "circular",
+        "dangling",
+        "malformed"
+      ],
+      "classifier": null
+    }
+  ]
+}
