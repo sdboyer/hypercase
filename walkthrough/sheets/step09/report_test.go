@@ -596,9 +596,9 @@ func TestCommit(t *testing.T) {
 // then their normal run, which fails unless the update wrote everything.
 // One pass is enough: neither the toy as copied nor the change moves a code
 // that the corpus check codes counts, so its findings don't depend on which
-// package writes first. Both
-// build with -trimpath, which keeps the scratch module's directory, new in
-// each run, out of the build cache's keys, so that the cache serves them.
+// package writes first. Both build with -trimpath, which keeps the scratch
+// module's directory, new in each run, out of the build cache's keys, so
+// that the cache serves them.
 func runUpdate(t *testing.T, repo, modfile string) {
 	t.Helper()
 	gotest := func(env []string) ([]byte, error) {
