@@ -14,8 +14,9 @@ import (
 )
 
 // TestImportInput: import finds its CSV by its tree, and errs on an input
-// that is not one file, csv/<name>.csv, with an error of its own, not the
-// importer's, so the error carries no code, and no mark of decl.Reject.
+// that is not one file, csv/<name>.csv, with a name that isn't empty or
+// only white space. The error is its own, not the importer's, so it
+// carries no code, and no mark of decl.Reject.
 func TestImportInput(t *testing.T) {
 	csv := &fstest.MapFile{Data: []byte("4,6\n")}
 	for _, tt := range []struct {
@@ -33,10 +34,13 @@ func TestImportInput(t *testing.T) {
 		{"outside", fstest.MapFS{"csv/a.csv": csv, "notes/about": csv}, `["csv/a.csv" "notes/about"]`},
 		{"directory", fstest.MapFS{"csv/x.csv/y": csv}, `["csv/x.csv/y"]`},
 		{"unnamed", fstest.MapFS{"csv/.csv": csv}, `["csv/.csv"]`},
+		{"space", fstest.MapFS{"csv/ .csv": csv}, `["csv/ .csv"]`},
+		{"spaces", fstest.MapFS{"csv/   .csv": csv}, `["csv/   .csv"]`},
+		{"tab", fstest.MapFS{"csv/\t.csv": csv}, `["csv/\t.csv"]`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: tt.in})
-			want := "import: the input holds " + tt.want + ", and a CSV export is one file, csv/<name>.csv"
+			want := "import: the input holds " + tt.want + ", and a CSV export is one file, csv/<name>.csv, with a name that isn't empty or only white space"
 			if err == nil || err.Error() != want {
 				t.Fatalf("got %v, want %s", err, want)
 			}
@@ -49,8 +53,9 @@ func TestImportInput(t *testing.T) {
 			}
 		})
 	}
-	// A name of one dot is a name: only an empty one is refused.
-	for _, p := range []string{"csv/one.csv", "csv/..csv"} {
+	// Only a name that is empty or white space alone is refused: one dot is
+	// a name, and so is a letter between spaces.
+	for _, p := range []string{"csv/one.csv", "csv/..csv", "csv/ a .csv"} {
 		files, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: fstest.MapFS{p: csv}})
 		if err != nil {
 			t.Fatal(err)

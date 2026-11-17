@@ -27,7 +27,7 @@
   "types": [
     {
       "dir": "csv",
-      "description": "A CSV export: one file, in/csv/<name>.csv, one row of the sheet per line.",
+      "description": "A CSV export: one file, in/csv/<name>.csv, with a name that isn't empty or only white space; one row of the sheet per line.",
       "goType": "github.com/sdboyer/hypercase/walkthrough/sheets/step10/sheetcorpus.CSV",
       "transforms": []
     },

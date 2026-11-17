@@ -105,7 +105,7 @@ const importFault = `--- FAIL: TestImportFault
                 csv/two: Two CSVs.
                     import: Turns each CSV field into a cell: row 1, field 2 is B1.
                     import's jenny failed on the case, with an error that is no rejection:
-                      import: the input holds ["csv/a.csv" "csv/b.csv"], and a CSV export is one file, csv/<name>.csv
+                      import: the input holds ["csv/a.csv" "csv/b.csv"], and a CSV export is one file, csv/<name>.csv, with a name that isn't empty or only white space
                     If import rejects the case, return the error as decl.Reject(err). If not, fix import's jenny. An update writes nothing for this cell.
 FAIL
 `
