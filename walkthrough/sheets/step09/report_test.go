@@ -2,7 +2,9 @@ package step09
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -218,24 +220,74 @@ func scratch(t *testing.T, repo string) (modfile string) {
 	}
 	copyFile(t, filepath.Join(module, "go.mod"), filepath.Join(repo, "go.mod"))
 
-	const replace = "replace github.com/sdboyer/hypercase => ../..\n"
 	mod, err := os.ReadFile(filepath.Join(module, "go.mod"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := bytes.Count(mod, []byte(replace)); n != 1 {
-		t.Fatalf("go.mod holds %q %d times, and the copy rewrites it once", replace, n)
+	mod, err = scratchModfile(mod, filepath.Join(module, "..", ".."))
+	if err != nil {
+		t.Fatal(err)
 	}
-	abs := "replace github.com/sdboyer/hypercase => " + filepath.Join(module, "..", "..") + "\n"
 	build := t.TempDir()
 	modfile = filepath.Join(build, "go.mod")
-	if err := os.WriteFile(modfile, bytes.Replace(mod, []byte(replace), []byte(abs), 1), 0o644); err != nil {
+	if err := os.WriteFile(modfile, mod, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	copyFile(t, filepath.Join(module, "go.sum"), filepath.Join(build, "go.sum"))
 
 	git(t, repo, gitInit...)
 	return modfile
+}
+
+// scratchModfile returns the toy's go.mod, mod, with its replace of
+// hypercase by a path relative to it rewritten to replace hypercase by root.
+// The path is quoted, so that every character of root is part of it.
+func scratchModfile(mod []byte, root string) ([]byte, error) {
+	const replace = "replace github.com/sdboyer/hypercase => ../..\n"
+	if n := bytes.Count(mod, []byte(replace)); n != 1 {
+		return nil, fmt.Errorf("go.mod holds %q %d times, and the copy rewrites it once", replace, n)
+	}
+	abs := "replace github.com/sdboyer/hypercase => " + strconv.Quote(root) + "\n"
+	return bytes.Replace(mod, []byte(replace), []byte(abs), 1), nil
+}
+
+// TestScratchModfile: the go command reads the scratch go.mod's replace of
+// hypercase as the path it was given, a space in it included.
+func TestScratchModfile(t *testing.T) {
+	mod, err := os.ReadFile(filepath.Join("..", "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(t.TempDir(), "a dir", "hypercase")
+	mod, err = scratchModfile(mod, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	modfile := filepath.Join(t.TempDir(), "go.mod")
+	if err := os.WriteFile(modfile, mod, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("go", "mod", "edit", "-json", modfile)
+	cmd.Env = goEnv("")
+	out, err := cmd.Output()
+	if err != nil {
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			t.Fatalf("go mod edit -json: %v\n%s", err, exit.Stderr)
+		}
+		t.Fatalf("go mod edit -json: %v", err)
+	}
+	var got struct {
+		Replace []struct {
+			Old, New struct{ Path, Version string }
+		}
+	}
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Replace) != 1 || got.Replace[0].Old.Path != "github.com/sdboyer/hypercase" || got.Replace[0].New.Path != root || got.Replace[0].New.Version != "" {
+		t.Errorf("the go command reads the replaces as %+v, not hypercase replaced by %q", got.Replace, root)
+	}
 }
 
 // gitInit makes the scratch repository, on main, with its objects named by
