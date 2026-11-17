@@ -195,7 +195,7 @@ func TestStripFrozen(t *testing.T) {
 
 	r := s.strip()
 	s.passes(r)
-	s.contains(r, "testdata/export/prices.txtar: left the cell list, frozen by its known gap, gaps line 1; hypercase strip -frozen strips it too\n")
+	s.contains(r, "testdata/export/prices.txtar: left the cell list, frozen by its known gap, gaps line 1; hypercase strip -column list -frozen strips it, and list's other frozen cells\n")
 	s.settle(stripModule...)
 	s.hasSections(prices, map[string]string{"out/list/files.txt": "2 files\n"})
 	s.fails(s.run("b", "strip-b", false), frozen)
@@ -267,7 +267,7 @@ func TestStripRootCheckVia(t *testing.T) {
 	s.passes(s.strip("-column", "nobody"))
 	r := s.strip("-column", "parse")
 	s.passes(r)
-	s.contains(r, "testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it too\n")
+	s.contains(r, "testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells\n")
 	for _, r := range s.settle(stripModule...) {
 		s.passes(r)
 	}

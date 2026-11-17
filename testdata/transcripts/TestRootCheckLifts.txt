@@ -66,7 +66,7 @@ $ go test  # ladder-a-useonly
     the lift parse is used by . and ./b, and no package owns it, so its error is recorded nowhere.
         Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
     testdata/script/x.txtar: no registry claims out/parse/outcome: no column named parse runs over the corpus script.
-        If a column should write them, register the column. If not, run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes parse's sections from every archive under the module-root corpus, and the update writes back those a registry claims.
+        If a column should write them, register the column. If not, run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes parse's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
     what ran, in order:
         parse ran on x
         resolve ran on x

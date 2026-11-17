@@ -1,0 +1,17 @@
+$ edit my corp/testdata/script/twice.txtar  # a corpus under the root "my corp", whose package registers echo alone
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # spaced-a
+    The root-package check for the corpus root my corp runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ go test  # spaced-a
+    my corp/testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
+        If a column should write them, register the column. If not, run hypercase strip -root 'my corp' -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes shout's sections from every archive under the corpus root my corp, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]

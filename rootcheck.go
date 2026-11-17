@@ -526,7 +526,7 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, tr
 		} else if len(ls) > 1 {
 			first = fmt.Sprintf("remove %s, which mark cells of theirs, so that strip removes them; then ", andList(ls))
 		}
-		t.Errorf("%s: no registry claims %s: %s. If not, %srun %s at the module root, then %s until it changes nothing. The strip removes %s from every archive under %s, and the update writes back those a registry claims.", rel, andList(unclaimed[c]), c.why, first, r.stripCmd(c.strip), r.updateCmd(), c.whose, r.rootName())
+		t.Errorf("%s: no registry claims %s: %s. If not, %srun %s at the module root, then %s until it changes nothing. The strip removes %s from every archive under %s, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.", rel, andList(unclaimed[c]), c.why, first, r.stripCmd(c.strip), r.updateCmd(), c.whose, r.rootName())
 	}
 }
 

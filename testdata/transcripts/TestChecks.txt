@@ -523,7 +523,7 @@ $ rm testdata/script/broken.txtar  # remove the broken archive
 $ edit testdata/script/twice.txtar  # leave the cells of a transform no corpus type lists
 $ go test  # tr-checks
     testdata/script/twice.txtar: no registry claims transform/gone/out/echo/outcome: no corpus type of testdata/script/ lists a transform named gone.
-        If a transform should make the variant, list it in its corpus type's Transforms. If not, run hypercase strip -transform gone at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes the sections under transform/gone/ from every archive under the module-root corpus, and the update writes back those a registry claims.
+        If a transform should make the variant, list it in its corpus type's Transforms. If not, run hypercase strip -transform gone at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes the sections under transform/gone/ from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
     script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
     script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
     script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps

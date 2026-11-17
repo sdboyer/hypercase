@@ -463,18 +463,28 @@ Its `.gitignore` names the corpus root's lock, which an update takes
   the registries that record the root and the findings files in their
   packages' `testdata/checks/` (steps 5 and 8). It keeps a package's
   registry while any findings file of the package is left, so that strip
-  run again finds it. `-column <name>` limits it to a column's sections,
-  at every level, and `-transform <name>` to those under a transform's
-  variant (step 7). Either leaves the registries and findings files.
+  run again finds it, and every registry while an archive it strips is
+  left, for a problem of form or a failed write, so that strip run again
+  reads them as this run did. `-column <name>` limits it to a column's
+  sections, at every level, and `-transform <name>` to those under a
+  transform's variant (step 7). Either leaves the registries and findings
+  files.
 - `-root <dir>` names the corpus root. Without it, strip takes the root
   that the registry of the package in the current directory records, or,
   at the module root with no registry there, the module-root corpus.
-  Anywhere else it asks for `-root`. A line that says to run strip again
-  gives the command, with `-root` unless strip ran at the module root on
-  the module-root corpus: the strip may have removed the registry that
-  named the root.
+  Anywhere else it asks for `-root`, and so it does for a recorded root
+  inside a module nested in the package's. A line that says to run strip
+  again gives the command, with `-root` unless strip ran at the module
+  root on the module-root corpus and the registry there, if there is one,
+  records that corpus: a strip may remove the registry that named the
+  root, and one that names another root would find that one. A path that
+  a shell would read as more than one word is quoted.
 - It leaves frozen cells (step 4) in place and lists them, and `-frozen`
-  strips those too. It leaves as it was, and lists with the reason, an
+  strips those too. A frozen cell's line gives the command that strips
+  it: `-column` with its column, and `-transform` for a cell of a
+  transform's variant. No flag limits strip to one archive or to a
+  hand-written variant, so the command strips the column's other frozen
+  cells too. It leaves as it was, and lists with the reason, an
   archive with a problem of form, and one that isn't
   `testdata/<corpus>/<archive>.txtar` with both names under the naming
   rule and `<corpus>` other than `checks`, and then exits non-zero. It

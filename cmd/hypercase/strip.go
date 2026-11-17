@@ -16,6 +16,7 @@ import (
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/hypercase/internal/root"
+	"github.com/sdboyer/hypercase/internal/shell"
 	"github.com/sdboyer/hypercase/strip"
 )
 
@@ -132,7 +133,14 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 		rootName = "the module-root corpus"
 	}
 	rel := func(p string) string { return root.Rel(corpusRoot, p) }
-	again := rerun(dir, mod, corpusRoot, sel)
+	// A line that says to run strip again names the root with -root,
+	// unless strip run again from dir with no -root finds the same root
+	// whether or not this run removes the registry there: dir is the module
+	// root, the corpus root the module-root corpus, and the registry there,
+	// if any, records it.
+	bare, err := findCorpusRoot(dir, "")
+	named := dir != mod || corpusRoot != mod || err != nil || bare != corpusRoot
+	again := rerun(dir, corpusRoot, named, sel)
 
 	// The registries, read before anything is removed: those that record
 	// the corpus root, and the corpus roots the others record.
@@ -235,9 +243,9 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	add := func(p, text string, problem bool) {
 		lines = append(lines, stripped{path: rel(p), text: text, problem: problem})
 	}
-	thaw := sel
-	thaw.Frozen = true
-	thawCmd := rerun(dir, mod, corpusRoot, thaw)
+	// Whether an archive that strip strips was left, so that strip must run
+	// again.
+	leftArchive := false
 	for _, p := range paths {
 		if err := strip.CheckPath(corpusRoot, p); err != nil {
 			add(p, "left as it was: "+err.Error()+".", true)
@@ -250,6 +258,7 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 		r, err := strip.Archive(corpusRoot, p, each)
 		if err != nil {
 			add(p, fmt.Sprintf("left as it was: %v, then run %s again.", err, again), true)
+			leftArchive = true
 			continue
 		}
 		if n := len(r.Removed); n == 1 {
@@ -258,16 +267,28 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 			add(p, fmt.Sprintf("removed %d sections", n), false)
 		}
 		for _, f := range r.Frozen {
+			// The command that strips the cell: its column's sections,
+			// under its transform for a transform's variant's cell. No flag
+			// limits strip to one archive or to a hand-written variant, so
+			// it strips the column's other frozen cells too.
 			name := f.Column
+			thaw := strip.Selection{Column: f.Column, Frozen: true}
+			reach := f.Column + "'s other frozen cells"
 			if f.Case != "" {
 				name = f.Case + "/" + f.Column
+				if kind, t, _ := strings.Cut(f.Case, "/"); kind == archive.Transform {
+					thaw.Transform = t
+					reach += " under " + archive.Transform + "/" + t + "/"
+				}
 			}
-			add(p, fmt.Sprintf("left the cell %s, frozen by its known gap, %s line %d; %s strips it too", name, f.Gaps, f.Line, thawCmd), false)
+			add(p, fmt.Sprintf("left the cell %s, frozen by its known gap, %s line %d; %s strips it, and %s", name, f.Gaps, f.Line, rerun(dir, corpusRoot, named, thaw), reach), false)
 		}
 	}
 	if sel.Column == "" && sel.Transform == "" {
 		// A registry goes only once its package's findings files have, so
-		// that a strip run again finds those left.
+		// that a strip run again finds those left, and only once every
+		// archive is stripped, so that a strip run again reads the
+		// registries as this one did.
 		lock := filepath.Join(td, archive.LockFile)
 		for _, g := range own {
 			left := false
@@ -282,8 +303,12 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 					left = true
 				}
 			}
-			if left {
+			switch {
+			case left:
 				add(g.path, "left in place, so that strip run again finds the findings files of its package that this run left.", false)
+				continue
+			case leftArchive:
+				add(g.path, "left in place while an archive this run left is still to strip, so that strip run again reads it as this run did.", false)
 				continue
 			}
 			if err := archive.RemoveFile(lock, g.path); err != nil {
@@ -311,14 +336,12 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 }
 
 // rerun returns the command that strips sel from the corpus root again,
-// run from dir. It names the root with -root, unless dir is the module
-// root and the corpus root is the module-root corpus, which strip finds
-// there with no registry: a strip with no flags removes the registry that
-// may have named the root.
-func rerun(dir, mod, corpusRoot string, sel strip.Selection) string {
+// run from dir, naming the root with -root when named says to. It quotes
+// the root's path for a shell where the path needs it.
+func rerun(dir, corpusRoot string, named bool, sel strip.Selection) string {
 	cmd := []string{"hypercase", "strip"}
-	if dir != mod || corpusRoot != mod {
-		cmd = append(cmd, "-root", root.Rel(dir, corpusRoot))
+	if named {
+		cmd = append(cmd, "-root", shell.Quote(root.Rel(dir, corpusRoot)))
 	}
 	if f := flags(sel); f != "" {
 		cmd = append(cmd, f)
@@ -333,7 +356,9 @@ func rerun(dir, mod, corpusRoot string, sel strip.Selection) string {
 // given, relative to dir; or else the one that the registry of the package
 // in dir records; or else, when dir is the module root, the module root.
 // Anywhere else with no registry, strip can't tell the package's corpus
-// root, and asks for -root.
+// root, and asks for -root. A registry's corpus root inside another
+// module, one nested in the package's, is refused: strip reads a corpus
+// root's registries in its own module, and the package's is another.
 func findCorpusRoot(dir, given string) (string, error) {
 	if given != "" {
 		p := given
@@ -366,7 +391,11 @@ func findCorpusRoot(dir, given string) (string, error) {
 	if !fs.ValidPath(h.CorpusRoot) {
 		return "", fmt.Errorf("%s records the corpus root %q, which isn't a slash path relative to the module root.\nName the corpus root with -root, relative to the current directory.", root.Rel(dir, p), h.CorpusRoot)
 	}
-	return filepath.Join(mod, filepath.FromSlash(h.CorpusRoot)), nil
+	corpusRoot := filepath.Join(mod, filepath.FromSlash(h.CorpusRoot))
+	if m, err := root.Module(corpusRoot); err == nil && m != mod {
+		return "", fmt.Errorf("%s records the corpus root %s, which lies inside the module at %s, and not in the module of the package here, at %s.\nMove the corpus root out of the module at %s, or name it with -root, relative to the current directory, to strip it as a corpus root of that module.", root.Rel(dir, p), h.CorpusRoot, root.Rel(dir, m), root.Rel(dir, mod), root.Rel(dir, m))
+	}
+	return corpusRoot, nil
 }
 
 // matches reports whether sel selects a section of an archive of the

@@ -6,7 +6,7 @@ $ go test  # pkg-a
     testdata/script/twice.txtar: gaps, line 1, names shout, and no registry has a column of that name over the corpus script.
         Register the column, or remove the line.
     testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
-        If a column should write them, register the column. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes shout's sections from every archive under the module-root corpus, and the update writes back those a registry claims.
+        If a column should write them, register the column. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes shout's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/script
         --- PASS: TestCorpus/script/twice
@@ -14,13 +14,13 @@ $ go test  # pkg-a
 FAIL
 [exit 1]
 $ hypercase strip -column shout
-testdata/script/twice.txtar: left the cell shout, frozen by its known gap, gaps line 1; hypercase strip -column shout -frozen strips it too
+testdata/script/twice.txtar: left the cell shout, frozen by its known gap, gaps line 1; hypercase strip -column shout -frozen strips it, and shout's other frozen cells
 Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
 $ go test  # pkg-a
     testdata/script/twice.txtar: gaps, line 1, names shout, and no registry has a column of that name over the corpus script.
         Register the column, or remove the line.
     testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
-        If a column should write them, register the column. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes shout's sections from every archive under the module-root corpus, and the update writes back those a registry claims.
+        If a column should write them, register the column. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -column shout at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes shout's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/script
         --- PASS: TestCorpus/script/twice
