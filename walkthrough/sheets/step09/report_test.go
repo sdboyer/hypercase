@@ -198,34 +198,37 @@ func firstDiff(got, want []byte) (n int, g, w string) {
 }
 
 // goEnv is the environment of each go command the test runs: this
-// process's, which holds where the toolchain keeps its caches, with no go
-// env file, no GOFLAGS, the module system offline, on this toolchain and
-// off any workspace, and the update variable only as updateVar sets it.
+// process's, with no GOFLAGS, the module system offline, on this toolchain
+// and off any workspace, and the update variable only as updateVar sets it.
+// The go env file applies, as it does to the caller's own go commands, and
+// with this process's environment says where the toolchain keeps its
+// caches. With the module system offline, a module missing from that
+// module cache fails the build.
 //
-// The go command reads a variable that is empty from its env file, so an
-// empty GOFLAGS holds none only with the file off. A cache location set only
-// in that file goes unused, and with the module system offline, a module
-// missing from the cache this environment names fails the build.
+// The go command reads a variable that is empty from the go env file, so
+// GOFLAGS is a space, which holds no flag and keeps the file's GOFLAGS out.
+// GOWORK, GOPROXY and GOTOOLCHAIN are set, which keeps the file's out too.
 func goEnv(updateVar string) []string {
 	var env []string
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
 		switch k {
-		case sheetcorpus.Project.UpdateVar, "GOENV", "GOFLAGS", "GOWORK", "GOPROXY", "GOTOOLCHAIN":
+		case sheetcorpus.Project.UpdateVar, "GOFLAGS", "GOWORK", "GOPROXY", "GOTOOLCHAIN":
 			continue
 		}
 		env = append(env, kv)
 	}
-	env = append(env, "GOENV=off", "GOFLAGS=", "GOWORK=off", "GOPROXY=off", "GOTOOLCHAIN=local")
+	env = append(env, "GOFLAGS= ", "GOWORK=off", "GOPROXY=off", "GOTOOLCHAIN=local")
 	if updateVar != "" {
 		env = append(env, updateVar)
 	}
 	return env
 }
 
-// TestGoEnv: GOFLAGS that a caller keeps in a go env file reaches no go
-// command the test runs. The probe's GOFLAGS would build it from another
-// source, through an overlay.
+// TestGoEnv: the go env file, where go env -w writes it, applies to the go
+// commands the test runs, but for its GOFLAGS. The file holds a module
+// cache's location, which they use, and GOFLAGS with an overlay, which
+// would build the probe from another source.
 func TestGoEnv(t *testing.T) {
 	probe := t.TempDir()
 	for name, data := range map[string]string{
@@ -238,11 +241,48 @@ func TestGoEnv(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	envFile := filepath.Join(t.TempDir(), "env")
-	if err := writeFile(envFile, []byte("GOFLAGS=-overlay=overlay.json\n")); err != nil {
+	gocmd := func(env []string, args ...string) string {
+		t.Helper()
+		cmd := exec.Command("go", args...)
+		cmd.Dir, cmd.Env = probe, env
+		out, err := cmd.Output()
+		if err != nil {
+			var exit *exec.ExitError
+			if errors.As(err, &exit) {
+				t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, exit.Stderr)
+			}
+			t.Fatalf("go %s: %v", strings.Join(args, " "), err)
+		}
+		return strings.TrimSpace(string(out))
+	}
+
+	// The file's default location is in the user's config directory, which
+	// HOME, XDG_CONFIG_HOME or AppData names, by platform. The build cache
+	// stays this process's, which serves the probe's build, and the module
+	// cache is left to the file.
+	cache := gocmd(nil, "env", "GOCACHE")
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
+	t.Setenv("AppData", filepath.Join(home, "AppData"))
+	t.Setenv("GOENV", "")
+	t.Setenv("GOCACHE", cache)
+	t.Setenv("GOMODCACHE", "")
+	envFile := gocmd(nil, "env", "GOENV")
+	if !strings.HasPrefix(envFile, home+string(filepath.Separator)) {
+		t.Fatalf("the go env file is %s, outside the test's HOME, %s", envFile, home)
+	}
+	// Telemetry is kept in the same directory. Off, it starts no process
+	// that writes there after the test.
+	gocmd(nil, "telemetry", "off")
+	modcache := filepath.Join(home, "modcache")
+	if err := writeFile(envFile, []byte("GOFLAGS=-overlay=overlay.json\nGOMODCACHE="+modcache+"\n")); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("GOENV", envFile)
+
+	if got := gocmd(goEnv(""), "env", "GOMODCACHE"); got != modcache {
+		t.Errorf("the go commands use the module cache %s, not the go env file's, %s", got, modcache)
+	}
 	cmd := exec.Command("go", "run", ".")
 	cmd.Dir = probe
 	cmd.Env = goEnv("")
