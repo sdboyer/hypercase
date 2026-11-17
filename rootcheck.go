@@ -590,16 +590,16 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, by
 	// A claim of a bytes lift's product names the lift.
 	type claim struct{ what, why, strip, whose, lift string }
 	unclaimed := map[claim][]string{}
-	// newClaim builds a claim of the sections of name, of which fact says
-	// why no registry claims them, and register what to do if one should.
-	// A name that breaks the naming rule, by archive.ValidName, no column,
-	// lift or transform can have, and hypercase strip refuses it as flag,
-	// so such a claim has no register and no strip.
-	newClaim := func(what, fact, register, flag, name, whose, lift string) claim {
-		if !archive.ValidName(name) {
+	// columnClaim builds a claim of the sections of the column col, of
+	// which fact says why no registry claims them, and register what to
+	// do if one should. A name that breaks the naming rule, by
+	// archive.ValidName, no column or lift can have, and hypercase strip
+	// refuses it as -column, so such a claim has no register and no strip.
+	columnClaim := func(what, fact, register, col, whose, lift string) claim {
+		if !archive.ValidName(col) {
 			return claim{what, fact + ", and none can, since the name breaks the naming rule: " + nameRule, "", whose, lift}
 		}
-		return claim{what, fact + ".\n" + register, flag + " " + name, whose, lift}
+		return claim{what, fact + ".\n" + register, "-column " + col, whose, lift}
 	}
 	// The gaps lines that keep strip from removing a claim's sections, as
 	// strip reads the archive's cells, knowing what the registries say of
@@ -614,21 +614,23 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, by
 	for _, s := range a.Sections {
 		kind, name, rest := archive.SplitCase(s.Name)
 		if kind == archive.Transform && !transforms[name] {
-			c := newClaim(archive.Transform+"/"+name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s", corpus, name), "If a transform should make the variant, list it in its corpus type's Transforms", "-transform", name, "the sections under transform/"+name+"/", "")
+			// archive.Check refuses a transform's name that breaks the
+			// naming rule, so strip takes this one as -transform.
+			c := claim{archive.Transform + "/" + name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s.\nIf a transform should make the variant, list it in its corpus type's Transforms", corpus, name), "-transform " + name, "the sections under transform/" + name + "/", ""}
 			unclaimed[c] = append(unclaimed[c], s.Name)
 			keep(c, s.Name)
 			continue
 		}
 		if out, ok := strings.CutPrefix(rest, archive.Out+"/"); ok {
 			if col, _, _ := strings.Cut(out, "/"); !cols[col] {
-				c := newClaim(col, fmt.Sprintf("no column named %s runs over the corpus %s", col, corpus), "If a column should write them, register the column", "-column", col, col+"'s sections", "")
+				c := columnClaim(col, fmt.Sprintf("no column named %s runs over the corpus %s", col, corpus), "If a column should write them, register the column", col, col+"'s sections", "")
 				unclaimed[c] = append(unclaimed[c], s.Name)
 				keep(c, s.Name)
 			}
 		}
 		if via, ok := strings.CutPrefix(rest, archive.Via+"/"); ok {
 			if l, _, _ := strings.Cut(via, "/"); !products[l] {
-				c := newClaim(archive.Via+"/"+l, fmt.Sprintf("no bytes lift named %s runs over the corpus %s", l, corpus), "If a bytes lift should write them, register it", "-column", l, l+"'s sections", l)
+				c := columnClaim(archive.Via+"/"+l, fmt.Sprintf("no bytes lift named %s runs over the corpus %s", l, corpus), "If a bytes lift should write them, register it", l, l+"'s sections", l)
 				unclaimed[c] = append(unclaimed[c], s.Name)
 				keep(c, s.Name)
 			}
