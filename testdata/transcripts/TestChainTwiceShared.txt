@@ -72,7 +72,7 @@ $ go test ./b  # chain-twice-b
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         list: Lists the files of the script's input view, with their bytes.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "blocked export", in out/import/outcome.
-        Only the package that owns export runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
+        Only the package that owns export runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads export's outcome and product from the archive. Delete nothing by hand before it has run.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/export
     --- FAIL: TestCorpus/grid

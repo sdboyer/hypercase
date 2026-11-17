@@ -30,10 +30,18 @@ import (
 // scenarios on it: an edit of what a lift or the case makes now (the
 // code's side, F) crossed with an edit of what the archive commits for a
 // bytes lift, a transform's variant or a cell (the committed side, C).
+// The hand-picked grids, closingGrids, each take one fixture's chain of
+// lifts and its packages. The topology grids, topologyGrids, take every
+// chain of up to maxChain lifts, bytes lifts or stages, with every
+// assignment of its lifts and its suite to two packages, and every way the
+// hand-picked grids make one lift on the chain fail, crossed with each edit
+// of what the archive commits that they make.
 // Each scenario runs a normal run, then an update, of each of the grid's
 // packages, as go test ./... runs them, in children that record each
 // cell's fate and files and whether its test failed, each run of a lift's
-// function, and each note's closing and what it claims, in both runs.
+// function, and each note's closing and what it claims, in both runs. A
+// topology grid's scenarios are variants of one archive, which each run
+// reads at once.
 // Where a note is of a frozen cell with cells past it, or its closing
 // claims what normal runs after the update do, the scenario runs one.
 // Then every note's closing must hold:
@@ -84,32 +92,39 @@ func TestClosings(t *testing.T) {
 			m[k] = name
 		}
 	}
+	record := func(name string, got reach) {
+		mu.Lock()
+		defer mu.Unlock()
+		ran++
+		for _, p := range got.pairs {
+			count[p]++
+			if first, ok := reached[p]; !ok || name < first {
+				reached[p] = name
+			}
+		}
+		for f := range got.set {
+			first(set, f, name)
+		}
+		for f := range got.unset {
+			first(unset, f, name)
+		}
+	}
 	t.Run("grid", func(t *testing.T) {
-		for _, g := range closingGrids() {
+		for _, g := range slices.Concat(closingGrids(), topologyGrids()) {
 			total += len(g.scenarios)
 			t.Run(g.name, func(t *testing.T) {
 				t.Parallel()
 				clean := g.clean(t)
+				if g.packed {
+					for name, got := range g.runPacked(t, clean, kinds, markers) {
+						record(g.name+"/"+name, got)
+					}
+					return
+				}
 				for _, sc := range g.scenarios {
 					t.Run(sc.name, func(t *testing.T) {
 						t.Parallel()
-						got := g.run(t, clean, sc, kinds, markers)
-						mu.Lock()
-						defer mu.Unlock()
-						ran++
-						name := g.name + "/" + sc.name
-						for _, p := range got.pairs {
-							count[p]++
-							if first, ok := reached[p]; !ok || name < first {
-								reached[p] = name
-							}
-						}
-						for f := range got.set {
-							first(set, f, name)
-						}
-						for f := range got.unset {
-							first(unset, f, name)
-						}
+						record(g.name+"/"+sc.name, g.run(t, clean, sc, kinds, markers))
 					})
 				}
 			})
@@ -281,7 +296,11 @@ func gapOn(col string) gridEdit {
 }
 
 // A closingGrid is a fixture, the packages that run over it, and the
-// scenarios run on its archive.
+// scenarios run on its archive. A packed grid's scenarios are hand-written
+// variants of its archive, which its prep writes and the first update
+// writes the cells of, each named for its scenario and then edited by it,
+// so that each run reads them all at once, and each update writes the
+// archive once: an update's every write of an archive syncs it to disk.
 type closingGrid struct {
 	name, fixture string
 	remove        []string          // the fixture's archives left out
@@ -290,6 +309,7 @@ type closingGrid struct {
 	pkgs          []childRun        // the packages, as go test ./... runs them
 	unowned       map[string]string // in a package that doesn't own a bytes lift: each column past it, "<pkg> <column>", and the lift
 	scenarios     []gridScenario
+	packed        bool
 }
 
 // clean is the fixture, written by one update, by path.
@@ -379,6 +399,85 @@ func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario,
 		}
 	}
 	return j.reach
+}
+
+// runPacked runs a packed grid's scenarios, and the runs after them that
+// their closings' claims need, judges each scenario on the records of its
+// variant, as run judges its one, and returns what the notes of each that
+// ran reach, by its name.
+func (g closingGrid) runPacked(t *testing.T, clean map[string][]byte, kinds map[int]string, markers []string) map[string]reach {
+	s := newSandbox(t, "")
+	for _, p := range slices.Sorted(maps.Keys(clean)) {
+		s.write(p, clean[p], "the clean fixture")
+	}
+	s.edit(g.archive, "the scenarios", func(a *archive.Archive) {
+		for _, sc := range g.scenarios {
+			for _, e := range sc.edits {
+				e.fn(a)
+			}
+		}
+		*a = *a.Place()
+		if ps := a.Check(); len(ps) > 0 {
+			t.Fatalf("the scenarios make an archive with problems of form: %v", ps)
+		}
+	})
+	before := archive.Parse(s.read(g.archive))
+	dir := t.TempDir()
+	runs := func(name string, update bool) []hypercase.Observed {
+		var obs []hypercase.Observed
+		for i, r := range g.runAll(s, update, filepath.Join(dir, name)) {
+			got := readObserved(t, filepath.Join(dir, fmt.Sprintf("%s-%d.jsonl", name, i)))
+			if len(got) == 0 {
+				t.Fatalf("the %s run of %s recorded nothing:\n%s", name, g.pkgs[i].registration, r.out)
+			}
+			obs = append(obs, got...)
+		}
+		return obs
+	}
+	normal, update := runs("normal", false), runs("update", true)
+	u := updated{after: archive.Parse(s.read(g.archive)), owners: g.owners(t, s)}
+	base := strings.TrimSuffix(strings.TrimPrefix(g.archive, "testdata/"), ".txtar")
+	judges := make([]*judge, len(g.scenarios))
+	post := false
+	for i, sc := range g.scenarios {
+		c := base + "/" + packedPrefix(sc.name)
+		j := &judge{g: g, kinds: kinds, markers: markers, before: before, normal: ofCase(normal, c), update: ofCase(update, c)}
+		ju := u
+		ju.cells, ju.lifts = cells(j.update), liftRuns(j.update)
+		j.u = &ju
+		post = post || j.needsPost()
+		judges[i] = j
+	}
+	if post {
+		obs := runs("post", false)
+		for i, sc := range g.scenarios {
+			judges[i].u.post = cells(ofCase(obs, base+"/"+packedPrefix(sc.name)))
+		}
+	}
+	out := map[string]reach{}
+	for i, sc := range g.scenarios {
+		t.Run(sc.name, func(t *testing.T) {
+			j := judges[i]
+			j.t = t
+			j.judge()
+			out[sc.name] = j.reach
+		})
+	}
+	return out
+}
+
+// packedPrefix names the variant that holds a packed grid's scenario.
+func packedPrefix(scenario string) string { return "variant/" + scenario }
+
+// ofCase returns the records of the case c.
+func ofCase(os []hypercase.Observed, c string) []hypercase.Observed {
+	var out []hypercase.Observed
+	for _, o := range os {
+		if o.Case == c {
+			out = append(out, o)
+		}
+	}
+	return out
 }
 
 // owners are the transforms that some package's registry, after the
@@ -753,24 +852,14 @@ var claimChecks = map[string]claimCheck{
 		}
 		return ""
 	}},
-	// The lift a closing says the update reruns is one whose function the
-	// update ran on the case, as its records of each run of a lift show:
-	// where the package can't tell, the lift it doesn't own, which the
-	// package that owns it runs, and otherwise the last bytes lift on the
-	// cell's path that the package's update ran.
+	// The lift a closing says the update reruns is the last bytes lift on
+	// the cell's path whose function the package's update ran on the case,
+	// as its records of each run of a lift show, and none where the
+	// closing says nothing of what the update does with the cell: in its
+	// default, and where the package can't tell.
 	"Reruns": {check: func(c *noteCheck, u *updated) string {
 		var want string
-		switch {
-		case c.cl.CantTell != "":
-			want = c.cl.CantTell
-			ran := false
-			for k := range u.lifts {
-				ran = ran || k.c == c.n.Case && k.lift == want
-			}
-			if !ran {
-				return fmt.Sprintf("the closing says the update reruns %s, and no package's update ran its function on the case", want)
-			}
-		case c.cl.Does != "":
+		if c.cl.Does != "" {
 			for _, l := range u.cell.Path {
 				if u.lifts[liftKey{c.n.Pkg, c.n.Case, l}] {
 					want = l
@@ -792,7 +881,7 @@ var claimChecks = map[string]claimCheck{
 			return fmt.Sprintf("the closing says the package can't tell, as it doesn't own %q, and the bytes lift on the cell's path it doesn't own is %q", c.cl.CantTell, want)
 		}
 		return ""
-	}, unobserved: "the claim is that this package doesn't own the lift, so it can't tell what the update does: which package owns which lift is the grid's registrations, which unowned records, and no run of the update shows what a package can't tell. What it says of the update, the lift it reruns, is Reruns'"},
+	}, unobserved: "the claim is that this package doesn't own the lift, so it can't tell what the update does, and reads the lift's outcome and product from the archive: which package owns which lift is the grid's registrations, which unowned records, and no run of the update shows what a package can't tell. It says nothing the update does, but how it stages a variant, which is Variant's"},
 	// The cells past a frozen lift fail in normal runs when the update
 	// writes them from what the lift makes now, and a normal run reads the
 	// frozen cell's committed outcome and product, which the update leaves

@@ -60,6 +60,9 @@ func init() {
 		register, ok = chainRegistrations[name]
 	}
 	if !ok {
+		register, ok = topologyRegistration(name)
+	}
+	if !ok {
 		panic("selftest: no registration named " + name)
 	}
 	register()

@@ -111,10 +111,15 @@ type claims struct {
 	// case, a variant of it, where this run reads its committed inputs.
 	Variant string `json:"variant,omitempty"`
 	// Reruns names the bytes lift the update reruns, whose outcome and
-	// product this run reads from the archive.
+	// product this run reads from the archive: the last on the cell's path
+	// that the update reaches.
 	Reruns string `json:"reruns,omitempty"`
 	// CantTell names the bytes lift on the cell's path that the package
-	// doesn't own, so it can't tell what the update does with the cell.
+	// doesn't own, so it can't tell what the update does with the cell: a
+	// normal run of the package reads the lift's outcome and product from
+	// the archive, and only the package that owns it runs it. A lift before
+	// it may fail in the update, which then reaches it in no package, so
+	// CantTell says nothing of what the update reruns.
 	CantTell string `json:"cantTell,omitempty"`
 	// PastFresh records, of a frozen bytes lift's cell, that the update
 	// writes the cells past the lift from what it makes now, and leaves
@@ -261,7 +266,7 @@ func (st *staging) close(n note) (string, claims) {
 	var c closing
 	switch {
 	case st.unowned != nil:
-		c.claims = claims{CantTell: st.unowned.name, Reruns: st.unowned.name}
+		c.claims = claims{CantTell: st.unowned.name}
 		c.advice = "Run it, fix what it reports, and read the diff before committing."
 		if n.kind == aboutOrphan || n.kind == aboutProductOrphan {
 			c.advice = "Delete nothing by hand before it has run."
@@ -389,7 +394,11 @@ func (st *staging) text(n note, c closing) string {
 	sep := " "
 	switch {
 	case cl.CantTell != "":
-		lead = append(lead, fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell what %s does with %s: %s.", cl.CantTell, u, st.col.name, staged(cl)))
+		how := fmt.Sprintf("a normal run reads %s's outcome and product from the archive", cl.CantTell)
+		if s := staged(cl); s != "" {
+			how = s + ", and " + how
+		}
+		lead = append(lead, fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell what %s does with %s: %s.", cl.CantTell, u, st.col.name, how))
 	case cl.Does != "":
 		lead = append(lead, st.does(cl))
 		if strings.HasPrefix(cl.Does, fateSkipped+" ") {

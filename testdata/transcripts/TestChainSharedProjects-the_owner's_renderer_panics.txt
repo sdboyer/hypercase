@@ -121,25 +121,25 @@ $ go test ./b  # chain-b
         out/evaluate/outcome differs (-golden +got):
         - blocked import
         + accepted
-        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
     export/prices: One export of prices: import makes a script whose quote/ tree list shows.
         list: Lists the files of the script's input view, with their bytes.
         out/list/outcome differs (-golden +got):
         - blocked import
         + accepted
-        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
         transform/louder/out/evaluate/outcome differs (-golden +got):
         - blocked import
         + accepted
-        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         list: Lists the files of the script's input view, with their bytes.
         transform/louder/out/list/outcome differs (-golden +got):
         - blocked import
         + accepted
-        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
     what ran, in order:
         parse ran on prices
         resolve ran on prices

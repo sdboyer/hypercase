@@ -368,7 +368,7 @@ func TestChainTwiceShared(t *testing.T) {
 		drop("out/export/error.txt")(a)
 	})
 	b := s.run("b", "chain-twice-b", false)
-	s.fails(b, "out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome \"blocked export\", in out/import/outcome.\nOnly the package that owns export runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.")
+	s.fails(b, "out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome \"blocked export\", in out/import/outcome.\nOnly the package that owns export runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads export's outcome and product from the archive. Delete nothing by hand before it has run.")
 	s.lacks(b, "export ran")
 	update()
 	s.same(sheet, clean)
@@ -1175,7 +1175,7 @@ func TestChainShared(t *testing.T) {
 	// cells that import's missing outcome blocks.
 	s.edit(prices, "import's cell has no committed outcome", drop("out/import/outcome"))
 	b = s.run("b", "chain-b", false)
-	s.fails(b, "out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.\nOnly the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.")
+	s.fails(b, "out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.\nOnly the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.")
 	s.lacks(b, "import ran")
 	s.write(prices, clean, "restore it")
 

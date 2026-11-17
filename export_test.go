@@ -168,6 +168,9 @@ func MarkerWords(s string) []string {
 
 func observeTo(path string) {
 	var mu sync.Mutex
+	// The file is opened once, and each record written whole with one
+	// write, so a child that exits leaves every record it made.
+	var f *os.File
 	write := func(o Observed) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -175,11 +178,11 @@ func observeTo(path string) {
 		if err != nil {
 			panic(err)
 		}
-		f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-		if err != nil {
-			panic(err)
+		if f == nil {
+			if f, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err != nil {
+				panic(err)
+			}
 		}
-		defer f.Close()
 		if _, err := f.Write(append(data, '\n')); err != nil {
 			panic(err)
 		}

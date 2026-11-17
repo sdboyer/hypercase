@@ -2966,10 +2966,12 @@ lift.
   commits, to delete nothing by hand before the update has run. Another
   package's normal run doesn't run the bytes lifts it doesn't own, so it
   can't tell what its update does with a cell past one: every message
-  about such a cell says so, names the lift, says that the update reruns
-  it, and says to run the update, fix what it reports, and read the diff
-  before committing, or, on a file the cell commits, to delete nothing by
-  hand before the update has run.
+  about such a cell says so, names the lift, says that a normal run reads
+  the lift's outcome and product from the archive, and says to run the
+  update, fix what it reports, and read the diff before committing, or, on
+  a file the cell commits, to delete nothing by hand before the update has
+  run. The update may not reach the lift at all, where a lift before it
+  fails on the case.
 - A cell past a bytes lift that runs on a committed product the lift no
   longer makes, and no longer produces a file it commits, runs on what the
   lift makes in the update, whose run may still write the file. A normal
