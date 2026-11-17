@@ -69,6 +69,73 @@ func TestParse(t *testing.T) {
 	}
 }
 
+// TestParseAny: a registry of each format from Oldest to Format reads in
+// today's form, holding what its format holds; one that holds a key a
+// later format added is no registry; and a format older than Oldest or
+// newer than Format is a FormatError that names it. Parse still reads
+// Format alone.
+func TestParseAny(t *testing.T) {
+	// A format 3 registry, as hypercase's main branch wrote it: corpus
+	// types with no transforms, no codes, and suites with no classifier.
+	const v3 = `{"format": 3, "updateVar": "X", "corpusRoot": ".", "rootPackage": true,
+	"issueLinks": [{"pattern": "sheets#(\\d+)", "url": "https://example.com/$1"}],
+	"properties": [{"name": "circular", "description": "A loop."}],
+	"types": [{"dir": "sheet", "description": "A sheet.", "goType": "example.com/m.Sheet"}],
+	"lifts": [],
+	"suites": [{"name": "calc", "description": "Runs calc.", "consumes": "io/fs.FS", "corpora": ["sheet"],
+		"outputs": [{"pattern": "stdout.txt", "description": "What it prints."}], "rejects": ["circular"]}]}`
+	v4 := strings.Replace(v3, `"format": 3`, `"format": 4`, 1)
+	v4 = strings.Replace(v4, `"goType": "example.com/m.Sheet"}`, `"goType": "example.com/m.Sheet",
+		"transforms": [{"name": "looped", "description": "Loops.", "gives": ["circular"], "keeps": [], "probe": false, "owned": true}]}`, 1)
+	for _, tt := range []struct {
+		data       string
+		format     int
+		transforms int
+	}{
+		{v3, 3, 0},
+		{v4, 4, 1},
+	} {
+		g, err := ParseAny([]byte(tt.data))
+		if err != nil {
+			t.Errorf("format %d: %v", tt.format, err)
+			continue
+		}
+		if g.Format != tt.format || g.CorpusRoot != "." || !g.RootPackage || len(g.IssueLinks) != 1 ||
+			len(g.Properties) != 1 || len(g.Suites) != 1 || g.Suites[0].Outputs[0].Pattern != "stdout.txt" ||
+			len(g.Types) != 1 || len(g.Types[0].Transforms) != tt.transforms || g.Codes || g.Suites[0].Classifier != nil {
+			t.Errorf("format %d reads as %+v", tt.format, g)
+		}
+		if _, err := Parse([]byte(tt.data)); !errors.As(err, new(*FormatError)) {
+			t.Errorf("Parse of format %d: got %v, want a FormatError", tt.format, err)
+		}
+	}
+	now := Registry{CorpusRoot: ".", Codes: true, Suites: []Suite{{Name: "evaluate", Classifier: &Classifier{Name: "div-zero", Description: "Divides by zero."}}}}
+	if g, err := ParseAny(now.Marshal()); err != nil || !bytes.Equal(g.Marshal(), now.Marshal()) {
+		t.Errorf("format %d: got %+v, %v", Format, g, err)
+	}
+
+	for _, tt := range []struct{ data, want string }{
+		{strings.Replace(v3, `"goType": "example.com/m.Sheet"}`, `"goType": "example.com/m.Sheet", "transforms": []}`, 1), "it is not a registry: it holds format 3, and types[].transforms, which format 4 added"},
+		{strings.Replace(v3, `"rootPackage": true,`, `"rootPackage": true, "codes": false,`, 1), "it is not a registry: it holds format 3, and codes, which format 5 added"},
+		{strings.Replace(v4, `"rootPackage": true,`, `"rootPackage": true, "codes": null,`, 1), "it is not a registry: it holds format 4, and codes, which format 5 added"},
+		{strings.Replace(v4, `"rejects": ["circular"]}`, `"rejects": ["circular"], "classifier": null}`, 1), "it is not a registry: it holds format 4, and suites[].classifier, which format 5 added"},
+		{strings.Replace(v4, `"rejects": ["circular"]}`, `"rejects": ["circular"], "later": 1}`, 1), `it is not a registry: json: unknown field "later"`},
+		{`{"format": 0}`, "it is not a registry: it holds no format version"},
+		{`[]`, "it is not a registry"},
+	} {
+		if _, err := ParseAny([]byte(tt.data)); err == nil || !strings.HasPrefix(err.Error(), tt.want) {
+			t.Errorf("%.60s…: got %v, want %q", tt.data, err, tt.want)
+		}
+	}
+	for _, format := range []int{1, 2, Format + 1} {
+		_, err := ParseAny(fmt.Appendf(nil, `{"format": %d}`, format))
+		var fe *FormatError
+		if !errors.As(err, &fe) || fe.Format != format {
+			t.Errorf("format %d: got %v, want a FormatError", format, err)
+		}
+	}
+}
+
 // TestPeek: a registry's corpus root is read whatever its format, an older
 // or a newer one's included, so a reader can leave another root's registry
 // unread.

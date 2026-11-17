@@ -1,0 +1,40 @@
+{
+  "format": 5,
+  "updateVar": "SHEETS_UPDATE_GOLDEN",
+  "corpusRoot": "step05",
+  "rootPackage": false,
+  "codes": false,
+  "issueLinks": [],
+  "properties": [
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    }
+  ],
+  "types": [],
+  "lifts": [],
+  "suites": [
+    {
+      "name": "format",
+      "description": "Prints each formula back in canonical form.",
+      "consumes": "io/fs.FS",
+      "corpora": [
+        "sheet"
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why the sheet doesn't parse."
+        },
+        {
+          "pattern": "formulas.txt",
+          "description": "Each formula cell and its formula, in cell order."
+        }
+      ],
+      "rejects": [
+        "malformed"
+      ],
+      "classifier": null
+    }
+  ]
+}

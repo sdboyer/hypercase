@@ -26,12 +26,13 @@ func (r *Report) WriteText(w io.Writer) error {
 }
 
 // Outcomes are the outcomes the change shows: at A and at B when the
-// outcome changed, at A when the cell disappeared, and at B otherwise.
+// outcome changed, or when only its bytes did and its state is unknown at
+// one revision; at A when the cell disappeared; and at B otherwise.
 func (ch Change) Outcomes() []string {
-	switch ch.Rank {
-	case OutcomeChanged:
+	switch {
+	case ch.Rank == OutcomeChanged, ch.Rank == BytesChanged && ch.Before != ch.After:
 		return []string{ch.Before, ch.After}
-	case Disappeared:
+	case ch.Rank == Disappeared:
 		return []string{ch.Before}
 	}
 	return []string{ch.After}

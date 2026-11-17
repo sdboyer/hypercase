@@ -8,8 +8,8 @@ import (
 
 // TestRanks: changed outcomes come first, then cells that appeared, then
 // those that disappeared, then cells whose other files changed under the
-// same outcome. A cell is listed once, at its first rank, and only the
-// cells' files are changes.
+// same outcome. A cell exists where its outcome file does, a cell is
+// listed once, at its first rank, and only the cells' files are changes.
 func TestRanks(t *testing.T) {
 	t.Parallel()
 	const head = "A case.\n-- in/sheet/A1 --\n1\n"
@@ -51,10 +51,30 @@ func TestRanks(t *testing.T) {
 			want: "bytes changed\n  sheet/x calc: accepted\n    stderr.txt removed\n    tables/a.csv changed\n    values.txt added\n",
 		},
 		{
+			// A cell exists where its outcome file does, so one that gains
+			// its outcome appears, with every file it has.
 			name: "an outcome file added",
 			a:    map[string]string{"x": head + "-- out/calc/stdout.txt --\n1\n"},
 			b:    map[string]string{"x": head + "-- out/calc/outcome --\naccepted\n-- out/calc/stdout.txt --\n1\n"},
-			want: "outcome changed\n  sheet/x calc: (no outcome) -> accepted\n",
+			want: "appeared\n  sheet/x calc: accepted\n    stdout.txt added\n",
+		},
+		{
+			name: "an outcome file removed",
+			a:    map[string]string{"x": head + "-- out/calc/outcome --\naccepted\n-- out/calc/stdout.txt --\n1\n"},
+			b:    map[string]string{"x": head + "-- out/calc/stdout.txt --\n2\n"},
+			want: "disappeared\n  sheet/x calc: accepted\n    stdout.txt removed\n",
+		},
+		{
+			name: "files with no outcome file are no cell's",
+			a:    map[string]string{"x": head + "-- out/calc/stdout.txt --\n1\n"},
+			b:    map[string]string{"x": head + "-- out/calc/stdout.txt --\n2\n"},
+			want: "",
+		},
+		{
+			name: "a transform's inputs are no cell's files",
+			a:    map[string]string{"x": head + "-- transform/doubled/in/sheet/A1 --\n2\n-- transform/doubled/out/calc/outcome --\naccepted\n"},
+			b:    map[string]string{"x": head + "-- transform/doubled/delete --\nsheet/B1\n-- transform/doubled/in/sheet/A1 --\n3\n-- transform/doubled/out/calc/outcome --\naccepted\n"},
+			want: "",
 		},
 		{
 			name: "a column's cell appears in a case",

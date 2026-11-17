@@ -1,0 +1,12 @@
+A1 is a negative number.
+-- in/sheet/A1 --
+-3
+-- gaps --
+parse A negative number is valid, and evaluates to itself. Waits on sheets#3.
+calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
+-- out/calc/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3
+-- out/parse/error.txt --
+A1: unexpected "-"
+  sheet/A1:1: -3

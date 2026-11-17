@@ -12,8 +12,9 @@ import (
 // the walkthrough's report: the archive ratio added, and a cycle worded
 // cycle: A1 -> B1 -> A1. It adds what the walkthrough's sample leaves out:
 // a cell whose outcome changes alone, one whose outcome and files change
-// together, and an archive removed. It holds no Go source: the report
-// reads registries and archives only.
+// together, an archive removed, and a hand-written variant whose cells
+// panicked and were skipped, so the matrix shows every state. It holds no
+// Go source: the report reads registries and archives only.
 
 const sheetsLink = "https://example.com/sheets/issues/$1"
 
@@ -25,31 +26,40 @@ func sheetsRegistries(link string) map[string]string {
 		{Name: "malformed", Description: "Some cell holds neither a number nor a formula."},
 	}
 	sheet := registry.Type{Dir: "sheet", Description: "A sheet: one file per cell, under sheet/, named for the cell.", GoType: "example.com/sheets/sheetcorpus.Sheet"}
+	looped := registry.Transform{Name: "looped", Description: "Makes A1 refer to itself, so the sheet has a cycle.", Gives: []string{"circular"}}
+	sheet.Transforms = []registry.Transform{looped}
+	owner := sheet
+	looped.Owned = true
+	owner.Transforms = []registry.Transform{looped}
 	const parsed, graph = "*example.com/sheets/sheet.Parsed", "*example.com/sheets/sheet.Graph"
 	corpora := []string{"sheet"}
-	parse := registry.Lift{Name: "parse", Description: "Parses every cell.", Input: sheet.GoType, Product: parsed, Owned: true, Corpora: corpora, Rejects: []string{"malformed"}}
-	resolve := registry.Lift{Name: "resolve", Description: "Orders the cells so that each comes after the cells it refers to.", Input: parsed, Product: graph, Owned: true, Corpora: corpora, Rejects: []string{"circular", "dangling"}}
+	errorTxt := []registry.Output{{Pattern: "error.txt", Description: "The error, and each line it points at."}}
+	parse := registry.Lift{Name: "parse", Description: "Parses every cell.", Input: sheet.GoType, Product: parsed, Owned: true, Corpora: corpora, Outputs: errorTxt, Rejects: []string{"malformed"}}
+	resolve := registry.Lift{Name: "resolve", Description: "Orders the cells so that each comes after the cells it refers to.", Input: parsed, Product: graph, Owned: true, Corpora: corpora, Outputs: errorTxt, Rejects: []string{"circular", "dangling"}}
 	used := parse
 	used.Owned = false
-	suite := func(name, desc, consumes string, rejects ...string) registry.Suite {
-		return registry.Suite{Name: name, Description: desc, Consumes: consumes, Corpora: corpora, Rejects: rejects}
+	suite := func(name, desc, consumes, output, outputDesc string, rejects ...string) registry.Suite {
+		return registry.Suite{Name: name, Description: desc, Consumes: consumes, Corpora: corpora,
+			Outputs: []registry.Output{{Pattern: output, Description: outputDesc}}, Rejects: rejects}
 	}
+	evaluate := suite("evaluate", "Evaluates every cell of the sheet.", graph, "values.txt", "Each cell's value, one per line, in cell order.")
+	evaluate.Classifier = &registry.Classifier{Name: "div-zero", Description: "Adds div-zero when some cell divides by zero."}
 	return map[string]string{
 		"go.mod": "module example.com/sheets\n\ngo 1.27\n",
 		"step09/testdata/hypercase.json": string(registry.Registry{
-			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", RootPackage: true,
-			IssueLinks: links, Properties: props, Types: []registry.Type{sheet},
+			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", RootPackage: true, Codes: true,
+			IssueLinks: links, Properties: props, Types: []registry.Type{owner},
 			Lifts:  []registry.Lift{parse, resolve},
-			Suites: []registry.Suite{suite("evaluate", "Evaluates every cell of the sheet.", graph)},
+			Suites: []registry.Suite{evaluate},
 		}.Marshal()),
 		"step09/format/testdata/hypercase.json": string(registry.Registry{
-			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", IssueLinks: links, Properties: props, Types: []registry.Type{sheet},
+			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", Codes: true, IssueLinks: links, Properties: props, Types: []registry.Type{sheet},
 			Lifts:  []registry.Lift{used},
-			Suites: []registry.Suite{suite("format", "Prints each formula back in canonical form.", parsed)},
+			Suites: []registry.Suite{suite("format", "Prints each formula back in canonical form.", parsed, "formulas.txt", "Each formula, in canonical form, one per line.")},
 		}.Marshal()),
 		"step09/cli/testdata/hypercase.json": string(registry.Registry{
-			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", IssueLinks: links, Properties: props, Types: []registry.Type{sheet},
-			Suites: []registry.Suite{suite("calc", "Runs the calc command on the sheet; see sheets#12.", sheet.GoType, "circular", "dangling", "malformed")},
+			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", Codes: true, IssueLinks: links, Properties: props, Types: []registry.Type{sheet},
+			Suites: []registry.Suite{suite("calc", "Runs the calc command on the sheet; see sheets#12.", sheet.GoType, "stdout.txt", "What calc prints: each cell's value, as one CSV line.", "circular", "dangling", "malformed")},
 		}.Marshal()),
 	}
 }
@@ -242,6 +252,20 @@ calc A negative number is valid. Waits on sheets#3.
 A1: unexpected "-"
 -- out/evaluate/outcome --
 rejected S101
+-- variant/positive/about --
+A1 is 3, which every column reads.
+-- variant/positive/in/sheet/A1 --
+3
+-- variant/positive/out/calc/error.txt --
+runtime error: index out of range [1] with length 1
+-- variant/positive/out/calc/outcome --
+panicked
+-- variant/positive/out/evaluate/outcome --
+accepted
+-- variant/positive/out/evaluate/values.txt --
+A1 3
+-- variant/positive/out/format/outcome --
+skipped no formulas
 `
 
 const divA = `C1 divides A1 by B1, which is zero.

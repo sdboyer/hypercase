@@ -1,0 +1,29 @@
+{
+  "format": 5,
+  "updateVar": "SHEETS_UPDATE_GOLDEN",
+  "corpusRoot": "step03",
+  "rootPackage": true,
+  "codes": false,
+  "issueLinks": [],
+  "properties": [],
+  "types": [],
+  "lifts": [],
+  "suites": [
+    {
+      "name": "evaluate",
+      "description": "Evaluates every cell of the sheet.",
+      "consumes": "io/fs.FS",
+      "corpora": [
+        "sheet"
+      ],
+      "outputs": [
+        {
+          "pattern": "values.txt",
+          "description": "Each cell's value, one per line, in cell order."
+        }
+      ],
+      "rejects": [],
+      "classifier": null
+    }
+  ]
+}
