@@ -1,17 +1,18 @@
-// Package shell quotes words for a POSIX shell, so that a command a
-// message gives runs as it reads when it is pasted. It doesn't import
-// testing.
+// Package shell quotes words for a shell, so that a command a message
+// gives reads as itself when it is pasted: in a POSIX shell, and in zsh,
+// macOS's default shell. It doesn't import testing.
 package shell
 
 import "strings"
 
-// Quote returns s as one word of a POSIX shell command: as it is when it
-// is not empty and each of its bytes is one no shell reads specially, and
-// otherwise in single quotes, with each single quote in it written as
+// Quote returns s as one word of a shell command: as it is when it is not
+// empty, each of its bytes is one no shell reads specially, and its first
+// isn't =, which zsh reads as a command to look up; and otherwise in
+// single quotes, with each single quote in it written as
 //
 //	'\''
 func Quote(s string) string {
-	if s != "" && strings.IndexFunc(s, special) < 0 {
+	if s != "" && s[0] != '=' && strings.IndexFunc(s, special) < 0 {
 		return s
 	}
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
