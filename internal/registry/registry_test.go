@@ -162,19 +162,22 @@ func TestParseAny(t *testing.T) {
 const keysVar = "HYPERCASE_UPDATE_GOLDEN"
 
 // frozenKeys holds the SHA-256 sum of testdata/keys-<N>.txt for each format
-// N below today's. A format that is no longer today's is history: some
-// commit of main holds registries of it, and its keys never change. When
-// Format is bumped, the format it was joins the table.
+// N from Oldest to today's. A format that is no longer today's is history:
+// some commit of main holds registries of it, and its keys never change.
+// Today's keys change only with its sum, by hand: once a commit of main
+// holds today's format, a change to its keys is a new format, which only
+// the person changing them knows, so no update rewrites the sum.
 var frozenKeys = map[int]string{
 	3: "5de45696f0737fd8e97d96e72ad6d26e45ab1daac642f49933226e152e590760",
 	4: "504994ef22efd44b15d7ac406d4f8d1be76d1c6c4ebc07a8451d89fd9f1c1e95",
 	5: "ee647b477b5596ed4f4377538de3840c72a76c139300f735db39d12b15b2f3ed",
+	6: "8296bfb2da3b7ab45e4e249079e81a8f51cc23de8fb2a204e4632029c3e662e4",
 }
 
 // TestFormatKeys: testdata/keys-<N>.txt holds the key paths of a registry
-// of format N, each written while its format was today's, and frozen, by
-// its sum in frozenKeys, once it isn't. ParseAny's added table is what
-// they say each format added. No format drops a key
+// of format N, as encoding/json writes them, each written while its format
+// was today's, and frozen by its sum in frozenKeys, today's too. ParseAny's
+// added table is what they say each format added. No format drops a key
 // an older one holds. A key a format adds, whose parent the format before
 // it holds, is in added, at that format. A registry of each format, holding
 // every key its format holds, reads, and with any key a later format
@@ -182,7 +185,7 @@ var frozenKeys = map[int]string{
 // format that added it. HYPERCASE_UPDATE_GOLDEN=1 writes today's format's
 // keys.
 func TestFormatKeys(t *testing.T) {
-	now := []byte(strings.Join(keyPaths(reflect.TypeFor[Registry](), ""), "\n") + "\n")
+	now := []byte(strings.Join(keyPaths(t, reflect.TypeFor[Registry]()), "\n") + "\n")
 	golden := func(f int) string { return filepath.Join("testdata", fmt.Sprintf("keys-%d.txt", f)) }
 	if os.Getenv(keysVar) == "1" {
 		if err := os.WriteFile(golden(Format), now, 0o644); err != nil {
@@ -198,16 +201,21 @@ func TestFormatKeys(t *testing.T) {
 		if f == Format && !bytes.Equal(data, now) {
 			t.Errorf("a registry's keys are not those of format %d (-%s +today):\n%s\nA change to them is a new format, unless no commit of main holds format %d: bump Format if one does, give added what the change adds, and run %s=1 go test ./... to write the keys.", Format, golden(f), diff.Lines(data, now), Format, keysVar)
 		}
-		if sum := fmt.Sprintf("%x", sha256.Sum256(data)); f < Format && frozenKeys[f] == "" {
+		switch sum := fmt.Sprintf("%x", sha256.Sum256(data)); {
+		case frozenKeys[f] == "" && f < Format:
 			t.Errorf("format %d is below today's, %d, and frozenKeys has no sum of its keys, %s.\nGive frozenKeys %d: %q, the sum of the keys format %d held while it was today's.", f, Format, golden(f), f, sum, f)
-		} else if f < Format && sum != frozenKeys[f] {
+		case frozenKeys[f] == "":
+			t.Errorf("frozenKeys has no sum of today's format's keys, %s.\nGive frozenKeys %d: %q, once the keys are those format %d holds.", golden(f), f, sum, f)
+		case sum != frozenKeys[f] && f < Format:
 			t.Errorf("%s changed: format %d is below today's, %d, so its keys are history, and frozenKeys has the sum %s, where the file's is %s.\nRestore the keys whose sum frozenKeys holds. A change to a registry's keys is a new format.", golden(f), f, Format, frozenKeys[f], sum)
+		case sum != frozenKeys[f]:
+			t.Errorf("%s changed: frozenKeys has the sum %s of today's format's keys, where the file's is %s.\nIf a commit of main holds format %d, the change is a new format: restore the keys, bump Format, give added what the change adds, and run %s=1 go test ./... to write the new format's keys. If none does, give frozenKeys %d: %q.", golden(f), frozenKeys[f], sum, f, keysVar, f, sum)
 		}
 		keys[f] = strings.Fields(string(data))
 	}
 	for _, f := range slices.Sorted(maps.Keys(frozenKeys)) {
-		if f >= Format || f < Oldest {
-			t.Errorf("frozenKeys has a sum for format %d, and freezes only the formats from Oldest, %d, below today's, %d.", f, Oldest, Format)
+		if f > Format || f < Oldest {
+			t.Errorf("frozenKeys has a sum for format %d, and freezes only the formats from Oldest, %d, to today's, %d.", f, Oldest, Format)
 		}
 	}
 
@@ -236,7 +244,7 @@ func TestFormatKeys(t *testing.T) {
 		t.Errorf("added holds %v, and the formats' keys say each format added %v, in format order.\nGive added each key a format adds, whose parent the format before it holds, at that format. A key added at today's format, %d, is a new format if a commit of main holds format %d: then bump Format, give added the key at the new format, and run %s=1 go test ./... to write its keys.", table, adds, Format, Format, keysVar)
 	}
 
-	full := fullValue(reflect.TypeFor[Registry]())
+	full := fullValue(t, reflect.TypeFor[Registry]())
 	for f := Oldest; f <= Format; f++ {
 		holds := func(more string) func(string) bool {
 			return func(k string) bool {
@@ -269,31 +277,29 @@ func TestFormatKeys(t *testing.T) {
 	}
 }
 
-// keyPaths returns the JSON key paths of a registry of type t, sorted: a
-// field's key, under its parent's as parent.key, or parent[].key when the
-// parent is a list.
-func keyPaths(t reflect.Type, prefix string) []string {
+// keyPaths returns the key paths of what encoding/json writes for a
+// registry with every field set, sorted: a key, under its parent's as
+// parent.key, parent[].key under a list, and parent.*.key under a map.
+func keyPaths(t *testing.T, typ reflect.Type) []string {
+	t.Helper()
 	var out []string
-	for f := range t.Fields() {
-		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
-		if name == "" || name == "-" {
-			continue
-		}
-		key := prefix + name
-		out = append(out, key)
-		ft, sub := f.Type, key+"."
-		if ft.Kind() == reflect.Slice {
-			ft, sub = ft.Elem(), key+"[]."
-		}
-		if ft.Kind() == reflect.Pointer {
-			ft = ft.Elem()
-		}
-		if ft.Kind() == reflect.Struct {
-			out = append(out, keyPaths(ft, sub)...)
+	var walk func(v any, prefix string)
+	walk = func(v any, prefix string) {
+		switch v := v.(type) {
+		case map[string]any:
+			for k, c := range v {
+				out = append(out, prefix+k)
+				walk(c, prefix+k+".")
+			}
+		case []any:
+			for _, c := range v {
+				walk(c, strings.TrimSuffix(prefix, ".")+"[].")
+			}
 		}
 	}
+	walk(fullValue(t, typ), "")
 	slices.Sort(out)
-	return out
+	return slices.Compact(out)
 }
 
 // parentKey returns the key path of the key that holds k, or "" for a key
@@ -306,30 +312,88 @@ func parentKey(k string) string {
 	return strings.TrimSuffix(k[:i], "[]")
 }
 
-// fullValue returns a JSON value of type t that holds every key, with one
-// element in each list.
-func fullValue(t reflect.Type) any {
-	switch t.Kind() {
-	case reflect.Pointer:
-		return fullValue(t.Elem())
-	case reflect.Struct:
-		m := map[string]any{}
-		for f := range t.Fields() {
-			if name, _, _ := strings.Cut(f.Tag.Get("json"), ","); name != "" && name != "-" {
-				m[name] = fullValue(f.Type)
-			}
-		}
-		return m
-	case reflect.Slice:
-		return []any{fullValue(t.Elem())}
-	case reflect.String:
-		return "x"
-	case reflect.Bool:
-		return true
-	case reflect.Int:
-		return 1
+// fullValue returns what encoding/json writes for a registry of type typ
+// with every field set, read back as JSON values: every key, with one
+// element in each list and map.
+func fullValue(t *testing.T, typ reflect.Type) any {
+	t.Helper()
+	data, err := json.Marshal(populated(typ).Interface())
+	if err != nil {
+		t.Fatal(err)
 	}
-	panic("no JSON value for " + t.String())
+	var v any
+	if err := json.Unmarshal(data, &v); err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+// populated returns a value of type typ with every field set: each string
+// "x", each map's one key "*", each bool true and each number 1, each list
+// and map holding one element, and each pointer pointing at one. It panics
+// on a field encoding/json doesn't write, and on a kind a registry can't
+// hold.
+func populated(typ reflect.Type) reflect.Value {
+	v := reflect.New(typ).Elem()
+	switch typ.Kind() {
+	case reflect.Struct:
+		for f := range typ.Fields() {
+			if !f.IsExported() {
+				panic("the unexported field " + f.Name + " of " + typ.String() + ": a registry type holds none")
+			}
+			v.FieldByIndex(f.Index).Set(populated(f.Type))
+		}
+	case reflect.Pointer:
+		v.Set(reflect.New(typ.Elem()))
+		v.Elem().Set(populated(typ.Elem()))
+	case reflect.Slice:
+		v.Set(reflect.Append(v, populated(typ.Elem())))
+	case reflect.Map:
+		if typ.Key().Kind() != reflect.String {
+			panic("no registry key of " + typ.String())
+		}
+		v.Set(reflect.MakeMap(typ))
+		v.SetMapIndex(reflect.ValueOf("*").Convert(typ.Key()), populated(typ.Elem()))
+	case reflect.String:
+		v.SetString("x")
+	case reflect.Bool:
+		v.SetBool(true)
+	case reflect.Int:
+		v.SetInt(1)
+	default:
+		panic("no registry value of " + typ.String())
+	}
+	return v
+}
+
+// TestKeyPaths: keyPaths reads each key as encoding/json writes it,
+// through nested structs, pointers, lists and maps: an embedded struct's
+// keys among its parent's, a field with no tag by its Go name, one tagged
+// only with options by its Go name too, and one tagged "-," as "-". A field
+// tagged "-" holds no key.
+func TestKeyPaths(t *testing.T) {
+	type inner struct {
+		A string `json:"a"`
+	}
+	type Embedded struct {
+		E string `json:"e"`
+	}
+	type entry struct {
+		Embedded
+		Plain  string
+		Opts   string           `json:",omitempty"`
+		Dash   string           `json:"-,"`
+		Hidden string           `json:"-"`
+		Nested inner            `json:"nested"`
+		Ptr    *inner           `json:"ptr"`
+		List   []inner          `json:"list"`
+		Map    map[string]inner `json:"map"`
+		Count  int              `json:"count,omitempty"`
+	}
+	want := []string{"-", "Opts", "Plain", "count", "e", "list", "list[].a", "map", "map.*", "map.*.a", "nested", "nested.a", "ptr", "ptr.a"}
+	if got := keyPaths(t, reflect.TypeFor[entry]()); !slices.Equal(got, want) {
+		t.Errorf("keyPaths:\n got %q\nwant %q", got, want)
+	}
 }
 
 // shape returns v holding only the keys that holds holds, and null for the
