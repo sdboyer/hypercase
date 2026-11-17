@@ -2465,15 +2465,29 @@ The command takes the flags `-root` and `-text`. The patterns are
 `decl.Project`'s `IssueLinks` field, a list of `decl.IssueLink`, each a
 regular expression and a URL template.
 
-This step's snippets come from no example yet: no directory under
-`walkthrough/` holds them, and the doc golden checks none of them.
+`walkthrough/sheets/step09/sheetcorpus/project.go` gives the project its
+`IssueLinks`, for the tracker that `negative`'s `gaps` lines name:
 
+<!-- source: walkthrough/sheets/step09/sheetcorpus/project.go#project -->
 ```go
-// sheetcorpus/project.go: Project gains
+var Project = decl.Project{
+	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
+	RenderError: renderError,
+	Codes: func(err error) []string {
+		var e *sheet.Error
+		if errors.As(err, &e) {
+			return []string{e.Code}
+		}
+		return nil
+	},
 	IssueLinks: []decl.IssueLink{
 		{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/issues/$1"},
 	},
+}
 ```
+
+On a branch, in the directory of a package whose registry records the
+corpus root:
 
 ```sh
 hypercase report "$(git merge-base main HEAD)" HEAD > report.html
@@ -2483,57 +2497,59 @@ hypercase report -text "$(git merge-base main HEAD)" HEAD
 ### How the files change
 
 No archive changes. `hypercase.json` gains the link patterns. The report is
-a file the person reads; nothing commits it.
+for the person to read, and a project needn't commit it.
+
+`walkthrough/sheets/step09/report_test.go` runs both commands as a person
+does on a branch. In a scratch repository, it runs the update on the toy at
+step 9 and commits it on `main`, makes a change on a branch, runs the update
+again, commits again, and runs the report in `step09/`. Its commits hold
+what the report reads: `go.mod`, the registries and the archives. The
+change makes three edits:
+
+- `calc` gains a classifier, `warned`, which adds `warned` to the outcome
+  of each cell where calc writes a warning.
+- The archive `blank` is renamed `empty`.
+- The sheet package words a file that is not a cell as
+  `notes: not the name of a cell`, where it said `notes: not a cell name`.
+
+The example commits what the report writes as its test's goldens, so that
+the walkthrough can show it: the plain text, below, and the page,
+`walkthrough/sheets/step09/testdata/report.html`, too long to show here,
+which a browser opens as it is.
 
 The report reads each archive as each revision commits it.
-`testdata/sheet/loop.txtar` holds two of the cells the sample below reports.
-With every other column left out, at `<a>`:
+`testdata/sheet/notes.txtar` holds two of the cells the sample below
+reports. At `<a>`:
 
+<!-- source: walkthrough/sheets/step09/testdata/sheet/notes.txtar -->
 ```
-A1 and B1 refer to each other.
+A note kept beside the cells, in a file that is not a cell.
 -- in/sheet/A1 --
-=B1
--- in/sheet/B1 --
-=A1
+1
+-- in/sheet/notes --
+remember the milk
 -- properties --
-circular
+malformed
 -- out/calc/error.txt --
-A1 -> B1 -> A1: cycle
-  sheet/A1:1: =B1
-  sheet/B1:1: =A1
+notes: not a cell name
+  sheet/notes
 -- out/calc/outcome --
-rejected S201
--- out/resolve/error.txt --
-A1 -> B1 -> A1: cycle
-  sheet/A1:1: =B1
-  sheet/B1:1: =A1
+rejected S101
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/parse/error.txt --
+notes: not a cell name
+  sheet/notes
+-- out/parse/outcome --
+rejected S101
 -- out/resolve/outcome --
-rejected S201
+blocked parse
 ```
 
-and at `<b>`, where a cycle is worded `cycle: A1 -> B1 -> A1`:
-
-```
-A1 and B1 refer to each other.
--- in/sheet/A1 --
-=B1
--- in/sheet/B1 --
-=A1
--- properties --
-circular
--- out/calc/error.txt --
-cycle: A1 -> B1 -> A1
-  sheet/A1:1: =B1
-  sheet/B1:1: =A1
--- out/calc/outcome --
-rejected S201
--- out/resolve/error.txt --
-cycle: A1 -> B1 -> A1
-  sheet/A1:1: =B1
-  sheet/B1:1: =A1
--- out/resolve/outcome --
-rejected S201
-```
+and at `<b>`, each `error.txt` starts `notes: not the name of a cell`, under
+the same outcome.
 
 ### Rules
 
@@ -2651,30 +2667,41 @@ place, where it has one, then what it is. Then one heading per rank that has
 changes, in rank order. Under it, one line per cell: its case, its column,
 and its outcome, or the change in it. So `outcome` is never listed as a
 file. Under each cell, one line per other file of the cell that was added,
-changed or removed. For a change that adds the archive `ratio`, whose `C1`
-is `=A1/B1` with `A1` at `6` and `B1` at `2`, and words a cycle as
-`cycle: A1 -> B1 -> A1`, with the transforms' variants left out:
+changed or removed. For the example's change,
+`walkthrough/sheets/step09/testdata/report.txt`:
 
+<!-- source: walkthrough/sheets/step09/testdata/report.txt -->
 ```
+outcome changed
+  sheet/divide calc: accepted -> accepted warned
+  sheet/divide/transform/renamed calc: accepted -> accepted warned
 appeared
-  sheet/ratio calc: accepted
-    stdout.txt added
-  sheet/ratio evaluate: accepted
-    values.txt added
-  sheet/ratio format: accepted
-    formulas.txt added
-  sheet/ratio parse: accepted
-  sheet/ratio resolve: accepted
+  sheet/empty calc: rejected S101
+    error.txt added
+  sheet/empty evaluate: blocked parse
+  sheet/empty format: blocked parse
+  sheet/empty parse: rejected S101
+    error.txt added
+  sheet/empty resolve: blocked parse
+disappeared
+  sheet/blank calc: rejected S101
+    error.txt removed
+  sheet/blank evaluate: blocked parse
+  sheet/blank format: blocked parse
+  sheet/blank parse: rejected S101
+    error.txt removed
+  sheet/blank resolve: blocked parse
 bytes changed
-  sheet/loop calc: rejected S201
+  sheet/notes calc: rejected S101
     error.txt changed
-  sheet/loop resolve: rejected S201
-    error.txt changed
-  sheet/twice/variant/cycle calc: rejected S201
-    error.txt changed
-  sheet/twice/variant/cycle resolve: rejected S201
+  sheet/notes parse: rejected S101
     error.txt changed
 ```
+
+A renamed archive's cells are new cells: the report knows a case by its
+name, so `blank`'s cells disappear and `empty`'s appear, with the same
+files. `blank` states `malformed`, which neither transform gives or keeps,
+so neither makes a variant of it, and only its base's cells move.
 
 ### What can now be seen
 
