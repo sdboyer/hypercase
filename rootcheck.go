@@ -303,6 +303,39 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 		t.Errorf("the registries that own or use the lift %s differ in %s:\n%s\nEvery package that owns or uses a lift registers one declaration of it: %s. Declare the lift once, in a package the others import, and register that declaration. %s", name, andList(differ), strings.Join(blocks, "\n"), why, stale)
 	}
+	// A package that uses a lift reaches it from each corpus by the path
+	// the lift's owner records, so that the lift's cells the owner writes
+	// are the ones the user's cells past it are built through, as a corpus
+	// check reads them on a cell's Path. A lift with no owner, or two, has
+	// no one path to compare with, and fails above.
+	for _, name := range slices.Sorted(maps.Keys(liftEntries)) {
+		var owners, users []liftEntry
+		for _, e := range liftEntries[name] {
+			if e.lift.Owned {
+				owners = append(owners, e)
+			} else {
+				users = append(users, e)
+			}
+		}
+		if len(owners) != 1 {
+			continue
+		}
+		owner := owners[0]
+		owned := map[string][]string{} // corpus → the owner's path from it
+		for _, p := range owner.lift.Paths {
+			owned[p.Corpus] = p.Lifts
+		}
+		for _, u := range users {
+			for _, p := range u.lift.Paths {
+				switch lifts, ok := owned[p.Corpus]; {
+				case !ok:
+					t.Errorf("the lift %s is used by %s on the path %s, and %s, which owns it, doesn't run it over testdata/%s/, so no package writes its cells of that corpus's cases, which %s's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does. Register in %s the corpus type of testdata/%s/ and the lifts on the path, each with hypercase.Own or hypercase.Use. If %s does already, a registry is stale: run %s, which rewrites the registry of every package with tests.", name, u.pkg, route(p.Corpus, p.Lifts, name), owner.pkg, p.Corpus, u.pkg, owner.pkg, p.Corpus, owner.pkg, r.updateCmd())
+				case !slices.Equal(lifts, p.Lifts):
+					t.Errorf("the lift %s is used by %s on the path %s, and %s, which owns it, runs it on the path %s, so no package writes the cells of %s that %s's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does. Register the same lifts between testdata/%s/ and %s in %s and %s, owning each in one package and using it in the other. If they do already, a registry is stale: run %s, which rewrites the registry of every package with tests.", name, u.pkg, route(p.Corpus, p.Lifts, name), owner.pkg, route(p.Corpus, lifts, name), name, u.pkg, p.Corpus, name, owner.pkg, u.pkg, r.updateCmd())
+				}
+			}
+		}
+	}
 
 	// The archives, and the directories that hold them.
 	td := filepath.Join(r.corpusRoot, "testdata")
@@ -435,11 +468,23 @@ type liftEntry struct {
 	lift registry.Lift
 }
 
+// route shows a lift's path from a corpus, as a registry records it, from
+// the corpus to the lift: testdata/export/ → import → parse.
+func route(corpus string, lifts []string, lift string) string {
+	s := "testdata/" + corpus + "/"
+	for _, l := range slices.Backward(lifts) {
+		s += " → " + l
+	}
+	return s + " → " + lift
+}
+
 // liftFields are the fields of a lift's registry entry that every registry
 // that owns or uses the lift records alike, each by its name in the
 // registry and as the root-package check shows it. Whether a package owns
 // the lift differs between them, and so may the corpora that reach it,
-// and the paths from them.
+// and the paths from them, where the owner runs the lift over each corpus
+// a user reaches it from, by the user's path, which rootCheck compares
+// apart.
 var liftFields = []struct {
 	name  string
 	value func(registry.Lift) string

@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/fs"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/sdboyer/hypercase"
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
+	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/jenny"
 )
 
@@ -716,4 +718,84 @@ func TestTopologyOrders(t *testing.T) {
 		t.Errorf("the orders only a chain of more than %d lifts gives are\n%q\nand ordersPastMaxChain lists\n%q", maxChain, past, ordersPastMaxChain)
 	}
 	t.Logf("the topology grids give %d of the %d orders any chain gives", len(realized), len(possible))
+}
+
+// TestTopologyPaths: over every topology, and transformGrid's, the
+// registry of each package records each column's paths as the chain gives
+// them: one from testdata/top0/, and one from the corpus type of each
+// bytes lift before the column, each naming the lifts between, nearest the
+// column first. And a normal run of each package passes after the first
+// update, so the root-package check finds no package that reaches a lift
+// it uses otherwise than the lift's owner: in a topology, a package
+// registers every corpus type of the chain, and uses each lift on its
+// columns' paths that it doesn't own.
+func TestTopologyPaths(t *testing.T) {
+	t.Parallel()
+	tps := append(topologies(), topology{kinds: "NB", owners: "aaa", transform: true})
+	for _, tp := range tps {
+		t.Run(tp.name(), func(t *testing.T) {
+			t.Parallel()
+			n := len(tp.kinds)
+			name := func(j int) string {
+				if j == n+1 {
+					return "list"
+				}
+				return fmt.Sprintf("l%d", j)
+			}
+			// want is the paths of the column at position j, list's past
+			// the chain.
+			want := func(j int) []registry.Path {
+				var ps []registry.Path
+				for k := range j {
+					if k > 0 && tp.kinds[k-1] != 'B' {
+						continue
+					}
+					p := registry.Path{Corpus: fmt.Sprintf("top%d", k), Lifts: []string{}}
+					for m := j - 1; m > k; m-- {
+						p.Lifts = append(p.Lifts, name(m))
+					}
+					ps = append(ps, p)
+				}
+				return ps
+			}
+			s := newSandbox(t, "")
+			at := topologyTree(tp.kinds, 0, n+1)
+			s.write("testdata/top0/base.txtar", fmt.Appendf(nil, "A chain of lifts, each following its tree.\n-- in/%sA1 --\n1\n-- in/%sB1 --\n2\n", at, at), "the topology's base")
+			g := closingGrid{pkgs: []childRun{{pkg: "", registration: tp.registration('a')}}}
+			regs := []string{"testdata/hypercase.json"}
+			if strings.Contains(tp.owners, "b") {
+				s.write("b/corpus_test.go", []byte(packageTestFile), "./b is a package with tests")
+				g.pkgs = append(g.pkgs, childRun{pkg: "b", registration: tp.registration('b')})
+				regs = append(regs, "b/testdata/hypercase.json")
+			}
+			for _, update := range []bool{true, false} {
+				for i, r := range g.runAll(s, update, "") {
+					if !r.ok() {
+						t.Fatalf("the run of %q, with update %v, failed:\n%s", g.pkgs[i].pkg, update, s.shown(r))
+					}
+				}
+			}
+			for _, reg := range regs {
+				g, err := registry.Parse(s.read(reg))
+				if err != nil {
+					t.Fatal(err)
+				}
+				got := map[string][]registry.Path{}
+				for _, l := range g.Lifts {
+					got[l.Name] = l.Paths
+				}
+				for _, c := range g.Suites {
+					got[c.Name] = c.Paths
+				}
+				if len(got) == 0 {
+					t.Errorf("%s records no column", reg)
+				}
+				for j := 1; j <= n+1; j++ {
+					if ps, ok := got[name(j)]; ok && !reflect.DeepEqual(ps, want(j)) {
+						t.Errorf("%s records %s's paths as %+v, and the chain gives %+v", reg, name(j), ps, want(j))
+					}
+				}
+			}
+		})
+	}
 }

@@ -339,6 +339,18 @@ var chainRegistrations = map[string]func(){
 	"chain-a-paths":  func() { chain(project, exportType, own(importLift, parse, resolve, pathsCheck)) },
 	"chain-b":        func() { chainB(project) },
 	"chain-a-render": func() { chain(projectRender, exportType, own(importLift, parse, resolve)) },
+	// used-fewer-a and -b reach parse and resolve otherwise: . owns them
+	// over script alone, and ./b, which uses them, reaches them from
+	// export too, through import, which it owns.
+	"used-fewer-a": func() { chain(project, own(parse, resolve, pathsCheck)) },
+	// used-fewer-a-fixed reaches parse and resolve from export as ./b
+	// does, by using import.
+	"used-fewer-a-fixed": func() {
+		chain(project, plainExportType, own(parse, resolve, pathsCheck), hypercase.Use(importLift))
+	},
+	"used-fewer-b": func() {
+		hypercase.Register(append([]any{project, scriptType, plainExportType, own(importLift, evaluate), hypercase.Use(parse, resolve)}, chainProps...)...)
+	},
 	"chain-b-render": func() { chainB(projectRender) },
 	// chain-b-nooutputs is chain-b with a copy of import that declares no
 	// outputs.

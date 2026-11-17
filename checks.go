@@ -62,8 +62,11 @@ type Cell struct {
 	// column's package records them: resolve, then parse, for evaluate's
 	// cell of a sheet, and past a bytes lift, resolve, parse, then import,
 	// for its cell of a CSV that import makes a sheet of. Each is a lift's
-	// column, and its cell of the case is one the cell is built through.
-	// Path is empty for a column that consumes its corpus type.
+	// column. Where the root-package check passes, each lift's cell of the
+	// case is the one the cell is built through: a package that uses a lift
+	// reaches it from each corpus by the path the lift's owner records.
+	// Path is empty for a column that consumes its corpus type, and for a
+	// suite that runs over its Corpus's raw input views.
 	Path []string
 	// Properties are what the case states: the base's properties, a
 	// hand-written variant's own, or what a transform gives and each
@@ -234,8 +237,9 @@ func (r *runner) orphanFindings(t *testing.T) {
 // written, then its transforms' by name, then column. A registry or an
 // archive that can't be read, or a cell's outcome, is an error, and so is
 // a column whose registry entry doesn't give one path from each of its
-// corpora, and a transform's variant whose properties can't be known: one
-// no corpus type lists, or one its transform declines.
+// corpora, or names on a path a lift the registry doesn't list, and a
+// transform's variant whose properties can't be known: one no corpus type
+// lists, or one its transform declines.
 func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 	// A col is a column over one corpus, and its path from the corpus.
 	type col struct {
@@ -258,9 +262,21 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 			return nil, fmt.Errorf("%s: %w", r.rel(f.Path), err)
 		}
 		pkg := r.pkgName(f.Pkg)
+		stale := fmt.Sprintf("The registry is stale, or edited by hand: run %s, which rewrites the registry of every package with tests", r.updateCmd())
+		lifts := map[string]bool{}
+		for _, l := range g.Lifts {
+			lifts[l.Name] = true
+		}
 		add := func(e Entry, corpora []string, paths []registry.Path) error {
 			if from := pathCorpora(paths); !slices.Equal(from, corpora) {
-				return fmt.Errorf("%s: the %s %s runs over %s, and has paths from %s. A registry gives each column one path from each corpus it runs over, in the same order", r.rel(f.Path), e.Kind, e.Name, dirList(corpora), dirList(from))
+				return fmt.Errorf("%s: the %s %s runs over %s, and has paths from %s, where a registry gives each column one path from each corpus it runs over, in the same order. %s", r.rel(f.Path), e.Kind, e.Name, dirList(corpora), dirList(from), stale)
+			}
+			for _, p := range paths {
+				for _, name := range p.Lifts {
+					if !lifts[name] {
+						return fmt.Errorf("%s: the %s %s's path from testdata/%s/ names %s, which the registry lists no lift of, where every lift on a column's path is one its package registers. %s", r.rel(f.Path), e.Kind, e.Name, p.Corpus, name, stale)
+					}
+				}
 			}
 			for i, corpus := range corpora {
 				columns[corpus] = append(columns[corpus], col{e, paths[i].Lifts})

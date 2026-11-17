@@ -62,6 +62,7 @@ $ go test  # two-types-paths
           grid format: through grid-parse
           grid grid-parse: through no lift
         - script format: through parse
+        + script format: grid-parse has no cell of script/a
         + script format: through grid-parse
           script parse: through no lift
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.

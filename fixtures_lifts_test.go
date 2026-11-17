@@ -265,6 +265,19 @@ var liftRegistrations = map[string]func(){
 	},
 	"ladder-b":      func() { hypercase.Register(project, scriptType, hypercase.Use(parse), own(outline)) },
 	"ladder-b-owns": func() { hypercase.Register(project, malformed, scriptType, own(parse, outline)) },
+	// ladder-b-producer uses resolve, and reaches it through parse2, a
+	// copy of parse it owns, where ., as ladder-a-paths, owns parse and
+	// resolve.
+	"ladder-b-producer": func() {
+		p := parse
+		p.Name = "parse2"
+		hypercase.Register(append([]any{project, scriptType, own(p, evaluate), hypercase.Use(resolve)}, ladderProps...)...)
+	},
+	// ladder-b-shared-producer reaches resolve as . does, by using parse.
+	"ladder-b-shared-producer": func() {
+		hypercase.Register(append([]any{project, scriptType, own(evaluate), hypercase.Use(parse, resolve)}, ladderProps...)...)
+	},
+	"ladder-a-paths": func() { ladder(project, parse, resolve, pathsCheck) },
 	// ladder-b-suite owns a suite named parse, which follows the outline/
 	// tree.
 	"ladder-b-suite": func() { hypercase.Register(project, scriptType, own(steered[Script]("parse", "outline"))) },

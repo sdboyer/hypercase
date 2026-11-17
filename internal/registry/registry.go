@@ -163,14 +163,16 @@ type Suite struct {
 }
 
 // A Path is the path of lifts a column's input passes through from one
-// corpus type: the one path the package plans from it.
+// corpus type, the one path the package plans from it, or from a suite's
+// Corpus.
 type Path struct {
-	// Corpus is the corpus type's directory, under the corpus root's
-	// testdata/.
+	// Corpus is the corpus type's directory, or the suite's Corpus, under
+	// the corpus root's testdata/.
 	Corpus string `json:"corpus"`
 	// Lifts names the path's lifts, the nearest to the column first: from
 	// a sheet to a *sheet.Graph, resolve, then parse. It is empty for a
-	// column that consumes the corpus type.
+	// column that consumes the corpus type, and for a suite over its
+	// Corpus's raw input views.
 	Lifts []string `json:"lifts"`
 }
 

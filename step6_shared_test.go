@@ -53,6 +53,33 @@ func TestRootCheckLifts(t *testing.T) {
 	s.done()
 }
 
+// TestRootCheckUsedPath: a package that uses a lift reaches it from each
+// corpus by the path the lift's owner records. Here . owns parse and
+// resolve, and ./b uses resolve, and reaches it through parse2, a copy of
+// parse it owns, so the cells of resolve that ./b's cells past it are
+// built through are cells no package writes, and the root-package check
+// fails. Each lift on a cell's path has a cell of the case, resolve's, so
+// the paths check finds no lift without one.
+func TestRootCheckUsedPath(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared-ladder")
+	s.passes(s.run("b", "ladder-b-producer", true))
+	s.passes(s.update("ladder-a-paths"))
+	s.cat("testdata/checks/paths.txt")
+	s.fails(s.normal("ladder-a-paths"), "the lift resolve is used by ./b on the path testdata/script/ → parse2 → resolve, and ., which owns it, runs it on the path testdata/script/ → parse → resolve, so no package writes the cells of resolve that ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does. Register the same lifts between testdata/script/ and resolve in . and ./b, owning each in one package and using it in the other. If they do already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
+	s.passes(s.run("b", "ladder-b-producer", false))
+
+	// ./b uses parse, as the message says, and a person removes parse2's
+	// cell, which no package writes now.
+	s.edit("testdata/script/x.txtar", "remove parse2's cell", drop("out/parse2/"))
+	s.passes(s.run("b", "ladder-b-shared-producer", true))
+	s.passes(s.update("ladder-a-paths"))
+	s.cat("testdata/checks/paths.txt")
+	s.passes(s.normal("ladder-a-paths"))
+	s.passes(s.run("b", "ladder-b-shared-producer", false))
+	s.done()
+}
+
 // TestRootCheckLiftOwnerUntested: a registry in a package with no _test.go
 // file owns nothing, though it still claims its sections. A column it and
 // another package own is the other's alone, and a lift it alone owns,

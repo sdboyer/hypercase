@@ -719,7 +719,8 @@ func TestCheckPaths(t *testing.T) {
 	})
 
 	// A path the registry records by hand fails a normal run, which
-	// compares the registry like a golden, and the check reads it.
+	// compares the registry like a golden, and the check reads it: format's
+	// cells of a script are built through grid-parse, which has none.
 	clean := s.read(reg)
 	g, err := registry.Parse(clean)
 	if err != nil {
@@ -731,7 +732,7 @@ func TestCheckPaths(t *testing.T) {
 		"testdata/hypercase.json differs from what the package registers (-committed +registered):",
 		"-             \"grid-parse\"\n+             \"parse\"",
 		"testdata/checks/paths.txt, the corpus check paths's findings, differs (-golden +got):",
-		"- script format: through parse\n+ script format: through grid-parse")
+		"- script format: through parse\n+ script format: grid-parse has no cell of script/a\n+ script format: through grid-parse")
 	s.write(reg, clean, "restore it")
 	s.passes(s.normal("two-types-paths"))
 	s.done()

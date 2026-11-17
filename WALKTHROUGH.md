@@ -1512,7 +1512,8 @@ blocked parse
 - There must be exactly one path to each consumed type, or the run fails
   before any case runs. The registry records that path, for each column
   and each corpus it runs over, as its lifts, nearest the column first. A
-  column that consumes a corpus type records a path with no lifts.
+  column that consumes a corpus type records a path with no lifts, and so
+  does a `Suite[fs.FS]` that names its `Corpus`.
 - Probes are distinct from corpus types: the type decides what a suite
   receives, and the probe decides whether a case is for it.
 - A suite's probe receives the value of the type the suite consumes, and
@@ -1533,6 +1534,14 @@ package owns every column it registers.
   with tests uses and none owns (step 5's rule for packages with no
   tests). A suite named like the lift owns no lift, and the check fails on
   the two as a collision, since lifts share the suites' column names.
+- A package that uses a lift reaches it from each corpus by the path the
+  lift's owner records, so the lift's cells the owner writes are the ones
+  the user's cells past it are built through. The root-package check fails
+  on a lift a package uses from a corpus its owner doesn't run it over,
+  and on one a package reaches by other lifts than its owner, as a copy of
+  `parse` under another name, owned by the package that uses `resolve`,
+  would. Each failure names both paths, or the corpus, and the lifts to
+  register.
 
 **Blocked cells.**
 
@@ -2428,10 +2437,12 @@ S202
   column, as its `Entry` is, so a check sees the path of another package's
   cells too, through the lifts that package uses, and plans none itself.
   Each lift on the path has a cell of the same case, the one the cell is
-  built through. A rule over what a cell is built on reads those cells: a
-  check that holds back a cell a `gaps` line marks can also hold back each
-  cell built through a lift's cell a line marks, since the cells past it
-  are still built on the lift's product.
+  built through, where the root-package check passes: a package that uses
+  a lift reaches it by the path its owner records (step 6). A rule over
+  what a cell is built on reads those cells: a check that holds back a
+  cell a `gaps` line marks can also hold back each cell built through a
+  lift's cell a line marks, since the cells past it are still built on the
+  lift's product.
 - A check sees every cell, frozen ones included: the framework exempts
   none, and each check decides. One that states a requirement over cells
   can excuse a cell with a `Gap`, so that a known gap and the requirement
@@ -2443,7 +2454,8 @@ S202
   package, and an update writes no findings. So does a transform's variant
   whose properties can't be known: one no corpus type lists, or one its
   transform declines. So does a registry that doesn't give a column one
-  path from each corpus it runs over, in their order.
+  path from each corpus it runs over, in their order, or that names on a
+  path a lift it doesn't list.
 - A check reads the cells as they are committed when it runs. The module's
   update runs packages at once, so a check can run before another package
   writes its cells: its findings can take a second update to settle, and a

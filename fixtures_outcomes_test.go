@@ -174,11 +174,16 @@ func cellCase(c hypercase.Cell) string {
 
 // pathsCheck lists the path of each column from each corpus, as each of
 // its cells gives it, so a cell whose path differs from its column's
-// others' adds a finding.
+// others' adds a finding, and each lift on a cell's path that has no cell
+// of the case.
 var pathsCheck = hypercase.Check{
 	Name:        "paths",
-	Description: "Lists the lifts each column's cells are built through, from each corpus.",
+	Description: "Lists the lifts each column's cells are built through, from each corpus, and each lift on a cell's path with no cell of the case.",
 	Run: func(cells []hypercase.Cell) ([]string, error) {
+		have := map[string]bool{} // "<case> <column>", for each cell
+		for _, c := range cells {
+			have[cellCase(c)+" "+c.Column] = true
+		}
 		var findings []string
 		for _, c := range cells {
 			through := "no lift"
@@ -186,6 +191,11 @@ var pathsCheck = hypercase.Check{
 				through = strings.Join(c.Path, ", ")
 			}
 			findings = append(findings, fmt.Sprintf("%s %s: through %s", c.Type, c.Column, through))
+			for _, l := range c.Path {
+				if !have[cellCase(c)+" "+l] {
+					findings = append(findings, fmt.Sprintf("%s %s: %s has no cell of %s", c.Type, c.Column, l, cellCase(c)))
+				}
+			}
 		}
 		return findings, nil
 	},
