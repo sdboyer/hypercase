@@ -5,7 +5,6 @@
 package walk
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -55,7 +54,9 @@ func IsFile(p string) bool {
 // testdata/<corpus>/<archive>.txtar under the root, where the corpus's
 // directory is not testdata/checks/, which holds corpus checks' findings,
 // and each name follows the naming rule. Only such an archive's cells
-// run, so only it is one an update writes. The error ends with the fix.
+// run, so only it is one an update writes. The error ends with the fix:
+// it is a [*PathError], but where the path can't be made relative to the
+// root.
 func CheckPath(root, path string) error {
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
@@ -69,24 +70,42 @@ func CheckPath(root, path string) error {
 	if err != nil {
 		return err
 	}
-	parts := strings.Split(filepath.ToSlash(rel), "/")
+	if e := ArchivePath(filepath.ToSlash(rel)); e != nil {
+		return e
+	}
+	return nil
+}
+
+// A PathError says why a path is no archive of the corpus root, and what
+// to do about it.
+type PathError struct {
+	Reason, Fix string
+}
+
+func (e *PathError) Error() string { return e.Reason + ". " + e.Fix }
+
+// ArchivePath is [CheckPath]'s rule for rel, a slash path relative to the
+// corpus root.
+func ArchivePath(rel string) *PathError {
+	parts := strings.Split(rel, "/")
 	file := parts[len(parts)-1]
 	name, isArchive := strings.CutSuffix(file, ".txtar")
+	const nameOne = "Name an archive of the corpus root, testdata/<corpus>/<archive>.txtar under it"
 	switch {
 	case parts[0] == ".." || parts[0] != "testdata" || len(parts) < 2:
-		return errors.New("it is not under the corpus root's testdata/, where a corpus's archives are. Name an archive of the corpus root, testdata/<corpus>/<archive>.txtar under it")
+		return &PathError{"it is not under the corpus root's testdata/, where a corpus's archives are", nameOne}
 	case !isArchive:
-		return fmt.Errorf("an archive's file name ends in .txtar, and %s doesn't. Name an archive of the corpus root, testdata/<corpus>/<archive>.txtar under it", file)
+		return &PathError{fmt.Sprintf("an archive's file name ends in .txtar, and %s doesn't", file), nameOne}
 	case len(parts) == 2:
-		return errors.New("an archive belongs in a corpus's directory, testdata/<corpus>/, and this one is directly in testdata/. Move it into one, or delete it")
+		return &PathError{"an archive belongs in a corpus's directory, testdata/<corpus>/, and this one is directly in testdata/", "Move it into one, or delete it"}
 	case len(parts) > 3:
-		return fmt.Errorf("an archive belongs directly in a corpus's directory, testdata/<corpus>/, and this one is below testdata/%s/, so it is no case. Move it into a corpus's directory, or delete it", parts[1])
+		return &PathError{fmt.Sprintf("an archive belongs directly in a corpus's directory, testdata/<corpus>/, and this one is below testdata/%s/, so it is no case", parts[1]), "Move it into a corpus's directory, or delete it"}
 	case parts[1] == archive.ChecksDir:
-		return fmt.Errorf("testdata/%s/ holds corpus checks' findings, so no corpus has the directory. Move the archive into a corpus's directory, or delete it", archive.ChecksDir)
+		return &PathError{fmt.Sprintf("testdata/%s/ holds corpus checks' findings, so no corpus has the directory", archive.ChecksDir), "Move the archive into a corpus's directory, or delete it"}
 	case !archive.ValidName(parts[1]):
-		return fmt.Errorf("the directory's name, %q, breaks the naming rule: %s, so no corpus has it. Rename the directory", parts[1], archive.NameRule)
+		return &PathError{fmt.Sprintf("the directory's name, %q, breaks the naming rule: %s, so no corpus has it", parts[1], archive.NameRule), "Rename the directory"}
 	case !archive.ValidName(name):
-		return fmt.Errorf("the archive's name, %q, breaks the naming rule: %s, so none of its cells run, and no update writes it. Rename the archive", name, archive.NameRule)
+		return &PathError{fmt.Sprintf("the archive's name, %q, breaks the naming rule: %s, so none of its cells run, and no update writes it", name, archive.NameRule), "Rename the archive"}
 	}
 	return nil
 }

@@ -578,7 +578,7 @@ var messageSites = map[string][]messageSite{
 		{"Skipf", "%s: %s is blocked: the lift %s failed on the case, and %s, %s, records its error.", "a cell that a lift whose committed error matches blocks, which it skips: it fails nothing"},
 	},
 	"runner.checkArchive": {
-		{"Errorf", "%s is no archive a run reads: %v.", "an archive hypercase strip refuses by its path, such as by its name, in the root-package check"},
+		{"Errorf", "%s is no archive a run reads: %s. %s.", "an archive hypercase strip refuses by its path, such as by its name, in the root-package check"},
 		{"Errorf", "reading %s: %v", "an archive that can't be read, in the root-package check"},
 		{"Errorf", "%s has problems of form, so none of its cells run, and no update writes it: %s Fix the archive by hand.", "an archive's problems of form, in the root-package check"},
 		{"Errorf", "%s: %s Write the case's description, in prose, as the archive's comment, the text before its first section.", "an archive with no description, in the root-package check"},

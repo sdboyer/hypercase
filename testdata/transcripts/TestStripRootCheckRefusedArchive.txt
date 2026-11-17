@@ -88,7 +88,8 @@ PASS
 $ edit testdata/export/Bad.txtar  # a copy of prices, under a name that breaks the naming rule
 $ edit testdata/export/Bad.txtar  # a removed column's outcome
 $ go test  # strip-a
-    testdata/export/Bad.txtar is no archive a run reads: the archive's name, "Bad", breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter, so none of its cells run, and no update writes it. Rename the archive.
+    testdata/export/Bad.txtar is no archive a run reads: the archive's name, "Bad", breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter, so none of its cells run, and no update writes it.
+        Rename the archive.
     testdata/export/Bad.txtar: the archive's name breaks the naming rule, so none of its cells run. The root-package check reports it.
     the corpus check cells can't read its cells: testdata/export/Bad.txtar: the archive's name breaks the naming rule
         Fix what the message names. No check runs, and an update writes no findings.

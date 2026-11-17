@@ -535,8 +535,8 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, by
 	rel := r.rel(p)
 	// An archive hypercase strip refuses by its path runs no cell, and
 	// strip strips none of its sections, so the check reports that alone.
-	if err := walk.CheckPath(r.corpusRoot, p); err != nil {
-		t.Errorf("%s is no archive a run reads: %v.", rel, err)
+	if e := walk.ArchivePath(filepath.ToSlash(mustRel(r.corpusRoot, p))); e != nil {
+		t.Errorf("%s is no archive a run reads: %s.\n%s.", rel, e.Reason, e.Fix)
 		return
 	}
 	data, err := os.ReadFile(p)

@@ -537,7 +537,7 @@ func TestStripRootCheckRefusedArchive(t *testing.T) {
 	s.write(bad, s.read(prices), "a copy of prices, under a name that breaks the naming rule")
 	s.edit(bad, "a removed column's outcome", insert("out/nobody/outcome", "accepted\n", "out/parse/"))
 	r := s.normal("strip-a")
-	s.fails(r, `testdata/export/Bad.txtar is no archive a run reads: the archive's name, "Bad", breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter, so none of its cells run, and no update writes it. Rename the archive.`)
+	s.fails(r, `testdata/export/Bad.txtar is no archive a run reads: the archive's name, "Bad", breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter, so none of its cells run, and no update writes it.`+"\nRename the archive.")
 	s.lacks(r, "no registry claims", "hypercase strip")
 	before := s.read(bad)
 	if got := s.strip("-root", ".", "-column", "nobody"); got.code != 1 {
