@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/sdboyer/hypercase/archive"
 )
@@ -378,8 +376,8 @@ func (st *staging) writes(o archive.Outcome) claims {
 // text renders a closing of a note: what the update does, where the
 // closing claims it does otherwise than this run, then the advice, then
 // what the update writes or leaves. Each sentence that says what an update
-// does is its claims' own. One that follows advice ending with a comma
-// goes on from it.
+// does is its claims' own. One that follows advice ending with a comma goes
+// on from it, in the form it takes there.
 func (st *staging) text(n note, c closing) string {
 	u := st.r.updateCmd()
 	cl := c.claims
@@ -400,70 +398,73 @@ func (st *staging) text(n note, c closing) string {
 		sep = "\n"
 	}
 	staged := cl.Does != "" || cl.CantTell != ""
-	var says []string
+	var says []said
 	if cl.RunWrites {
-		says = append(says, "What it writes for the cell, if anything, is its run's.")
+		says = append(says, said{"What it writes for the cell, if anything, is its run's.", "what it writes for the cell, if anything, is its run's."})
 	}
 	if cl.MayWrite != "" {
 		made := "write"
 		if n.kind == aboutProductOrphan {
 			made = "make"
 		}
-		says = append(says, fmt.Sprintf("Its run may still %s the file: delete nothing by hand before it has run.", made))
+		says = append(says, said{fmt.Sprintf("Its run may still %s the file: delete nothing by hand before it has run.", made), fmt.Sprintf("its run may still %s the file: delete nothing by hand before it has run.", made)})
 	}
 	if cl.Outcome != "" {
-		s := fmt.Sprintf("It writes the outcome %q", cl.Outcome)
+		s := said{fmt.Sprintf("It writes the outcome %q", cl.Outcome), fmt.Sprintf("it writes the outcome %q", cl.Outcome)}
 		if cl.Differs {
-			s += ", not this one"
+			s = s.then(", not this one")
 		}
 		if cl.Panic {
-			s += ", and the panic in " + errorFile
+			s = s.then(", and the panic in " + errorFile)
 		}
-		says = append(says, s+".")
+		says = append(says, s.then("."))
 	}
 	if cl.Nothing {
-		s := "An update writes nothing for this cell"
+		s := said{"An update writes nothing for this cell", "an update writes nothing for this cell"}
 		if staged {
-			s = "It writes nothing for the cell"
+			s = said{"It writes nothing for the cell", "it writes nothing for the cell"}
 		}
 		if cl.Frozen {
-			s += ", which a gaps line freezes"
+			s = s.then(", which a gaps line freezes")
 		}
-		says = append(says, s+".")
+		says = append(says, s.then("."))
 	}
 	if cl.Writes != "" {
-		says = append(says, fmt.Sprintf("Run %s to write it, and read it before committing.", u))
+		says = append(says, said{fmt.Sprintf("Run %s to write it, and read it before committing.", u), fmt.Sprintf("run %s to write it, and read it before committing.", u)})
 	}
 	if cl.OnlyOutcome != "" {
-		says = append(says, fmt.Sprintf("Run %s to add it. The update adds the outcome and changes nothing else.", u))
+		says = append(says, said{fmt.Sprintf("Run %s to add it. The update adds the outcome and changes nothing else.", u), fmt.Sprintf("run %s to add it. The update adds the outcome and changes nothing else.", u)})
 	}
 	if cl.Leaves != "" {
-		says = append(says, fmt.Sprintf("%s leaves it in place.", u))
+		s := fmt.Sprintf("%s leaves it in place.", u)
+		says = append(says, said{s, s})
 	}
 	switch {
 	case cl.Removes != "" && staged:
-		says = append(says, "It removes the file: read the diff before committing.")
+		says = append(says, said{"It removes the file: read the diff before committing.", "it removes the file: read the diff before committing."})
 	case cl.Removes != "":
-		says = append(says, fmt.Sprintf("Run %s, which removes it, and read the diff before committing.", u))
+		says = append(says, said{fmt.Sprintf("Run %s, which removes it, and read the diff before committing.", u), fmt.Sprintf("run %s, which removes it, and read the diff before committing.", u)})
 	}
 	if cl.RemovesInputs != "" {
-		says = append(says, fmt.Sprintf("Run %s to remove them.", u))
+		says = append(says, said{fmt.Sprintf("Run %s to remove them.", u), fmt.Sprintf("run %s to remove them.", u)})
 	}
 	if cl.WritesInputs != "" {
-		says = append(says, fmt.Sprintf("Run %s to write them, and read them before committing.", u))
+		says = append(says, said{fmt.Sprintf("Run %s to write them, and read them before committing.", u), fmt.Sprintf("run %s to write them, and read them before committing.", u)})
 	}
 	if cl.RewritesInputs != "" {
-		says = append(says, fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s.%s", u, cl.RewritesInputs, st.r.ifUnowned(st.c.tr)))
-	}
-	if strings.HasSuffix(c.advice, ",") && len(says) > 0 {
-		r, size := utf8.DecodeRuneInString(says[0])
-		says[0] = string(unicode.ToLower(r)) + says[0][size:]
+		says = append(says, said{fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s.%s", u, cl.RewritesInputs, st.r.ifUnowned(st.c.tr)), fmt.Sprintf("the module's update, %s, rewrites them, in the package that owns %s.%s", u, cl.RewritesInputs, st.r.ifUnowned(st.c.tr))})
 	}
 	var rest []string
 	if c.advice != "" {
 		rest = append(rest, c.advice)
 	}
-	rest = append(rest, says...)
+	for i, s := range says {
+		if i == 0 && strings.HasSuffix(c.advice, ",") {
+			rest = append(rest, s.joined)
+			continue
+		}
+		rest = append(rest, s.own)
+	}
 	all := strings.Join(lead, "\n")
 	switch {
 	case all == "":
@@ -473,6 +474,16 @@ func (st *staging) text(n note, c closing) string {
 	}
 	return all + sep + strings.Join(rest, " ")
 }
+
+// A said is a sentence a closing's claims say: own, as it reads on its
+// own, and joined, as it reads going on from advice that ends with a
+// comma. Each is written whole, and neither is made from the other by
+// changing a letter's case, which would change a name or the update
+// command that opens it.
+type said struct{ own, joined string }
+
+// then is the sentence s, going on with more.
+func (s said) then(more string) said { return said{s.own + more, s.joined + more} }
 
 // staged says how the update stages the case otherwise than a normal run,
 // as cl claims.
