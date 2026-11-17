@@ -205,7 +205,7 @@ func TestVariantProblems(t *testing.T) {
 		{"bad name", "-- variant/Cycle/about --\nx\n", []string{`variant/Cycle/about: the variant's name, "Cycle", breaks the naming rule`}},
 		{"transform bad name", "-- transform/x_y/in/sheet/A1 --\n=A1\n", []string{`transform/x_y/in/sheet/A1: the variant's name, "x_y", breaks the naming rule`}},
 		{"unknown section", "-- variant/cycle/notes --\nx\n", []string{"variant/cycle/notes: notes is not one of a hand-written variant's sections: about, in, delete, properties, gaps, via and out"}},
-		{"unknown transform section", "-- transform/looped/about --\nx\n", []string{"transform/looped/about: about is not one of a transform's sections: in, delete, via and out, which an update writes"}},
+		{"unknown transform section", "-- transform/looped/about --\nx\n", []string{"transform/looped/about: about is not one of a transform's sections: in, delete, via and out, none of them hand-written"}},
 		{"transform properties", "-- transform/looped/properties --\ncircular\n", []string{"transform/looped/properties: properties is not one of a transform's sections"}},
 		{"about below", "-- variant/cycle/about/x --\nx\n", []string{"variant/cycle/about/x: about is one section, with nothing below it"}},
 		// A product is a variant's whole, in its own section names, and

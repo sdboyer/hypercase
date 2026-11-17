@@ -724,8 +724,8 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			// Only an update runs a bytes lift past which it finds this.
 			var ns notes
 			ns.add(aboutFault,
-				fmt.Sprintf("The update writes nothing for the cell of the lift %s, on %s's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for %s, so the update writes nothing for this cell either, and the cell runs nothing.", by.lift.name, col.name, by.lift.name),
-				closing{advice: fmt.Sprintf("Fix what %s's cell reports.", by.lift.name)})
+				fmt.Sprintf("The cell of the lift %s, on %s's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for %s, so this cell runs nothing.", by.lift.name, col.name, by.lift.name),
+				closing{advice: fmt.Sprintf("Fix what %s's cell reports.", by.lift.name), claims: claims{Unwritten: by.lift.name}})
 			report(t, header, ns, r.staging(c, col, res.fate, false, cf.frozen(marked), nil))
 			return
 		}
@@ -837,9 +837,9 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		switch {
 		case len(diffs) > 0:
 			var cl closing
-			cl.advice = "If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them."
+			cl.advice = "If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files."
 			if bytesLift {
-				cl.advice = fmt.Sprintf("If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files and its product, under %s and %s, and the next update writes them.", c.outDir(col.name), col.lift.viaDir(c.prefix))
+				cl.advice = fmt.Sprintf("If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files and its product, under %s and %s.", c.outDir(col.name), col.lift.viaDir(c.prefix))
 			}
 			if !couldWrite {
 				cl = closing{"Fix the problems above.", claims{Nothing: true, Frozen: true}}
@@ -1462,7 +1462,7 @@ func (r *runner) compareProduct(ns *notes, c *aCase, l *lift, out *called, produ
 		}
 		cl := closing{should + " If not,", claims{Removes: dir + p}}
 		if !writable {
-			cl = closing{advice: should + " If not, an update removes it, once the problems above are fixed."}
+			cl = closing{should + " If not, fix the problems above first.", claims{Nothing: true}}
 		}
 		if failed {
 			ns.addFile(aboutProductOrphan, dir+p,

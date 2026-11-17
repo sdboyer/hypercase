@@ -3056,16 +3056,25 @@ lift.
   message about the cell ends with what it does, as step 7 gives for a
   transform's variant, a panic of the cell's run or its probe and a frozen
   cell's files among them. So does each message about the lift's own cell,
-  a file of its committed product included. When the update writes nothing
-  for the cell of a lift on the cell's path, the message says so, names
-  the lift, and says to fix what that cell reports, and, on a file the cell
-  commits, to delete nothing by hand before the update has run. Another
+  a file of its committed product included. Where a lift before every
+  bytes lift on the cell's path fails on the case in the update, which
+  then reaches none of them, the message names it, and the last bytes
+  lift, whose outcome and product a normal run reads from the archive.
+  On a transform's variant that the update runs on what the transform
+  makes now, where a normal run reads the inputs the archive holds, it
+  names the transform for that instead, and no bytes lift.
+  When the update writes nothing for the cell of a lift on the cell's
+  path, the message says so, names the lift, and says to fix what that
+  cell reports, and, on a file the cell commits, to delete nothing by hand
+  before the update has run. Another
   package's normal run doesn't run the bytes lifts it doesn't own, so it
   can't tell what its update does with a cell past one: every message
-  about such a cell says so, names the lift, says that the update reruns
-  it, and says to run the update, fix what it reports, and read the diff
-  before committing, or, on a file the cell commits, to delete nothing by
-  hand before the update has run.
+  about such a cell says so, names the lift, says that a normal run reads
+  the lift's outcome and product from the archive, and says to run the
+  update, fix what it reports, and read the diff before committing, or, on
+  a file the cell commits, to delete nothing by hand before the update has
+  run. The update may not reach the lift at all, where a lift before it
+  fails on the case.
 - A cell past a bytes lift that runs on a committed product the lift no
   longer makes, and no longer produces a file it commits, runs on what the
   lift makes in the update, whose run may still write the file. A normal

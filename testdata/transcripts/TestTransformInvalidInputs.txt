@@ -78,7 +78,7 @@ $ go test ./b  # tr-b
     script/twice/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.
         The archive's inputs for looped's variant are invalid, and no cell runs on them:
           transform/looped: the variant's input view holds do/out/values.txt, and do/out/values.txt/x below it
-        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns looped. If no package owns looped, the root-package check says so, and no update rewrites the inputs.
+        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns looped. If no package owns looped, no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs
@@ -220,7 +220,7 @@ $ go test ./b  # tr-b
     script/twice/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.
         The archive's inputs for looped's variant are invalid, and no cell runs on them:
           transform/looped/delete, line 1: "../x" is not a path in the input view
-        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns looped. If no package owns looped, the root-package check says so, and no update rewrites the inputs.
+        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns looped. If no package owns looped, no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs
@@ -362,7 +362,7 @@ $ go test ./b  # tr-b
     script/twice/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.
         The archive's inputs for looped's variant are invalid, and no cell runs on them:
           transform/looped/delete, line 2: do/out/values.txt is listed twice, on lines 1 and 2
-        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns looped. If no package owns looped, the root-package check says so, and no update rewrites the inputs.
+        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns looped. If no package owns looped, no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs
@@ -504,7 +504,7 @@ $ go test ./b  # tr-b
     script/twice/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.
         The archive's inputs for looped's variant are invalid, and no cell runs on them:
           transform/looped/delete: the section is empty; a variant that removes nothing has no delete section
-        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns looped. If no package owns looped, the root-package check says so, and no update rewrites the inputs.
+        The module's update, FIXTURE_UPDATE_GOLDEN=1 go test ./..., rewrites them, in the package that owns looped. If no package owns looped, no update rewrites the inputs.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs

@@ -20,7 +20,7 @@ $ go test  # variants
         variant/more/out/echo/b.txt differs (-committed +got):
         - b1 three
         + b1 3
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/twice
@@ -42,7 +42,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # variants
         variant/more/out/echo/b.txt differs (-committed +got):
         - b1 three
         + b1 3
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/twice
