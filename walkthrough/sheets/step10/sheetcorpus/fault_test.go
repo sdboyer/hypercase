@@ -81,10 +81,7 @@ func TestImportFault(t *testing.T) {
 	// are dropped, so the output reads the same wherever the code moves, and
 	// so is the coverage line a coverage-built binary prints, as the child
 	// is whenever this test's binary is.
-	got := positions.ReplaceAllString(string(out), "$1")
-	got = durations.ReplaceAllString(got, "$1")
-	got = coverage.ReplaceAllString(got, "")
-	if got != importFault {
+	if got := strip(string(out)); got != importFault {
 		t.Errorf("the update's output:\n%s\nwant:\n%s", got, importFault)
 	}
 	if got, err := os.ReadFile(filepath.Join(dir, "testdata", "csv", "two.txtar")); err != nil {
@@ -92,6 +89,38 @@ func TestImportFault(t *testing.T) {
 	} else if string(got) != two {
 		t.Errorf("the update wrote the archive:\n%s", got)
 	}
+}
+
+// TestStrip: strip drops a duration, a file:line prefix and a coverage line
+// only where the testing package writes them, so a message that holds one
+// reads as written.
+func TestStrip(t *testing.T) {
+	out := `--- FAIL: TestA (0.01s)
+    --- FAIL: TestA/b (0.00s)
+        fault_test.go:42: a message that quotes x.go:1: and ends --- FAIL: TestC (0.00s)
+        --- FAIL: TestD (0.00s) is a message too
+        a message that ends coverage: 1.0% of statements
+FAIL
+coverage: 50.0% of statements
+`
+	want := `--- FAIL: TestA
+    --- FAIL: TestA/b
+        a message that quotes x.go:1: and ends --- FAIL: TestC (0.00s)
+        --- FAIL: TestD (0.00s) is a message too
+        a message that ends coverage: 1.0% of statements
+FAIL
+`
+	if got := strip(out); got != want {
+		t.Errorf("strip gave:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// strip drops from a test binary's output each duration of a test's result
+// line, each file:line prefix of a message, and the coverage line.
+func strip(out string) string {
+	out = positions.ReplaceAllString(out, "$1")
+	out = durations.ReplaceAllString(out, "$1")
+	return coverage.ReplaceAllString(out, "")
 }
 
 var (
