@@ -2771,30 +2771,39 @@ generator function, which here generates the product's files from the lift's
 input. It receives the input alone, so `import` finds its CSV by its tree,
 not by the archive's name. `view` gives each file of the sheet that
 `sheet.ImportCSV` returns as one of the jenny's files. `decl.Reject` marks
-the jenny's error as the lift's rejection of the case: the importer's error
-is one, and a CSV archive without exactly one CSV is no rejection, so it
-fails the cell.
+the jenny's error as the lift's rejection of the case: the importer's own
+error, a `*sheet.Error`, is one. Any other error is no rejection, so it
+fails the cell: an input that breaks the corpus type's rule (one file,
+`in/csv/<name>.csv`, with a name holding a character that is neither white
+space nor a format character); an input the jenny can't walk; and a CSV it
+can't read. White space and format characters are Unicode's White_Space and
+category Cf, so a name of a zero-width space alone breaks the rule.
 
-This step's snippets come from no example yet: no directory under
-`walkthrough/` holds them, and the doc golden checks none of them. The
-framework's self-tests check what the framework does with the error: it
-starts with the jenny's name, and `Codes` reaches the importer's error
-through the jenny and `decl.Reject`, so the outcome carries its code. The
-rest, such as what `RenderError` quotes, is the sheets code's, and
-untested.
+`walkthrough/sheets/step10/sheetcorpus/types.go` declares the corpus type,
+the three properties `import` rejects, and the lift:
 
+<!-- source: walkthrough/sheets/step10/sheetcorpus/types.go#import -->
 ```go
-// walkthrough/sheets/step10/sheetcorpus/types.go gains
 type CSV struct{ fs.FS } // in/csv/<name>.csv
 
 var CSVType = decl.Type[CSV]{
 	Dir:         "csv",
-	Description: "A CSV export: one file under in/csv/, one row of the sheet per line.",
+	Description: "A CSV export: one file, in/csv/<name>.csv, with a name holding a character that is neither white space nor a format character; one row of the sheet per record, where a quoted field may hold a newline.",
 }
 
 var Unterminated = decl.Property{
 	Name:        "unterminated",
 	Description: "Some quoted field is never closed.",
+}
+
+var StrayQuote = decl.Property{
+	Name:        "stray-quote",
+	Description: "Some unquoted field holds a quote, or some quoted field has text after its closing quote.",
+}
+
+var OutOfRange = decl.Property{
+	Name:        "out-of-range",
+	Description: "Some field that is not empty lies past the sheet's last column, XFD, or its last row, 1048576.",
 }
 
 var Import = decl.Lift[CSV, Sheet]{
@@ -2806,32 +2815,89 @@ var Import = decl.Lift[CSV, Sheet]{
 	Product: []decl.Output{
 		{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them."},
 	},
-	Rejects: []decl.Property{Unterminated},
+	Rejects: []decl.Property{Unterminated, StrayQuote, OutOfRange},
 	Jenny: jenny.For[CSV]().New("import", func(in CSV) (jenny.Files, error) {
-		paths, _ := fs.Glob(in, "csv/*.csv")
-		if len(paths) != 1 {
-			return nil, fmt.Errorf("%d files under csv/, not one", len(paths))
+		var paths []string
+		err := fs.WalkDir(in, ".", func(p string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				paths = append(paths, p)
+			}
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		var name string
+		ok := len(paths) == 1 && path.Dir(paths[0]) == "csv"
+		if ok {
+			name, ok = strings.CutSuffix(path.Base(paths[0]), ".csv")
+		}
+		ok = ok && strings.ContainsFunc(name, func(r rune) bool {
+			return !unicode.In(r, unicode.White_Space, unicode.Cf)
+		})
+		if !ok {
+			return nil, fmt.Errorf("the input holds %q, and a CSV export is one file, csv/<name>.csv, with a name holding a character that is neither white space nor a format character", paths)
 		}
 		s, err := sheet.ImportCSV(in, paths[0])
-		if err != nil {
+		var e *sheet.Error
+		if errors.As(err, &e) {
 			return nil, decl.Reject(err)
+		}
+		if err != nil {
+			return nil, err
 		}
 		return view(s, nil)
 	}),
 }
 ```
 
-The root package registers the new type and property, and owns the new lift.
+The root package registers the new type and properties, and owns the new
+lift. Its `codes` check (step 8) counts the importer's codes,
+`sheet.CSVCodes`, beside the evaluator's, `sheet.Codes`.
+`walkthrough/sheets/step10/corpus_test.go`:
+
+<!-- source: walkthrough/sheets/step10/corpus_test.go#register -->
+```go
+func init() {
+	hypercase.Register(
+		sheetcorpus.Project,
+		hypercase.Root("step10"),
+		hypercase.RootPackage(),
+		sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.Unterminated, sheetcorpus.StrayQuote, sheetcorpus.OutOfRange,
+		sheetcorpus.SheetType, sheetcorpus.CSVType,
+		hypercase.Own(sheetcorpus.Import, sheetcorpus.Parse, sheetcorpus.Resolve, evaluate),
+		hypercase.Own(sheetcorpus.Looped, sheetcorpus.Renamed),
+		hypercase.Own(codes),
+	)
+}
+```
+
 Each other package whose columns read past it registers the type and adds
-the lift to its `Use`: `format/` uses `sheetcorpus.Import` and
-`sheetcorpus.Parse`.
+the lift to its `Use`. `cli/` uses `sheetcorpus.Import`, for `calc`, and
+`format/` uses it beside `sheetcorpus.Parse`:
+
+<!-- source: walkthrough/sheets/step10/format/corpus_test.go#register -->
+```go
+func init() {
+	hypercase.Register(
+		sheetcorpus.Project,
+		hypercase.Root("step10"),
+		sheetcorpus.Circular, sheetcorpus.Dangling,
+		sheetcorpus.SheetType, sheetcorpus.CSVType,
+		hypercase.Use(sheetcorpus.Import, sheetcorpus.Parse), // computed here; their sections are left alone
+		hypercase.Own(format),
+	)
+}
+```
 
 ### How the files change
 
-A new corpus directory, `testdata/csv/`. Each of its archives holds the
-product under `via/<lift>/`, and the cells of every column the product
-reaches. `testdata/csv/prices.txtar`:
+A new corpus directory, `testdata/csv/`. Each archive whose CSV `import`
+accepts holds the product under `via/<lift>/`, and every archive holds the
+cells of `import` and of every column past it. `testdata/csv/prices.txtar`:
 
+<!-- source: walkthrough/sheets/step10/testdata/csv/prices.txtar -->
 ```
 Two prices and their total, exported as CSV.
 -- in/csv/prices.csv --
@@ -2867,6 +2933,7 @@ accepted
 `testdata/csv/open-quote.txtar`. Every column past `import` is blocked by
 it:
 
+<!-- source: walkthrough/sheets/step10/testdata/csv/open-quote.txtar -->
 ```
 A quoted field that never closes.
 -- in/csv/open-quote.csv --
@@ -2891,7 +2958,66 @@ blocked import
 ```
 
 A jenny's error starts with the jenny's name, so `import`'s `error.txt` starts
-`import: `.
+`import: `. `Codes` reaches the importer's error through the jenny and
+`decl.Reject`, so the outcome carries its code.
+
+`testdata/csv/stray-quote.txtar` states `stray-quote`, for a quote inside an
+unquoted field, and `testdata/csv/past-xfd.txtar` states `out-of-range`, for
+a field in column 16385, one past XFD. `import` rejects them as `C102` and
+`C103`, and every column past it is `blocked import`, as for `open-quote`.
+So some CSV reaches each of the importer's codes, and the `codes` check's
+findings, `testdata/checks/codes.txt`, list them beside the evaluator's:
+
+<!-- source: walkthrough/sheets/step10/testdata/checks/codes.txt -->
+```
+C101
+C102
+C103
+S101
+S201
+S202
+```
+
+`testdata/csv/loop.txtar` states `circular`, which `resolve` rejects past
+the lift. Its `error.txt` quotes `sheet/A1` and `sheet/B1`, which only the
+product holds: past `import`, `RenderError` gets the product as the input
+view.
+
+<!-- source: walkthrough/sheets/step10/testdata/csv/loop.txtar -->
+```
+A1 and B1 refer to each other, exported as CSV.
+-- in/csv/loop.csv --
+=B1,=A1
+-- properties --
+circular
+-- via/import/sheet/A1 --
+=B1
+-- via/import/sheet/B1 --
+=A1
+-- out/calc/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1
+  sheet/B1:1: =A1
+-- out/calc/outcome --
+rejected S201
+-- out/evaluate/outcome --
+blocked resolve
+-- out/format/formulas.txt --
+A1 =B1
+B1 =A1
+-- out/format/outcome --
+accepted
+-- out/import/outcome --
+accepted
+-- out/parse/outcome --
+accepted
+-- out/resolve/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1
+  sheet/B1:1: =A1
+-- out/resolve/outcome --
+rejected S201
+```
 
 `hypercase.json` gives every lift `"bytes"`, true for a bytes lift, and
 `"productFiles"`, its product declarations, which are empty for every other
@@ -3046,7 +3172,9 @@ lift.
   sheet. Paths through bytes lifts count toward the one path to each
   consumed type, and a column's path from `csv` in the registry, and so its
   cells' `Path` (step 8), runs through `import`: `resolve`, `parse`, then
-  `import`, for `evaluate`.
+  `import`, for `evaluate`. The `format` package, which uses `import` and
+  `parse`, reaches `parse` from `csv` through `import`, as the root
+  package, which owns both, does: step 6's rule for a lift a package uses.
 - A suite reaches across types by the type it consumes: `calc`, which
   consumes `Sheet`, runs on every CSV that `import` accepts.
 - Past a bytes lift, a cell's input view, which `RenderError` receives, is
@@ -3087,8 +3215,10 @@ lift.
   import shows as a change to `via/import/`, which the report ranks on
   `import`'s cell, and fails `import`'s column alone until the update; the
   columns downstream read the committed sheet.
-- Where a chained input stops: `open-quote` at `import`, with every column
-  past it `blocked import`.
+- Where a chained input stops: `open-quote`, `stray-quote` and `past-xfd`
+  at `import`, with every column past it `blocked import`.
+- Every code the importer defines, reached by some CSV: if no CSV reaches
+  `C102` any more, the `codes` check fails.
 - A CSV and a hand-written sheet with the same cells side by side in the
   matrix, `csv/prices` beside `sheet/prices`.
 
