@@ -268,6 +268,17 @@ func TestRootCheckDeclaredDirectory(t *testing.T) {
 	s.done()
 }
 
+// TestRootCheckNoTestdata: a corpus root with no testdata/ holds no
+// archive, and the root-package check passes over it.
+func TestRootCheckNoTestdata(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.write("corp/README", []byte("A corpus root with no testdata/ yet.\n"), "a corpus root, corp, with no testdata/")
+	s.passes(s.update("corp-root-only"))
+	s.passes(s.normal("corp-root-only"))
+	s.done()
+}
+
 func TestRootCheckRegistries(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared")
