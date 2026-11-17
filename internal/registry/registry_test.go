@@ -114,10 +114,15 @@ func TestDeclarations(t *testing.T) {
 	}
 	var got []string
 	for _, d := range r.Declarations() {
-		switch {
-		case d.Type == nil:
+		if d.Type == nil {
 			got = append(got, d.Dir+" (raw)")
-		case d.Type != &r.Types[slices.IndexFunc(r.Types, func(ct Type) bool { return ct.Dir == d.Dir })]:
+			continue
+		}
+		i := slices.IndexFunc(r.Types, func(ct Type) bool { return ct.Dir == d.Dir })
+		switch {
+		case i < 0:
+			t.Fatalf("the declaration of %s has a type, and no corpus type of the registry has that Dir", d.Dir)
+		case d.Type != &r.Types[i]:
 			t.Errorf("the declaration of %s points at another type than the registry's %s", d.Dir, d.Dir)
 		default:
 			got = append(got, d.Dir)
