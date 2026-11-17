@@ -186,7 +186,8 @@ func goEnv(updateVar string) []string {
 }
 
 // buildHypercase builds the hypercase command into a temp dir, and returns
-// its path.
+// its path. It builds in hypercase's own module, whose go.mod and go.sum
+// list what the command needs, where this module's list what the toy needs.
 //
 // The command's source is outside this module, where go test doesn't look
 // for what a test read, and the test's binary doesn't import the command or
@@ -196,11 +197,23 @@ func buildHypercase(t *testing.T) string {
 	t.Helper()
 	exe := filepath.Join(t.TempDir(), "hypercase")
 	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", exe, "github.com/sdboyer/hypercase/cmd/hypercase")
+	cmd.Dir = hypercaseRoot(t)
 	cmd.Env = goEnv("")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("building hypercase: %v\n%s", err, out)
 	}
 	return exe
+}
+
+// hypercaseRoot returns the directory of hypercase's own module, which the
+// toy's go.mod replaces hypercase by.
+func hypercaseRoot(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root
 }
 
 // scratch copies the toy into repo, a new git repository on the branch
@@ -224,7 +237,7 @@ func scratch(t *testing.T, repo string) (modfile string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mod, err = scratchModfile(mod, filepath.Join(module, "..", ".."))
+	mod, err = scratchModfile(mod, hypercaseRoot(t))
 	if err != nil {
 		t.Fatal(err)
 	}
