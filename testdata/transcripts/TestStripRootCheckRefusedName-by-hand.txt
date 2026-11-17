@@ -87,12 +87,12 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
 PASS
 $ edit testdata/export/prices.txtar  # outcomes and a product of columns whose names break the naming rule
 $ go test  # strip-a
-    testdata/export/prices.txtar: no registry claims out/Old/outcome: no column named Old runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
-    testdata/export/prices.txtar: no registry claims out/my col/outcome: no column named my col runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
-    testdata/export/prices.txtar: no registry claims via/Old/quote/A1: no bytes lift named Old runs over the corpus export.
-        If a bytes lift should write them, register it. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+    testdata/export/prices.txtar: no registry claims out/Old/outcome: no column named Old runs over the corpus export, and none can, since the name breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place. Delete them by hand, or run hypercase strip -root . at the module root: with no flags, it removes every section an update writes, from every archive under the module-root corpus but a frozen cell's, and the registries and findings files of the root, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
+    testdata/export/prices.txtar: no registry claims out/my col/outcome: no column named my col runs over the corpus export, and none can, since the name breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place. Delete them by hand, or run hypercase strip -root . at the module root: with no flags, it removes every section an update writes, from every archive under the module-root corpus but a frozen cell's, and the registries and findings files of the root, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
+    testdata/export/prices.txtar: no registry claims via/Old/quote/A1: no bytes lift named Old runs over the corpus export, and none can, since the name breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place. Delete them by hand, or run hypercase strip -root . at the module root: with no flags, it removes every section an update writes, from every archive under the module-root corpus but a frozen cell's, and the registries and findings files of the root, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     what ran, in order:
         import ran
         parse ran on prices

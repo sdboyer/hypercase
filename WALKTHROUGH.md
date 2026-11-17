@@ -1180,8 +1180,10 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
     sections in every archive under the root, and, since strip leaves a
     cell a `gaps` line marks, it says to remove first a line that marks
     one of theirs. Where the column's name breaks the naming rule, as in
-    `out/Old/…`, strip refuses it as `-column`, so the failure names no
-    strip, and says to delete the sections by hand;
+    `out/Old/…`, no column can have it, and strip refuses it as
+    `-column`, so the failure says to delete the sections by hand, or to
+    run `hypercase strip -root <dir>` with no flags, which removes every
+    section an update writes, then the update;
   - an archive whose name breaks the naming rule, as `Bad.txtar`: none of
     its cells run, and `hypercase strip` refuses it, so the check reports
     that alone, as strip words it, and names no strip for its sections;
@@ -3209,11 +3211,13 @@ lift.
 - The root-package check claims `via/<lift>/…` in a corpus for each bytes
   lift a package owns over it; any other `via/` section is unclaimed, and
   its failure names `hypercase strip -root <dir> -column <lift>`, then the
-  update, as it does for a removed suite (step 5). When a `gaps` line marks a cell of
-  those sections and the registries disagree on whether the lift is a
-  bytes lift, whether strip leaves them turns on that, so the failure
-  names no strip: it says to settle the registries first, then run the
-  check again.
+  update, as it does for a removed suite (step 5). Where the lift's name
+  breaks the naming rule, as in `via/Old/…`, the failure says to delete
+  the sections by hand, or to strip with no flags, as for a column of
+  such a name. When a `gaps` line marks a cell of those sections and the
+  registries disagree on whether the lift is a bytes lift, whether strip
+  leaves them turns on that, so the failure names no strip: it says to
+  settle the registries first, then run the check again.
 - The root-package check fails when the registries of packages with tests
   that own or use a lift record it differently, any lift: its
   description, input, product, `bytes`, outputs, `productFiles` or

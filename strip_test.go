@@ -465,42 +465,61 @@ func TestStripRootCheckNamesRoot(t *testing.T) {
 
 // TestStripRootCheckRefusedName: sections of columns whose names break
 // the naming rule, out/Old/…, out/my col/… and a product, via/Old/…, which
-// an archive may hold and no column can write. hypercase strip refuses
-// -column Old and -column my col, so the root-package check's messages
-// for them name no strip, and say to delete them by hand, as the update
-// leaves them. Deleted, they leave the check passing.
+// an archive may hold and no column can have. hypercase strip refuses
+// -column Old and -column my col, and the update leaves them. So the
+// root-package check's messages for them say to delete them by hand, or
+// to run strip with no flags, which removes every section an update
+// writes. Either way, they leave the check passing.
 func TestStripRootCheckRefusedName(t *testing.T) {
 	t.Parallel()
-	s := newSandbox(t, "strip")
-	s.settle(stripModule...)
-	s.edit(prices, "outcomes and a product of columns whose names break the naming rule", func(a *archive.Archive) {
-		insert("via/Old/quote/A1", "3\n", "via/")(a)
-		insert("out/Old/outcome", "accepted\n", "out/")(a)
-		insert("out/my col/outcome", "accepted\n", "out/parse/")(a)
-	})
-	const byHand = "If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place."
-	r := s.normal("strip-a")
-	s.fails(r,
-		"testdata/export/prices.txtar: no registry claims out/Old/outcome: no column named Old runs over the corpus export.\nIf a column should write them, register the column. "+byHand,
-		"testdata/export/prices.txtar: no registry claims out/my col/outcome: no column named my col runs over the corpus export.\nIf a column should write them, register the column. "+byHand,
-		"testdata/export/prices.txtar: no registry claims via/Old/quote/A1: no bytes lift named Old runs over the corpus export.\nIf a bytes lift should write them, register it. "+byHand)
-	s.lacks(r, "hypercase strip")
-	for _, col := range []string{"Old", "my col"} {
-		if got := s.strip("-root", ".", "-column", col); got.code != 2 {
-			t.Errorf("hypercase strip -column %q exited %d, not 2, for a name that breaks the naming rule:\n%s", col, got.code, got.out)
-		}
-	}
-	s.settle(stripModule...)
-	s.hasSections(prices, map[string]string{"out/Old/outcome": "accepted\n", "out/my col/outcome": "accepted\n", "via/Old/quote/A1": "3\n"})
+	for _, how := range []string{"by-hand", "strip"} {
+		t.Run(how, func(t *testing.T) {
+			t.Parallel()
+			s := newSandbox(t, "strip")
+			s.settle(stripModule...)
+			s.edit(prices, "outcomes and a product of columns whose names break the naming rule", func(a *archive.Archive) {
+				insert("via/Old/quote/A1", "3\n", "via/")(a)
+				insert("out/Old/outcome", "accepted\n", "out/")(a)
+				insert("out/my col/outcome", "accepted\n", "out/parse/")(a)
+			})
+			const none = ", and none can, since the name breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter.\n"
+			const advice = "FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place. Delete them by hand, or run hypercase strip -root . at the module root: with no flags, it removes every section an update writes, from every archive under the module-root corpus but a frozen cell's, and the registries and findings files of the root, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports."
+			r := s.normal("strip-a")
+			s.fails(r,
+				"testdata/export/prices.txtar: no registry claims out/Old/outcome: no column named Old runs over the corpus export"+none+advice,
+				"testdata/export/prices.txtar: no registry claims out/my col/outcome: no column named my col runs over the corpus export"+none+advice,
+				"testdata/export/prices.txtar: no registry claims via/Old/quote/A1: no bytes lift named Old runs over the corpus export"+none+advice)
+			s.lacks(r, "-column Old", "-column my col", "register")
+			for _, col := range []string{"Old", "my col"} {
+				if got := s.strip("-root", ".", "-column", col); got.code != 2 {
+					t.Errorf("hypercase strip -column %q exited %d, not 2, for a name that breaks the naming rule:\n%s", col, got.code, got.out)
+				}
+			}
+			s.settle(stripModule...)
+			s.hasSections(prices, map[string]string{"out/Old/outcome": "accepted\n", "out/my col/outcome": "accepted\n", "via/Old/quote/A1": "3\n"})
 
-	s.edit(prices, "delete them by hand, as the messages say", func(a *archive.Archive) {
-		drop("via/Old/")(a)
-		drop("out/Old/")(a)
-		drop("out/my col/")(a)
-	})
-	s.passes(s.normal("strip-a"))
-	s.passes(s.run("b", "strip-b", false))
-	s.done()
+			if how == "by-hand" {
+				s.edit(prices, "delete them by hand, as the messages say", func(a *archive.Archive) {
+					drop("via/Old/")(a)
+					drop("out/Old/")(a)
+					drop("out/my col/")(a)
+				})
+			} else {
+				s.passes(s.strip(s.printedStrip(s.normal("strip-a"))...))
+				for _, r := range s.settle(stripModule...) {
+					s.passes(r)
+				}
+				for _, sec := range []string{"via/Old/quote/A1", "out/Old/outcome", "out/my col/outcome"} {
+					if _, ok := archive.Parse(s.read(prices)).Section(sec); ok {
+						t.Errorf("the strip with no flags, then the update, left %s in %s", sec, prices)
+					}
+				}
+			}
+			s.passes(s.normal("strip-a"))
+			s.passes(s.run("b", "strip-b", false))
+			s.done()
+		})
+	}
 }
 
 // TestStripRootCheckRefusedArchive: an archive whose name breaks the
