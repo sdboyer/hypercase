@@ -161,7 +161,7 @@ $ go test  # transforms
     the corpus directory script has two different corpus types:
           .: github.com/sdboyer/hypercase_test.Script: "Trees of instructions, under in/<tree>/, that the fixtures' columns follow."; the transform looped: "Adds do/error and resolve/error, so echo and resolve err as on a cycle.", gives [circular], keeps [], with a probe; the transform upper: "Uppercases every file under do/out/.", gives [], keeps [circular dangling], with a probe
           ./b: github.com/sdboyer/hypercase_test.Script: "Trees of instructions, under in/<tree>/, that the fixtures' columns follow."; the transform looped: "Adds do/error and resolve/error, so echo and resolve err as on a cycle.", gives [circular], keeps [], with a probe
-        An archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration.
+        An archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration. If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
     script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
     script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
     script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps

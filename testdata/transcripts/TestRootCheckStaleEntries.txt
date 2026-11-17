@@ -1,0 +1,81 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a-circular
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # pkg-b-circular
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ go test  # pkg-a-circular
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ edit b/testdata/hypercase.json  # b's registry records another the corpus type script's description, which b's code doesn't
+$ go test  # pkg-a-circular
+    the corpus directory script has two different corpus types:
+          .: github.com/sdboyer/hypercase_test.Script: "Trees of instructions, under in/<tree>/, that the fixtures' columns follow."
+          ./b: github.com/sdboyer/hypercase_test.Script: "Scripts."
+        An archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration. If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a-circular
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # pkg-b-circular
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ go test  # pkg-a-circular
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ edit b/testdata/hypercase.json  # b's registry records another the property circular's description, which b's code doesn't
+$ go test  # pkg-a-circular
+    the property circular has two different entries:
+          .: "Some cell's formula refers back to itself, directly or through other cells."
+          ./b: "A loop."
+        Declare the property once, in a package the others import, and register that declaration. If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # pkg-a-circular
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # pkg-b-circular
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/shout
+PASS
+$ go test  # pkg-a-circular
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS

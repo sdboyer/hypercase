@@ -67,10 +67,11 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-b-nooutputs
 FAIL
 [exit 1]
 $ go test  # chain-a
-    the registries that own or use the lift import record different outputs:
-          .: error.txt "Why the importer rejects the export."
-          ./b: none
-        Every package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration.
+    the registries that own or use the lift import differ in outputs:
+          outputs:
+            .: error.txt "Why the importer rejects the export."
+            ./b: none
+        Every package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration. If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
     export/quoted: parse is blocked: testdata/export/quoted.txtar, out/import/outcome, records the lift import's outcome as "rejected".
     export/quoted: resolve is blocked: testdata/export/quoted.txtar, out/import/outcome, records the lift import's outcome as "rejected".
     export/quoted/transform/louder: louder declines the base: the export makes no output of evaluate

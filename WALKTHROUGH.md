@@ -1131,7 +1131,9 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 - It reads every registry under the root and every archive in the
   directories they declare, and fails on:
   - a column two packages register;
-  - one property name with two different entries;
+  - one property name with two different entries, which the packages
+    declare differently, or which a stale registry records, as one edited
+    by hand: the update, which rewrites the registries, ends the second;
   - a section no registry claims, such as `out/<suite>/…` after that suite
     was removed;
   - a problem of an archive as a whole: a missing description, a top-level
@@ -1151,7 +1153,8 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
   tested, and the result doesn't depend on the environment the check
   runs in. The check counts none of the registry's columns, lifts or
   transforms (steps 6 and 7) as owned, its lifts as used, or the
-  transforms its corpus types list as needing an owner. The sections of
+  transforms its corpus types list as needing an owner, and compares none
+  of its lifts' entries with other registries' (step 10). The sections of
   its suites, its owned lifts and its listed transforms stay claimed, so
   the registry's own failure is the one that reports them. A lift needs
   an owner when a package with tests uses it, and a transform when a
@@ -2839,10 +2842,16 @@ lift.
   that lift's product.
 - The root-package check claims `via/<lift>/…` in a corpus for each bytes
   lift a package owns over it; any other `via/` section is unclaimed.
-- The root-package check fails when the registries that own or use a lift
-  record it differently, any lift: its description, input, product,
-  `bytes`, outputs, `productFiles` or rejects. It names the packages and
-  the field.
+- The root-package check fails when the registries of packages with tests
+  that own or use a lift record it differently, any lift: its
+  description, input, product, `bytes`, outputs, `productFiles` or
+  rejects. It fails once per lift, naming the packages and every field
+  that differs. A registry in a package with no `_test.go` file isn't
+  compared: no test runs what it records, and its own failure says to
+  delete it. When the packages register one declaration already, a
+  registry is stale, and the update, which rewrites the registries, ends
+  the failure. The comparisons of properties and corpus types (steps 5 and
+  6) say so too.
 - A corpus check (step 8) receives a bytes lift's committed product as its
   cell's `Product`, by each file's path under `via/<lift>/`.
 - `testdata/sheet/prices.txtar` and `testdata/csv/prices.txtar` both reach

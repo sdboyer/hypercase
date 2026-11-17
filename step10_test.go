@@ -1075,14 +1075,17 @@ func TestChainSharedProjects(t *testing.T) {
 }
 
 // TestChainLiftEntries: the root-package check fails when the registries
-// that own or use a lift record it differently, naming the packages and
-// the field. A package that only uses a bytes lift tells by its own
-// declaration whether an update writes the lift's cell, and so the cells
-// past it, so it must declare the lift as the owner does.
+// that own or use a lift record it differently, once per lift, naming the
+// packages and each field that differs. A package that only uses a bytes
+// lift tells by its own declaration whether an update writes the lift's
+// cell, and so the cells past it, and one that uses any lift stages the
+// cells past it by its own declaration, so it must declare the lift as
+// the owner does. A registry in a package with no _test.go file isn't
+// compared.
 func TestChainLiftEntries(t *testing.T) {
 	t.Parallel()
-	const breakage = "the registries that own or use the lift import record different "
-	const fix = "\nEvery package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration."
+	const breakage = "the registries that own or use the lift import differ in "
+	const fix = "\nEvery package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration." + staleRegistry
 
 	// ./b uses a copy of import that declares no outputs, so its update
 	// holds the cells past import back on an error.txt it doesn't declare,
@@ -1096,26 +1099,42 @@ func TestChainLiftEntries(t *testing.T) {
 		s.passes(rs[0])
 		s.fails(rs[1], "The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it.")
 		s.hasSections(quoted, map[string]string{"out/import/outcome": "rejected\n"}, "out/list/", "out/evaluate/")
-		s.fails(s.normal("chain-a"), breakage+"outputs:\n  .: error.txt \"Why the importer rejects the export.\"\n  ./b: none"+fix)
+		s.fails(s.normal("chain-a"), breakage+"outputs:\n  outputs:\n    .: error.txt \"Why the importer rejects the export.\"\n    ./b: none"+fix)
 		s.done()
 	})
 
-	// Each field of b's entry, changed in its registry by hand.
+	// Each field of b's entry, changed in its registry by hand, then two
+	// at once, and an ordinary lift's. The module's update rewrites the
+	// stale registry.
 	t.Run("each field", func(t *testing.T) {
 		t.Parallel()
 		s := newSandbox(t, "chain-shared")
-		for _, r := range s.parallel(childRun{"", "chain-a", true}, childRun{"b", "chain-b", true}) {
-			s.passes(r)
+		update := func() {
+			for _, r := range s.parallel(childRun{"", "chain-a", true}, childRun{"b", "chain-b", true}) {
+				s.passes(r)
+			}
 		}
+		update()
 		s.passes(s.normal("chain-a"))
 		const reg = "b/testdata/hypercase.json"
 		clean := s.read(reg)
+		edit := func(lift, why string, change func(l *registry.Lift)) result {
+			g, err := registry.Parse(clean)
+			if err != nil {
+				t.Fatal(err)
+			}
+			i := slices.IndexFunc(g.Lifts, func(l registry.Lift) bool { return l.Name == lift })
+			change(&g.Lifts[i])
+			s.write(reg, g.Marshal(), why)
+			return s.normal("chain-a")
+		}
+		description := func(l *registry.Lift) { l.Description = "Imports the export." }
 		for _, tt := range []struct {
 			field  string
 			change func(l *registry.Lift)
 			want   string
 		}{
-			{"description", func(l *registry.Lift) { l.Description = "Imports the export." }, "description:\n  .: \"Imports the export as a script, as its import/ tree says.\"\n  ./b: \"Imports the export.\""},
+			{"description", description, "description:\n  .: \"Imports the export as a script, as its import/ tree says.\"\n  ./b: \"Imports the export.\""},
 			{"input", func(l *registry.Lift) { l.Input = "github.com/sdboyer/hypercase_test.Grid" }, "input:\n  .: github.com/sdboyer/hypercase_test.Export\n  ./b: github.com/sdboyer/hypercase_test.Grid"},
 			{"product", func(l *registry.Lift) { l.Product = "*github.com/sdboyer/hypercase_test.Parsed" }, "product:\n  .: github.com/sdboyer/hypercase_test.Script\n  ./b: *github.com/sdboyer/hypercase_test.Parsed"},
 			{"bytes", func(l *registry.Lift) { l.Bytes = false }, "bytes:\n  .: true\n  ./b: false"},
@@ -1123,21 +1142,57 @@ func TestChainLiftEntries(t *testing.T) {
 			{"productFiles", func(l *registry.Lift) { l.ProductFiles = l.ProductFiles[:1] }, "productFiles:\n  .: evaluate/* \"What evaluate does, as a script's evaluate/ tree says.\", evaluate/out/* \"An output evaluate returns.\", inputs/* \"A tree named as a cell's inputs file is.\", names/* \"Files named as a cell's own files are.\", parse/* \"What parse does, as a script's parse/ tree says.\", quote/* \"What a renderer of errors quotes.\", resolve/* \"What resolve does, as a script's resolve/ tree says.\"\n  ./b: evaluate/* \"What evaluate does, as a script's evaluate/ tree says.\""},
 			{"rejects", func(l *registry.Lift) { l.Rejects = nil }, "rejects:\n  .: unterminated\n  ./b: none"},
 		} {
-			g, err := registry.Parse(clean)
-			if err != nil {
-				t.Fatal(err)
-			}
-			i := slices.IndexFunc(g.Lifts, func(l registry.Lift) bool { return l.Name == "import" })
-			tt.change(&g.Lifts[i])
-			s.write(reg, g.Marshal(), "b's registry records another "+tt.field+" for import")
-			r := s.normal("chain-a")
-			s.fails(r, breakage+tt.want+fix)
+			r := edit("import", "b's registry records another "+tt.field+" for import", tt.change)
+			s.fails(r, breakage+tt.field+":\n"+tt.want+fix)
 			if n := strings.Count(r.out, breakage); n != 1 {
-				t.Errorf("%s: the check reports %d fields of import, want 1:\n%s", tt.field, n, r.out)
+				t.Errorf("%s: the check reports import %d times, want once:\n%s", tt.field, n, r.out)
 			}
 		}
-		s.write(reg, clean, "restore it")
+
+		// Two fields that differ give one error, which names both.
+		r := edit("import", "b's registry records another description and other rejects for import", func(l *registry.Lift) {
+			description(l)
+			l.Rejects = nil
+		})
+		s.fails(r, breakage+"description and rejects:\n  description:\n    .: \"Imports the export as a script, as its import/ tree says.\"\n    ./b: \"Imports the export.\"\n  rejects:\n    .: unterminated\n    ./b: none"+fix)
+		if n := strings.Count(r.out, breakage); n != 1 {
+			t.Errorf("two fields: the check reports import %d times, want once:\n%s", n, r.out)
+		}
+
+		// parse is an ordinary lift: ./b stages the cells past it by its own
+		// declaration.
+		s.fails(edit("parse", "b's registry records another description for parse", func(l *registry.Lift) { l.Description = "Parses." }),
+			"the registries that own or use the lift parse differ in description:\n  description:\n    .: \"Parses the script, as its parse/ tree says.\"\n    ./b: \"Parses.\"\nEvery package that owns or uses a lift registers one declaration of it: a package that only uses a lift runs its own declaration of it to stage the cells past it, and the lift's cell, which the package that owns it writes, records what the owner's declaration does. Declare the lift once, in a package the others import, and register that declaration."+staleRegistry)
+
+		// The packages register one declaration of each lift, so the
+		// registry is stale, and the module's update rewrites it.
+		update()
+		s.same(reg, clean)
 		s.passes(s.normal("chain-a"))
+		s.done()
+	})
+
+	// ./b has no _test.go file, so no test runs what its registry records:
+	// the registry fails on its own, and its entry of import isn't
+	// compared with the owner's.
+	t.Run("an untested package", func(t *testing.T) {
+		t.Parallel()
+		s := newSandbox(t, "chain-shared")
+		for _, r := range s.parallel(childRun{"", "chain-a", true}, childRun{"b", "chain-b", true}) {
+			s.passes(r)
+		}
+		const reg = "b/testdata/hypercase.json"
+		g, err := registry.Parse(s.read(reg))
+		if err != nil {
+			t.Fatal(err)
+		}
+		i := slices.IndexFunc(g.Lifts, func(l registry.Lift) bool { return l.Name == "import" })
+		g.Lifts[i].Description = "Imports the export."
+		s.write(reg, g.Marshal(), "b's registry records another description for import")
+		s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
+		r := s.normal("chain-a")
+		s.fails(r, "b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests.")
+		s.lacks(r, "the registries that own or use the lift")
 		s.done()
 	})
 }
