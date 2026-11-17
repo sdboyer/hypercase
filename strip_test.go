@@ -462,3 +462,43 @@ func TestStripRootCheckNamesRoot(t *testing.T) {
 	}
 	s.done()
 }
+
+// TestStripRootCheckRefusedName: sections of columns whose names break
+// the naming rule, out/Old/…, out/my col/… and a product, via/Old/…, which
+// an archive may hold and no column can write. hypercase strip refuses
+// -column Old and -column my col, so the root-package check's messages
+// for them name no strip, and say to delete them by hand, as the update
+// leaves them. Deleted, they leave the check passing.
+func TestStripRootCheckRefusedName(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	s.settle(stripModule...)
+	s.edit(prices, "outcomes and a product of columns whose names break the naming rule", func(a *archive.Archive) {
+		insert("via/Old/quote/A1", "3\n", "via/")(a)
+		insert("out/Old/outcome", "accepted\n", "out/")(a)
+		insert("out/my col/outcome", "accepted\n", "out/parse/")(a)
+	})
+	const byHand = "If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place."
+	r := s.normal("strip-a")
+	s.fails(r,
+		"testdata/export/prices.txtar: no registry claims out/Old/outcome: no column named Old runs over the corpus export.\nIf a column should write them, register the column. "+byHand,
+		"testdata/export/prices.txtar: no registry claims out/my col/outcome: no column named my col runs over the corpus export.\nIf a column should write them, register the column. "+byHand,
+		"testdata/export/prices.txtar: no registry claims via/Old/quote/A1: no bytes lift named Old runs over the corpus export.\nIf a bytes lift should write them, register it. "+byHand)
+	s.lacks(r, "hypercase strip")
+	for _, col := range []string{"Old", "my col"} {
+		if got := s.strip("-root", ".", "-column", col); got.code != 2 {
+			t.Errorf("hypercase strip -column %q exited %d, not 2, for a name that breaks the naming rule:\n%s", col, got.code, got.out)
+		}
+	}
+	s.settle(stripModule...)
+	s.hasSections(prices, map[string]string{"out/Old/outcome": "accepted\n", "out/my col/outcome": "accepted\n", "via/Old/quote/A1": "3\n"})
+
+	s.edit(prices, "delete them by hand, as the messages say", func(a *archive.Archive) {
+		drop("via/Old/")(a)
+		drop("out/Old/")(a)
+		drop("out/my col/")(a)
+	})
+	s.passes(s.normal("strip-a"))
+	s.passes(s.run("b", "strip-b", false))
+	s.done()
+}

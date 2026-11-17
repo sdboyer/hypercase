@@ -1172,7 +1172,9 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
     may record otherwise. The failure says the strip reaches the column's
     sections in every archive under the root, and, since strip leaves a
     cell a `gaps` line marks, it says to remove first a line that marks
-    one of theirs;
+    one of theirs. Where the column's name breaks the naming rule, as in
+    `out/Old/…`, strip refuses it as `-column`, so the failure names no
+    strip, and says to delete the sections by hand;
   - a problem of an archive as a whole: a missing description, a top-level
     name outside the closed set, hand-written sections that don't sit
     together, a `properties`

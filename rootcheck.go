@@ -588,10 +588,20 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, by
 	// Sections no registry claims: a column's outputs and a bytes lift's
 	// product, in any case, and a transform's variant, whole, when no
 	// corpus type lists the transform. A claim's strip is the flag that
-	// limits hypercase strip to its sections, and whose names them. A
-	// claim of a bytes lift's product names the lift.
+	// limits hypercase strip to its sections, or "" where strip would
+	// refuse the flag, and whose names them. A claim of a bytes lift's
+	// product names the lift.
 	type claim struct{ what, why, strip, whose, lift string }
 	unclaimed := map[claim][]string{}
+	// hypercase strip refuses a -column or -transform whose name breaks
+	// the naming rule, by archive.ValidName, so it strips no section of
+	// such a name.
+	stripFlag := func(flag, name string) string {
+		if !archive.ValidName(name) {
+			return ""
+		}
+		return flag + " " + name
+	}
 	// The gaps lines that keep strip from removing a claim's sections, as
 	// strip reads the archive's cells, knowing what the registries say of
 	// the columns over the corpus.
@@ -605,21 +615,21 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, by
 	for _, s := range a.Sections {
 		kind, name, rest := archive.SplitCase(s.Name)
 		if kind == archive.Transform && !transforms[name] {
-			c := claim{archive.Transform + "/" + name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s.\nIf a transform should make the variant, list it in its corpus type's Transforms", corpus, name), "-transform " + name, "the sections under transform/" + name + "/", ""}
+			c := claim{archive.Transform + "/" + name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s.\nIf a transform should make the variant, list it in its corpus type's Transforms", corpus, name), stripFlag("-transform", name), "the sections under transform/" + name + "/", ""}
 			unclaimed[c] = append(unclaimed[c], s.Name)
 			keep(c, s.Name)
 			continue
 		}
 		if out, ok := strings.CutPrefix(rest, archive.Out+"/"); ok {
 			if col, _, _ := strings.Cut(out, "/"); !cols[col] {
-				c := claim{col, fmt.Sprintf("no column named %s runs over the corpus %s.\nIf a column should write them, register the column", col, corpus), "-column " + col, col + "'s sections", ""}
+				c := claim{col, fmt.Sprintf("no column named %s runs over the corpus %s.\nIf a column should write them, register the column", col, corpus), stripFlag("-column", col), col + "'s sections", ""}
 				unclaimed[c] = append(unclaimed[c], s.Name)
 				keep(c, s.Name)
 			}
 		}
 		if via, ok := strings.CutPrefix(rest, archive.Via+"/"); ok {
 			if l, _, _ := strings.Cut(via, "/"); !products[l] {
-				c := claim{archive.Via + "/" + l, fmt.Sprintf("no bytes lift named %s runs over the corpus %s.\nIf a bytes lift should write them, register it", l, corpus), "-column " + l, l + "'s sections", l}
+				c := claim{archive.Via + "/" + l, fmt.Sprintf("no bytes lift named %s runs over the corpus %s.\nIf a bytes lift should write them, register it", l, corpus), stripFlag("-column", l), l + "'s sections", l}
 				unclaimed[c] = append(unclaimed[c], s.Name)
 				keep(c, s.Name)
 			}
@@ -631,6 +641,10 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, by
 	}
 	slices.SortFunc(claims, func(a, b claim) int { return strings.Compare(a.what, b.what) })
 	for _, c := range claims {
+		if c.strip == "" {
+			t.Errorf("%s: no registry claims %s: %s. If not, delete them by hand; %s leaves them in place.", rel, andList(unclaimed[c]), c.why, r.updateCmd())
+			continue
+		}
 		// Whether a gaps line keeps strip from removing a lift's product
 		// turns on whether the lift is a bytes lift, so while the
 		// registries differ on that, the advice waits on them.
