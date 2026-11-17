@@ -83,7 +83,9 @@ func TestImportFault(t *testing.T) {
 	// are dropped, so the output reads the same wherever the code moves, and
 	// so is the coverage line a coverage-built binary prints, as the child
 	// is whenever this test's binary is.
-	got := coverage.ReplaceAllString(durations.ReplaceAllString(positions.ReplaceAllString(string(out), ""), ""), "")
+	got := positions.ReplaceAllString(string(out), "$1")
+	got = durations.ReplaceAllString(got, "$1")
+	got = coverage.ReplaceAllString(got, "")
 	if got != importFault {
 		t.Errorf("the update's output:\n%s\nwant:\n%s", got, importFault)
 	}
@@ -95,8 +97,8 @@ func TestImportFault(t *testing.T) {
 }
 
 var (
-	durations = regexp.MustCompile(` \(\d+\.\d+s\)`)
-	positions = regexp.MustCompile(`\S+\.go:\d+: `)
+	durations = regexp.MustCompile(`(?m)^( *--- \w+: \S+) \(\d+\.\d+s\)$`)
+	positions = regexp.MustCompile(`(?m)^( *)[\w.-]+\.go:\d+: `)
 	coverage  = regexp.MustCompile(`(?m)^coverage: .*\n`)
 )
 
