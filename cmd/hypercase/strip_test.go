@@ -1283,31 +1283,46 @@ func TestStripUnreadFindings(t *testing.T) {
 // left are gone: a removed suite's sections, in an archive of each root,
 // and a findings file no check writes. The toy's frozen cells keep their
 // committed files.
+//
+// The toy's go.mod replaces hypercase by ../.., hypercase's own module,
+// where step 9's report test also builds the hypercase command. So the
+// toy is copied to walkthrough/sheets in a copy of that module, which
+// leaves out .git, and, outside the toy, the testdata/ directories: no
+// build reads them, and the module's own tests can be writing them while
+// this one copies.
 func TestStripToys(t *testing.T) {
 	t.Parallel()
 	hc, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
-	src := filepath.Join(hc, "walkthrough", "sheets")
-	dir := t.TempDir()
-	err = filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || d.Name() == archive.LockFile {
+	toy := filepath.Join("walkthrough", "sheets")
+	top := t.TempDir()
+	err = filepath.WalkDir(hc, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
 			return err
+		}
+		rel, _ := filepath.Rel(hc, p)
+		inToy := rel == toy || strings.HasPrefix(rel, toy+string(filepath.Separator))
+		switch {
+		case d.IsDir() && (d.Name() == ".git" || d.Name() == "testdata" && !inToy):
+			return filepath.SkipDir
+		case d.IsDir() || d.Name() == ".git" || d.Name() == archive.LockFile:
+			return nil
 		}
 		data, err := os.ReadFile(p)
 		if err != nil {
 			return err
 		}
-		rel, _ := filepath.Rel(src, p)
-		if err := os.MkdirAll(filepath.Join(dir, filepath.Dir(rel)), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(top, filepath.Dir(rel)), 0o755); err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Join(dir, rel), data, 0o644)
+		return os.WriteFile(filepath.Join(top, rel), data, 0o644)
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	dir := filepath.Join(top, toy)
 	var env []string
 	for _, kv := range os.Environ() {
 		if k, _, _ := strings.Cut(kv, "="); k != "GOFLAGS" && k != "GOWORK" && k != sheetsVar && k != goldenVar && k != "PWD" {
@@ -1323,7 +1338,6 @@ func TestStripToys(t *testing.T) {
 			t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, out)
 		}
 	}
-	goCmd(nil, "mod", "edit", "-replace=github.com/sdboyer/hypercase="+hc)
 	want := tree(t, dir)
 
 	// The toy's corpus roots, as its registries record them.
