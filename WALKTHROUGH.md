@@ -2581,8 +2581,8 @@ not by the archive's name. `view` gives each file of the sheet that
 `sheet.ImportCSV` returns as one of the jenny's files. `decl.Reject` marks
 the jenny's error as the lift's rejection of the case: the importer's own
 error, a `*sheet.Error`, is one. Any other error is no rejection, so it
-fails the cell: an input that is not one file, `csv/<name>.csv`, and a CSV
-the jenny can't read.
+fails the cell: an input that is not one file, `csv/<name>.csv`, an input
+the jenny can't walk, and a CSV it can't read.
 
 `walkthrough/sheets/step10/sheetcorpus/types.go` declares the corpus type,
 its property and the lift:
@@ -2680,7 +2680,7 @@ func init() {
 
 A new corpus directory, `testdata/csv/`. Each archive whose CSV `import`
 accepts holds the product under `via/<lift>/`, and every archive holds the
-cells of every column past the lift. `testdata/csv/prices.txtar`:
+cells of `import` and of every column past it. `testdata/csv/prices.txtar`:
 
 <!-- source: walkthrough/sheets/step10/testdata/csv/prices.txtar -->
 ```
