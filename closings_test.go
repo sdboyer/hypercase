@@ -36,16 +36,18 @@ import (
 // bytes lift, a transform's variant or a cell (the committed side, C).
 // The hand-picked grids, closingGrids, each take one fixture's chain of
 // lifts and its packages. The topology grids, topologyGrids, take every
-// chain of up to maxChain lifts, bytes lifts or stages, with every
-// assignment of its lifts and its suite to two packages, and every way the
-// hand-picked grids make one lift on the chain fail, crossed with each edit
-// of what the archive commits that they make.
+// chain of up to maxChain lifts, bytes lifts or stages, with each
+// assignment of its lifts and its suite to two packages that topologies
+// keeps, and every way the hand-picked grids make one lift on the chain
+// fail, crossed with each edit of what the archive commits that they make;
+// and, in transformGrid, one chain with a transform's variant, on which
+// the transform makes the stage before the bytes lift fail.
 // Each scenario runs a normal run, then an update, of each of the grid's
 // packages, as go test ./... runs them, in children that record each
 // cell's fate and files and whether its test failed, each run of a lift's
 // function, and each note's closing and what it claims, in both runs. A
-// topology grid's scenarios are variants of one archive, which each run
-// reads at once.
+// packed grid's scenarios, every topology grid's but transformGrid's, are
+// variants of one archive, which each run reads at once.
 // Where a note is of a frozen cell with cells past it, or its closing
 // claims what normal runs after the update do, the scenario runs one.
 // Then every note's closing must hold:
@@ -73,14 +75,20 @@ import (
 //   - A note of a variant about no one cell closes on its default.
 //   - No note's body mentions the update, which is its closing's to name:
 //     not the update command, its variable, or the word "update", in any
-//     case.
+//     case. This reads only the bodies the grids' fixtures give, which are
+//     made for the grids, and it would fail a body that quotes what a
+//     corpus holds where that holds the word: TestOneClosing checks the
+//     constants that make every body.
 //
 // In each run, a cell's test fails just where the run gives notes of the
 // cell. What each update record says it wrote is checked against the
 // archive after the update, and what it didn't write is unchanged. The
 // grids together must reach every pair of a note's kind and the form of
-// its closing that a note can give (closingPairs), and every field of a
-// closing's claims, set in some note and unset in another.
+// its closing that a note can give (closingPairs), every field of a
+// closing's claims, set in some note and unset in another, and a closing
+// in which the update stages a transform's variant on what the transform
+// makes and blocks the cell before every bytes lift on its path, where the
+// closing names no bytes lift.
 func TestClosings(t *testing.T) {
 	t.Parallel()
 	kinds := hypercase.NoteKinds(t)
@@ -90,6 +98,7 @@ func TestClosings(t *testing.T) {
 	reached := map[closingPair]string{} // each pair, and the scenario first by name that reached it
 	count := map[closingPair]int{}      // how many notes give each pair
 	set, unset := map[string]string{}, map[string]string{}
+	var restaged string // the scenario first by name whose notes reach restaged
 	total, ran := 0, 0
 	first := func(m map[string]string, k, name string) {
 		if was, ok := m[k]; !ok || name < was {
@@ -111,6 +120,9 @@ func TestClosings(t *testing.T) {
 		}
 		for f := range got.unset {
 			first(unset, f, name)
+		}
+		if got.restaged && (restaged == "" || name < restaged) {
+			restaged = name
 		}
 	}
 	t.Run("grid", func(t *testing.T) {
@@ -165,6 +177,11 @@ func TestClosings(t *testing.T) {
 		if _, ok := unset[f]; !ok {
 			t.Errorf("every note the scenarios give claims %s, so none shows a closing without it.\nAdd a scenario whose note doesn't to a grid in closingGrids.", f)
 		}
+	}
+	if restaged == "" {
+		t.Errorf("no scenario gives a closing in which the update stages a transform's variant on what the transform makes, and blocks the cell before every bytes lift on its path.\nAdd a scenario that does to transformGrid.")
+	} else {
+		t.Logf("the update stages a transform's variant and blocks a cell before every bytes lift on its path first in %s", restaged)
 	}
 }
 
@@ -327,7 +344,7 @@ func (g closingGrid) clean(t *testing.T) map[string][]byte {
 	}
 	for i, r := range g.runAll(s, true, "") {
 		if !r.ok() {
-			t.Fatalf("the first update of %s failed:\n%s", g.pkgs[i].pkg, r.out)
+			t.Fatalf("the first update of %s failed:\n%s", g.pkgs[i].pkg, s.shown(r))
 		}
 	}
 	return s.snapshot()
@@ -335,9 +352,11 @@ func (g closingGrid) clean(t *testing.T) map[string][]byte {
 
 // runAll runs each package at once, as go test ./... runs them, each
 // recording what it observes to observe, then its index, if observe isn't
-// "".
-func (g closingGrid) runAll(s *sandbox, update bool, observe string) []result {
-	results := make([]result, len(g.pkgs))
+// "". What each child wrote is left as it wrote it, for the caller to
+// show on a failure: the grids read the records, and a packed grid's
+// children write a line for each of its scenarios' cells.
+func (g closingGrid) runAll(s *sandbox, update bool, observe string) []rawResult {
+	results := make([]rawResult, len(g.pkgs))
 	var wg sync.WaitGroup
 	for i, c := range g.pkgs {
 		wg.Add(1)
@@ -348,7 +367,7 @@ func (g closingGrid) runAll(s *sandbox, update bool, observe string) []result {
 			if observe != "" {
 				env = append(env, fmt.Sprintf("%s=%s-%d.jsonl", observeEnv, observe, i))
 			}
-			results[i] = s.exec(c.pkg, c.registration, env)
+			results[i] = s.execRaw(c.pkg, c.registration, env)
 		}()
 	}
 	wg.Wait()
@@ -356,10 +375,14 @@ func (g closingGrid) runAll(s *sandbox, update bool, observe string) []result {
 }
 
 // What a scenario's notes reach: the pairs of a normal run's notes, and
-// the fields of the claims some note sets, and some note leaves unset.
+// the fields of the claims some note sets, and some note leaves unset, and
+// whether a normal run's closing says the update stages a transform's
+// variant on what the transform makes and blocks the cell before every
+// bytes lift on its path, where it names no bytes lift: restaged.
 type reach struct {
 	pairs      []closingPair
 	set, unset map[string]bool
+	restaged   bool
 }
 
 // run runs one scenario, and the runs after it that its closings' claims
@@ -372,14 +395,14 @@ func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario,
 	for _, e := range sc.edits {
 		s.edit(g.archive, e.name, e.fn)
 	}
-	before := archive.Parse(s.read(g.archive))
+	before := index(archive.Parse(s.read(g.archive)))
 	dir := t.TempDir()
-	var logs []string
+	var logs childLogs
 	runs := func(name string, update bool) []hypercase.Observed {
 		rs := g.runAll(s, update, filepath.Join(dir, name))
 		var obs []hypercase.Observed
 		for i, r := range rs {
-			logs = append(logs, fmt.Sprintf("the %s run of %s:\n%s", name, g.pkgs[i].registration, r.out))
+			logs = append(logs, childLog{name, g.pkgs[i].registration, r})
 			obs = append(obs, readObserved(t, filepath.Join(dir, fmt.Sprintf("%s-%d.jsonl", name, i)))...)
 		}
 		return obs
@@ -387,17 +410,32 @@ func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario,
 	j := &judge{g: g, t: t, kinds: kinds, before: before}
 	j.normal = runs("normal", false)
 	j.update = runs("update", true)
-	j.u = &updated{after: archive.Parse(s.read(g.archive)), cells: cells(j.update), lifts: liftRuns(j.update), owners: g.owners(t, s)}
+	j.u = &updated{after: index(archive.Parse(s.read(g.archive))), cells: cells(j.update), lifts: liftRuns(j.update, false), owners: g.owners(t, s), normal: cells(j.normal), normalLifts: liftRuns(j.normal, true)}
 	if j.needsPost() {
 		j.u.post = cells(runs("post", false))
 	}
 	j.judge()
 	if t.Failed() {
-		for _, l := range logs {
-			t.Log(l)
-		}
+		logs.log(t, s)
 	}
 	return j.reach
+}
+
+// childLogs are a scenario's runs of its children, which its test logs
+// when it fails: each run, the registration it ran, and what it left.
+type childLogs []childLog
+
+type childLog struct {
+	run, registration string
+	r                 rawResult
+}
+
+// log logs each run, with what its child wrote, normalized.
+func (ls childLogs) log(t *testing.T, s *sandbox) {
+	t.Helper()
+	for _, l := range ls {
+		t.Logf("the %s run of %s:\n%s", l.run, l.registration, s.shown(l.r))
+	}
 }
 
 // runPacked runs a packed grid's scenarios, and the runs after them that
@@ -410,57 +448,114 @@ func (g closingGrid) runPacked(t *testing.T, clean map[string][]byte, kinds map[
 		s.write(p, clean[p], "the clean fixture")
 	}
 	s.edit(g.archive, "the scenarios", func(a *archive.Archive) {
-		for _, sc := range g.scenarios {
-			for _, e := range sc.edits {
-				e.fn(a)
+		// Each scenario edits its variant's sections alone, so its edits
+		// read those, and not every section of the archive.
+		var order []string
+		of := map[string][]archive.Section{}
+		for _, sec := range a.Sections {
+			prefix := ""
+			if kind, name, _ := archive.SplitCase(sec.Name); kind != "" {
+				prefix = kind + "/" + name + "/"
 			}
+			if _, ok := of[prefix]; !ok {
+				order = append(order, prefix)
+			}
+			of[prefix] = append(of[prefix], sec)
+		}
+		for _, sc := range g.scenarios {
+			prefix := packedPrefix(sc.name) + "/"
+			v := &archive.Archive{Sections: of[prefix]}
+			for _, e := range sc.edits {
+				e.fn(v)
+			}
+			for _, sec := range v.Sections {
+				if !strings.HasPrefix(sec.Name, prefix) {
+					t.Fatalf("the scenario %s edits %s, which is no section of its variant's", sc.name, sec.Name)
+				}
+			}
+			if _, ok := of[prefix]; !ok {
+				order = append(order, prefix)
+			}
+			of[prefix] = v.Sections
+		}
+		a.Sections = nil
+		for _, prefix := range order {
+			a.Sections = append(a.Sections, of[prefix]...)
 		}
 		*a = *a.Place()
 		if ps := a.Check(); len(ps) > 0 {
 			t.Fatalf("the scenarios make an archive with problems of form: %v", ps)
 		}
 	})
-	before := archive.Parse(s.read(g.archive))
+	before := index(archive.Parse(s.read(g.archive)))
 	dir := t.TempDir()
-	runs := func(name string, update bool) []hypercase.Observed {
+	var logs childLogs
+	runs := func(name string, update bool) map[string][]hypercase.Observed {
 		var obs []hypercase.Observed
 		for i, r := range g.runAll(s, update, filepath.Join(dir, name)) {
+			logs = append(logs, childLog{name, g.pkgs[i].registration, r})
 			got := readObserved(t, filepath.Join(dir, fmt.Sprintf("%s-%d.jsonl", name, i)))
 			if len(got) == 0 {
-				t.Fatalf("the %s run of %s recorded nothing:\n%s", name, g.pkgs[i].registration, r.out)
+				t.Fatalf("the %s run of %s recorded nothing:\n%s", name, g.pkgs[i].registration, s.shown(r))
 			}
 			obs = append(obs, got...)
 		}
-		return obs
+		return byCase(obs)
 	}
 	normal, update := runs("normal", false), runs("update", true)
-	u := updated{after: archive.Parse(s.read(g.archive)), owners: g.owners(t, s)}
+	u := updated{after: index(archive.Parse(s.read(g.archive))), owners: g.owners(t, s)}
+	// The cases judged: the base, and each scenario's variant. Every record
+	// is of one of them.
 	base := strings.TrimSuffix(strings.TrimPrefix(g.archive, "testdata/"), ".txtar")
-	judges := make([]*judge, len(g.scenarios))
+	cases := []string{base}
+	for _, sc := range g.scenarios {
+		cases = append(cases, base+"/"+packedPrefix(sc.name))
+	}
+	judged := map[string]bool{}
+	for _, c := range cases {
+		judged[c] = true
+	}
+	for _, run := range []map[string][]hypercase.Observed{normal, update} {
+		for _, c := range slices.Sorted(maps.Keys(run)) {
+			if !judged[c] {
+				t.Errorf("the runs record the case %s, which no judge reads: %+v", c, run[c][0])
+			}
+		}
+	}
+	judges := make([]*judge, len(cases))
 	post := false
-	for i, sc := range g.scenarios {
-		c := base + "/" + packedPrefix(sc.name)
-		j := &judge{g: g, kinds: kinds, before: before, normal: ofCase(normal, c), update: ofCase(update, c)}
+	for i, c := range cases {
+		j := &judge{g: g, kinds: kinds, before: before, normal: normal[c], update: update[c]}
 		ju := u
-		ju.cells, ju.lifts = cells(j.update), liftRuns(j.update)
+		ju.cells, ju.lifts = cells(j.update), liftRuns(j.update, false)
+		ju.normal, ju.normalLifts = cells(j.normal), liftRuns(j.normal, true)
 		j.u = &ju
 		post = post || j.needsPost()
 		judges[i] = j
 	}
 	if post {
 		obs := runs("post", false)
-		for i, sc := range g.scenarios {
-			judges[i].u.post = cells(ofCase(obs, base+"/"+packedPrefix(sc.name)))
+		for i, c := range cases {
+			judges[i].u.post = cells(obs[c])
 		}
 	}
+	// The base is judged as each scenario is, and what its notes reach is
+	// no scenario's.
+	t.Run("base", func(t *testing.T) {
+		judges[0].t = t
+		judges[0].judge()
+	})
 	out := map[string]reach{}
 	for i, sc := range g.scenarios {
 		t.Run(sc.name, func(t *testing.T) {
-			j := judges[i]
+			j := judges[i+1]
 			j.t = t
 			j.judge()
 			out[sc.name] = j.reach
 		})
+	}
+	if t.Failed() {
+		logs.log(t, s)
 	}
 	return out
 }
@@ -468,13 +563,11 @@ func (g closingGrid) runPacked(t *testing.T, clean map[string][]byte, kinds map[
 // packedPrefix names the variant that holds a packed grid's scenario.
 func packedPrefix(scenario string) string { return "variant/" + scenario }
 
-// ofCase returns the records of the case c.
-func ofCase(os []hypercase.Observed, c string) []hypercase.Observed {
-	var out []hypercase.Observed
-	for _, o := range os {
-		if o.Case == c {
-			out = append(out, o)
-		}
+// byCase returns records by their case.
+func byCase(obs []hypercase.Observed) map[string][]hypercase.Observed {
+	out := map[string][]hypercase.Observed{}
+	for _, o := range obs {
+		out[o.Case] = append(out[o.Case], o)
 	}
 	return out
 }
@@ -505,7 +598,7 @@ func (g closingGrid) owners(t *testing.T, s *sandbox) map[string]bool {
 // archive package: the base's gaps marks the base's cells and, with lines
 // that start with transform/<name>, a transform's variant's, and a
 // hand-written variant's own gaps mark its cells.
-func marked(a *archive.Archive, prefix, col string) bool {
+func marked(x *indexed, prefix, col string) bool {
 	section, lead := "gaps", col+" "
 	switch kind, name, _ := strings.Cut(strings.TrimSuffix(prefix, "/"), "/"); kind {
 	case "transform":
@@ -513,8 +606,8 @@ func marked(a *archive.Archive, prefix, col string) bool {
 	case "variant":
 		section = prefix + "gaps"
 	}
-	data, _ := a.Section(section)
-	for _, l := range strings.Split(string(data), "\n") {
+	data := x.byName[section]
+	for _, l := range strings.Split(data, "\n") {
 		if strings.HasPrefix(l, lead) {
 			return true
 		}
@@ -549,31 +642,35 @@ type judge struct {
 	g              closingGrid
 	t              *testing.T
 	kinds          map[int]string
-	before         *archive.Archive
+	before         *indexed
 	normal, update []hypercase.Observed
 	u              *updated
 	reach          reach
 }
 
-// updated is what the update did, which a claim's check observes: every
+// updated is what the runs did, which a claim's check observes: every
 // cell's record in the update, and the note's cell's, the archive after
 // it, the lifts whose functions it ran, the transforms the registries it
 // wrote record a package owns, and each cell's record in the normal run
-// after it, where the scenario runs one.
+// after it, where the scenario runs one; and of the normal run before it,
+// each cell's record and the lifts whose functions it ran, in its staging
+// of a case as its update stages it too.
 type updated struct {
-	cell   hypercase.Observed
-	cells  map[cellKey]hypercase.Observed
-	after  *archive.Archive
-	lifts  map[liftKey]bool
-	owners map[string]bool
-	post   map[cellKey]hypercase.Observed
+	cell        hypercase.Observed
+	cells       map[cellKey]hypercase.Observed
+	after       *indexed
+	lifts       map[liftKey]bool
+	owners      map[string]bool
+	post        map[cellKey]hypercase.Observed
+	normal      map[cellKey]hypercase.Observed
+	normalLifts map[liftKey]bool
 }
 
 type cellKey struct{ pkg, c, prefix, col string }
 
-func cells(os []hypercase.Observed) map[cellKey]hypercase.Observed {
+func cells(obs []hypercase.Observed) map[cellKey]hypercase.Observed {
 	m := map[cellKey]hypercase.Observed{}
-	for _, o := range os {
+	for _, o := range obs {
 		if o.Record == "cell" {
 			m[cellKey{o.Pkg, o.Case, o.Prefix, o.Column}] = o
 		}
@@ -585,12 +682,12 @@ func cells(os []hypercase.Observed) map[cellKey]hypercase.Observed {
 type liftKey struct{ pkg, c, lift string }
 
 // liftRuns are the lifts whose functions a run ran, on each case, in each
-// package, but in a normal run's staging of a case as its update stages
-// it.
-func liftRuns(os []hypercase.Observed) map[liftKey]bool {
+// package, but, where asUpdate is false, in a normal run's staging of a
+// case as its update stages it.
+func liftRuns(obs []hypercase.Observed, asUpdate bool) map[liftKey]bool {
 	m := map[liftKey]bool{}
-	for _, o := range os {
-		if o.Record == "lift" && !o.AsUpdate {
+	for _, o := range obs {
+		if o.Record == "lift" && (asUpdate || !o.AsUpdate) {
 			m[liftKey{o.Pkg, o.Case, o.Lift}] = true
 		}
 	}
@@ -682,7 +779,7 @@ func (j *judge) judge() {
 		default:
 			bad("the note's form is %q", form)
 		}
-		for _, name := range slices.Sorted(maps.Keys(claimChecks)) {
+		for _, name := range checkNames {
 			if msg := claimChecks[name].check(c, &u); msg != "" {
 				bad("%s: %s", name, msg)
 			}
@@ -697,6 +794,9 @@ func (j *judge) judge() {
 		}
 		if n.Column == "" && form != "default" {
 			bad("a variant's note about no one cell has a %s closing", form)
+		}
+		if c.cl.Variant != "" && strings.HasPrefix(c.cl.Does, "blocked ") && c.cl.Reruns == "" && len(u.cell.Path) > 0 {
+			j.reach.restaged = true
 		}
 		if n.Declined {
 			// The update declines the variant too.
@@ -768,8 +868,9 @@ func runName(update bool) string {
 // names it, the archive before the runs, and, for a note of a cell, this
 // run's record of the cell: the normal run's, or, for an update's note, the
 // update's.
-// What the update did is the check's other argument, so a check that
-// observes nothing of it names no such argument.
+// What the runs did, the update and the normal run's records of the cells
+// and lifts, is the check's other argument, so a check that observes
+// nothing of them names no such argument.
 type noteCheck struct {
 	g      closingGrid
 	n      hypercase.Observed
@@ -777,7 +878,7 @@ type noteCheck struct {
 	kind   string
 	cell   bool
 	this   hypercase.Observed
-	before *archive.Archive
+	before *indexed
 }
 
 // staged reports whether the closing says what the update does, or that
@@ -785,22 +886,26 @@ type noteCheck struct {
 func (c *noteCheck) staged() bool { return c.cl.Does != "" || c.cl.CantTell != "" }
 
 // section returns a section of an archive, and whether it has it.
-func section(a *archive.Archive, name string) (string, bool) {
-	data, ok := a.Section(name)
-	return string(data), ok
+func section(x *indexed, name string) (string, bool) {
+	data, ok := x.byName[name]
+	return data, ok
 }
 
 // out names a file of the note's cell, by its path under out/<column>/.
 func (c *noteCheck) out(p string) string { return c.n.Prefix + "out/" + c.n.Column + "/" + p }
 
 // A claimCheck checks one field of a closing's claims against what the
-// update did, u, and returns what is wrong, or "". unobserved says why
-// the check observes nothing the update did, where it doesn't, and only
-// there: TestClaimChecks requires it of a check that never reads u.
+// runs did, u, and returns what is wrong, or "". unobserved says why
+// the check observes nothing the runs did, where it doesn't, and only
+// there: TestClaimChecks requires it of a check that never observes u.
 type claimCheck struct {
 	check      func(c *noteCheck, u *updated) string
 	unobserved string
 }
+
+// checkNames are claimChecks' fields, sorted, in the order the judge runs
+// their checks.
+var checkNames = slices.Sorted(maps.Keys(claimChecks))
 
 // claimChecks check each field of a closing's claims. TestClaimChecks
 // fails on a field of the claims with no check here, so no closing claims
@@ -886,30 +991,7 @@ var claimChecks = map[string]claimCheck{
 		case want == "":
 			return ""
 		}
-		data, _ := c.before.Section(c.n.Prefix + "out/" + want + "/" + archive.OutcomeFile)
-		o, err := archive.ParseOutcome(data)
-		accepted := err == nil && o.State == archive.Accepted
-		product := map[string]string{}
-		for _, s := range c.before.Sections {
-			if p, ok := strings.CutPrefix(s.Name, c.n.Prefix+"via/"+want+"/"); ok {
-				product[p] = string(s.Data)
-			}
-		}
-		wantFate := "blocked " + want
-		if err == nil && o.State == archive.Blocked {
-			wantFate = "blocked " + o.Detail
-		}
-		blocker, blocked := strings.CutPrefix(c.this.Fate, "blocked ")
-		switch {
-		case !accepted && c.this.Fate != wantFate:
-			return fmt.Sprintf("the closing says a normal run reads %s's outcome, which the archive commits as %q, and the normal run's cell's fate is %q", want, data, c.this.Fate)
-		case !accepted:
-		case !blocked && !maps.Equal(c.this.View, product):
-			return fmt.Sprintf("the closing says a normal run reads %s's product, whose committed outcome is accepted, and the normal run's cell's input view isn't the committed product: %v", want, c.this.View)
-		case blocked && (slices.Contains(u.cell.Path, blocker) || c.this.Fate == c.cl.Does):
-			return fmt.Sprintf("the closing says a normal run reads %s's product, whose committed outcome is accepted, and the normal run's cell is blocked by %s, a bytes lift on its path or the lift the update fails", want, blocker)
-		}
-		return ""
+		return readsCommitted(c.before, c.n.Prefix, want, c.this, u.cell.Path, c.cl.Does)
 	}},
 	// Where the update writes nothing for a cell past a bytes lift whose
 	// cell it writes nothing for, its fate there, a closing that says what
@@ -951,16 +1033,40 @@ var claimChecks = map[string]claimCheck{
 		}
 		return ""
 	}},
-	"CantTell": {check: func(c *noteCheck, _ *updated) string {
+	// The bytes lift a closing says the package can't tell past is the
+	// last on the cell's path that the package doesn't own, as the grid's
+	// registrations say. Only its owner runs it in a normal run: this
+	// package's normal run ran its function on the case nowhere, in its
+	// staging as the update stages it neither, and took what the archive
+	// commits for it, as its record of the cell past the lift, the next
+	// bytes lift on the path or the cell itself, shows.
+	"CantTell": {check: func(c *noteCheck, u *updated) string {
 		var want string
 		if c.cell && !c.n.Update {
 			want = c.g.unowned[c.n.Pkg+" "+c.n.Column]
 		}
-		if c.cl.CantTell != want {
+		switch {
+		case c.cl.CantTell != want:
 			return fmt.Sprintf("the closing says the package can't tell, as it doesn't own %q, and the bytes lift on the cell's path it doesn't own is %q", c.cl.CantTell, want)
+		case want == "":
+			return ""
+		case u.normalLifts[liftKey{c.n.Pkg, c.n.Case, want}]:
+			return fmt.Sprintf("the closing says only the package that owns %s runs it in a normal run, and this package's normal run ran it on the case", want)
 		}
-		return ""
-	}, unobserved: "the claim is that this package doesn't own the lift, so it can't tell what the update does, and reads the lift's outcome and product from the archive: which package owns which lift is the grid's registrations, which unowned records, and no run of the update shows what a package can't tell. It says nothing the update does, but how it stages a variant, which is Variant's"},
+		i := slices.Index(u.cell.Path, want)
+		if i < 0 {
+			return fmt.Sprintf("the closing names %s, which no bytes lift on the cell's path, %v, is", want, u.cell.Path)
+		}
+		col := c.n.Column
+		if i > 0 {
+			col = u.cell.Path[i-1]
+		}
+		r, ok := u.normal[cellKey{c.n.Pkg, c.n.Case, c.n.Prefix, col}]
+		if !ok {
+			return fmt.Sprintf("the closing says a normal run reads %s's outcome and product, and the normal run recorded no cell of %s, past it", want, col)
+		}
+		return readsCommitted(c.before, c.n.Prefix, want, r, u.cell.Path, "")
+	}},
 	// The cells past a frozen lift fail in normal runs when the update
 	// writes them from what the lift makes now, and a normal run reads the
 	// frozen cell's committed outcome and product, which the update leaves
@@ -1209,7 +1315,7 @@ func inputsMade(c *noteCheck, u *updated, tr string) string {
 		return fmt.Sprintf("the closing names %s's inputs, and the note is of %s", tr, c.n.Case)
 	}
 	var vc *archive.VariantCase
-	for _, v := range u.after.Variants() {
+	for _, v := range u.after.a.Variants() {
 		if v.Kind == archive.Transform && v.Name == tr {
 			vc = &v
 		}
@@ -1217,7 +1323,7 @@ func inputsMade(c *noteCheck, u *updated, tr string) string {
 	if vc == nil || !vc.Inputs {
 		return fmt.Sprintf("the closing says the update writes %s's inputs, and the archive holds none", tr)
 	}
-	view, ps := u.after.Base().InputView(*vc)
+	view, ps := u.after.a.Base().InputView(*vc)
 	if len(ps) > 0 {
 		return fmt.Sprintf("the closing says the update writes %s's inputs, and those the archive holds are invalid: %v", tr, ps)
 	}
@@ -1240,6 +1346,34 @@ func inputsMade(c *noteCheck, u *updated, tr string) string {
 	return ""
 }
 
+// readsCommitted checks that r, a normal run's record of a cell with no
+// bytes lift between it and the bytes lift l on its path, took what the
+// archive before the runs commits for l. An outcome other than accepted
+// blocks the cell, by the lift a blocked one names, or by l itself. An
+// accepted one gives its product, which is the cell's input view, or
+// which a lift past l fails on: one that isn't a bytes lift on path, and
+// whose block isn't the fate notFate. It returns what is wrong, or "".
+func readsCommitted(before *indexed, prefix, l string, r hypercase.Observed, path []string, notFate string) string {
+	data, _ := section(before, prefix+"out/"+l+"/"+archive.OutcomeFile)
+	o, err := archive.ParseOutcome([]byte(data))
+	accepted := err == nil && o.State == archive.Accepted
+	wantFate := "blocked " + l
+	if err == nil && o.State == archive.Blocked {
+		wantFate = "blocked " + o.Detail
+	}
+	blocker, blocked := strings.CutPrefix(r.Fate, "blocked ")
+	switch {
+	case !accepted && r.Fate != wantFate:
+		return fmt.Sprintf("the closing says a normal run reads %s's outcome, which the archive commits as %q, and the normal run's fate of %s is %q", l, data, r.Column, r.Fate)
+	case !accepted:
+	case !blocked && !maps.Equal(r.View, product(before, prefix, l)):
+		return fmt.Sprintf("the closing says a normal run reads %s's product, whose committed outcome is accepted, and the normal run's input view of %s isn't the committed product: %v", l, r.Column, r.View)
+	case blocked && (slices.Contains(path, blocker) || r.Fate == notFate):
+		return fmt.Sprintf("the closing says a normal run reads %s's product, whose committed outcome is accepted, and the normal run blocks %s by %s, a bytes lift on its path or the lift the update fails", l, r.Column, blocker)
+	}
+	return ""
+}
+
 // viewFiles returns an input view's files, by path.
 func viewFiles(view fs.FS) (map[string]string, error) {
 	paths, err := archive.Paths(view)
@@ -1258,10 +1392,11 @@ func viewFiles(view fs.FS) (map[string]string, error) {
 }
 
 // TestClaimChecks: claimChecks checks each field of a closing's claims,
-// and names no other. A check observes what the update did through its
-// second argument alone, so one that names it _, or never reads it, as
-// reads tells, observes nothing the update did: it, and only it, says why
-// in unobserved. The type checker reads the checks' source in this file.
+// and names no other. A check observes what the runs did through its
+// second argument alone, so one that names it _, or never observes it, as
+// an observer tells, observes nothing the runs did: it, and only it,
+// says why in unobserved. The type checker reads the checks' source in
+// this file.
 func TestClaimChecks(t *testing.T) {
 	var fields []string
 	for f := range reflect.TypeFor[hypercase.Claims]().Fields() {
@@ -1283,17 +1418,17 @@ func TestClaimChecks(t *testing.T) {
 		case !ok:
 			t.Errorf("claimChecks' check of %s is no func literal in claimChecks' source, so TestClaimChecks can't tell what it observes", name)
 		case !o && unobserved == "":
-			t.Errorf("claimChecks' check of %s observes nothing the update did: it never reads its second argument.\nCheck the claim against what the update did, or say in unobserved why no observation of the update can check it.", name)
+			t.Errorf("claimChecks' check of %s observes nothing the runs did: it takes no selector, index or method call on its second argument, or on an alias of it, and passes it to no function that does.\nCheck the claim against what the runs did, or say in unobserved why no observation of the runs can check it.", name)
 		case o && unobserved != "":
-			t.Errorf("claimChecks' check of %s says it observes nothing the update did, and reads its second argument", name)
+			t.Errorf("claimChecks' check of %s says it observes nothing the runs did, and observes its second argument", name)
 		}
 	}
 }
 
 // checksObserving reports, for each check of claimChecks, by its field,
-// whether its func literal reads its second parameter, what the update
-// did, as reads tells, in claimChecks' source in this file, which the type
-// checker reads with the rest of this package.
+// whether its func literal observes its second parameter, what the update
+// did, as an observer tells, in claimChecks' source in this file, which
+// the type checker reads with the rest of this package.
 func checksObserving(t *testing.T) map[string]bool {
 	t.Helper()
 	tf := xtestTypes(t)
@@ -1324,7 +1459,7 @@ func checksObserving(t *testing.T) map[string]bool {
 							continue
 						}
 						if lit, ok := fkv.Value.(*ast.FuncLit); ok {
-							out[name] = readsParam(tf.info, lit, 1)
+							out[name] = readsParam(tf.info, tf.files, lit, 1)
 						}
 					}
 				}
@@ -1334,40 +1469,198 @@ func checksObserving(t *testing.T) map[string]bool {
 	return out
 }
 
-// readsParam reports whether a func literal's body reads its parameter i,
-// as reads tells. A parameter with no name, or named _, is read nowhere.
-func readsParam(info *types.Info, lit *ast.FuncLit, i int) bool {
-	var params []*ast.Ident
-	for _, p := range lit.Type.Params.List {
-		params = append(params, p.Names...)
-	}
-	if i >= len(params) || params[i].Name == "_" {
-		return false
-	}
-	return reads(info, lit.Body, info.Defs[params[i]])
+// readsParam reports whether a func literal's body observes its parameter
+// i, as an observer of the files tells. A parameter with no name, or named
+// _, is observed nowhere.
+func readsParam(info *types.Info, files []*ast.File, lit *ast.FuncLit, i int) bool {
+	return newObserver(info, files).observesParam(lit.Type, lit.Body, i)
 }
 
-// reads reports whether body reads the object v, as the type checker
-// resolves each name in it, so a name that shadows v is another object:
-// whether it names v otherwise than as what an assignment assigns to,
-// directly or through its fields, elements or pointer, and otherwise than
-// in what an assignment to blank identifiers alone assigns, which keeps
-// nothing it reads.
-func reads(info *types.Info, body ast.Node, v types.Object) bool {
-	read := false
+// An observer tells whether code observes an object, in the files the
+// type checker read: the package's functions, by their objects, are what
+// it follows a passed object into, and busy holds the parameters whose
+// functions it is following, so a function that passes a parameter back
+// to itself observes it only by what else it does with it.
+type observer struct {
+	info  *types.Info
+	funcs map[types.Object]*ast.FuncDecl
+	busy  map[types.Object]bool
+}
+
+func newObserver(info *types.Info, files []*ast.File) *observer {
+	o := &observer{info: info, funcs: map[types.Object]*ast.FuncDecl{}, busy: map[types.Object]bool{}}
+	for _, f := range files {
+		for _, d := range f.Decls {
+			if fd, ok := d.(*ast.FuncDecl); ok && fd.Body != nil {
+				o.funcs[info.Defs[fd.Name]] = fd
+			}
+		}
+	}
+	return o
+}
+
+// observesParam reports whether body observes the parameter i of the
+// function type ft. A variadic parameter takes every argument from its
+// index on.
+func (o *observer) observesParam(ft *ast.FuncType, body *ast.BlockStmt, i int) bool {
+	var params []*ast.Ident
+	for _, p := range ft.Params.List {
+		params = append(params, p.Names...)
+	}
+	if n := len(ft.Params.List); n > 0 && len(params) > 0 && i >= len(params) {
+		if _, ok := ft.Params.List[n-1].Type.(*ast.Ellipsis); ok {
+			i = len(params) - 1
+		}
+	}
+	if i >= len(params) || params[i].Name == "_" || body == nil {
+		return false
+	}
+	v := o.info.Defs[params[i]]
+	if o.busy[v] {
+		return false
+	}
+	o.busy[v] = true
+	defer delete(o.busy, v)
+	return o.observes(body, v)
+}
+
+// observes reports whether body observes the object v, as the type
+// checker resolves each name in it, so a name that shadows v is another
+// object. An observation is a selector, an index or a method call on v or
+// an alias of it, through parentheses and pointers, or passing either to a
+// func literal, or a function of the package called by its name, that
+// observes the parameter it takes it as. Neither is one where it is what
+// an assignment assigns to, or reaches through, or is in what an
+// assignment to blank identifiers alone assigns, which keeps nothing it
+// reads. Anything else that names v observes nothing of it: an alias, a
+// comparison of it, as with nil, returning it, or passing it to a
+// builtin, a conversion, a function value, or a function this package
+// doesn't declare.
+func (o *observer) observes(body ast.Node, v types.Object) bool {
+	aliases := o.aliases(body, v)
+	seen := false
 	var stack []ast.Node
 	ast.Inspect(body, func(n ast.Node) bool {
 		if n == nil {
 			stack = stack[:len(stack)-1]
 			return true
 		}
-		if id, ok := n.(*ast.Ident); ok && info.Uses[id] == v && !discarded(stack, id) {
-			read = true
+		if id, ok := n.(*ast.Ident); ok && !seen && aliases[o.info.Uses[id]] {
+			seen = o.observation(stack, id) && !discarded(stack, id)
 		}
 		stack = append(stack, n)
 		return true
 	})
-	return read
+	return seen
+}
+
+// observation reports whether an identifier, under the nodes of stack,
+// outermost first, is what a selector, an index or a call's argument
+// observes, through parentheses and pointers.
+func (o *observer) observation(stack []ast.Node, id *ast.Ident) bool {
+	var child ast.Node = id
+	for i := len(stack) - 1; i >= 0; i-- {
+		switch p := stack[i].(type) {
+		case *ast.ParenExpr:
+		case *ast.StarExpr:
+		case *ast.SelectorExpr:
+			return p.X == child
+		case *ast.IndexExpr:
+			return p.X == child
+		case *ast.IndexListExpr:
+			return p.X == child
+		case *ast.CallExpr:
+			arg := slices.Index(p.Args, child.(ast.Expr))
+			return arg >= 0 && o.observesArg(p, arg)
+		default:
+			return false
+		}
+		child = stack[i]
+	}
+	return false
+}
+
+// observesArg reports whether the function a call calls observes its
+// argument i: a func literal, or a function or method of the package.
+func (o *observer) observesArg(call *ast.CallExpr, i int) bool {
+	var id *ast.Ident
+	switch fun := ast.Unparen(call.Fun).(type) {
+	case *ast.FuncLit:
+		return o.observesParam(fun.Type, fun.Body, i)
+	case *ast.Ident:
+		id = fun
+	case *ast.SelectorExpr:
+		id = fun.Sel
+	case *ast.IndexExpr:
+		id, _ = ast.Unparen(fun.X).(*ast.Ident)
+	case *ast.IndexListExpr:
+		id, _ = ast.Unparen(fun.X).(*ast.Ident)
+	}
+	if id == nil {
+		return false
+	}
+	f, ok := o.info.Uses[id].(*types.Func)
+	if !ok {
+		return false
+	}
+	fd, ok := o.funcs[f.Origin()]
+	if !ok {
+		return false
+	}
+	return o.observesParam(fd.Type, fd.Body, i)
+}
+
+// aliases returns v and the variables body assigns it to, or an alias of
+// it, through parentheses and pointers, each named in an assignment or a
+// declaration.
+func (o *observer) aliases(body ast.Node, v types.Object) map[types.Object]bool {
+	set := map[types.Object]bool{v: true}
+	of := func(e ast.Expr) bool {
+		for {
+			switch x := e.(type) {
+			case *ast.ParenExpr:
+				e = x.X
+			case *ast.StarExpr:
+				e = x.X
+			case *ast.Ident:
+				return set[o.info.Uses[x]]
+			default:
+				return false
+			}
+		}
+	}
+	for grew := true; grew; {
+		grew = false
+		add := func(l *ast.Ident, r ast.Expr) {
+			obj := o.info.Defs[l]
+			if obj == nil {
+				obj = o.info.Uses[l]
+			}
+			if obj != nil && !set[obj] && of(r) {
+				set[obj], grew = true, true
+			}
+		}
+		ast.Inspect(body, func(n ast.Node) bool {
+			switch s := n.(type) {
+			case *ast.AssignStmt:
+				if len(s.Lhs) == len(s.Rhs) {
+					for i, l := range s.Lhs {
+						if id, ok := ast.Unparen(l).(*ast.Ident); ok {
+							add(id, s.Rhs[i])
+						}
+					}
+				}
+			case *ast.ValueSpec:
+				if len(s.Names) == len(s.Values) {
+					for i, l := range s.Names {
+						add(l, s.Values[i])
+					}
+				}
+			}
+			return true
+		})
+	}
+	return set
 }
 
 // discarded reports whether an identifier, under the nodes of stack,
@@ -1406,32 +1699,88 @@ func isBlank(e ast.Expr) bool {
 	return ok && id.Name == "_"
 }
 
-// TestReads: whether a claim's check observes what the update did is
-// whether its func literal reads its second parameter, which reads tells:
-// a name that shadows the parameter is another object, and an assignment
-// to it, or to blank identifiers alone, reads nothing it keeps.
+// TestReads: whether a claim's check observes what the runs did is
+// whether its func literal observes its second parameter, which an
+// observer tells: a selector, an index or a method call on it or an alias
+// of it, or passing either to a function that observes it. A name that
+// shadows the parameter is another object, an assignment to it, or to
+// blank identifiers alone, keeps nothing it reads, and an alias, a
+// comparison with nil, or a builtin's argument observes nothing.
 func TestReads(t *testing.T) {
 	t.Parallel()
 	const src = `package p
 
 type updated struct{ n int }
 
+func (u *updated) m() int { return u.n }
+
+func get(w *updated) int { return w.n }
+
+func ignore(w *updated) int { return 0 }
+
+func named(_ *updated) int { return 0 }
+
+func loop(w *updated) int { return loop(w) }
+
+func forward(w *updated) int { return get(w) }
+
+func same(w *updated) *updated { return w }
+
+func nilOnly(w *updated) bool { return w == nil }
+
+func anyOf(c int, ws ...*updated) int { return ws[c].n }
+
+type holder struct{}
+
+func (holder) get(w *updated) int { return w.n }
+
+func pick[T any](v T, w *updated) int { return w.n }
+
 var sink int
 
 var checks = map[string]func(c int, u *updated) string{
-	"a field":        func(c int, u *updated) string { sink = u.n; return "" },
-	"an index":       func(c int, u *updated) string { var m map[int]int; m[u.n] = c; return "" },
-	"a target's":     func(c int, u *updated) string { var m map[int]int; m[c] = u.n; return "" },
-	"nothing":        func(c int, u *updated) string { return "" },
-	"blank":          func(c int, u *updated) string { _ = u; return "" },
-	"blank field":    func(c int, u *updated) string { _, _ = u.n, c; return "" },
-	"blank var":      func(c int, u *updated) string { var _ = u.n; return "" },
-	"shadowed":       func(c int, u *updated) string { if c > 0 { u := &updated{}; sink = u.n }; return "" },
-	"a literal's":    func(c int, u *updated) string { return func(u *updated) string { sink = u.n; return "" }(nil) },
-	"assigned":       func(c int, u *updated) string { u = nil; return "" },
-	"field assigned": func(c int, u *updated) string { u.n = c; return "" },
-	"incremented":    func(c int, u *updated) string { u.n++; return "" },
+	"a field":          func(c int, u *updated) string { sink = u.n; return "" },
+	"an index":         func(c int, u *updated) string { var m map[int]int; m[u.n] = c; return "" },
+	"a target's":       func(c int, u *updated) string { var m map[int]int; m[c] = u.n; return "" },
+	"a method":         func(c int, u *updated) string { sink = u.m(); return "" },
+	"a pointer's":      func(c int, u *updated) string { sink = (*u).n; return "" },
+	"an alias's":       func(c int, u *updated) string { w := u; sink = w.n; return "" },
+	"an alias's alias": func(c int, u *updated) string { var w *updated; w = u; x := (w); sink = x.n; return "" },
+	"a copy's":         func(c int, u *updated) string { v := *u; sink = v.n; return "" },
+	"captured":         func(c int, u *updated) string { f := func() int { return u.n }; sink = f(); return "" },
+	"passed":           func(c int, u *updated) string { sink = get(u); return "" },
+	"passed on":        func(c int, u *updated) string { sink = forward(u); return "" },
+	"an alias passed":  func(c int, u *updated) string { w := u; sink = get(w); return "" },
+	"passed variadic":  func(c int, u *updated) string { sink = anyOf(c, u, nil); return "" },
+	"passed a method":  func(c int, u *updated) string { sink = holder{}.get(u); return "" },
+	"passed generic":   func(c int, u *updated) string { sink = pick(c, u); return "" },
+	"passed explicit":  func(c int, u *updated) string { sink = pick[int](c, u); return "" },
+	"passed a literal": func(c int, u *updated) string { return func(w *updated) string { sink = w.n; return "" }(u) },
+	"nothing":          func(c int, u *updated) string { return "" },
+	"blank":            func(c int, u *updated) string { _ = u; return "" },
+	"blank field":      func(c int, u *updated) string { _, _ = u.n, c; return "" },
+	"blank var":        func(c int, u *updated) string { var _ = u.n; return "" },
+	"blank passed":     func(c int, u *updated) string { _ = get(u); return "" },
+	"shadowed":         func(c int, u *updated) string { if c > 0 { u := &updated{}; sink = u.n }; return "" },
+	"a literal's":      func(c int, u *updated) string { return func(u *updated) string { sink = u.n; return "" }(nil) },
+	"assigned":         func(c int, u *updated) string { u = nil; return "" },
+	"field assigned":   func(c int, u *updated) string { u.n = c; return "" },
+	"incremented":      func(c int, u *updated) string { u.n++; return "" },
+	"an alias":         func(c int, u *updated) string { w := u; _ = w; return "" },
+	"an alias kept":    func(c int, u *updated) string { w := u; if w != nil { sink = c }; return "" },
+	"an alias's field assigned": func(c int, u *updated) string { w := u; w.n = c; return "" },
+	"nil":              func(c int, u *updated) string { if u == nil { return "nil" }; return "" },
+	"compared":         func(c int, u *updated) string { if u == (&updated{}) { sink = c }; return "" },
+	"returned":         func(c int, u *updated) string { x := same(u); _ = x; return "" },
+	"a builtin's":      func(c int, u *updated) string { println(u); return "" },
+	"passed, ignored":  func(c int, u *updated) string { sink = ignore(u); return "" },
+	"passed, unnamed":  func(c int, u *updated) string { sink = named(u); return "" },
+	"passed in a loop": func(c int, u *updated) string { sink = loop(u); return "" },
+	"passed, compared": func(c int, u *updated) string { if nilOnly(u) { sink = c }; return "" },
+	"passed generic, not w": func(c int, u *updated) string { sink = pick(u, nil); return "" },
+	"passed as a value": func(c int, u *updated) string { var f func(*updated) int = get; sink = f(u); return "" },
 }
+
 `
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "p.go", src, 0)
@@ -1442,19 +1791,32 @@ var checks = map[string]func(c int, u *updated) string{
 	if _, err := (&types.Config{}).Check("p", fset, []*ast.File{f}, info); err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]bool{"a field": true, "an index": true, "a target's": true}
+	want := map[string]bool{
+		"a field": true, "an index": true, "a target's": true, "a method": true,
+		"a pointer's": true, "an alias's": true, "an alias's alias": true, "a copy's": true,
+		"captured": true, "passed": true, "passed on": true, "an alias passed": true,
+		"passed variadic": true, "passed a method": true, "passed generic": true,
+		"passed explicit": true, "passed a literal": true,
+	}
 	got := map[string]bool{}
+	var cases []string
 	ast.Inspect(f, func(n ast.Node) bool {
 		if kv, ok := n.(*ast.KeyValueExpr); ok {
 			name, _ := strconv.Unquote(kv.Key.(*ast.BasicLit).Value)
-			if readsParam(info, kv.Value.(*ast.FuncLit), 1) {
+			cases = append(cases, name)
+			if readsParam(info, []*ast.File{f}, kv.Value.(*ast.FuncLit), 1) {
 				got[name] = true
 			}
 		}
 		return true
 	})
+	for name := range want {
+		if !slices.Contains(cases, name) {
+			t.Errorf("the case %q is no check of the source", name)
+		}
+	}
 	if !maps.Equal(got, want) {
-		t.Errorf("the checks that read u are %v, want %v", slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(want)))
+		t.Errorf("the checks that observe u are %v, want %v", slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(want)))
 	}
 }
 
@@ -1545,29 +1907,76 @@ func compareCells(a, b cellKey) int {
 	return strings.Compare(a.pkg+" "+a.c+" "+a.col, b.pkg+" "+b.c+" "+b.col)
 }
 
-// cellSections returns a cell's files and product in an archive, by
-// section.
-func cellSections(a *archive.Archive, prefix, col string) map[string]string {
-	m := map[string]string{}
+// An indexed is an archive whose sections are indexed once: by name, by
+// the cell whose files or product each is, and by the transform whose
+// variant's inputs each is. A packed grid's judges read its one archive
+// for each of its scenarios, so a scan of every section at each look
+// would be quadratic in the grid.
+type indexed struct {
+	a      *archive.Archive
+	byName map[string]string
+	// cells holds each cell's out/<column>/ and via/<column>/ sections, by
+	// name, under its case's prefix and its column, and products its
+	// via/<column>/ files, by their paths below it.
+	cells, products map[cellAt]map[string]string
+	// inputs holds each transform's variant's in/ and delete sections, by
+	// name, under the transform's name.
+	inputs map[string]map[string]string
+}
+
+// A cellAt is a cell of an archive: its case's prefix, and its column.
+type cellAt struct{ prefix, col string }
+
+// index indexes an archive's sections.
+func index(a *archive.Archive) *indexed {
+	x := &indexed{a: a, byName: map[string]string{}, cells: map[cellAt]map[string]string{}, products: map[cellAt]map[string]string{}, inputs: map[string]map[string]string{}}
+	add := func(m map[cellAt]map[string]string, k cellAt, name, data string) {
+		if m[k] == nil {
+			m[k] = map[string]string{}
+		}
+		m[k][name] = data
+	}
 	for _, s := range a.Sections {
-		if strings.HasPrefix(s.Name, prefix+"out/"+col+"/") || strings.HasPrefix(s.Name, prefix+"via/"+col+"/") {
-			m[s.Name] = string(s.Data)
+		data := string(s.Data)
+		x.byName[s.Name] = data
+		kind, name, rest := archive.SplitCase(s.Name)
+		prefix := ""
+		if kind != "" {
+			prefix = kind + "/" + name + "/"
+		}
+		top, below, _ := strings.Cut(rest, "/")
+		switch col, file, ok := strings.Cut(below, "/"); {
+		case (top == archive.Out || top == archive.Via) && ok:
+			add(x.cells, cellAt{prefix, col}, s.Name, data)
+			if top == archive.Via {
+				add(x.products, cellAt{prefix, col}, file, data)
+			}
+		case kind == archive.Transform && (top == archive.In && below != "" || rest == archive.Delete):
+			if x.inputs[name] == nil {
+				x.inputs[name] = map[string]string{}
+			}
+			x.inputs[name][s.Name] = data
 		}
 	}
-	return m
+	return x
+}
+
+// cellSections returns a cell's files and product in an archive, by
+// section.
+func cellSections(x *indexed, prefix, col string) map[string]string {
+	return maps.Clone(x.cells[cellAt{prefix, col}])
+}
+
+// product returns a bytes lift's cell's product in an archive, by its
+// files' paths below via/<column>/.
+func product(x *indexed, prefix, col string) map[string]string {
+	return maps.Clone(x.products[cellAt{prefix, col}])
 }
 
 // inputs returns a transform's variant's committed inputs in an archive,
 // by section.
-func inputs(a *archive.Archive, tr string) map[string]string {
-	m := map[string]string{}
-	prefix := "transform/" + tr + "/"
-	for _, s := range a.Sections {
-		if strings.HasPrefix(s.Name, prefix+"in/") || s.Name == prefix+"delete" {
-			m[s.Name] = string(s.Data)
-		}
-	}
-	return m
+func inputs(x *indexed, tr string) map[string]string {
+	return maps.Clone(x.inputs[tr])
 }
 
 // written checks each cell the update records against the archive after
@@ -1593,19 +2002,18 @@ func (j *judge) written() {
 
 // holdsCell says how an archive doesn't hold what an update records it
 // wrote for a cell: its files, and a bytes lift's product, or "".
-func holdsCell(a *archive.Archive, ur hypercase.Observed) string {
+func holdsCell(x *indexed, ur hypercase.Observed) string {
+	out := ur.Prefix + "out/" + ur.Column + "/"
 	for _, p := range slices.Sorted(maps.Keys(ur.Files)) {
 		data := ur.Files[p]
-		if got, ok := a.Section(ur.Prefix + "out/" + ur.Column + "/" + p); !ok || string(got) != data {
+		if got, ok := section(x, out+p); !ok || got != data {
 			return fmt.Sprintf("the update records it wrote %s as %q, and the archive has %q", p, data, got)
 		}
 	}
 	if ur.Via {
-		got := map[string]string{}
-		for _, s := range a.Sections {
-			if rest, ok := strings.CutPrefix(s.Name, ur.Prefix+"via/"+ur.Column+"/"); ok {
-				got[rest] = string(s.Data)
-			}
+		got := product(x, ur.Prefix, ur.Column)
+		if got == nil {
+			got = map[string]string{}
 		}
 		want := ur.Product
 		if want == nil {

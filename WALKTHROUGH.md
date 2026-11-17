@@ -2964,6 +2964,9 @@ lift.
   bytes lift on the cell's path fails on the case in the update, which
   then reaches none of them, the message names it, and the last bytes
   lift, whose outcome and product a normal run reads from the archive.
+  On a transform's variant that the update runs on what the transform
+  makes now, where a normal run reads the inputs the archive holds, it
+  names the transform for that instead, and no bytes lift.
   When the update writes nothing for the cell of a lift on the cell's
   path, the message says so, names the lift, and says to fix what that
   cell reports, and, on a file the cell commits, to delete nothing by hand
