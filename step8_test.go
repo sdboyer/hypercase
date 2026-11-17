@@ -449,8 +449,35 @@ func TestBlockedStaleTransformVariant(t *testing.T) {
 	r := s.normal("tr-ladder-eval")
 	s.fails(r,
 		"upper's variant of the base differs from its committed inputs:\ntransform/upper/in/resolve/error is no longer made",
-		"transform/upper/out/evaluate/outcome differs (-golden +got):\n- accepted\n+ blocked resolve\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate, and writes the outcome of its run, not this one: "+why+".",
-		"transform/upper/out/evaluate/values.txt is recorded, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+why+". Delete nothing by hand.")
+		"transform/upper/out/evaluate/outcome differs (-golden +got):\n- accepted\n+ blocked resolve\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+why+". What it writes for the cell, if anything, is its run's, not this outcome.",
+		"transform/upper/out/evaluate/values.txt is recorded, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+why+". Delete nothing by hand before it has run.")
+	s.lacks(r, "delete the section by hand")
+	s.passes(s.update("tr-ladder-eval"))
+	s.same(twice, clean)
+	s.done()
+}
+
+// TestSkippedStaleTransformVariant: as TestBlockedStaleTransformVariant,
+// for a cell whose probe says no on the committed inputs, where the
+// update's probe reads what the transform makes. Here upper's committed
+// inputs hold an evaluate/probe that upper doesn't make, so the normal
+// run's probe says the case isn't for evaluate, and the update runs
+// evaluate.
+func TestSkippedStaleTransformVariant(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.remove("testdata/script/errs.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.remove("testdata/script/garbled.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.edit(twice, "evaluate writes a file", set("in/evaluate/out/values.txt", "a1 six\n"))
+	s.passes(s.update("tr-ladder-eval"))
+	clean := s.read(twice)
+	s.edit(twice, "upper's committed inputs hold an evaluate/probe upper doesn't make", insert("transform/upper/in/evaluate/probe", "a stale reason\n", "transform/upper/out/"))
+	runs := "FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds."
+	r := s.normal("tr-ladder-eval")
+	s.fails(r,
+		"upper's variant of the base differs from its committed inputs:\ntransform/upper/in/evaluate/probe is no longer made",
+		"transform/upper/out/evaluate/outcome differs (-golden +got):\n- accepted\n+ skipped a stale reason\n"+runs+" What it writes for the cell, if anything, is its run's, not this outcome.",
+		"transform/upper/out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it: a stale reason\n"+runs+" Delete nothing by hand before it has run.")
 	s.lacks(r, "delete the section by hand")
 	s.passes(s.update("tr-ladder-eval"))
 	s.same(twice, clean)

@@ -1913,12 +1913,17 @@ whether each has a probe, and whether the package owns it.
   update wrote fails, and the failure shows how the sections differ from
   what the transform makes, and names the module's update.
 - When the committed sections differ from what the transform makes, a
-  cell that a lift blocks on them may be one the update runs. A normal run
-  stages the variant on what the transform makes, as the update does, to
-  tell, and runs the cell's probe, if it has one, on what that reaches.
-  When the update runs the cell, its committed files are no orphans: the
-  normal run says so, and to delete none of them by hand, and, from step 8
-  on, that the update writes the cell's outcome from its run.
+  cell that a lift blocks on them, or whose probe says no on them, may be
+  one the update runs, or skips or blocks otherwise. A normal run stages
+  the variant on what the transform makes, as the update does, to tell,
+  and runs the cell's probe, if it has one, on what that reaches. It says
+  what the update does with the cell. When the update runs the cell, its
+  committed files are no orphans: the normal run says to delete none of
+  them by hand before the update has run, and, from step 8 on, that what
+  the update writes for the cell, if anything, is its run's. When the
+  update skips or blocks the cell otherwise, the normal run says why, and,
+  from step 8 on, which outcome the update writes; when the cell's probe
+  fails there, that the probe needs fixing.
 - An update replaces a transform's `in/…` and `delete` whole: a file the
   transform no longer produces is removed, and the removal shows in the diff.
 - When a transform no longer applies to a base, no cell runs on its
@@ -2793,17 +2798,21 @@ lift.
   lift that is `accepted` with no product files gives its readers an empty
   view.
 - A cell that a normal run finds blocked past a bytes lift, by a committed
-  outcome or by a lift that fails on a committed product, may run in the
-  update, which reruns every lift on its path. Then the cell's committed
-  files, a bytes lift's product among them, are no orphans, and the update
-  writes the outcome of the cell's run. A normal run of a package that owns
+  outcome or by a lift that fails on a committed product, or whose probe
+  says no on a committed product, may run in the update, which reruns
+  every lift on its path, or be skipped or blocked there otherwise. When
+  the update runs the cell, the cell's committed files, a bytes lift's
+  product among them, are no orphans, and what the update writes for the
+  cell, if anything, is its run's. A normal run of a package that owns
   every bytes lift on the cell's path stages the case as its update does,
   on what a transform makes for its variant, and runs the cell's probe, if
-  it has one, on what that reaches. It says whether the update runs the
-  cell: if it does, to delete nothing by hand, and that the update writes
-  the cell's outcome from its run. Another package's normal run doesn't run
-  the lifts it doesn't own, so it says to run the update before deleting
-  any of them.
+  it has one, on what that reaches. It says what the update does with the
+  cell: if it runs the cell, to delete nothing by hand before it has run,
+  and that what it writes for the cell, if anything, is its run's; if it
+  skips or blocks the cell otherwise, why, and which outcome it writes, if
+  any; if the cell's probe fails there, that the probe needs fixing.
+  Another package's normal run doesn't run the lifts it doesn't own, so it
+  says to run the update before deleting any of them.
 - A bytes lift's frozen cell includes its `via/` product: no update writes
   it, and a product that differs from what the lift makes fails the cell,
   in every run. An update writes the cells past it from what the lift makes

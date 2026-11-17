@@ -42,9 +42,9 @@ $ go test  # tr-ladder-eval
         transform/upper/out/evaluate/outcome differs (-golden +got):
         - accepted
         + blocked resolve
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate, and writes the outcome of its run, not this one: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. What it writes for the cell, if anything, is its run's, not this outcome.
         transform/upper/out/evaluate/values.txt is recorded, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case.
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Delete nothing by hand.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Delete nothing by hand before it has run.
     script/twice/transform/upper: Uppercases every file under do/out/.
         resolve: Resolves the parsed script, as its resolve/ tree says.
         resolve returned an error, but the variant states no property resolve rejects:
