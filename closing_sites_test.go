@@ -37,8 +37,11 @@ import (
 // says nothing of what an update does: no constant of it names an update.
 // Nor does a note's body mention the update at all, which is its
 // closing's to name: no constant of a body says "update", in any case, or
-// holds the words updateCmd gives the update command. TestClosings checks
-// every body its grids give for the update's command, variable and name.
+// holds the words updateCmd gives the update command, followed into every
+// package of the module that gives one, as the archive package's problems.
+// What another module or the standard library gives a body is data here,
+// as the corpus's is. TestClosings checks every body its grids give for
+// the update's command, variable and name.
 func TestOneClosing(t *testing.T) {
 	s := loadSource(t)
 	sites := s.messageSites(t)
@@ -168,7 +171,11 @@ func TestOneClosing(t *testing.T) {
 
 var (
 	sentenceEnd = regexp.MustCompile(`[.;:!?\n]`)
-	formatVerb  = regexp.MustCompile(`%[-+# 0-9.]*[a-zA-Z]`)
+	// formatVerb matches a format verb, as fmt's grammar has it: its
+	// flags, a width and a precision, each a number or a *, an explicit
+	// argument index before either's * and before the verb, and the verb,
+	// %% among them.
+	formatVerb = regexp.MustCompile(`%[-+# 0]*(?:(?:\[\d+\])?\*|\d+)?(?:\.(?:(?:\[\d+\])?\*|\d+)?)?(?:\[\d+\])?[a-zA-Z%]`)
 )
 
 // sentences splits a constant string into its sentences and clauses, each
@@ -467,6 +474,42 @@ func method(t *testing.T) { r.take(r{}, t) }
 	}
 }
 
+// TestFormatVerbs: formatVerb takes each format verb whole, as fmt's
+// grammar has it, explicit argument indexes and * widths and precisions
+// among them, so a message method's message that is format verbs alone
+// holds no words of its own, and TestOneClosing refuses it.
+func TestFormatVerbs(t *testing.T) {
+	t.Parallel()
+	for _, v := range []string{"%s", "%v", "%+v", "%#v", "%q", "%-8s", "% x", "%08b", "%6.2f", "%.3s", "%*d", "%-*d", "%.*s", "%[1]s", "%[2]q", "%[2]*d", "%[2]*[1]d", "%[3]*.[2]*[1]f", "%.[2]*d", "%6.2[1]f", "%%"} {
+		if got := formatVerb.ReplaceAllString("a "+v+" b", "%"); got != "a % b" {
+			t.Errorf("formatVerb makes %q of %q, want %q", got, "a "+v+" b", "a % b")
+		}
+	}
+	dir := tempPackage(t, map[string]string{"p.go": `package p
+
+import "testing"
+
+func indexed(t *testing.T, msg, fix string) { t.Errorf("%[1]s\n%[2]s", msg, fix) }
+
+func starred(t *testing.T, n int, msg string) { t.Errorf("%*d: %s", n, n, msg) }
+
+func worded(t *testing.T, msg string) { t.Errorf("the cell %[1]s fails", msg) }
+`})
+	s, err := typeCheck(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for name, sites := range s.messageSites(t) {
+		for _, st := range sites {
+			got[name] = st.text
+		}
+	}
+	if want := map[string]bool{"indexed": false, "starred": false, "worded": true}; !maps.Equal(got, want) {
+		t.Errorf("whether each function's message holds words of its own: %v, want %v", got, want)
+	}
+}
+
 // message is a message method's message, as messageSites names it: its
 // first argument's constant value, with its words single-spaced, or, where
 // that has none, the argument's source, or "" for a call with none. text
@@ -654,8 +697,11 @@ type text struct{ text, at string }
 // package's closings, those of what their claims say, and those that make
 // its notes' bodies, however an expression gives them: in a note's or a
 // closing's literal or an assignment to its field, or in what is assigned
-// to a variable, a field or a parameter they take, or what a function of
-// the package they call returns, followed to the constants.
+// to a variable, a field or a parameter they take, or what a function
+// they call returns, followed to the constants, through every package
+// whose source loadSource reads: this one, and each of the module that it
+// imports. What a function of another module or the standard library
+// returns is data to it, as what the corpus holds is.
 func (s *source) closingWords(t *testing.T) (advice, claimed, bodies []text) {
 	t.Helper()
 	field := func(typeName, name string) *types.Var {
@@ -668,20 +714,33 @@ func (s *source) closingWords(t *testing.T) (advice, claimed, bodies []text) {
 		t.Fatalf("%s has no field %s", typeName, name)
 		return nil
 	}
-	objOf := func(e ast.Expr) types.Object {
+	var objOf func(e ast.Expr) types.Object
+	objOf = func(e ast.Expr) types.Object {
+		var o types.Object
 		switch e := ast.Unparen(e).(type) {
 		case *ast.Ident:
-			if o := s.info.Uses[e]; o != nil {
-				return o
+			if o = s.info.Uses[e]; o == nil {
+				o = s.info.Defs[e]
 			}
-			return s.info.Defs[e]
 		case *ast.SelectorExpr:
 			if sel := s.info.Selections[e]; sel != nil {
-				return sel.Obj()
+				o = sel.Obj()
+			} else {
+				o = s.info.Uses[e.Sel]
 			}
-			return s.info.Uses[e.Sel]
+		case *ast.IndexExpr:
+			// A generic function, instantiated.
+			return objOf(e.X)
+		case *ast.IndexListExpr:
+			return objOf(e.X)
 		}
-		return nil
+		switch x := o.(type) {
+		case *types.Func:
+			return x.Origin()
+		case *types.Var:
+			return x.Origin()
+		}
+		return o
 	}
 	// What is assigned to each variable, field and parameter, the calls
 	// of each function, and what it returns.
@@ -693,7 +752,7 @@ func (s *source) closingWords(t *testing.T) (advice, claimed, bodies []text) {
 		i  int
 	}
 	params := map[*types.Var]param{}
-	for _, f := range s.files {
+	for _, f := range slices.Concat(s.files, s.deps) {
 		for _, d := range f.Decls {
 			if fd, ok := d.(*ast.FuncDecl); ok {
 				fn := s.info.Defs[fd.Name].(*types.Func)
@@ -744,7 +803,7 @@ func (s *source) closingWords(t *testing.T) (advice, claimed, bodies []text) {
 					assigned[st.Field(i)] = append(assigned[st.Field(i)], el)
 				}
 			case *ast.CallExpr:
-				if fn, ok := objOf(n.Fun).(*types.Func); ok && fn.Pkg() == s.pkg {
+				if fn, ok := objOf(n.Fun).(*types.Func); ok && s.ours(fn.Pkg()) {
 					calls[fn] = append(calls[fn], n)
 				}
 			}
@@ -769,11 +828,11 @@ func (s *source) closingWords(t *testing.T) (advice, claimed, bodies []text) {
 			}
 			switch ex := ex.(type) {
 			case *ast.Ident, *ast.SelectorExpr:
-				if v, ok := objOf(ex).(*types.Var); ok && v.Pkg() == s.pkg {
+				if v, ok := objOf(ex).(*types.Var); ok && s.ours(v.Pkg()) {
 					out = append(out, flows(v)...)
 				}
 			case *ast.CallExpr:
-				if fn, ok := objOf(ex.Fun).(*types.Func); ok && fn.Pkg() == s.pkg {
+				if fn, ok := objOf(ex.Fun).(*types.Func); ok && s.ours(fn.Pkg()) {
 					out = append(out, flows(fn)...)
 				}
 			}
@@ -813,7 +872,16 @@ func (s *source) closingWords(t *testing.T) (advice, claimed, bodies []text) {
 	}
 	clear(seen)
 	bodies = flows(field("note", "body"))
-	return advice, claimed, bodies
+	// A constant reaches by more than one way, as a field's value and as
+	// what a function returns: each is given once.
+	once := func(ts []text) []text {
+		had := map[text]bool{}
+		return slices.DeleteFunc(ts, func(x text) bool {
+			defer func() { had[x] = true }()
+			return had[x]
+		})
+	}
+	return once(advice), once(claimed), once(bodies)
 }
 
 // words counts a sentence's words that hold a letter.

@@ -21,12 +21,18 @@ import (
 	"testing"
 )
 
-// A source is the package's non-test source, type-checked.
+// A source is the package's non-test source, type-checked. deps are the
+// files of each package of its module that it imports, directly or not,
+// which the type checker reads from source too, so that an object the
+// package names from one of them is the one that package declares:
+// depPkgs holds those packages.
 type source struct {
-	fset  *token.FileSet
-	files []*ast.File
-	pkg   *types.Package
-	info  *types.Info
+	fset    *token.FileSet
+	files   []*ast.File
+	pkg     *types.Package
+	info    *types.Info
+	deps    []*ast.File
+	depPkgs map[*types.Package]bool
 }
 
 var (
@@ -36,12 +42,14 @@ var (
 )
 
 // loadSource type-checks the package's non-test source, as go list gives
-// its files, against its imports' export data, which go list builds. It
-// uses the go command and the standard library alone, so the module needs
-// no loader: golang.org/x/tools/go/packages would bring in
-// golang.org/x/mod, a module hypercase doesn't otherwise require. It
-// fails on a non-test file of the package that build constraints exclude
-// here, which it can't read, so no check of the source misses one.
+// its files, and that of every package of its module that it imports,
+// against the export data of the other modules' packages and the standard
+// library's, which go list builds. It uses the go command and the
+// standard library alone, so the module needs no loader:
+// golang.org/x/tools/go/packages would bring in golang.org/x/mod, a
+// module hypercase doesn't otherwise require. It fails on a non-test file
+// of one of the module's packages that build constraints exclude here,
+// which it can't read, so no check of the source misses one.
 func loadSource(t *testing.T) *source {
 	t.Helper()
 	loadedOnce.Do(func() { loaded, loadErr = typeCheck(".") })
@@ -51,10 +59,15 @@ func loadSource(t *testing.T) *source {
 	return loaded
 }
 
+// An importerFunc imports a package by its path.
+type importerFunc func(path string) (*types.Package, error)
+
+func (f importerFunc) Import(path string) (*types.Package, error) { return f(path) }
+
 // typeCheck type-checks the non-test source of the package in dir, as
 // loadSource does.
 func typeCheck(dir string) (*source, error) {
-	cmd := exec.Command("go", "list", "-export", "-deps", "-json=ImportPath,Dir,GoFiles,IgnoredGoFiles,Export,DepOnly", ".")
+	cmd := exec.Command("go", "list", "-export", "-deps", "-json=ImportPath,Dir,GoFiles,IgnoredGoFiles,Export,DepOnly,Module", ".")
 	cmd.Dir = dir
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -66,8 +79,9 @@ func typeCheck(dir string) (*source, error) {
 		ImportPath, Dir, Export string
 		GoFiles, IgnoredGoFiles []string
 		DepOnly                 bool
+		Module                  *struct{ Main bool }
 	}
-	exports := map[string]string{}
+	pkgs := map[string]*listed{}
 	var self *listed
 	dec := json.NewDecoder(bytes.NewReader(out))
 	for {
@@ -77,7 +91,7 @@ func typeCheck(dir string) (*source, error) {
 		} else if err != nil {
 			return nil, err
 		}
-		exports[p.ImportPath] = p.Export
+		pkgs[p.ImportPath] = &p
 		if !p.DepOnly {
 			self = &p
 		}
@@ -85,36 +99,68 @@ func typeCheck(dir string) (*source, error) {
 	if self == nil {
 		return nil, errors.New("go list gave no package for .")
 	}
-	// The check reads the non-test source alone, so a test file the build
-	// excludes misses nothing.
-	var ignored []string
-	for _, name := range self.IgnoredGoFiles {
-		if !strings.HasSuffix(name, "_test.go") {
-			ignored = append(ignored, name)
-		}
-	}
-	if len(ignored) > 0 {
-		return nil, fmt.Errorf("build constraints exclude %v from the package on this platform, so the type check can't read them, and a check of the source would miss what they hold. Keep every file of the package in every build, or check it on each platform", ignored)
-	}
-	s := &source{fset: token.NewFileSet()}
-	for _, name := range self.GoFiles {
-		f, err := parser.ParseFile(s.fset, filepath.Join(self.Dir, name), nil, parser.SkipObjectResolution)
-		if err != nil {
-			return nil, err
-		}
-		s.files = append(s.files, f)
-	}
-	imp := importer.ForCompiler(s.fset, "gc", func(path string) (io.ReadCloser, error) {
-		if exports[path] == "" {
-			return nil, fmt.Errorf("go list gave no export data for %s", path)
-		}
-		return os.Open(exports[path])
-	})
+	s := &source{fset: token.NewFileSet(), depPkgs: map[*types.Package]bool{}}
 	s.info = &types.Info{
 		Types:      map[ast.Expr]types.TypeAndValue{},
 		Defs:       map[*ast.Ident]types.Object{},
 		Uses:       map[*ast.Ident]types.Object{},
 		Selections: map[*ast.SelectorExpr]*types.Selection{},
+	}
+	// parse parses a package's non-test files. The check reads the
+	// non-test source alone, so a test file the build excludes misses
+	// nothing.
+	parse := func(p *listed) ([]*ast.File, error) {
+		var ignored []string
+		for _, name := range p.IgnoredGoFiles {
+			if !strings.HasSuffix(name, "_test.go") {
+				ignored = append(ignored, name)
+			}
+		}
+		if len(ignored) > 0 {
+			return nil, fmt.Errorf("build constraints exclude %v from %s on this platform, so the type check can't read them, and a check of the source would miss what they hold. Keep every file of the package in every build, or check it on each platform", ignored, p.ImportPath)
+		}
+		var files []*ast.File
+		for _, name := range p.GoFiles {
+			f, err := parser.ParseFile(s.fset, filepath.Join(p.Dir, name), nil, parser.SkipObjectResolution)
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, f)
+		}
+		return files, nil
+	}
+	exports := importer.ForCompiler(s.fset, "gc", func(path string) (io.ReadCloser, error) {
+		if p := pkgs[path]; p != nil && p.Export != "" {
+			return os.Open(p.Export)
+		}
+		return nil, fmt.Errorf("go list gave no export data for %s", path)
+	})
+	// A package of the module is read from source, once.
+	checked := map[string]*types.Package{}
+	var imp importerFunc
+	imp = func(path string) (*types.Package, error) {
+		if pkg, ok := checked[path]; ok {
+			return pkg, nil
+		}
+		p := pkgs[path]
+		if p == nil || p.Module == nil || !p.Module.Main {
+			return exports.Import(path)
+		}
+		files, err := parse(p)
+		if err != nil {
+			return nil, err
+		}
+		pkg, err := (&types.Config{Importer: imp}).Check(path, s.fset, files, s.info)
+		if err != nil {
+			return nil, err
+		}
+		checked[path] = pkg
+		s.deps = append(s.deps, files...)
+		s.depPkgs[pkg] = true
+		return pkg, nil
+	}
+	if s.files, err = parse(self); err != nil {
+		return nil, err
 	}
 	conf := types.Config{Importer: imp}
 	s.pkg, err = conf.Check(self.ImportPath, s.fset, s.files, s.info)
@@ -123,6 +169,10 @@ func typeCheck(dir string) (*source, error) {
 	}
 	return s, nil
 }
+
+// ours reports whether a package is the one source checks, or one of its
+// module that it imports, whose source it reads.
+func (s *source) ours(pkg *types.Package) bool { return pkg != nil && (pkg == s.pkg || s.depPkgs[pkg]) }
 
 // funcName names a function declaration as its messages are listed: a
 // method by its receiver's type name, and a dot, whatever the type's
@@ -208,7 +258,7 @@ func TestTypeCheckIgnored(t *testing.T) {
 	}
 	dir = tempPackage(t, map[string]string{"p.go": "package p\n", "q.go": excluded, "r_test.go": excluded})
 	_, err := typeCheck(dir)
-	if err == nil || !strings.Contains(err.Error(), "exclude [q.go] from the package") {
+	if err == nil || !strings.Contains(err.Error(), "exclude [q.go] from example.com/p") {
 		t.Errorf("type-checking a package with an excluded non-test file, q.go, beside an excluded test, gives %v", err)
 	}
 }
