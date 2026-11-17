@@ -65,7 +65,7 @@ $ go test  # chain-twice
         out/import/outcome differs (-golden +got):
         - accepted
         + rejected
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it reruns export, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's, not this outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it reruns export, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
         via/import/quote/A1 is recorded, and import failed on the case in this run, so this run has no product.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it reruns export, whose outcome and product a normal run reads from the archive. Its run may still make the file: delete nothing by hand before it has run.
     what ran, in order:

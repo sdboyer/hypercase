@@ -106,7 +106,7 @@ $ go test  # outcomes
         out/echo/values.txt differs (-golden +got):
         - A1 7
         + A1 6
-        An update writes nothing for this cell until the problems above are fixed.
+        Fix the problems above first. An update writes nothing for this cell.
     script/codes-panic: Codes panics on echo's error.
         echo: Does what the case's do/ tree says.
         The project's Codes panicked on echo's error: codes boom
@@ -428,7 +428,7 @@ $ go test  # outcomes
         out/echo/values.txt differs (-committed +got):
         - A1 7
         + A1 6
-        The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.
+        Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.
     script/cl-panic: The classifier panics.
         echo: Does what the case's do/ tree says.
         echo's classifier steered panicked: classifier boom
@@ -478,7 +478,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # outcomes
         out/echo/values.txt differs (-committed +got):
         - A1 7
         + A1 6
-        The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.
+        Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.
     script/cl-panic: The classifier panics.
         echo: Does what the case's do/ tree says.
         echo's classifier steered panicked: classifier boom
@@ -526,7 +526,7 @@ $ go test  # outcomes
         The cell is frozen by its known gap, gaps line 1: "echo The classifier gives a detail. Waits on sheets#10."
         Its committed files record today's behavior, and the run now produces different ones:
         out/echo/values.txt is new
-        The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.
+        Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.
     script/cl-panic: The classifier panics.
         echo: Does what the case's do/ tree says.
         echo's classifier steered panicked: classifier boom
@@ -574,7 +574,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # outcomes
         The cell is frozen by its known gap, gaps line 1: "echo The classifier gives a detail. Waits on sheets#10."
         Its committed files record today's behavior, and the run now produces different ones:
         out/echo/values.txt is new
-        The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.
+        Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.
     script/cl-panic: The classifier panics.
         echo: Does what the case's do/ tree says.
         echo's classifier steered panicked: classifier boom
@@ -622,7 +622,7 @@ $ go test  # outcomes
         The cell is frozen by its known gap, gaps line 1: "echo The classifier gives a detail. Waits on sheets#10."
         Its committed files record today's behavior, and the run now produces different ones:
         out/echo/g.txt is no longer produced
-        The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.
+        Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.
     script/cl-panic: The classifier panics.
         echo: Does what the case's do/ tree says.
         echo's classifier steered panicked: classifier boom
@@ -670,7 +670,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # outcomes
         The cell is frozen by its known gap, gaps line 1: "echo The classifier gives a detail. Waits on sheets#10."
         Its committed files record today's behavior, and the run now produces different ones:
         out/echo/g.txt is no longer produced
-        The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.
+        Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.
     script/cl-panic: The classifier panics.
         echo: Does what the case's do/ tree says.
         echo's classifier steered panicked: classifier boom

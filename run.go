@@ -526,13 +526,14 @@ func (r *runner) runCells(t *testing.T, c *aCase, cols []*column, w *caseWrites)
 	if reverseCells {
 		slices.Reverse(order)
 	}
+	passed := make([]bool, len(cols))
 	for _, i := range order {
 		col, res := cols[i], results[i]
-		t.Run(col.name, func(t *testing.T) { r.runCell(t, c, col, res) })
+		passed[i] = t.Run(col.name, func(t *testing.T) { r.runCell(t, c, col, res) })
 	}
 	for i, col := range cols {
 		if observe.cell != nil {
-			observe.cell(c, col, results[i])
+			observe.cell(c, col, results[i], !passed[i])
 		}
 		if res := results[i]; res.ran && res.writable {
 			for p, data := range res.files {
@@ -652,14 +653,16 @@ type cellResult struct {
 	ran      bool
 	writable bool              // whether an update writes the cell's files
 	files    map[string][]byte // the cell's outputs, by path under out/<column>/
+	// onValue records that the cell ran on a value: its run, or its
+	// lift's, past its probe, if it has one. view is the input view the
+	// value comes from, or nil where a lift on the cell's path blocks it.
+	onValue bool
+	view    fs.FS
 	// via records that an update that writes the cell replaces its bytes
 	// lift's product, under via/<column>/, with product: the files of the
 	// product, by path in it, or none, for a lift with no product.
 	via     bool
 	product map[string][]byte
-	// frozenDiffers records a frozen cell whose run produced files other
-	// than its committed ones.
-	frozenDiffers bool
 }
 
 // The names the framework owns directly under a column's directory.
@@ -713,6 +716,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	goldens := cf.goldens
 
 	in, view, by := c.state.stage(col.consumes)
+	res.view = view
 	if by != nil {
 		st.applied++
 		res.fate = updateFate{block: by}
@@ -721,8 +725,8 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			var ns notes
 			ns.add(aboutFault,
 				fmt.Sprintf("The update writes nothing for the cell of the lift %s, on %s's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for %s, so the update writes nothing for this cell either, and the cell runs nothing.", by.lift.name, col.name, by.lift.name),
-				fmt.Sprintf("Fix what %s's cell reports.", by.lift.name))
-			report(t, header, ns, r.staging(c, col, res.fate, false, cf.frozen(marked)))
+				closing{advice: fmt.Sprintf("Fix what %s's cell reports.", by.lift.name)})
+			report(t, header, ns, r.staging(c, col, res.fate, false, cf.frozen(marked), nil))
 			return
 		}
 		r.blocked(t, c, header, col, by, gap, marked, cf, res)
@@ -758,11 +762,11 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		}
 	}
 	st.applied++
-	res.ran = true
+	res.ran, res.onValue = true, true
 	frozen := cf.frozen(marked)
 	// What the update does with the cell, which a normal run tells once,
 	// when a closing first needs it.
-	stg := r.staging(c, col, res.fate, true, frozen)
+	stg := r.staging(c, col, res.fate, true, frozen, nil)
 
 	if out == nil {
 		finished := false
@@ -773,18 +777,18 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			// The run called FailNow or SkipNow, through its testing.TB.
 			if t.Skipped() {
 				var ns notes
-				ns.add(aboutFault, "The run skipped its cell.", "A run can't skip a case; a probe decides which cases are for a suite.")
+				ns.add(aboutFault, "The run skipped its cell.", closing{advice: "A run can't skip a case; a probe decides which cases are for a suite."})
 				report(t, header, ns, stg)
 				return
 			}
-			r.failedTest(t, header)
+			failedTest(t, header, stg)
 		}()
 		out = call(func(o *called) {
 			o.files, o.err = col.run(t, c.archive, in, &o.stdout, &o.stderr)
 		})
 		finished = true
 		if t.Failed() {
-			r.failedTest(t, header)
+			failedTest(t, header, stg)
 			return
 		}
 	}
@@ -832,13 +836,13 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		_, made := files[outcomeFile]
 		switch {
 		case len(diffs) > 0:
-			res.frozenDiffers = true
-			closing := "If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them."
+			var cl closing
+			cl.advice = "If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them."
 			if bytesLift {
-				closing = fmt.Sprintf("If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files and its product, under %s and %s, and the next update writes them.", c.outDir(col.name), col.lift.viaDir(c.prefix))
+				cl.advice = fmt.Sprintf("If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files and its product, under %s and %s, and the next update writes them.", c.outDir(col.name), col.lift.viaDir(c.prefix))
 			}
 			if !couldWrite {
-				closing = "The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell."
+				cl = closing{"Fix the problems above.", claims{Nothing: true, Frozen: true}}
 			}
 			// A normal run gives the cells past a bytes lift what its cell
 			// commits, and an update, which writes them unless it writes
@@ -847,13 +851,11 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			// both accept and the products differ.
 			if bytesLift && couldWrite {
 				was, is := accepts(goldens[outcomeFile]), accepts(files[outcomeFile])
-				if was != is || is && len(productDiffs) > 0 {
-					closing = fmt.Sprintf("The cells past %s fail in normal runs until the frozen cell is resolved: an update writes them from what %s makes now, and leaves the cell's committed outcome and product in place, which a normal run reads.\n", col.name, col.name) + closing
-				}
+				cl.claims.PastFresh = was != is || is && len(productDiffs) > 0
 			}
 			ns.add(aboutFrozen,
 				fmt.Sprintf("The cell is frozen by its known gap, %s line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s", c.gapsAt, gap.Line, gap.Raw, strings.Join(diffs, "\n")),
-				closing)
+				cl)
 		case hasOutcome || !made || !couldWrite:
 		case r.update:
 			// The upgrade, the one write an update makes to a frozen cell:
@@ -863,7 +865,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		default:
 			ns.add(aboutFrozen,
 				fmt.Sprintf("The cell is frozen by its known gap, %s line %d: %q\nIts committed files match the run, and it has no %s, which every cell has.", c.gapsAt, gap.Line, gap.Raw, c.out(col.name, outcomeFile)),
-				fmt.Sprintf("Run %s to add it. The update adds the outcome and changes nothing else.", r.updateCmd()))
+				closing{claims: claims{OnlyOutcome: c.out(col.name, outcomeFile)}})
 		}
 	} else {
 		r.compare(&ns, c, col, files, goldens, unjudged, writable)
@@ -872,6 +874,7 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		}
 	}
 	if len(ns) > 0 {
+		stg.outcome = files[outcomeFile]
 		report(t, header, ns, stg)
 		if out.panicked && !marked {
 			t.Logf("stack of the panic:\n%s", out.stack)
@@ -1017,12 +1020,13 @@ func frozenDiffs(dir string, committed, got map[string][]byte, unjudged map[stri
 	return diffs
 }
 
-func (r *runner) failedTest(t *testing.T, header string) {
-	what := "The run failed its test, through its testing.TB."
-	if r.update {
-		what += " The update writes nothing for this cell."
-	}
-	t.Logf("%s\n%s", header, what)
+// failedTest finishes a cell whose run failed its test, through its
+// testing.TB, with a note, which the staging closes as it closes every
+// note of a cell.
+func failedTest(t *testing.T, header string, stg *staging) {
+	var ns notes
+	ns.add(aboutFault, "The run failed its test, through its testing.TB.", closing{"Fix the code.", claims{Nothing: true}})
+	report(t, header, ns, stg)
 }
 
 // skipped finishes a cell whose probe said the case isn't for its column.
@@ -1031,37 +1035,23 @@ func (r *runner) failedTest(t *testing.T, header string) {
 func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why string, gap archive.Gap, marked bool, goldens map[string][]byte, res *cellResult) {
 	var ns notes
 	frozen := marked && len(goldens) > 0
-	u := r.updateCmd()
 	if marked {
-		ns.add(aboutGap, fmt.Sprintf("%s marks the cell, and %s's probe says the case isn't for it: %s", c.gapAt(gap), col.name, why), "Remove the line, or fix the probe.")
+		ns.add(aboutGap, fmt.Sprintf("%s marks the cell, and %s's probe says the case isn't for it: %s", c.gapAt(gap), col.name, why), closing{advice: "Remove the line, or fix the probe."})
 	}
 	o := archive.Outcome{State: archive.Skipped, Detail: why}
 	r.ranNothing(&ns, c, col, o, frozen, goldens, res)
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		if p != outcomeFile {
-			ns.add(aboutOrphan,
+			ns.addFile(aboutOrphan, c.out(col.name, p),
 				fmt.Sprintf("%s is recorded, and %s's probe says the case isn't for it: %s", c.out(col.name, p), col.name, why),
-				fmt.Sprintf("If the suite should run on the case, fix the probe. If not, delete the section by hand; %s leaves it in place.", u))
+				closing{"If the suite should run on the case, fix the probe. If not, delete the section by hand;", claims{Leaves: c.out(col.name, p)}})
 		}
 	}
 	if len(ns) > 0 {
-		report(t, header, ns, r.staging(c, col, res.fate, false, frozen))
+		report(t, header, ns, r.staging(c, col, res.fate, false, frozen, o.Format()))
 		return
 	}
 	t.Skipf("%s: %s's probe says the case isn't for it: %s", c.name, col.name, why)
-}
-
-// staged says how the update stages a case otherwise than a normal run,
-// for a cell whose path's last bytes lift is last, or nil.
-func (c *aCase) staged(last *lift) string {
-	var how []string
-	if c.state.made != nil {
-		how = append(how, fmt.Sprintf("it runs the variant on what %s makes now, where a normal run reads the inputs the archive holds", c.tr.name))
-	}
-	if last != nil {
-		how = append(how, fmt.Sprintf("it reruns %s, whose outcome and product a normal run reads from the archive", last.name))
-	}
-	return strings.Join(how, ", and ")
 }
 
 // probeFailed finishes a cell whose probe said the case isn't for its
@@ -1072,17 +1062,17 @@ func (c *aCase) staged(last *lift) string {
 // the one the transform makes, where the probe reads another value, a
 // normal run says so of the cell's committed files too.
 func (r *runner) probeFailed(t *testing.T, c *aCase, header string, col *column, why string, marked bool, cf cellFiles, res *cellResult) {
-	stg := r.staging(c, col, res.fate, false, cf.frozen(marked))
+	stg := r.staging(c, col, res.fate, false, cf.frozen(marked), nil)
 	var ns notes
 	if strings.TrimSpace(why) == "" {
-		ns.add(aboutProbeFault, fmt.Sprintf("%s's probe said the case isn't for it, and gave no reason.", col.name), "Fix the probe: when it says no, it says why.")
+		ns.add(aboutProbeFault, fmt.Sprintf("%s's probe said the case isn't for it, and gave no reason.", col.name), closing{advice: "Fix the probe: when it says no, it says why."})
 	} else {
-		ns.add(aboutProbeFault, fmt.Sprintf("%s's probe said the case isn't for it, with a reason an outcome can't hold: %v.", col.name, archive.CheckDetail(why)), "Fix the probe. An update writes nothing for this cell.")
+		ns.add(aboutProbeFault, fmt.Sprintf("%s's probe said the case isn't for it, with a reason an outcome can't hold: %v.", col.name, archive.CheckDetail(why)), closing{"Fix the probe.", claims{Nothing: true}})
 	}
 	if !r.update && stg.differs() {
 		for _, p := range slices.Sorted(maps.Keys(cf.goldens)) {
 			if p != outcomeFile {
-				ns.add(aboutOrphan, fmt.Sprintf("%s is recorded, and %s.", c.out(col.name, p), res.fate.fault), "An update writes nothing for this cell, and leaves the file in place.")
+				ns.addFile(aboutOrphan, c.out(col.name, p), fmt.Sprintf("%s is recorded, and %s.", c.out(col.name, p), res.fate.fault), closing{claims: claims{Nothing: true, Leaves: c.out(col.name, p)}})
 			}
 		}
 	}
@@ -1097,20 +1087,19 @@ func (r *runner) probeFailed(t *testing.T, c *aCase, header string, col *column,
 // which other cells read.
 func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, b *blockage, gap archive.Gap, marked bool, cf cellFiles, res *cellResult) {
 	var ns notes
-	u := r.updateCmd()
 	why := b.why(col)
 	goldens := cf.goldens
 	if marked {
-		ns.add(aboutGap, fmt.Sprintf("%s marks the cell, and the cell is blocked: %s, so the cell runs nothing.", c.gapAt(gap), why), fmt.Sprintf("Remove the line, or fix the lift or %s.", c.inputsAt()))
+		ns.add(aboutGap, fmt.Sprintf("%s marks the cell, and the cell is blocked: %s, so the cell runs nothing.", c.gapAt(gap), why), closing{advice: fmt.Sprintf("Remove the line, or fix the lift or %s.", c.inputsAt())})
 	}
 	frozen := cf.frozen(marked)
 	o := archive.Outcome{State: archive.Blocked, Detail: b.failed}
 	r.ranNothing(&ns, c, col, o, frozen, goldens, res)
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		if p != outcomeFile {
-			ns.add(aboutOrphan,
+			ns.addFile(aboutOrphan, c.out(col.name, p),
 				fmt.Sprintf("%s is recorded, and the cell is blocked: %s.", c.out(col.name, p), why),
-				fmt.Sprintf("If the cell should run, fix the lift or %s. If not, delete the section by hand; %s leaves it in place.", c.inputsAt(), u))
+				closing{fmt.Sprintf("If the cell should run, fix the lift or %s. If not, delete the section by hand;", c.inputsAt()), claims{Leaves: c.out(col.name, p)}})
 		}
 	}
 	if col.lift != nil && col.lift.bytes && !frozen {
@@ -1118,14 +1107,14 @@ func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, b *
 		if !r.update {
 			dir := col.lift.viaDir(c.prefix)
 			for _, p := range slices.Sorted(maps.Keys(cf.product)) {
-				ns.add(aboutProductOrphan,
+				ns.addFile(aboutProductOrphan, dir+p,
 					fmt.Sprintf("%s is recorded, and %s is blocked: %s, so it has no product in this run.", dir+p, col.name, why),
-					fmt.Sprintf("Run %s, which removes it, and read the diff before committing.", u))
+					closing{claims: claims{Removes: dir + p}})
 			}
 		}
 	}
 	if len(ns) > 0 {
-		report(t, header, ns, r.staging(c, col, res.fate, false, frozen))
+		report(t, header, ns, r.staging(c, col, res.fate, false, frozen, o.Format()))
 		return
 	}
 	switch {
@@ -1170,9 +1159,9 @@ func (r *runner) ranNothing(ns *notes, c *aCase, col *column, o archive.Outcome,
 	u := r.updateCmd()
 	switch g, ok := goldens[outcomeFile]; {
 	case !ok:
-		ns.add(aboutOutcome, fmt.Sprintf("%s has no golden.", c.out(col.name, outcomeFile)), fmt.Sprintf("Run %s to write it, and read it before committing.", u))
+		ns.addFile(aboutOutcome, c.out(col.name, outcomeFile), fmt.Sprintf("%s has no golden.", c.out(col.name, outcomeFile)), closing{claims: claims{Writes: c.out(col.name, outcomeFile)}})
 	case !bytes.Equal(g, data):
-		ns.add(aboutOutcome, fmt.Sprintf("%s differs (-golden +got):\n%s", c.out(col.name, outcomeFile), strings.TrimSuffix(diff.Lines(g, data), "\n")), fmt.Sprintf("If the change is intended, run %s and read the diff before committing.", u))
+		ns.addFile(aboutOutcome, c.out(col.name, outcomeFile), fmt.Sprintf("%s differs (-golden +got):\n%s", c.out(col.name, outcomeFile), strings.TrimSuffix(diff.Lines(g, data), "\n")), closing{advice: fmt.Sprintf("If the change is intended, run %s and read the diff before committing.", u)})
 	}
 }
 
@@ -1188,7 +1177,7 @@ func (r *runner) outcome(ns *notes, col *column, in any, out *called, files map[
 	case out.panicked:
 		return archive.Outcome{State: archive.Panicked}, true
 	case out.noProduct:
-		ns.add(aboutFault, fmt.Sprintf("%s returned no product and no error, so the cell has no outcome.", col.name), "Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error, and an update writes nothing for this cell.")
+		ns.add(aboutFault, fmt.Sprintf("%s returned no product and no error, so the cell has no outcome.", col.name), closing{"Fix the lift: it returns its product, or an error that says why it has none. Returning neither is never an expected error.", claims{Nothing: true}})
 		return o, false
 	case out.jennyErr != nil:
 		// The cell's problems say why: its jenny's fault.
@@ -1212,15 +1201,15 @@ func (r *runner) outcome(ns *notes, col *column, in any, out *called, files map[
 	p := call(func(*called) { detail, err = cl.classify(in, newResult(files, out.err)) })
 	switch {
 	case p.panicked:
-		ns.add(aboutFault, fmt.Sprintf("%s's classifier %s panicked: %v", col.name, cl.name, p.panicValue), "Fix the classifier. An update writes nothing for this cell.")
+		ns.add(aboutFault, fmt.Sprintf("%s's classifier %s panicked: %v", col.name, cl.name, p.panicValue), closing{"Fix the classifier.", claims{Nothing: true}})
 		return o, false
 	case err != nil:
-		ns.add(aboutFault, fmt.Sprintf("%s's classifier %s failed: %v", col.name, cl.name, err), "Fix the classifier. An update writes nothing for this cell.")
+		ns.add(aboutFault, fmt.Sprintf("%s's classifier %s failed: %v", col.name, cl.name, err), closing{"Fix the classifier.", claims{Nothing: true}})
 		return o, false
 	case detail == "":
 	default:
 		if err := archive.CheckDetail(detail); err != nil {
-			ns.add(aboutFault, fmt.Sprintf("%s's classifier %s gave a detail an outcome can't hold: %v.", col.name, cl.name, err), "Fix the classifier. An update writes nothing for this cell.")
+			ns.add(aboutFault, fmt.Sprintf("%s's classifier %s gave a detail an outcome can't hold: %v.", col.name, cl.name, err), closing{"Fix the classifier.", claims{Nothing: true}})
 			return o, false
 		}
 		o.Detail = detail
@@ -1238,12 +1227,12 @@ func (r *runner) errorCodes(ns *notes, col *column, err error) ([]string, bool) 
 	var codes []string
 	p := call(func(*called) { codes = r.codes(err) })
 	if p.panicked {
-		ns.add(aboutFault, fmt.Sprintf("The project's Codes panicked on %s's error: %v", col.name, p.panicValue), "Fix Codes. An update writes nothing for this cell.")
+		ns.add(aboutFault, fmt.Sprintf("The project's Codes panicked on %s's error: %v", col.name, p.panicValue), closing{"Fix Codes.", claims{Nothing: true}})
 		return nil, false
 	}
 	for _, code := range codes {
 		if err := archive.CheckCode(code); err != nil {
-			ns.add(aboutFault, fmt.Sprintf("The project's Codes gave %s's error a code an outcome can't hold: %v.", col.name, err), "Fix Codes. An update writes nothing for this cell.")
+			ns.add(aboutFault, fmt.Sprintf("The project's Codes gave %s's error a code an outcome can't hold: %v.", col.name, err), closing{"Fix Codes.", claims{Nothing: true}})
 			return nil, false
 		}
 	}
@@ -1264,13 +1253,13 @@ func (r *runner) outputs(ns *notes, c *aCase, col *column, view fs.FS, out *call
 	for _, f := range out.files {
 		switch {
 		case !fs.ValidPath(f.Path) || f.Path == ".":
-			ns.add(aboutFault, fmt.Sprintf("The run returned an output at %q, which is not a valid slash path under %s.", f.Path, c.outDir(col.name)), "Fix the code. An update writes nothing for this cell.")
+			ns.add(aboutFault, fmt.Sprintf("The run returned an output at %q, which is not a valid slash path under %s.", f.Path, c.outDir(col.name)), closing{"Fix the code.", claims{Nothing: true}})
 			writable = false
 		case slices.Contains(frameworkFiles, f.Path):
-			ns.add(aboutFault, fmt.Sprintf("The run returned an output at %s, a name the framework owns under %s.", f.Path, c.outDir(col.name)), "Rename the output. An update writes nothing for this cell.")
+			ns.add(aboutFault, fmt.Sprintf("The run returned an output at %s, a name the framework owns under %s.", f.Path, c.outDir(col.name)), closing{"Rename the output.", claims{Nothing: true}})
 			writable = false
 		case files[f.Path] != nil:
-			ns.add(aboutFault, fmt.Sprintf("The run returned two outputs at %s.", f.Path), "Fix the code. An update writes nothing for this cell.")
+			ns.add(aboutFault, fmt.Sprintf("The run returned two outputs at %s.", f.Path), closing{"Fix the code.", claims{Nothing: true}})
 			writable = false
 		default:
 			files[f.Path] = bytes.Clone(f.Data)
@@ -1301,7 +1290,7 @@ func (r *runner) outputs(ns *notes, c *aCase, col *column, view fs.FS, out *call
 		names = append(names, c.out(col.name, p))
 	}
 	for _, p := range archive.Conflicts(names) {
-		ns.add(aboutFault, fmt.Sprintf("%s can't be held in an archive: %s.", p.Section, p.Msg), "Fix the code. An update writes nothing for this cell.")
+		ns.add(aboutFault, fmt.Sprintf("%s can't be held in an archive: %s.", p.Section, p.Msg), closing{"Fix the code.", claims{Nothing: true}})
 		writable = false
 	}
 	for _, p := range slices.Sorted(maps.Keys(files)) {
@@ -1310,19 +1299,19 @@ func (r *runner) outputs(ns *notes, c *aCase, col *column, view fs.FS, out *call
 		}
 		switch hit := col.declared(p); len(hit) {
 		case 0:
-			ns.add(aboutFault, fmt.Sprintf("%s%s is not declared.", c.out(col.name, p), holds(p)), fmt.Sprintf("Declare it in %s's Outputs, with a description, or fix the code. An update writes nothing for this cell.", col.name))
+			ns.add(aboutFault, fmt.Sprintf("%s%s is not declared.", c.out(col.name, p), holds(p)), closing{fmt.Sprintf("Declare it in %s's Outputs, with a description, or fix the code.", col.name), claims{Nothing: true}})
 			writable = false
 			unjudged[p] = true
 		case 1:
 		default:
-			ns.add(aboutFault, fmt.Sprintf("%s matches two of %s's output declarations, %s and %s.", c.out(col.name, p), col.name, hit[0], hit[1]), "Change the patterns so that one declaration matches each file. An update writes nothing for this cell.")
+			ns.add(aboutFault, fmt.Sprintf("%s matches two of %s's output declarations, %s and %s.", c.out(col.name, p), col.name, hit[0], hit[1]), closing{"Change the patterns so that one declaration matches each file.", claims{Nothing: true}})
 			writable = false
 			unjudged[p] = true
 		}
 	}
 	for _, p := range slices.Sorted(maps.Keys(files)) {
 		if err := archive.Holds(files[p]); err != nil && !unjudged[p] {
-			ns.add(aboutFault, fmt.Sprintf("%s can't be held in an archive: %v.", c.out(col.name, p), err), "Fix the code so the output can be held. An update writes nothing for this cell.")
+			ns.add(aboutFault, fmt.Sprintf("%s can't be held in an archive: %v.", c.out(col.name, p), err), closing{"Fix the code so the output can be held.", claims{Nothing: true}})
 			writable = false
 			unjudged[p] = true
 		}
@@ -1342,10 +1331,10 @@ func (r *runner) render(ns *notes, col *column, view fs.FS, err error) ([]byte, 
 	p := call(func(*called) { data = r.renderError(view, err) })
 	switch {
 	case p.panicked:
-		ns.add(aboutFault, fmt.Sprintf("The project's RenderError panicked on %s's error: %v", col.name, p.panicValue), "Fix RenderError. An update writes nothing for this cell.")
+		ns.add(aboutFault, fmt.Sprintf("The project's RenderError panicked on %s's error: %v", col.name, p.panicValue), closing{"Fix RenderError.", claims{Nothing: true}})
 		return []byte{}, false
 	case !bytes.HasSuffix(data, []byte("\n")):
-		ns.add(aboutFault, fmt.Sprintf("The project's RenderError returned %q for %s's error, which doesn't end with a newline.", data, col.name), "Its output must end with a newline: fix RenderError. An update writes nothing for this cell.")
+		ns.add(aboutFault, fmt.Sprintf("The project's RenderError returned %q for %s's error, which doesn't end with a newline.", data, col.name), closing{"Its output must end with a newline: fix RenderError.", claims{Nothing: true}})
 		return []byte{}, false
 	}
 	return bytes.Clone(data), true
@@ -1372,26 +1361,26 @@ func (r *runner) expectedError(ns *notes, c *aCase, col *column, out *called) {
 	errText := func() string { return indent(strings.TrimSuffix(out.err.Error(), "\n"), "  ") }
 	switch {
 	case out.panicked && out.inProbe:
-		ns.add(aboutFault, fmt.Sprintf("%s's probe panicked: %v", col.name, out.panicValue), "Fix the probe. A panic is never an expected error.")
+		ns.add(aboutFault, fmt.Sprintf("%s's probe panicked: %v", col.name, out.panicValue), closing{advice: "Fix the probe. A panic is never an expected error."})
 	case out.panicked:
-		ns.add(aboutFault, fmt.Sprintf("%s panicked: %v", col.name, out.panicValue), "Fix the code. A panic is never an expected error.")
+		ns.add(aboutFault, fmt.Sprintf("%s panicked: %v", col.name, out.panicValue), closing{advice: "Fix the code. A panic is never an expected error."})
 	case out.noProduct || out.jennyErr != nil:
 	case out.err != nil && len(hit) == 0 && c.tr != nil:
 		ns.add(aboutFault,
 			fmt.Sprintf("%s returned an error, but the variant states no property %s rejects:\n  %s\n%s", col.name, col.name, errText(), c.tr.states()),
-			fmt.Sprintf("Fix the code or %s's jenny, or give the variant the property, in %s's Gives or Keeps, and list it in %s's Rejects.", c.tr.name, c.tr.name, col.name))
+			closing{advice: fmt.Sprintf("Fix the code or %s's jenny, or give the variant the property, in %s's Gives or Keeps, and list it in %s's Rejects.", c.tr.name, c.tr.name, col.name)})
 	case out.err != nil && len(hit) == 0:
 		ns.add(aboutFault,
 			fmt.Sprintf("%s returned an error, but the case states no property %s rejects:\n  %s", col.name, col.name, errText()),
-			fmt.Sprintf("Fix the code, or state the property on the case and in %s's Rejects.", col.name))
+			closing{advice: fmt.Sprintf("Fix the code, or state the property on the case and in %s's Rejects.", col.name)})
 	case out.err == nil && len(hit) > 0 && c.tr != nil:
 		ns.add(aboutFault,
 			fmt.Sprintf("%s returned no error, but the variant states %s, which %s rejects.\n%s", col.name, andList(hit), col.name, c.tr.states()),
-			fmt.Sprintf("Fix the code or %s's jenny, or correct %s's Gives or Keeps, or %s's Rejects.", c.tr.name, c.tr.name, col.name))
+			closing{advice: fmt.Sprintf("Fix the code or %s's jenny, or correct %s's Gives or Keeps, or %s's Rejects.", c.tr.name, c.tr.name, col.name)})
 	case out.err == nil && len(hit) > 0:
 		ns.add(aboutFault,
 			fmt.Sprintf("%s returned no error, but the case states %s, which %s rejects.", col.name, andList(hit), col.name),
-			fmt.Sprintf("Fix the code, or correct the case's properties or %s's Rejects.", col.name))
+			closing{advice: fmt.Sprintf("Fix the code, or correct the case's properties or %s's Rejects.", col.name)})
 	}
 }
 
@@ -1426,7 +1415,7 @@ func (r *runner) compare(ns *notes, c *aCase, col *column, files, goldens map[st
 		default:
 			what = "is an output the run no longer produces"
 		}
-		ns.add(aboutOrphan, fmt.Sprintf("%s %s.", c.out(col.name, p), what), fmt.Sprintf("If the run should still write it, fix the code. If not, delete the section by hand; %s leaves it in place.", r.updateCmd()))
+		ns.addFile(aboutOrphan, c.out(col.name, p), fmt.Sprintf("%s %s.", c.out(col.name, p), what), closing{"If the run should still write it, fix the code. If not, delete the section by hand;", claims{Leaves: c.out(col.name, p)}})
 	}
 }
 
@@ -1440,11 +1429,11 @@ func (r *runner) compareFile(ns *notes, kind noteKind, name string, golden []byt
 	switch {
 	case !ok && !writable:
 	case !ok:
-		ns.add(kind, fmt.Sprintf("%s has no golden.", name), fmt.Sprintf("Run %s to write it, and read it before committing.", u))
+		ns.addFile(kind, name, fmt.Sprintf("%s has no golden.", name), closing{claims: claims{Writes: name}})
 	case !bytes.Equal(golden, got) && !writable:
-		ns.add(kind, fmt.Sprintf("%s differs (-golden +got):\n%s", name, strings.TrimSuffix(diff.Lines(golden, got), "\n")), "An update writes nothing for this cell until the problems above are fixed.")
+		ns.addFile(kind, name, fmt.Sprintf("%s differs (-golden +got):\n%s", name, strings.TrimSuffix(diff.Lines(golden, got), "\n")), closing{"Fix the problems above first.", claims{Nothing: true}})
 	case !bytes.Equal(golden, got):
-		ns.add(kind, fmt.Sprintf("%s differs (-golden +got):\n%s", name, strings.TrimSuffix(diff.Lines(golden, got), "\n")), fmt.Sprintf("If the change is intended, run %s and read the diff before committing.", u))
+		ns.addFile(kind, name, fmt.Sprintf("%s differs (-golden +got):\n%s", name, strings.TrimSuffix(diff.Lines(golden, got), "\n")), closing{advice: fmt.Sprintf("If the change is intended, run %s and read the diff before committing.", u)})
 	}
 }
 
@@ -1462,24 +1451,28 @@ func (r *runner) compareProduct(ns *notes, c *aCase, l *lift, out *called, produ
 		g, ok := committed[p]
 		r.compareFile(ns, aboutFile, dir+p, g, ok, product[p], writable)
 	}
-	closing := fmt.Sprintf("If not, run %s, which removes it, and read the diff before committing.", r.updateCmd())
-	if !writable {
-		closing = "If not, an update removes it, once the problems above are fixed."
-	}
 	failed := out.panicked || out.err != nil
 	for _, p := range slices.Sorted(maps.Keys(committed)) {
 		if _, ok := product[p]; ok {
 			continue
 		}
+		should := fmt.Sprintf("If it should, fix %s's jenny.", l.name)
 		if failed {
-			ns.add(aboutProductOrphan,
+			should = fmt.Sprintf("If it should make one, fix %s or %s.", l.name, c.inputsAt())
+		}
+		cl := closing{should + " If not,", claims{Removes: dir + p}}
+		if !writable {
+			cl = closing{advice: should + " If not, an update removes it, once the problems above are fixed."}
+		}
+		if failed {
+			ns.addFile(aboutProductOrphan, dir+p,
 				fmt.Sprintf("%s is recorded, and %s failed on the case in this run, so this run has no product.", dir+p, l.name),
-				fmt.Sprintf("If it should make one, fix %s or %s. %s", l.name, c.inputsAt(), closing))
+				cl)
 			continue
 		}
-		ns.add(aboutProductOrphan,
+		ns.addFile(aboutProductOrphan, dir+p,
 			fmt.Sprintf("%s is a file of %s's committed product, which this run of %s doesn't make.", dir+p, l.name, l.name),
-			fmt.Sprintf("If it should, fix %s's jenny. %s", l.name, closing))
+			cl)
 	}
 }
 
