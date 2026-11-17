@@ -120,7 +120,8 @@ var Import = decl.Lift[CSV, Sheet]{
 		if err != nil {
 			return nil, err
 		}
-		if len(paths) != 1 || path.Dir(paths[0]) != "csv" || path.Ext(paths[0]) != ".csv" {
+		if len(paths) != 1 || path.Dir(paths[0]) != "csv" ||
+			path.Ext(paths[0]) != ".csv" || path.Base(paths[0]) == ".csv" {
 			return nil, fmt.Errorf("the input holds %q, and a CSV export is one file, csv/<name>.csv", paths)
 		}
 		s, err := sheet.ImportCSV(in, paths[0])

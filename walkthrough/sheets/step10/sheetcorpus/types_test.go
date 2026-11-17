@@ -32,6 +32,7 @@ func TestImportInput(t *testing.T) {
 		{"readme", fstest.MapFS{"csv/a.csv": csv, "csv/README": csv}, `["csv/README" "csv/a.csv"]`},
 		{"outside", fstest.MapFS{"csv/a.csv": csv, "notes/about": csv}, `["csv/a.csv" "notes/about"]`},
 		{"directory", fstest.MapFS{"csv/x.csv/y": csv}, `["csv/x.csv/y"]`},
+		{"unnamed", fstest.MapFS{"csv/.csv": csv}, `["csv/.csv"]`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: tt.in})
@@ -48,20 +49,23 @@ func TestImportInput(t *testing.T) {
 			}
 		})
 	}
-	files, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: fstest.MapFS{"csv/one.csv": csv}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var got []string
-	for _, f := range files {
-		data, err := f.Render()
+	// A name of one dot is a name: only an empty one is refused.
+	for _, p := range []string{"csv/one.csv", "csv/..csv"} {
+		files, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: fstest.MapFS{p: csv}})
 		if err != nil {
 			t.Fatal(err)
 		}
-		got = append(got, f.Path()+"="+string(data))
-	}
-	if want := []string{"sheet/A1=4\n", "sheet/B1=6\n"}; !slices.Equal(got, want) {
-		t.Errorf("one CSV: got %q, want %q", got, want)
+		var got []string
+		for _, f := range files {
+			data, err := f.Render()
+			if err != nil {
+				t.Fatal(err)
+			}
+			got = append(got, f.Path()+"="+string(data))
+		}
+		if want := []string{"sheet/A1=4\n", "sheet/B1=6\n"}; !slices.Equal(got, want) {
+			t.Errorf("%s: got %q, want %q", p, got, want)
+		}
 	}
 }
 
