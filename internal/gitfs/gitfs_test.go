@@ -327,12 +327,61 @@ exec "$GIT" "$@"
 			}
 		}
 	})
-	// A bad header, then more than a pipe holds, which no read takes:
-	// stopping cat-file closes the pipe it writes to, so it exits, and
-	// neither the read nor Close waits on it. The deadlines fail only a
-	// read or a Close that never returns.
+	// answer has the wrapper answer one read as git does, which starts
+	// cat-file and every process the wrapper starts. more then writes more
+	// than a pipe holds, which no read takes, and starts no process: with
+	// SIGPIPE ignored, each write after the pipe is closed fails, and the
+	// loop ends.
+	const answer = `read -r line; printf '%s\n' "$line" | "$GIT" cat-file --batch
+`
+	const more = `trap '' PIPE; s=0123456789abcdef; s=$s$s$s$s; s=$s$s$s$s; s=$s$s; i=0
+while [ $i -lt 2048 ]; do echo "$s"; i=$((i+1)); done 2>/dev/null
+while read -r line; do :; done; exit 0
+`
+	// A bad header, then more than a pipe holds: stopping cat-file closes
+	// the pipe it writes to, so it exits, and the read doesn't wait on it.
+	// The read before it has started every process, so the deadline fails
+	// only a read that never returns.
 	t.Run("header then more", func(t *testing.T) {
-		wrapGit(t, `if [ "$1" = cat-file ]; then read -r line; echo "nonsense"; head -c 1048576 /dev/zero 2>/dev/null; while read -r line; do :; done; exit 0; fi
+		wrapGit(t, `if [ "$1" = cat-file ]; then
+`+answer+`read -r line; echo "nonsense"
+`+more+`fi
+exec "$GIT" "$@"
+`)
+		// Not open's Close, which would wait on a read that never returns.
+		r, err := gitfs.Open(g.Dir, gittest.Env())
+		if err != nil {
+			t.Fatal(err)
+		}
+		tree, err := r.Tree(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := fs.ReadFile(tree, "a.txt"); err != nil || string(got) != files["a.txt"] {
+			t.Fatalf("ReadFile(a.txt) = %q, %v", got, err)
+		}
+		read := make(chan error, 1)
+		go func() {
+			_, err := fs.ReadFile(tree, "dir/b.txt")
+			read <- err
+		}()
+		want := `readfile dir/b.txt: git cat-file gave "nonsense" for the blob ` + strings.TrimSpace(g.Git("rev-parse", c+":dir/b.txt"))
+		select {
+		case err := <-read:
+			if err == nil || err.Error() != want {
+				t.Errorf("ReadFile(dir/b.txt): got %v, want %q", err, want)
+			}
+		case <-time.After(time.Minute):
+			t.Fatal("ReadFile(dir/b.txt) never returned: git cat-file is blocked writing what no read takes")
+		}
+	})
+	// An answer, then more than a pipe holds: Close closes the pipe
+	// cat-file writes to before it waits, so it exits, and Close doesn't
+	// wait on it. The read before it has started every process, so the
+	// deadline fails only a Close that never returns.
+	t.Run("answer then more", func(t *testing.T) {
+		wrapGit(t, `if [ "$1" = cat-file ]; then
+`+answer+more+`fi
 exec "$GIT" "$@"
 `)
 		r, err := gitfs.Open(g.Dir, gittest.Env())
@@ -343,19 +392,8 @@ exec "$GIT" "$@"
 		if err != nil {
 			t.Fatal(err)
 		}
-		read := make(chan error, 1)
-		go func() {
-			_, err := fs.ReadFile(tree, "a.txt")
-			read <- err
-		}()
-		want := `readfile a.txt: git cat-file gave "nonsense" for the blob ` + strings.TrimSpace(g.Git("rev-parse", c+":a.txt"))
-		select {
-		case err := <-read:
-			if err == nil || err.Error() != want {
-				t.Errorf("ReadFile(a.txt): got %v, want %q", err, want)
-			}
-		case <-time.After(time.Minute):
-			t.Fatal("ReadFile(a.txt) never returned: git cat-file is blocked writing what no read takes")
+		if got, err := fs.ReadFile(tree, "a.txt"); err != nil || string(got) != files["a.txt"] {
+			t.Fatalf("ReadFile(a.txt) = %q, %v", got, err)
 		}
 		closed := make(chan error, 1)
 		go func() { closed <- r.Close() }()
@@ -365,7 +403,7 @@ exec "$GIT" "$@"
 				t.Errorf("Close: %v", err)
 			}
 		case <-time.After(time.Minute):
-			t.Fatal("Close never returned")
+			t.Fatal("Close never returned: git cat-file is blocked writing what no read takes")
 		}
 	})
 }
