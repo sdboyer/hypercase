@@ -23,9 +23,12 @@ type Repo struct {
 func New(t testing.TB) *Repo {
 	t.Helper()
 	r := &Repo{t: t, Dir: t.TempDir()}
-	r.Git("init", "-q", "-b", "main")
+	r.Git(initArgs...)
 	return r
 }
+
+// initArgs are the arguments of the git init that New runs.
+var initArgs = []string{"init", "-q", "-b", "main"}
 
 // Env is the environment every git command of the test runs with: this
 // process's, less every GIT_ variable and the locale, with git's
