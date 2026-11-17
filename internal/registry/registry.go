@@ -168,6 +168,37 @@ type Output struct {
 	Description string `json:"description"`
 }
 
+// BytesLifts returns what the registries say of the columns over each
+// corpus, by corpus and then column: whether the column is a bytes lift,
+// whose via/<column>/… is part of its cell. A column is one when any of
+// their entries for a lift of its name over the corpus, owned or used,
+// records a bytes lift. Every other column they record over the corpus, a
+// suite or a lift, is none. So registries that disagree on a lift, which
+// the root-package check fails on, make it a bytes lift, and a frozen cell
+// keeps its via/. hypercase strip and the root-package check both read the
+// registries through it, so that the check's advice on a frozen cell's
+// via/ is what strip does.
+func BytesLifts(regs []*Registry) map[string]map[string]bool {
+	lifts := map[string]map[string]bool{}
+	column := func(name string, bytes bool, corpora []string) {
+		for _, c := range corpora {
+			if lifts[c] == nil {
+				lifts[c] = map[string]bool{}
+			}
+			lifts[c][name] = lifts[c][name] || bytes
+		}
+	}
+	for _, r := range regs {
+		for _, s := range r.Suites {
+			column(s.Name, false, s.Corpora)
+		}
+		for _, l := range r.Lifts {
+			column(l.Name, l.Bytes, l.Corpora)
+		}
+	}
+	return lifts
+}
+
 // Marshal returns the registry's bytes: indented JSON, ending with a
 // newline, with every list sorted, so the bytes depend only on what was
 // registered.

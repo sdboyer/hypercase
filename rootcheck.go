@@ -326,10 +326,18 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	}
 
 	props := func(name string) bool { _, ok := propEntries[name]; return ok }
+	// What the registries say of the bytes lifts over each corpus, read as
+	// strip reads them, to say which gaps lines keep it from removing a
+	// section.
+	var parsed []*registry.Registry
+	for _, g := range regs {
+		parsed = append(parsed, g.reg)
+	}
+	bytesLifts := registry.BytesLifts(parsed)
 	for _, corpus := range slices.Sorted(maps.Keys(archives)) {
 		cols := claimed[corpus]
 		for _, file := range archives[corpus] {
-			r.checkArchive(t, filepath.Join(td, corpus, file), corpus, cols, products[corpus], transforms[corpus], props)
+			r.checkArchive(t, filepath.Join(td, corpus, file), corpus, cols, products[corpus], bytesLifts[corpus], transforms[corpus], props)
 		}
 	}
 }
@@ -482,9 +490,11 @@ func typeEntry(ct registry.Type) string {
 }
 
 // checkArchive reports the problems of one archive as a whole. cols are
-// the columns over its corpus, products the bytes lifts among them, and
-// transforms its corpus type's.
-func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, transforms map[string]bool, props func(string) bool) {
+// the columns over its corpus, products the bytes lifts among them that a
+// package owns, bytesLifts what the registries say of the columns over it
+// as strip reads them (see [registry.BytesLifts]), and transforms its
+// corpus type's.
+func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, bytesLifts, transforms map[string]bool, props func(string) bool) {
 	t.Helper()
 	rel := r.rel(p)
 	if name := strings.TrimSuffix(filepath.Base(p), ".txtar"); !validName(name) {
@@ -544,13 +554,6 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, tr
 	// the columns over the corpus.
 	kept := map[claim][]string{}
 	marks := cells.Marks(a)
-	bytesLifts := map[string]bool{}
-	for col := range cols {
-		bytesLifts[col] = products[col]
-	}
-	for col := range products {
-		bytesLifts[col] = true
-	}
 	keep := func(c claim, section string) {
 		if l, ok := stripKeeps(marks, section, bytesLifts); ok && !slices.Contains(kept[c], l) {
 			kept[c] = append(kept[c], l)

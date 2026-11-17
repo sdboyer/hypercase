@@ -150,8 +150,8 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	}
 	var own []ownRegistry
 	others := map[string]bool{}
-	vars := map[string][]string{}         // update variable → the registries that record it
-	lifts := map[string]map[string]bool{} // corpus → column → whether it is a bytes lift
+	vars := map[string][]string{} // update variable → the registries that record it
+	var regs []*registry.Registry // those that record the corpus root, read whole
 	for _, f := range found {
 		data, err := os.ReadFile(f.Path)
 		if err != nil {
@@ -181,21 +181,9 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 		case err != nil:
 			return fail("%s can't be read as a registry: %v. So strip can't tell which of the columns it registers are bytes lifts. Nothing was removed.\nFix the file or delete it, then run %s again.", rel(f.Path), err, again)
 		}
-		column := func(name string, bytes bool, corpora []string) {
-			for _, c := range corpora {
-				if lifts[c] == nil {
-					lifts[c] = map[string]bool{}
-				}
-				lifts[c][name] = lifts[c][name] || bytes
-			}
-		}
-		for _, s := range reg.Suites {
-			column(s.Name, false, s.Corpora)
-		}
-		for _, l := range reg.Lifts {
-			column(l.Name, l.Bytes, l.Corpora)
-		}
+		regs = append(regs, reg)
 	}
+	lifts := registry.BytesLifts(regs) // corpus → column → whether it is a bytes lift
 	if len(vars) > 1 {
 		var each []string
 		for _, v := range slices.Sorted(maps.Keys(vars)) {
