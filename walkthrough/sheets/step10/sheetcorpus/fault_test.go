@@ -1,6 +1,7 @@
 package sheetcorpus_test
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,7 +44,6 @@ func TestImportFault(t *testing.T) {
 	two := "Two CSVs.\n-- in/csv/a.csv --\n4\n-- in/csv/b.csv --\n6\n"
 	for name, data := range map[string]string{
 		"go.mod":                 "module example.com/throwaway\n\ngo 1.27\n",
-		"corpus_test.go":         "package throwaway\n",
 		"testdata/csv/two.txtar": two,
 	} {
 		p := filepath.Join(dir, filepath.FromSlash(name))
@@ -54,7 +54,13 @@ func TestImportFault(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	cmd := exec.Command(os.Args[0], "-test.run=^TestImportFault$", "-test.count=1")
+	// The child starts by the binary's absolute path: a relative argv[0]
+	// would resolve in dir.
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(exe, "-test.run=^TestImportFault$", "-test.count=1")
 	cmd.Dir = dir
 	for _, kv := range os.Environ() {
 		if k, _, _ := strings.Cut(kv, "="); k != throwaway && k != sheetcorpus.Project.UpdateVar && k != "PWD" {
@@ -63,8 +69,12 @@ func TestImportFault(t *testing.T) {
 	}
 	cmd.Env = append(cmd.Env, throwaway+"=1", sheetcorpus.Project.UpdateVar+"=1")
 	out, err := cmd.CombinedOutput()
-	if err == nil {
+	var exit *exec.ExitError
+	switch {
+	case err == nil:
 		t.Fatalf("the update passed:\n%s", out)
+	case !errors.As(err, &exit):
+		t.Fatalf("running the update: %v\n%s", err, out)
 	}
 	for _, want := range []string{
 		"import's jenny failed on the case, with an error that is no rejection:",
