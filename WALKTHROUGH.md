@@ -2306,9 +2306,11 @@ lines each holds exactly once, in an order both share, and diffs each
 stretch between them the same way. The whole diff shares one fixed budget,
 which alone pays to look for such lines. Each stretch also has a fixed
 amount of work for each of its lines, which it spends once the shared
-budget is gone, so a short change after a long rewrite is still diffed
-exactly. A diff's work is at most the budget plus a fixed amount for each
-line, so its cost never grows with the product of the files' lengths. A
+budget is gone. So a short change after a long rewrite is still diffed
+exactly when a line both files hold once lies between them, which puts the
+change in a stretch of its own. A diff's work is at most the budget plus a
+fixed amount for each line, so its cost never grows with the product of
+the files' lengths. A
 stretch with no such line, or that the budget and its own work no longer
 cover, is left unaligned: its diff is one line saying how many lines it
 leaves out of each file, and its file says it is partly unaligned in place

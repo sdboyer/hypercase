@@ -393,7 +393,7 @@ func align(x, y []int, w *budget, own *int, out *[]op) {
 
 // uniqueAnchors returns the longest run of pairs (i, j), increasing in
 // both, where x[i] and y[j] are one line that x and y each hold once. It
-// looks up each line of x and y once.
+// looks up each line of x twice, and each line of y once.
 func uniqueAnchors(x, y []int) [][2]int {
 	type seen struct{ nx, ny, i, j int }
 	lines := map[int]*seen{}

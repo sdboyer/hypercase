@@ -377,9 +377,13 @@ func rewritten(side string, regions, size, keys, change int) []byte {
 // the rest. The rest is still aligned exactly, on each stretch's own work:
 // the lines both files hold in the same place, and a line changed among
 // them. So the diff holds each rewritten stretch as one Unaligned line,
-// and the change as it is, whether the files share 10,000 lines after it
-// or 20,000, and its work stays within maxWork plus perLine for each line
-// of the files.
+// and the change as it is, and its work stays within maxWork plus perLine
+// for each line of the files. The keys split what follows the rewritten
+// stretches into 4,000 stretches of a line or two on each side, the last
+// holding the change, and those test that own work. The files hold 10,000
+// or 20,000 lines after the rewritten stretches, which checks only that
+// the budget the diff shares doesn't grow with the files' lengths: both
+// give the same diff.
 func TestDiffSpent(t *testing.T) {
 	const regions, size = 8, 1100
 	var want []Line
@@ -400,6 +404,37 @@ func TestDiffSpent(t *testing.T) {
 		if most := maxWork + perLine*2*(regions*(size+1)+2*keys); work > most {
 			t.Errorf("%d keys: the diff did %d work, want at most %d", keys, work, most)
 		}
+	}
+}
+
+// TestDiffRewriteThenChange: a short change after a long rewrite, with no
+// line both files hold once between them, is in the rewrite's stretch, and
+// is left unaligned with it, though the diff doesn't spend maxWork. Each
+// side writes 2,200 lines its own way, then 10,000 lines of x, and b
+// changes the 4,001st of those to y. The trim takes the 5,999 lines of x
+// after it.
+func TestDiffRewriteThenChange(t *testing.T) {
+	file := func(side string, change int) []byte {
+		var b strings.Builder
+		for i := range 2200 {
+			fmt.Fprintf(&b, "%s %d\n", side, i)
+		}
+		for i := range 10_000 {
+			if i == change {
+				b.WriteString("y\n")
+				continue
+			}
+			b.WriteString("x\n")
+		}
+		return []byte(b.String())
+	}
+	got, work := Diff(file("a", -1), file("b", 4000))
+	want := []Line{{Kind: Unaligned, Old: 2200 + 4001, New: 2200 + 4001}, {Kind: ' ', Text: "x"}, {Kind: ' ', Text: "x"}, {Kind: ' ', Text: "x"}}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+	if work >= maxWork {
+		t.Errorf("the diff did %d work, want less than maxWork, %d", work, maxWork)
 	}
 }
 
