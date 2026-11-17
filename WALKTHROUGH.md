@@ -2960,10 +2960,14 @@ lift.
   message about the cell ends with what it does, as step 7 gives for a
   transform's variant, a panic of the cell's run or its probe and a frozen
   cell's files among them. So does each message about the lift's own cell,
-  a file of its committed product included. When the update writes nothing
-  for the cell of a lift on the cell's path, the message says so, names
-  the lift, and says to fix what that cell reports, and, on a file the cell
-  commits, to delete nothing by hand before the update has run. Another
+  a file of its committed product included. Where a lift before every
+  bytes lift on the cell's path fails on the case in the update, which
+  then reaches none of them, the message names it, and the last bytes
+  lift, whose outcome and product a normal run reads from the archive.
+  When the update writes nothing for the cell of a lift on the cell's
+  path, the message says so, names the lift, and says to fix what that
+  cell reports, and, on a file the cell commits, to delete nothing by hand
+  before the update has run. Another
   package's normal run doesn't run the bytes lifts it doesn't own, so it
   can't tell what its update does with a cell past one: every message
   about such a cell says so, names the lift, says that a normal run reads

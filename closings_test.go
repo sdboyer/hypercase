@@ -872,6 +872,52 @@ var claimChecks = map[string]claimCheck{
 		}
 		return ""
 	}},
+	// Where the closing says what the update does with the cell, and the
+	// update stages no variant and runs no bytes lift on the cell's path,
+	// as its records of each run of a lift show, the closing names the
+	// last of them, and this run's cell took what the archive commits for
+	// it. An outcome other than accepted blocks the cell, by the lift a
+	// blocked one names, or by the lift itself. An accepted one gives its
+	// product, which is the cell's input view, or which a lift past it
+	// fails on: one that isn't a bytes lift, and isn't the lift the
+	// update fails before them.
+	"Reads": {check: func(c *noteCheck, u *updated) string {
+		var want string
+		reached := slices.ContainsFunc(u.cell.Path, func(l string) bool { return u.lifts[liftKey{c.n.Pkg, c.n.Case, l}] })
+		if c.cl.Does != "" && c.cl.Variant == "" && len(u.cell.Path) > 0 && !reached {
+			want = u.cell.Path[0]
+		}
+		switch {
+		case c.cl.Reads != want:
+			return fmt.Sprintf("the closing says a normal run reads %q's outcome and product, where the update reaches no bytes lift on the cell's path, and the last of %v, which the update reaches none of: %v, is %q", c.cl.Reads, u.cell.Path, !reached, want)
+		case want == "":
+			return ""
+		}
+		data, _ := c.before.Section(c.n.Prefix + "out/" + want + "/" + archive.OutcomeFile)
+		o, err := archive.ParseOutcome(data)
+		accepted := err == nil && o.State == archive.Accepted
+		product := map[string]string{}
+		for _, s := range c.before.Sections {
+			if p, ok := strings.CutPrefix(s.Name, c.n.Prefix+"via/"+want+"/"); ok {
+				product[p] = string(s.Data)
+			}
+		}
+		wantFate := "blocked " + want
+		if err == nil && o.State == archive.Blocked {
+			wantFate = "blocked " + o.Detail
+		}
+		blocker, blocked := strings.CutPrefix(c.nr.Fate, "blocked ")
+		switch {
+		case !accepted && c.nr.Fate != wantFate:
+			return fmt.Sprintf("the closing says a normal run reads %s's outcome, which the archive commits as %q, and the normal run's cell's fate is %q", want, data, c.nr.Fate)
+		case !accepted:
+		case !blocked && !maps.Equal(c.nr.View, product):
+			return fmt.Sprintf("the closing says a normal run reads %s's product, whose committed outcome is accepted, and the normal run's cell's input view isn't the committed product: %v", want, c.nr.View)
+		case blocked && (slices.Contains(u.cell.Path, blocker) || c.nr.Fate == c.cl.Does):
+			return fmt.Sprintf("the closing says a normal run reads %s's product, whose committed outcome is accepted, and the normal run's cell is blocked by %s, a bytes lift on its path or the lift the update fails", want, blocker)
+		}
+		return ""
+	}},
 	"CantTell": {check: func(c *noteCheck, _ *updated) string {
 		var want string
 		if c.cell && !c.n.Update {

@@ -114,6 +114,11 @@ type claims struct {
 	// product this run reads from the archive: the last on the cell's path
 	// that the update reaches.
 	Reruns string `json:"reruns,omitempty"`
+	// Reads names the last bytes lift on the cell's path, whose outcome
+	// and product this run reads from the archive, where the update blocks
+	// the cell by a lift before every bytes lift there, so it reaches none
+	// of them, and stages no variant.
+	Reads string `json:"reads,omitempty"`
 	// CantTell names the bytes lift on the cell's path that the package
 	// doesn't own, so it can't tell what the update does with the cell: a
 	// normal run of the package reads the lift's outcome and product from
@@ -276,6 +281,12 @@ func (st *staging) close(n note) (string, claims) {
 		c.claims.Does, c.claims.Another = fateWords(st.f), st.f.runs() && st.ran
 		if st.reran != nil {
 			c.claims.Reruns = st.reran.name
+		} else if st.c.state.made == nil {
+			// The update reaches no bytes lift on the cell's path, so a lift
+			// before them all blocks the cell there, and this run differs
+			// from it by reading the last one's outcome and product.
+			last, _ := st.c.state.plan.bytesOnPath(st.col.consumes)
+			c.claims.Reads = last.name
 		}
 	default:
 		return st.text(n, n.def), n.def.claims
@@ -538,10 +549,12 @@ func (st *staging) does(cl claims) string {
 	case fateBlocked:
 		// The update runs every lift on the cell's path, so a lift that
 		// blocks the cell there failed on the case. One that fails before
-		// the first bytes lift on the path leaves the update none to rerun,
-		// and, with no variant, nothing it stages otherwise.
-		if how == "" {
-			return fmt.Sprintf("%s blocks %s: the lift %s, on %s's path, failed on the case, before any bytes lift there.", u, col, detail, col)
+		// every bytes lift on the path, with no variant, leaves the update
+		// nothing it stages otherwise than this run: what differs is the
+		// outcome and product of the last one, which this run reads from
+		// the archive, as Reads names it.
+		if cl.Reads != "" {
+			return fmt.Sprintf("%s blocks %s: the lift %s, on %s's path, failed on the case, before %s, whose outcome and product a normal run reads from the archive.", u, col, detail, col, cl.Reads)
 		}
 		return fmt.Sprintf("%s blocks %s: %s, and the lift %s, on %s's path, failed on the case.", u, col, how, detail, col)
 	}
