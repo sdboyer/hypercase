@@ -11,8 +11,8 @@ import (
 
 // TestTestdata: Testdata calls file with each file under testdata/, in
 // lexical order, past each directory below it that holds a go.mod or is
-// another corpus root, and returns the walk's error, as for a testdata/
-// that doesn't exist.
+// another corpus root, but not testdata/ itself, and returns the walk's
+// error, as for a testdata/ that doesn't exist.
 func TestTestdata(t *testing.T) {
 	td := t.TempDir()
 	for _, f := range []string{"a/x.txtar", "a/y.txt", "b.txtar", "nested/go.mod", "nested/z.txtar", "other/w.txtar", "other-not/v.txtar"} {
@@ -31,6 +31,16 @@ func TestTestdata(t *testing.T) {
 	})
 	if want := []string{"a/x.txtar", "a/y.txt", "b.txtar", "other-not/v.txtar"}; err != nil || !slices.Equal(got, want) {
 		t.Errorf("Testdata visited %q, with the error %v; want %q", got, err, want)
+	}
+
+	// A go.mod directly in testdata/ makes no nested module of testdata/
+	// itself, which the walk reads whole.
+	got = nil
+	err = Testdata(filepath.Join(td, "nested"), nil, func(p string, d fs.DirEntry) {
+		got = append(got, filepath.Base(p))
+	})
+	if want := []string{"go.mod", "z.txtar"}; err != nil || !slices.Equal(got, want) {
+		t.Errorf("Testdata of a testdata/ that holds a go.mod visited %q, with the error %v; want %q", got, err, want)
 	}
 
 	got = nil
