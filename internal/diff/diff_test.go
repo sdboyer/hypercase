@@ -428,3 +428,42 @@ func TestEditsOwnWork(t *testing.T) {
 		t.Errorf(`Diff("a\n", "b\n") did %d work, want %d`, work, 2+6+1+3+5)
 	}
 }
+
+// TestEditsSplitNoFurther: a stretch whose attempt of Myers' algorithm
+// spends the rest of maxWork and some of the stretch's own work is split no
+// further, though what is left of its own work would pay a pass for unique
+// lines, and its sides hold such a line every 100 lines. So every line is
+// left unaligned, and the work is at most what was left of maxWork plus
+// perLine for each line. The test gives the budget itself, so it doesn't
+// depend on maxWork.
+func TestEditsSplitNoFurther(t *testing.T) {
+	var a, b []string
+	for i := range 3000 {
+		if i%100 == 50 {
+			both := fmt.Sprintf("both %d\n", i)
+			a, b = append(a, both), append(b, both)
+		}
+		a, b = append(a, fmt.Sprintf("a %d\n", i)), append(b, fmt.Sprintf("b %d\n", i))
+	}
+	x, y, _ := number(a, b)
+	lines := len(x) + len(y)
+	const shared = maxCells - 10_000
+	w := &budget{shared: shared}
+	var ops []op
+	edits(x, y, w, &ops)
+	unaligned := 0
+	for _, o := range ops {
+		if o.unaligned {
+			unaligned++
+		}
+	}
+	if len(ops) != lines || unaligned != lines {
+		t.Errorf("the script has %d ops, %d of them unaligned, want %d, all unaligned", len(ops), unaligned, lines)
+	}
+	if most := shared + perLine*lines; w.spent > most {
+		t.Errorf("the stretch did %d work, want at most %d", w.spent, most)
+	}
+	if own := w.spent - shared; w.shared != 0 || own <= 0 || perLine*lines-own < lines {
+		t.Errorf("the stretch did %d work, %d of it its own, and left %d of maxWork, want all of maxWork spent and some of its own work, with at least %d of it left", w.spent, own, w.shared, lines)
+	}
+}
