@@ -142,21 +142,33 @@ type Lift[In, Out any] struct {
 	// generates from the input are the product's input view, by their
 	// paths in it. An error it returns is the lift's rejection when
 	// [Reject] marks all of it: each error the returned one wraps or joins,
-	// down to those that wrap none, is one Reject made or below one. Any
-	// other error is a fault of the jenny, jenny's own included, such as
-	// two files at one path, and so is a rejection joined with a fault, as
-	// jenny's Pipeline joins its jennies' errors: it fails the lift's cell,
-	// and no update writes the cell.
+	// down to those that wrap none, is one Reject made or below one, as
+	// Unwrap finds them. Any other error is a fault of the jenny, jenny's
+	// own included, such as two files at one path, and so is a rejection
+	// joined with a fault, as jenny's Pipeline joins its jennies' errors:
+	// it fails the lift's cell, and no update writes the cell.
 	Jenny jenny.Jenny[In]
 }
 
 // Reject marks err as a bytes lift's rejection of its input, for the
 // lift's jenny to return. A jenny's error has two sources, the jenny's
 // generator and jenny itself, and only an error Reject marks all of is a
-// rejection, so a fault of the jenny is never recorded as one, alone or
-// joined with a rejection. The rejection's text is err's, and it wraps
-// err, so errors.As reaches err through it. Reject returns nil for a nil
-// err.
+// rejection, so jenny's own fault, alone or joined with a rejection, is
+// no rejection. But Reject marks all of err, whatever it holds: a
+// generator that runs a jenny of its own and returns that jenny's error
+// marked has jenny's faults in it, such as two files at one path,
+// recorded as its rejection. Mark only what the generator rejects.
+//
+// The framework finds the marks through Unwrap() error and
+// Unwrap() []error alone, never through an error's own As or Is method.
+// So an error that reaches the errors it holds through As, as
+// go-multierror's does, is a fault, however many of them Reject marks:
+// when the generator rejects the input, mark that error whole, with
+// Reject. An error reached through more than 100 Unwrap calls, as in an
+// error whose Unwrap leads back to itself, makes the whole error a fault.
+//
+// The rejection's text is err's, and it wraps err, so errors.As reaches
+// err through it. Reject returns nil for a nil err.
 func Reject(err error) error {
 	if err == nil {
 		return nil
