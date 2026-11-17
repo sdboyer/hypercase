@@ -8,7 +8,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # pkg-b-circular
         out/shout/values.txt differs (-committed +got):
         - A1 SIX
         + A1 SEVEN
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/gapped
@@ -53,7 +53,7 @@ $ go test ./b  # pkg-b-circular
         out/shout/values.txt differs (-committed +got):
         - A1 SIX
         + A1 SEVEN
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/gapped

@@ -51,7 +51,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # tr-b-jenny
         transform/upper/out/copy/values.txt differs (-committed +got):
           A1 SIX
         + A1 SIX
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/twice
@@ -98,7 +98,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-jenny
         transform/upper/out/echo/values.txt differs (-committed +got):
           A1 SIX
         + A1 SIX
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/twice
@@ -118,7 +118,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-jenny
         transform/upper/out/echo/values.txt differs (-committed +got):
           A1 SIX
         + A1 SIX
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/twice
@@ -137,7 +137,7 @@ $ go test  # tr-jenny
         transform/upper/out/echo/values.txt differs (-committed +got):
           A1 SIX
         + A1 SIX
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/twice
@@ -156,7 +156,7 @@ $ go test ./b  # tr-b-jenny
         transform/upper/out/copy/values.txt differs (-committed +got):
           A1 SIX
         + A1 SIX
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/twice
@@ -193,7 +193,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # tr-b-jenny
         transform/upper/out/copy/values.txt differs (-committed +got):
           A1 SIX
         + A1 SIX
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- FAIL: TestCorpus/script/twice

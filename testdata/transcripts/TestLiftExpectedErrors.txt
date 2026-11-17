@@ -232,7 +232,7 @@ $ go test -run=TestCorpus/script/gapped/  # ladder
         out/parse/error.txt differs (-committed +got):
         - A1: wrongly rejected
         + A1: wrongly rejected, reworded
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
     script/gapped: resolve is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
     script/panics-gapped: evaluate is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
     script/panics-gapped: format is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
@@ -269,7 +269,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test -run=TestCorpus/script/gapped/  # ladder
         out/parse/error.txt differs (-committed +got):
         - A1: wrongly rejected
         + A1: wrongly rejected, reworded
-        If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.
+        If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.
     script/gapped: resolve is blocked: the lift parse failed on the case, and testdata/script/gapped.txtar, out/parse/error.txt, records its error.
     script/panics-gapped: evaluate is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.
     script/panics-gapped: format is blocked: the lift parse failed on the case, and testdata/script/panics-gapped.txtar, out/parse/error.txt, records its error.

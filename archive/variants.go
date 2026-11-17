@@ -238,7 +238,7 @@ func checkVariant(s Section, kind, name, rest string) []Problem {
 	case top == Delete:
 		return []Problem{{Section: s.Name, Msg: "delete is one section, with nothing below it"}}
 	}
-	return []Problem{{Section: s.Name, Msg: fmt.Sprintf("%s is not one of a transform's sections: in, delete, via and out, which an update writes", top)}}
+	return []Problem{{Section: s.Name, Msg: fmt.Sprintf("%s is not one of a transform's sections: in, delete, via and out, none of them hand-written", top)}}
 }
 
 // checkVariants reports the problems of the variants as wholes: a

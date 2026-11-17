@@ -114,8 +114,8 @@ func TestFrameworkNamesFail(t *testing.T) {
 // TestUnwritableCell: a cell whose outputs an update won't write, for any
 // of the reasons the run gives, fails on that reason first. A file of it
 // with no golden isn't asked for, and one that differs from its golden
-// says the update writes nothing until the problems above are fixed. An
-// orphan is reported as in any other cell.
+// says to fix the problems above first, and that an update writes nothing
+// for the cell. An orphan is reported as in any other cell.
 func TestUnwritableCell(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "basic")

@@ -190,7 +190,7 @@ func TestFrozenCellChanges(t *testing.T) {
 		"out/echo/error.txt differs (-committed +got):",
 		"out/echo/values.txt differs (-committed +got):",
 		"out/echo/c.txt is new",
-		"If the gap is closed, remove the line, and the next update writes the cell. If the wrong behavior changed shape, delete the cell's files, and the next update writes them.",
+		"If the gap is closed, remove the line. If the wrong behavior changed shape, delete the cell's files.",
 	}
 	s.fails(s.normal("rejects", "-test.run=TestCorpus/script/(negative|div-zero|accepted-loop)/"), want...)
 	s.fails(s.update("rejects", "-test.run=TestCorpus/script/(negative|div-zero|accepted-loop)/"), want...)

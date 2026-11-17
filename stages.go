@@ -484,6 +484,23 @@ func (p *plan) bytesOnPath(typ reflect.Type) (last, unowned *lift) {
 	return last, unowned
 }
 
+// reran returns the last bytes lift on the plan's path to typ that an
+// update runs, where f is its fate for the cell: past the lift that
+// blocks the cell, if one does, it runs nothing, so it is the last at or
+// before that lift. It is nil where the update runs none.
+func (p *plan) reran(typ reflect.Type, f updateFate) *lift {
+	reached := f.block == nil
+	for typ != p.root.goType {
+		l := p.producer[typ]
+		reached = reached || l == f.block.lift
+		if reached && l.bytes {
+			return l
+		}
+		typ = l.in
+	}
+	return nil
+}
+
 // read reads, once, what the archive commits for a bytes lift on the
 // case. Its committed outcome decides: accepted gives the committed
 // product, an empty one included; blocked by another lift blocks the cells
@@ -533,6 +550,9 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 	}
 	lr := &liftRun{}
 	s.runs[l] = lr
+	if observe.lift != nil {
+		observe.lift(s, l)
+	}
 	if !l.bytes {
 		lr.out = call(func(o *called) {
 			lr.value, o.err = l.run(s.c.archive, in, &o.stderr)

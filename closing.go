@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/sdboyer/hypercase/archive"
 )
@@ -113,10 +111,24 @@ type claims struct {
 	// case, a variant of it, where this run reads its committed inputs.
 	Variant string `json:"variant,omitempty"`
 	// Reruns names the bytes lift the update reruns, whose outcome and
-	// product this run reads from the archive.
+	// product this run reads from the archive: the last on the cell's path
+	// that the update reaches.
 	Reruns string `json:"reruns,omitempty"`
+	// Reads names the last bytes lift on the cell's path, whose outcome
+	// and product this run reads from the archive, where the update blocks
+	// the cell by a lift before every bytes lift there, so it reaches none
+	// of them, and stages no variant.
+	Reads string `json:"reads,omitempty"`
+	// Unwritten names the bytes lift on the cell's path whose cell the
+	// update writes nothing for, as a problem of the cell keeps it from
+	// being written, so the update writes nothing for the cell either.
+	Unwritten string `json:"unwritten,omitempty"`
 	// CantTell names the bytes lift on the cell's path that the package
-	// doesn't own, so it can't tell what the update does with the cell.
+	// doesn't own, so it can't tell what the update does with the cell: a
+	// normal run of the package reads the lift's outcome and product from
+	// the archive, and only the package that owns it runs it. A lift before
+	// it may fail in the update, which then reaches it in no package, so
+	// CantTell says nothing of what the update reruns.
 	CantTell string `json:"cantTell,omitempty"`
 	// PastFresh records, of a frozen bytes lift's cell, that the update
 	// writes the cells past the lift from what it makes now, and leaves
@@ -147,12 +159,15 @@ type claims struct {
 	Leaves      string `json:"leaves,omitempty"`
 	Removes     string `json:"removes,omitempty"`
 	// RemovesInputs names the transform whose variant's inputs the update
-	// removes, WritesInputs one whose variant's inputs, which the archive
-	// lacks, the update writes, and RewritesInputs one whose variant's
-	// inputs the module's update rewrites, in the package that owns it.
-	RemovesInputs  string `json:"removesInputs,omitempty"`
-	WritesInputs   string `json:"writesInputs,omitempty"`
-	RewritesInputs string `json:"rewritesInputs,omitempty"`
+	// removes, and WritesInputs one whose variant's inputs, which the
+	// archive lacks, the update writes. RewritesInputs names one this
+	// package owns, whose variant's inputs its update rewrites, and
+	// OwnerRewritesInputs one it doesn't, whose variant's inputs the update
+	// of the package that owns it rewrites, if a package does.
+	RemovesInputs       string `json:"removesInputs,omitempty"`
+	WritesInputs        string `json:"writesInputs,omitempty"`
+	RewritesInputs      string `json:"rewritesInputs,omitempty"`
+	OwnerRewritesInputs string `json:"ownerRewritesInputs,omitempty"`
 }
 
 // A staging is what a normal run tells of what the package's update does
@@ -182,16 +197,18 @@ type staging struct {
 	declined bool
 
 	told bool
-	// unowned is the last bytes lift on the cell's path that the package
-	// doesn't own, which keeps it from telling: only the package that owns
-	// a bytes lift runs it in a normal run.
-	unowned *lift
+	// last is the last bytes lift on the cell's path, nil where there is
+	// none, and unowned the last there that the package doesn't own, which
+	// keeps it from telling: only the package that owns a bytes lift runs
+	// it in a normal run.
+	last, unowned *lift
 	// f is the cell's fate in the update, and otherwise says whether the
-	// update does otherwise with the cell than this run. last is the last
-	// bytes lift on the cell's path.
+	// update does otherwise with the cell than this run. reran is the last
+	// bytes lift on the cell's path that the update runs, nil where it runs
+	// none.
 	f         updateFate
 	otherwise bool
-	last      *lift
+	reran     *lift
 }
 
 // staging makes a cell's staging, untold: this is the cell's fate in this
@@ -226,6 +243,7 @@ func (st *staging) tell() {
 	}
 	s := st.c.state
 	last, unowned := s.plan.bytesOnPath(st.col.consumes)
+	st.last = last
 	switch {
 	case last == nil && s.made == nil:
 		return
@@ -240,7 +258,7 @@ func (st *staging) tell() {
 	if st.f.same(st.this) && !(st.ran && st.this.runs() && s.restages(st.col)) {
 		return
 	}
-	st.otherwise, st.last = true, last
+	st.otherwise, st.reran = true, s.plan.reran(st.col.consumes, st.f)
 }
 
 // differs reports whether the update does otherwise with the cell than
@@ -259,7 +277,7 @@ func (st *staging) close(n note) (string, claims) {
 	var c closing
 	switch {
 	case st.unowned != nil:
-		c.claims = claims{CantTell: st.unowned.name, Reruns: st.unowned.name}
+		c.claims = claims{CantTell: st.unowned.name}
 		c.advice = "Run it, fix what it reports, and read the diff before committing."
 		if n.kind == aboutOrphan || n.kind == aboutProductOrphan {
 			c.advice = "Delete nothing by hand before it has run."
@@ -267,8 +285,16 @@ func (st *staging) close(n note) (string, claims) {
 	case st.otherwise:
 		c = st.tail(n)
 		c.claims.Does, c.claims.Another = fateWords(st.f), st.f.runs() && st.ran
-		if st.last != nil {
-			c.claims.Reruns = st.last.name
+		if b := st.f.block; b != nil && b.broken {
+			c.claims.Unwritten = b.lift.name
+		}
+		if st.reran != nil {
+			c.claims.Reruns = st.reran.name
+		} else if st.c.state.made == nil {
+			// The update reaches no bytes lift on the cell's path, so a lift
+			// before them all blocks the cell there, and this run differs
+			// from it by reading the last one's outcome and product.
+			c.claims.Reads = st.last.name
 		}
 	default:
 		return st.text(n, n.def), n.def.claims
@@ -378,8 +404,8 @@ func (st *staging) writes(o archive.Outcome) claims {
 // text renders a closing of a note: what the update does, where the
 // closing claims it does otherwise than this run, then the advice, then
 // what the update writes or leaves. Each sentence that says what an update
-// does is its claims' own. One that follows advice ending with a comma
-// goes on from it.
+// does is its claims' own. One that follows advice ending with a comma goes
+// on from it, in the form it takes there.
 func (st *staging) text(n note, c closing) string {
 	u := st.r.updateCmd()
 	cl := c.claims
@@ -387,7 +413,11 @@ func (st *staging) text(n note, c closing) string {
 	sep := " "
 	switch {
 	case cl.CantTell != "":
-		lead = append(lead, fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell what %s does with %s: %s.", cl.CantTell, u, st.col.name, staged(cl)))
+		how := fmt.Sprintf("a normal run reads %s's outcome and product from the archive", cl.CantTell)
+		if s := staged(cl); s != "" {
+			how = s + ", and " + how
+		}
+		lead = append(lead, fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell what %s does with %s: %s.", cl.CantTell, u, st.col.name, how))
 	case cl.Does != "":
 		lead = append(lead, st.does(cl))
 		if strings.HasPrefix(cl.Does, fateSkipped+" ") {
@@ -400,70 +430,84 @@ func (st *staging) text(n note, c closing) string {
 		sep = "\n"
 	}
 	staged := cl.Does != "" || cl.CantTell != ""
-	var says []string
+	var says []said
 	if cl.RunWrites {
-		says = append(says, "What it writes for the cell, if anything, is its run's.")
+		says = append(says, said{"What it writes for the cell, if anything, is its run's.", "what it writes for the cell, if anything, is its run's."})
 	}
 	if cl.MayWrite != "" {
 		made := "write"
 		if n.kind == aboutProductOrphan {
 			made = "make"
 		}
-		says = append(says, fmt.Sprintf("Its run may still %s the file: delete nothing by hand before it has run.", made))
+		says = append(says, said{fmt.Sprintf("Its run may still %s the file: delete nothing by hand before it has run.", made), fmt.Sprintf("its run may still %s the file: delete nothing by hand before it has run.", made)})
 	}
 	if cl.Outcome != "" {
-		s := fmt.Sprintf("It writes the outcome %q", cl.Outcome)
+		s := said{fmt.Sprintf("It writes the outcome %q", cl.Outcome), fmt.Sprintf("it writes the outcome %q", cl.Outcome)}
 		if cl.Differs {
-			s += ", not this one"
+			s = s.then(", not this one")
 		}
 		if cl.Panic {
-			s += ", and the panic in " + errorFile
+			s = s.then(", and the panic in " + errorFile)
 		}
-		says = append(says, s+".")
+		says = append(says, s.then("."))
+	}
+	if cl.Unwritten != "" && !staged {
+		// Where the closing says what the update does with the cell, its
+		// fate's sentence says it.
+		l, col := cl.Unwritten, st.col.name
+		says = append(says, said{fmt.Sprintf("An update writes nothing for the cell of the lift %s, on %s's path, nor for this cell.", l, col), fmt.Sprintf("an update writes nothing for the cell of the lift %s, on %s's path, nor for this cell.", l, col)})
 	}
 	if cl.Nothing {
-		s := "An update writes nothing for this cell"
+		s := said{"An update writes nothing for this cell", "an update writes nothing for this cell"}
 		if staged {
-			s = "It writes nothing for the cell"
+			s = said{"It writes nothing for the cell", "it writes nothing for the cell"}
 		}
 		if cl.Frozen {
-			s += ", which a gaps line freezes"
+			s = s.then(", which a gaps line freezes")
 		}
-		says = append(says, s+".")
+		says = append(says, s.then("."))
 	}
 	if cl.Writes != "" {
-		says = append(says, fmt.Sprintf("Run %s to write it, and read it before committing.", u))
+		says = append(says, said{fmt.Sprintf("Run %s to write it, and read it before committing.", u), fmt.Sprintf("run %s to write it, and read it before committing.", u)})
 	}
 	if cl.OnlyOutcome != "" {
-		says = append(says, fmt.Sprintf("Run %s to add it. The update adds the outcome and changes nothing else.", u))
+		says = append(says, said{fmt.Sprintf("Run %s to add it. The update adds the outcome and changes nothing else.", u), fmt.Sprintf("run %s to add it. The update adds the outcome and changes nothing else.", u)})
 	}
 	if cl.Leaves != "" {
-		says = append(says, fmt.Sprintf("%s leaves it in place.", u))
+		s := fmt.Sprintf("%s leaves it in place.", u)
+		says = append(says, said{s, s})
 	}
 	switch {
 	case cl.Removes != "" && staged:
-		says = append(says, "It removes the file: read the diff before committing.")
+		says = append(says, said{"It removes the file: read the diff before committing.", "it removes the file: read the diff before committing."})
 	case cl.Removes != "":
-		says = append(says, fmt.Sprintf("Run %s, which removes it, and read the diff before committing.", u))
+		says = append(says, said{fmt.Sprintf("Run %s, which removes it, and read the diff before committing.", u), fmt.Sprintf("run %s, which removes it, and read the diff before committing.", u)})
 	}
 	if cl.RemovesInputs != "" {
-		says = append(says, fmt.Sprintf("Run %s to remove them.", u))
+		says = append(says, said{fmt.Sprintf("Run %s to remove them.", u), fmt.Sprintf("run %s to remove them.", u)})
 	}
 	if cl.WritesInputs != "" {
-		says = append(says, fmt.Sprintf("Run %s to write them, and read them before committing.", u))
+		says = append(says, said{fmt.Sprintf("Run %s to write them, and read them before committing.", u), fmt.Sprintf("run %s to write them, and read them before committing.", u)})
 	}
 	if cl.RewritesInputs != "" {
-		says = append(says, fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s.%s", u, cl.RewritesInputs, st.r.ifUnowned(st.c.tr)))
+		says = append(says, said{fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s.", u, cl.RewritesInputs), fmt.Sprintf("the module's update, %s, rewrites them, in the package that owns %s.", u, cl.RewritesInputs)})
 	}
-	if strings.HasSuffix(c.advice, ",") && len(says) > 0 {
-		r, size := utf8.DecodeRuneInString(says[0])
-		says[0] = string(unicode.ToLower(r)) + says[0][size:]
+	if cl.OwnerRewritesInputs != "" {
+		// This package can't know some package owns the transform.
+		tr := cl.OwnerRewritesInputs
+		says = append(says, said{fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s. If no package owns %s, no update rewrites the inputs.", u, tr, tr), fmt.Sprintf("the module's update, %s, rewrites them, in the package that owns %s. If no package owns %s, no update rewrites the inputs.", u, tr, tr)})
 	}
 	var rest []string
 	if c.advice != "" {
 		rest = append(rest, c.advice)
 	}
-	rest = append(rest, says...)
+	for i, s := range says {
+		if i == 0 && strings.HasSuffix(c.advice, ",") {
+			rest = append(rest, s.joined)
+			continue
+		}
+		rest = append(rest, s.own)
+	}
 	all := strings.Join(lead, "\n")
 	switch {
 	case all == "":
@@ -473,6 +517,16 @@ func (st *staging) text(n note, c closing) string {
 	}
 	return all + sep + strings.Join(rest, " ")
 }
+
+// A said is a sentence a closing's claims say: own, as it reads on its
+// own, and joined, as it reads going on from advice that ends with a
+// comma. Each is written whole, and neither is made from the other by
+// changing a letter's case, which would change a name or the update
+// command that opens it.
+type said struct{ own, joined string }
+
+// then is the sentence s, going on with more.
+func (s said) then(more string) said { return said{s.own + more, s.joined + more} }
 
 // staged says how the update stages the case otherwise than a normal run,
 // as cl claims.
@@ -504,10 +558,25 @@ func (st *staging) does(cl claims) string {
 	case fateSkipped:
 		return fmt.Sprintf("%s skips %s: %s, and %s's probe says the case isn't for it: %s", u, col, how, col, detail)
 	case fateBroken:
-		return fmt.Sprintf("%s writes nothing for %s: %s, and it writes nothing for the cell of the lift %s, on %s's path, whose outcome and product a normal run reads.", u, col, how, detail, col)
+		// The update reruns the lift whose cell it writes nothing for: the
+		// last bytes lift it runs on the cell's path, as Reruns names it. Its
+		// claims name the lift three times, and the sentence names the one
+		// Does does, and says once whose outcome and product a normal run
+		// reads, in how.
+		if cl.Reruns != detail || cl.Unwritten != detail {
+			panic(fmt.Sprintf("hypercase: an update that writes nothing for a cell past the lift %s, whose claims say it reruns %q, and writes nothing for the cell of %q", detail, cl.Reruns, cl.Unwritten))
+		}
+		return fmt.Sprintf("%s writes nothing for %s: %s, and it writes nothing for the cell of the lift %s, on %s's path.", u, col, how, detail, col)
 	case fateBlocked:
 		// The update runs every lift on the cell's path, so a lift that
-		// blocks the cell there failed on the case.
+		// blocks the cell there failed on the case. One that fails before
+		// every bytes lift on the path, with no variant, leaves the update
+		// nothing it stages otherwise than this run: what differs is the
+		// outcome and product of the last one, which this run reads from
+		// the archive, as Reads names it.
+		if cl.Reads != "" {
+			return fmt.Sprintf("%s blocks %s: the lift %s, on %s's path, failed on the case, before %s, whose outcome and product a normal run reads from the archive.", u, col, detail, col, cl.Reads)
+		}
 		return fmt.Sprintf("%s blocks %s: %s, and the lift %s, on %s's path, failed on the case.", u, col, how, detail, col)
 	}
 	panic(fmt.Sprintf("hypercase: no words for what an update does with a cell, %q", cl.Does))
@@ -566,11 +635,13 @@ func report(t *testing.T, header string, ns notes, st *staging) {
 
 // observe is nil but in hypercase's own tests, which set its functions in
 // the test binaries they run as children, to see each cell's result and
-// fate in every run, and each note's closing in a normal run, and check
-// what a normal run says the update does against what the update did.
+// fate in every run, each note's closing, and each run of a lift's
+// function, and check what a normal run says the update does against what
+// the update did.
 var observe struct {
 	cell func(c *aCase, col *column, res *cellResult, failed bool)
 	note func(st *staging, n note, closing string, cl claims)
+	lift func(s *caseState, l *lift)
 }
 
 // outcomeLine is an outcome as its file holds it, less its newline.

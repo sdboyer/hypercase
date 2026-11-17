@@ -198,19 +198,19 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		columns[name] = true
 	}
 	for _, name := range slices.Sorted(maps.Keys(columns)) {
-		if msg := duplicateColumn(name, suitePkgs[name], liftPkgs[name], usedPkgs[name]); msg != "" {
-			t.Error(msg)
+		if holders, why, fix := duplicateColumn(suitePkgs[name], liftPkgs[name], usedPkgs[name]); holders != "" {
+			t.Errorf("the column %s is %s. %s\n%s", name, holders, why, fix)
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(usedPkgs)) {
 		if len(liftPkgs[name]) > 0 {
 			continue
 		}
-		msg := fmt.Sprintf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.", name, andList(usedPkgs[name]))
+		var untested string
 		fix := "Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use."
 		if pkgs := untestedLifts[name]; len(pkgs) > 0 {
 			why, restore := untestedOwners("lift", pkgs)
-			msg += " " + why
+			untested = " " + why
 			fix = restore + " own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use."
 		}
 		// Owning the lift while a suite holds its name would make the
@@ -219,7 +219,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		if len(suitePkgs[name]) > 0 {
 			fix = "Once no suite shares the lift's name, " + lowerFirst(fix)
 		}
-		t.Errorf("%s\n%s", msg, fix)
+		t.Errorf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.%s\n%s", name, andList(usedPkgs[name]), untested, fix)
 	}
 	// Registries that differ where the packages' code agrees are stale,
 	// such as one edited by hand, so each comparison's fix says how the
@@ -246,14 +246,14 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		for _, name := range slices.Sorted(maps.Keys(needOwner[dir])) {
 			switch pkgs := trPkgs[trKey{dir, name}]; {
 			case len(pkgs) == 0:
-				msg := fmt.Sprintf("the transform %s, of testdata/%s/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.", name, dir)
+				var untested string
 				fix := "Give it to hypercase.Own in one package that registers its corpus type."
 				if u := untestedTrs[trKey{dir, name}]; len(u) > 0 {
 					why, restore := untestedOwners("transform", u)
-					msg += " " + why
+					untested = " " + why
 					fix = restore + " give the transform to hypercase.Own in another package that registers its corpus type."
 				}
-				t.Errorf("%s\n%s", msg, fix)
+				t.Errorf("the transform %s, of testdata/%s/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.%s\n%s", name, dir, untested, fix)
 			case len(pkgs) > 1:
 				t.Errorf("the transform %s, of testdata/%s/, is owned by %s. One package owns each transform.\nOwn it in one of them.", name, dir, andList(pkgs))
 			}
@@ -383,16 +383,17 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 }
 
 // duplicateColumn words the failure of a name that two or more columns
-// hold, or returns "" when fewer do. suites are the packages that own the
-// name as a suite, lifts those that own it as a lift, and users those
-// that use the lift. Each suite's owner counts as one column, and each
-// lift's owner as one. When no package owns the lift, its users together
-// count as one column, the one owning the lift would make; when one does,
-// they count for nothing. The fix leaves one column of the name. Only a
-// lift's owners are offered hypercase.Use, and only when more than one
-// owns the lift, since a lift that one package owns has an owner it
-// needs.
-func duplicateColumn(name string, suites, lifts, users []string) string {
+// hold: who holds it, why that fails, and the fix, which rootCheck's
+// message gives in turn. It returns "" for each when fewer hold it. suites
+// are the packages that own the name as a suite, lifts those that own it
+// as a lift, and users those that use the lift. Each suite's owner counts
+// as one column, and each lift's owner as one. When no package owns the
+// lift, its users together count as one column, the one owning the lift
+// would make; when one does, they count for nothing. The fix leaves one
+// column of the name. Only a lift's owners are offered hypercase.Use, and
+// only when more than one owns the lift, since a lift that one package
+// owns has an owner it needs.
+func duplicateColumn(suites, lifts, users []string) (holders, why, fix string) {
 	if len(lifts) > 0 {
 		users = nil
 	}
@@ -401,7 +402,7 @@ func duplicateColumn(name string, suites, lifts, users []string) string {
 		n++
 	}
 	if n < 2 {
-		return ""
+		return "", "", ""
 	}
 	// A lift owner that only reads the lift's product removes its column
 	// with hypercase.Use, so that is how the fix says to remove one.
@@ -409,7 +410,6 @@ func duplicateColumn(name string, suites, lifts, users []string) string {
 	if len(lifts) > 1 {
 		useHint = fmt.Sprintf(" Of %s, which own the lift, one that only reads its product removes its column by giving the lift to hypercase.Use in place of hypercase.Own.", andList(lifts))
 	}
-	var holders, why, fix string
 	switch {
 	case len(lifts) == 0 && len(users) == 0:
 		holders = "owned by " + pkgsAs(suites, "suite")
@@ -428,7 +428,7 @@ func duplicateColumn(name string, suites, lifts, users []string) string {
 		why = "Lifts share the suites' column names, which are unique per corpus root. No package owns the lift, and owning it would add a column of the name."
 		fix = leaveOne(n, "the suite or the lift", "the suites and the lift") + " To remove the lift, drop it from hypercase.Use in every package that uses it."
 	}
-	return fmt.Sprintf("the column %s is %s. %s\n%s", name, holders, why, fix)
+	return holders, why, fix
 }
 
 // leaveOne words the fix that leaves one of n columns of a name: of two,
