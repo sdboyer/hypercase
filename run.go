@@ -1088,14 +1088,7 @@ func (r *runner) asUpdate(c *aCase, col *column, same func(updateFate) bool) adv
 	if same(f) {
 		return advice{}
 	}
-	var how []string
-	if c.state.made != nil {
-		how = append(how, fmt.Sprintf("it runs the variant on what %s makes now, where a normal run reads the inputs the archive holds", c.tr.name))
-	}
-	if last != nil {
-		how = append(how, fmt.Sprintf("it reruns %s, whose outcome and product a normal run reads from the archive", last.name))
-	}
-	staged := strings.Join(how, ", and ")
+	staged := c.staged(last)
 	writes := func(o archive.Outcome) string {
 		return fmt.Sprintf("It writes the outcome %q, not this one.", strings.TrimSuffix(string(o.Format()), "\n"))
 	}
@@ -1128,6 +1121,42 @@ func (r *runner) asUpdate(c *aCase, col *column, same func(updateFate) bool) adv
 		files:   says + fmt.Sprintf("\nIf the cell should run, fix the lift or %s. If not, delete the section by hand; %s leaves it in place.", c.inputsAt(), u),
 		outcome: says + " " + writes(archive.Outcome{State: archive.Blocked, Detail: f.block.failed}),
 	}
+}
+
+// staged says how the update stages a case otherwise than a normal run,
+// for a cell whose path's last bytes lift is last, or nil.
+func (c *aCase) staged(last *lift) string {
+	var how []string
+	if c.state.made != nil {
+		how = append(how, fmt.Sprintf("it runs the variant on what %s makes now, where a normal run reads the inputs the archive holds", c.tr.name))
+	}
+	if last != nil {
+		how = append(how, fmt.Sprintf("it reruns %s, whose outcome and product a normal run reads from the archive", last.name))
+	}
+	return strings.Join(how, ", and ")
+}
+
+// mayStillWrite words, in a normal run, the advice for a file that a
+// cell's committed files hold and its run no longer produces, when the
+// update runs the cell on another value than this run, as it may past a
+// bytes lift, or on a transform's variant whose committed inputs differ
+// from what the transform makes: the update's run may still write the
+// file. It returns "" when the update runs the cell on this run's value,
+// or doesn't run it, and the file is the update's orphan too. A package
+// that doesn't own every bytes lift on the cell's path can't tell, and
+// says so.
+func (r *runner) mayStillWrite(c *aCase, col *column) string {
+	u := r.updateCmd()
+	last, unowned := c.state.plan.bytesOnPath(col.consumes)
+	switch {
+	case last == nil && c.state.made == nil:
+		return ""
+	case unowned != nil:
+		return fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell whether an update's run of %s still writes it. Run %s, which reruns %s, and delete nothing by hand before it has.", unowned.name, col.name, u, unowned.name)
+	case !c.state.updateFate(col).runs() || !c.state.restages(col):
+		return ""
+	}
+	return fmt.Sprintf("%s runs %s on another value than this run: %s. Its run may still write the file: delete nothing by hand before it has run.", u, col.name, c.staged(last))
 }
 
 // blocked finishes a cell that a lift on its path blocked, by failing on
@@ -1453,7 +1482,9 @@ func (r *runner) expectedError(m *msg, c *aCase, col *column, out *called) {
 
 // compare compares a cell's files with its goldens, and reports orphans.
 // In a cell no update writes, a file with no golden isn't reported, and
-// one that differs says the cell's problems come first.
+// one that differs says the cell's problems come first. A normal run that
+// finds an orphan asks once whether the update runs the cell on another
+// value, whose run may still write it.
 func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[string][]byte, unjudged map[string]bool, writable bool) {
 	if !r.update {
 		for _, p := range slices.Sorted(maps.Keys(files)) {
@@ -1463,6 +1494,8 @@ func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[strin
 			}
 		}
 	}
+	asked := false
+	var keep string
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		if _, ok := files[p]; ok || unjudged[p] {
 			continue
@@ -1477,6 +1510,14 @@ func (r *runner) compare(m *msg, c *aCase, col *column, files, goldens map[strin
 			what = "records output, but the run wrote nothing to stderr"
 		default:
 			what = "is an output the run no longer produces"
+		}
+		if !r.update && !asked {
+			asked = true
+			keep = r.mayStillWrite(c, col)
+		}
+		if keep != "" {
+			m.add("%s %s.\n%s", c.out(col.name, p), what, keep)
+			continue
 		}
 		m.add("%s %s.\nIf the run should still write it, fix the code. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, p), what, r.updateCmd())
 	}

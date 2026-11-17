@@ -380,7 +380,9 @@ func TestChainTwiceShared(t *testing.T) {
 // the committed inputs. Here louder's committed inputs differ from what it
 // makes, each way: they hold an import/error louder doesn't make, so the
 // update runs list, which the committed outcome blocks; or a stale delete
-// hides the import/error louder makes, so the update blocks list too.
+// hides the import/error louder makes, so the update blocks list too, and
+// writes the import/error.txt for which the normal run, on the committed
+// inputs, finds no error.
 func TestChainVariantAsUpdate(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "chain")
@@ -412,10 +414,11 @@ func TestChainVariantAsUpdate(t *testing.T) {
 	r := s.normal("chain")
 	s.fails(r,
 		"louder's variant of the base differs from its committed inputs:\ntransform/louder/delete is no longer made",
-		orphan+"has the committed outcome \"rejected\", in transform/louder/out/import/outcome."+deleteByHand)
+		orphan+"has the committed outcome \"rejected\", in transform/louder/out/import/outcome."+deleteByHand,
+		"transform/louder/out/import/error.txt records an error, but the run returned none.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Its run may still write the file: delete nothing by hand before it has run.")
 	s.lacks(r, "runs list")
 	s.fails(s.update("chain"), orphan+"failed on the case."+deleteByHand)
-	s.hasSections(prices, map[string]string{}, "transform/louder/delete")
+	s.hasSections(prices, map[string]string{"transform/louder/out/import/error.txt": "import: line 2: unclosed quote\n"}, "transform/louder/delete")
 	s.done()
 }
 
@@ -513,6 +516,37 @@ func TestChainOutcomeAsUpdate(t *testing.T) {
 	s.fails(s.normal("chain"), "out/evaluate/outcome differs (-golden +got):\n- accepted\n+ blocked import\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+reruns+". What it writes for the cell, if anything, is its run's, not this outcome.")
 	s.fails(s.update("chain"), "The run failed its test, through its testing.TB. The update writes nothing for this cell.")
 	s.hasSections(prices, map[string]string{"out/import/outcome": "accepted\n", "out/evaluate/outcome": "accepted\n", "out/evaluate/values.txt": "a1 3\nb1 6\n"})
+	s.done()
+}
+
+// TestChainOrphanAsUpdate: a cell past a bytes lift that runs on a stale
+// committed product, and no longer produces a file it commits, may write
+// it in the update, which runs the cell on what the lift makes: the
+// normal run says to delete nothing by hand. When the committed product
+// is what the lift makes, the update's run is this run, and the file is
+// an orphan.
+func TestChainOrphanAsUpdate(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "chain")
+	s.passes(s.update("chain"))
+	clean := s.read(prices)
+
+	s.edit(prices, "import's committed product lacks evaluate/out/values.txt, which import makes", drop("via/import/evaluate/out/values.txt"))
+	r := s.normal("chain")
+	s.fails(r,
+		"via/import/evaluate/out/values.txt has no golden.",
+		"out/evaluate/values.txt is an output the run no longer produces.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Its run may still write the file: delete nothing by hand before it has run.")
+	s.lacks(r, "delete the section by hand")
+	s.passes(s.update("chain"))
+	s.same(prices, clean)
+
+	s.edit(prices, "evaluate's cell commits a file evaluate doesn't make", insert("out/evaluate/stray.txt", "a stray\n", "out/evaluate/values.txt"))
+	orphan := "out/evaluate/stray.txt is an output the run no longer produces.\nIf the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place."
+	r = s.normal("chain")
+	s.fails(r, orphan)
+	s.lacks(r, "runs evaluate on another value")
+	s.fails(s.update("chain"), orphan)
+	s.hasSections(prices, map[string]string{"out/evaluate/stray.txt": "a stray\n"})
 	s.done()
 }
 

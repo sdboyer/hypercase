@@ -457,6 +457,30 @@ func TestBlockedStaleTransformVariant(t *testing.T) {
 	s.done()
 }
 
+// TestOrphanStaleTransformVariant: as TestBlockedStaleTransformVariant,
+// for a cell that runs on the committed inputs, and no longer produces a
+// file it commits, which its run on what the transform makes, in the
+// update, still writes. Here a stale delete hides the evaluate/out/
+// values.txt that upper's variant keeps from the base.
+func TestOrphanStaleTransformVariant(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.remove("testdata/script/errs.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.remove("testdata/script/garbled.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.edit(twice, "evaluate writes a file", set("in/evaluate/out/values.txt", "a1 six\n"))
+	s.passes(s.update("tr-ladder-eval"))
+	clean := s.read(twice)
+	s.edit(twice, "a stale delete hides evaluate/out/values.txt from upper's variant", insert("transform/upper/delete", "evaluate/out/values.txt\n", "transform/upper/out/"))
+	r := s.normal("tr-ladder-eval")
+	s.fails(r,
+		"upper's variant of the base differs from its committed inputs:\ntransform/upper/delete is no longer made",
+		"transform/upper/out/evaluate/values.txt is an output the run no longer produces.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate on another value than this run: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Its run may still write the file: delete nothing by hand before it has run.")
+	s.lacks(r, "delete the section by hand")
+	s.passes(s.update("tr-ladder-eval"))
+	s.same(twice, clean)
+	s.done()
+}
+
 // TestSkippedStaleTransformVariant: as TestBlockedStaleTransformVariant,
 // for a cell whose probe says no on the committed inputs, where the
 // update's probe reads what the transform makes. Here upper's committed

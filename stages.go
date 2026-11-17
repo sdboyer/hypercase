@@ -1,6 +1,7 @@
 package hypercase
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -413,6 +414,25 @@ func (s *caseState) updateFate(col *column) updateFate {
 		return updateFate{fault: fmt.Sprintf("%s's probe says the case isn't for it, with a reason an outcome can't hold: %v", col.name, err)}
 	}
 	return updateFate{skip: why}
+}
+
+// restages reports, in a normal run, once updateFate says the update runs
+// col's cell, whether the update runs it on another value than this run
+// does. Past a bytes lift, the cell's value comes from the last bytes
+// lift's product alone, so it differs when that lift makes another
+// product than the one the archive commits. With no bytes lift on the
+// path, it differs when the update stages a transform's variant on what
+// the transform makes.
+func (s *caseState) restages(col *column) bool {
+	last, _ := s.plan.bytesOnPath(col.consumes)
+	if last == nil {
+		return s.made != nil
+	}
+	lr, ok := s.asUpdate.runs[last]
+	if !ok && s.asUpdate.normal != nil {
+		lr, ok = s.asUpdate.normal.runs[last]
+	}
+	return !ok || !maps.EqualFunc(lr.product, s.c.product(last), bytes.Equal)
 }
 
 // bytesOnPath returns the last bytes lift on the plan's path to typ, and

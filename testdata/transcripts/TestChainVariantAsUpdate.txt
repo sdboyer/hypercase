@@ -503,7 +503,7 @@ $ go test  # chain
         + accepted
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         transform/louder/out/import/error.txt records an error, but the run returned none.
-        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Its run may still write the file: delete nothing by hand before it has run.
         transform/louder/via/import/evaluate/out/values.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         transform/louder/via/import/quote/A1 has no golden.

@@ -1926,7 +1926,11 @@ whether each has a probe, and whether the package owns it.
   the update writes for the cell, if anything, is its run's. When the
   update skips or blocks the cell otherwise, the normal run says why, and,
   from step 8 on, which outcome the update writes; when the cell's probe
-  fails there, that the probe needs fixing.
+  fails there, that the probe needs fixing. A cell that runs on the
+  committed sections, and no longer produces a file it commits, runs on
+  what the transform makes in the update, whose run may still write the
+  file: the normal run says to delete nothing by hand before the update
+  has run.
 - An update replaces a transform's `in/…` and `delete` whole: a file the
   transform no longer produces is removed, and the removal shows in the diff.
 - When a transform no longer applies to a base, no cell runs on its
@@ -2821,6 +2825,14 @@ lift.
   any; if the cell's probe fails there, that the probe needs fixing.
   Another package's normal run doesn't run the lifts it doesn't own, so it
   says to run the update before deleting any of them.
+- A cell past a bytes lift that runs on a committed product the lift no
+  longer makes, and no longer produces a file it commits, runs on what the
+  lift makes in the update, whose run may still write the file. A normal
+  run of a package that owns every bytes lift on the cell's path tells
+  whether the update runs the cell on another product, and if it does,
+  says to delete nothing by hand before the update has run. Another
+  package's can't tell, and says so, and to run the update before deleting
+  the file.
 - A bytes lift's frozen cell includes its `via/` product: no update writes
   it, and a product that differs from what the lift makes fails the cell,
   in every run. An update writes the cells past it from what the lift makes
