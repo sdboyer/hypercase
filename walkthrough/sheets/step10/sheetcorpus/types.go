@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"path"
 	"strings"
+	"unicode"
 
 	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
@@ -92,7 +93,7 @@ type CSV struct{ fs.FS } // in/csv/<name>.csv
 
 var CSVType = decl.Type[CSV]{
 	Dir:         "csv",
-	Description: "A CSV export: one file, in/csv/<name>.csv, with a name that isn't empty or only white space; one row of the sheet per line.",
+	Description: "A CSV export: one file, in/csv/<name>.csv, with a name holding a character that is neither white space nor a format character; one row of the sheet per line.",
 }
 
 var Unterminated = decl.Property{
@@ -126,8 +127,11 @@ var Import = decl.Lift[CSV, Sheet]{
 		if ok {
 			name, ok = strings.CutSuffix(path.Base(paths[0]), ".csv")
 		}
-		if !ok || strings.TrimSpace(name) == "" {
-			return nil, fmt.Errorf("the input holds %q, and a CSV export is one file, csv/<name>.csv, with a name that isn't empty or only white space", paths)
+		ok = ok && strings.ContainsFunc(name, func(r rune) bool {
+			return !unicode.In(r, unicode.White_Space, unicode.Cf)
+		})
+		if !ok {
+			return nil, fmt.Errorf("the input holds %q, and a CSV export is one file, csv/<name>.csv, with a name holding a character that is neither white space nor a format character", paths)
 		}
 		s, err := sheet.ImportCSV(in, paths[0])
 		var e *sheet.Error

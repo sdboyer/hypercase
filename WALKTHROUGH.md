@@ -2589,8 +2589,10 @@ not by the archive's name. `view` gives each file of the sheet that
 the jenny's error as the lift's rejection of the case: the importer's own
 error, a `*sheet.Error`, is one. Any other error is no rejection, so it
 fails the cell: an input that breaks the corpus type's rule (one file,
-`csv/<name>.csv`, with a name that isn't empty or only white space); an
-input the jenny can't walk; and a CSV it can't read.
+`in/csv/<name>.csv`, with a name holding a character that is neither white
+space nor a format character); an input the jenny can't walk; and a CSV it
+can't read. White space and format characters are Unicode's White_Space and
+category Cf, so a name of a zero-width space alone breaks the rule.
 
 `walkthrough/sheets/step10/sheetcorpus/types.go` declares the corpus type,
 its property and the lift:
@@ -2601,7 +2603,7 @@ type CSV struct{ fs.FS } // in/csv/<name>.csv
 
 var CSVType = decl.Type[CSV]{
 	Dir:         "csv",
-	Description: "A CSV export: one file, in/csv/<name>.csv, with a name that isn't empty or only white space; one row of the sheet per line.",
+	Description: "A CSV export: one file, in/csv/<name>.csv, with a name holding a character that is neither white space nor a format character; one row of the sheet per line.",
 }
 
 var Unterminated = decl.Property{
@@ -2635,8 +2637,11 @@ var Import = decl.Lift[CSV, Sheet]{
 		if ok {
 			name, ok = strings.CutSuffix(path.Base(paths[0]), ".csv")
 		}
-		if !ok || strings.TrimSpace(name) == "" {
-			return nil, fmt.Errorf("the input holds %q, and a CSV export is one file, csv/<name>.csv, with a name that isn't empty or only white space", paths)
+		ok = ok && strings.ContainsFunc(name, func(r rune) bool {
+			return !unicode.In(r, unicode.White_Space, unicode.Cf)
+		})
+		if !ok {
+			return nil, fmt.Errorf("the input holds %q, and a CSV export is one file, csv/<name>.csv, with a name holding a character that is neither white space nor a format character", paths)
 		}
 		s, err := sheet.ImportCSV(in, paths[0])
 		var e *sheet.Error

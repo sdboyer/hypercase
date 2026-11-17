@@ -14,9 +14,13 @@ import (
 )
 
 // TestImportInput: import finds its CSV by its tree, and errs on an input
-// that breaks the corpus type's rule (one file, csv/<name>.csv, with a name
-// that isn't empty or only white space). The error is its own, not the
-// importer's, so it carries no code, and no mark of decl.Reject.
+// that breaks the corpus type's rule (one file, in/csv/<name>.csv, with a
+// name holding a character that is neither white space nor a format
+// character). White space is Unicode's White_Space, and a format character
+// is one of its category Cf, such as a zero-width space. The error is its
+// own, not the importer's, so it carries no code, and no mark of
+// decl.Reject. It gives the path in the jenny's view, csv/<name>.csv, as it
+// gives the files the input holds.
 func TestImportInput(t *testing.T) {
 	csv := &fstest.MapFile{Data: []byte("4,6\n")}
 	for _, tt := range []struct {
@@ -38,10 +42,13 @@ func TestImportInput(t *testing.T) {
 		{"spaces", fstest.MapFS{"csv/   .csv": csv}, `["csv/   .csv"]`},
 		{"tab", fstest.MapFS{"csv/\t.csv": csv}, `["csv/\t.csv"]`},
 		{"nbsp", fstest.MapFS{"csv/\u00a0.csv": csv}, `["csv/\u00a0.csv"]`},
+		{"zwsp", fstest.MapFS{"csv/\u200b.csv": csv}, `["csv/\u200b.csv"]`},
+		{"bom", fstest.MapFS{"csv/\ufeff.csv": csv}, `["csv/\ufeff.csv"]`},
+		{"joiner", fstest.MapFS{"csv/\u2060.csv": csv}, `["csv/\u2060.csv"]`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: tt.in})
-			want := "import: the input holds " + tt.want + ", and a CSV export is one file, csv/<name>.csv, with a name that isn't empty or only white space"
+			want := "import: the input holds " + tt.want + ", and a CSV export is one file, csv/<name>.csv, with a name holding a character that is neither white space nor a format character"
 			if err == nil || err.Error() != want {
 				t.Fatalf("got %v, want %s", err, want)
 			}
@@ -54,17 +61,14 @@ func TestImportInput(t *testing.T) {
 			}
 		})
 	}
-	// Only a name that is empty or white space alone is refused: one dot is
-	// a name, and so is a letter between spaces. U+200B, U+FEFF and U+2060
-	// are no white space, so a name of one of them alone is a name too,
-	// though nothing shows.
+	// A name holding a character that is neither white space nor a format
+	// character imports, whatever else it holds: one dot does, and so do a
+	// letter between spaces and a letter after a zero-width space.
 	for _, tt := range []struct{ name, path string }{
 		{"word", "csv/one.csv"},
 		{"dot", "csv/..csv"},
 		{"letter", "csv/ a .csv"},
-		{"zwsp", "csv/\u200b.csv"},
-		{"bom", "csv/\ufeff.csv"},
-		{"joiner", "csv/\u2060.csv"},
+		{"zwsp-letter", "csv/\u200ba.csv"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			files, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: fstest.MapFS{tt.path: csv}})
