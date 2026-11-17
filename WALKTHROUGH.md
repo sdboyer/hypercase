@@ -2461,10 +2461,11 @@ No archive changes. `hypercase.json` gains the link patterns. The report is
 for the person to read, and a project needn't commit it.
 
 `walkthrough/sheets/step09/report_test.go` runs both commands as a person
-does on a branch. In a scratch repository, it commits the toy at step 9 on
-`main`, makes a change on a branch, runs the update, commits again, and
-runs the report in `step09/`. Its commits hold what the report reads:
-`go.mod`, the registries and the archives. The change makes three edits:
+does on a branch. In a scratch repository, it runs the update on the toy at
+step 9 and commits it on `main`, makes a change on a branch, runs the update
+again, commits again, and runs the report in `step09/`. Its commits hold
+what the report reads: `go.mod`, the registries and the archives. The
+change makes three edits:
 
 - `calc` gains a classifier, `warned`, which adds `warned` to the outcome
   of each cell where calc writes a warning.

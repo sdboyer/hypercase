@@ -19,11 +19,12 @@ import (
 )
 
 // TestReport runs hypercase report over a change to this corpus root, as a
-// person does on a branch. In a scratch repository, it commits the toy as
-// it is on main, makes the change on the branch change, runs the update
-// there, commits again, and reports from the merge base to HEAD, in
-// step09. The ranked changes, as plain text, are testdata/report.txt, and
-// the page is testdata/report.html. The update rewrites both.
+// person does on a branch. In a scratch repository, it runs the update on
+// the toy as it is on main and commits it, makes the change on the branch
+// change, runs the update there, commits again, and reports from the merge
+// base to HEAD, in step09. The ranked changes, as plain text, are
+// testdata/report.txt, and the page is testdata/report.html. The update
+// rewrites both.
 //
 // The scratch repository's commits hold what the report reads, and nothing
 // else: go.mod, which places the module root, and the corpus root's
@@ -34,14 +35,18 @@ import (
 //
 // The toy is copied from this module's working tree, which, in the module's
 // update, another package can be writing while this test copies it. Each
-// file is copied as it was before such a write or after it, so the test's
-// goldens, like a corpus check's findings, can take a second update to
-// settle.
+// file is copied as it was before such a write or after it, and the update
+// before each commit rewrites what the toy's code writes, so each revision
+// holds what the code writes for it either way. The test makes a cell of the
+// copy stale, as such a copy can find it, to show that main's update
+// rewrites it.
 func TestReport(t *testing.T) {
 	update := updating(t)
 	hypercase := buildHypercase(t)
 	repo := t.TempDir()
 	modfile := scratch(t, repo)
+	stale.apply(t, repo)
+	runUpdate(t, repo, modfile)
 	commit(t, repo, "main")
 
 	git(t, repo, "switch", "-q", "-c", "change")
@@ -77,6 +82,16 @@ var change = []edit{
 	// A file that is not a cell is worded otherwise, under the same
 	// outcome: bytes changed.
 	{path: "sheet/sheet.go", old: `"%s: not a cell name"`, new: `"%s: not the name of a cell"`},
+}
+
+// stale makes a cell of the copy differ from what the code writes for it, as
+// a copy taken in the module's update can find a cell the update has yet to
+// rewrite. The update before main's commit rewrites it, so the report shows
+// no change in it.
+var stale = edit{
+	path: "step09/testdata/sheet/prices.txtar",
+	old:  "-- out/calc/stdout.txt --\n4,6,10\n",
+	new:  "-- out/calc/stdout.txt --\n4,6,11\n",
 }
 
 const calcRun = `	Run: func(t testing.TB, archive string, in sheetcorpus.Sheet, stdout, stderr io.Writer) ([]hypercase.File, error) {
@@ -509,8 +524,9 @@ func TestCommit(t *testing.T) {
 
 // runUpdate runs the update of step09's packages in the scratch module,
 // then their normal run, which fails unless the update wrote everything.
-// One pass is enough: the change moves no code that the corpus check codes
-// counts, so its findings don't depend on which package writes first. Both
+// One pass is enough: neither the toy as copied nor the change moves a code
+// that the corpus check codes counts, so its findings don't depend on which
+// package writes first. Both
 // build with -trimpath, which keeps the scratch module's directory, new in
 // each run, out of the build cache's keys, so that the cache serves them.
 func runUpdate(t *testing.T, repo, modfile string) {
