@@ -2,9 +2,11 @@ package registry
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -159,9 +161,20 @@ func TestParseAny(t *testing.T) {
 // goldens.
 const keysVar = "HYPERCASE_UPDATE_GOLDEN"
 
+// frozenKeys holds the SHA-256 sum of testdata/keys-<N>.txt for each format
+// N below today's. A format that is no longer today's is history: some
+// commit of main holds registries of it, and its keys never change. When
+// Format is bumped, the format it was joins the table.
+var frozenKeys = map[int]string{
+	3: "5de45696f0737fd8e97d96e72ad6d26e45ab1daac642f49933226e152e590760",
+	4: "504994ef22efd44b15d7ac406d4f8d1be76d1c6c4ebc07a8451d89fd9f1c1e95",
+	5: "ee647b477b5596ed4f4377538de3840c72a76c139300f735db39d12b15b2f3ed",
+}
+
 // TestFormatKeys: testdata/keys-<N>.txt holds the key paths of a registry
-// of format N, each written while its format was today's, and ParseAny's
-// added table is what they say each format added. No format drops a key
+// of format N, each written while its format was today's, and frozen, by
+// its sum in frozenKeys, once it isn't. ParseAny's added table is what
+// they say each format added. No format drops a key
 // an older one holds. A key a format adds, whose parent the format before
 // it holds, is in added, at that format. A registry of each format, holding
 // every key its format holds, reads, and with any key a later format
@@ -185,7 +198,17 @@ func TestFormatKeys(t *testing.T) {
 		if f == Format && !bytes.Equal(data, now) {
 			t.Errorf("a registry's keys are not those of format %d (-%s +today):\n%s\nA change to them is a new format, unless no commit of main holds format %d: bump Format if one does, give added what the change adds, and run %s=1 go test ./... to write the keys.", Format, golden(f), diff.Lines(data, now), Format, keysVar)
 		}
+		if sum := fmt.Sprintf("%x", sha256.Sum256(data)); f < Format && frozenKeys[f] == "" {
+			t.Errorf("format %d is below today's, %d, and frozenKeys has no sum of its keys, %s.\nGive frozenKeys %d: %q, the sum of the keys format %d held while it was today's.", f, Format, golden(f), f, sum, f)
+		} else if f < Format && sum != frozenKeys[f] {
+			t.Errorf("%s changed: format %d is below today's, %d, so its keys are history, and frozenKeys has the sum %s, where the file's is %s.\nRestore the keys whose sum frozenKeys holds. A change to a registry's keys is a new format.", golden(f), f, Format, frozenKeys[f], sum)
+		}
 		keys[f] = strings.Fields(string(data))
+	}
+	for _, f := range slices.Sorted(maps.Keys(frozenKeys)) {
+		if f >= Format || f < Oldest {
+			t.Errorf("frozenKeys has a sum for format %d, and freezes only the formats from Oldest, %d, below today's, %d.", f, Oldest, Format)
+		}
 	}
 
 	type newKey struct {
@@ -210,7 +233,7 @@ func TestFormatKeys(t *testing.T) {
 		table = append(table, newKey{a.format, a.key})
 	}
 	if !slices.Equal(table, adds) {
-		t.Errorf("added holds %v, and the formats' keys say each format added %v, in format order.\nGive added each key a format adds, whose parent the format before it holds, at that format.", table, adds)
+		t.Errorf("added holds %v, and the formats' keys say each format added %v, in format order.\nGive added each key a format adds, whose parent the format before it holds, at that format. A key added at today's format, %d, is a new format if a commit of main holds format %d: then bump Format, give added the key at the new format, and run %s=1 go test ./... to write its keys.", table, adds, Format, Format, keysVar)
 	}
 
 	full := fullValue(reflect.TypeFor[Registry]())
