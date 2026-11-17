@@ -40,8 +40,8 @@ import (
 // maxChain is the longest chain a topology has. Three is the shortest
 // chain in which the lifts a closing tells apart on a cell's path, the one
 // that fails, the last bytes lift and the last one the cell's package
-// doesn't own, stand in every order to one another. A fourth lift makes the
-// grids six times as large.
+// doesn't own, stand in every order to one another. Chains of four lifts
+// add 138,849 scenarios to the 21,548 of chains up to three.
 const maxChain = 3
 
 // The types a topology's lifts take and make: Top0, the corpus type, and at
