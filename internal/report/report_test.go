@@ -1,9 +1,11 @@
 package report
 
 import (
+	"reflect"
 	"testing"
 	"testing/fstest"
 
+	"github.com/sdboyer/hypercase/internal/diff"
 	"github.com/sdboyer/hypercase/internal/registry"
 )
 
@@ -11,7 +13,8 @@ import (
 // line marks at A and none marks at B shows no gap, since a change's gap is
 // read at B. A change that closes the gap is such a change, since it
 // removes the line as it fixes the cell. What is right is to show A's line,
-// marked as closed, with its link.
+// marked as closed, with its link. The test compares the whole change, so
+// a fix that shows the line in a field of its own fails it too.
 func TestChangeClosedGap(t *testing.T) {
 	reg := &registry.Registry{
 		Format:     registry.Format,
@@ -42,10 +45,15 @@ func TestChangeClosedGap(t *testing.T) {
 		t.Fatal(bad)
 	}
 	got := changes(a, b, b.props, links)
-	if len(got) != 1 || got[0].Rank != OutcomeChanged || got[0].Case != "sheet/negative" || got[0].Column != "parse" {
-		t.Fatalf("the changes are %+v, not the change of outcome of negative's parse cell", got)
-	}
-	if got[0].Gap != nil {
-		t.Errorf("the change shows the gap %q, where today it shows none (#51). If #51 is fixed, make this test show A's line, marked as closed.", got[0].Gap)
+	want := []Change{{
+		Rank:   OutcomeChanged,
+		Case:   "sheet/negative",
+		Column: "parse",
+		Before: "rejected S101",
+		After:  "accepted",
+		Files:  []FileChange{{Path: "error.txt", How: "removed", Diff: []diff.Line{{Kind: '-', Text: `A1: unexpected "-"`}}, Removed: 1}},
+	}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("the changes are\n\t%+v\nwhere today they are\n\t%+v\nthe change of outcome of negative's parse cell, with no gap (#51). If #51 is fixed, make this test show A's line, marked as closed.", got, want)
 	}
 }
