@@ -635,23 +635,24 @@ func (j *judge) judge() {
 		key := cellKey{n.Pkg, n.Case, n.Prefix, n.Column}
 		u := *j.u
 		c := &noteCheck{g: j.g, n: n, cl: *n.Claims, kind: j.kinds[n.Kind], before: j.before}
+		var nr hypercase.Observed
 		bad := func(format string, args ...any) {
-			t.Errorf("%s, %s, in %s, in the %s: %s\nthe note: %s\n%s\nits claims: %+v\nthe normal run's cell: %+v\nthe update's: %+v", n.Case, n.Column, n.Pkg, runName(n.Update), fmt.Sprintf(format, args...), n.Body, n.Closing, *n.Claims, c.nr, u.cell)
+			t.Errorf("%s, %s, in %s, in the %s: %s\nthe note: %s\n%s\nits claims: %+v\nthe normal run's cell: %+v\nthe update's: %+v", n.Case, n.Column, n.Pkg, runName(n.Update), fmt.Sprintf(format, args...), n.Body, n.Closing, *n.Claims, nr, u.cell)
 		}
 		if n.Column != "" {
 			// A normal run's note is of a cell both runs record, and an
 			// update's of one the update records: a normal run that finds a
 			// variant's inputs invalid runs none of its cells.
 			var nok, uok bool
-			c.nr, nok = nc[key]
+			nr, nok = nc[key]
 			u.cell, uok = j.u.cells[key]
 			if !uok || !nok && !n.Update {
 				bad("the normal run recorded the cell: %v, the update: %v", nok, uok)
 				continue
 			}
-			c.cell = true
-			if this := map[bool]hypercase.Observed{false: c.nr, true: u.cell}[n.Update]; this.Fate != n.This {
-				bad("the note's staging has this run's fate as %q, and the cell's is %q", n.This, this.Fate)
+			c.cell, c.this = true, map[bool]hypercase.Observed{false: nr, true: u.cell}[n.Update]
+			if c.this.Fate != n.This {
+				bad("the note's staging has this run's fate as %q, and the cell's is %q", n.This, c.this.Fate)
 			}
 		}
 		if how := updateInBody(n.Body); how != "" {
@@ -764,8 +765,9 @@ func runName(update bool) string {
 
 // A noteCheck is what a claim's check reads of the run that gave the
 // note: the note, what its closing claims, the note's kind, as NoteKinds
-// names it, the archive before the runs, and, for a note of a cell, the
-// cell's record in the normal run.
+// names it, the archive before the runs, and, for a note of a cell, this
+// run's record of the cell: the normal run's, or, for an update's note, the
+// update's.
 // What the update did is the check's other argument, so a check that
 // observes nothing of it names no such argument.
 type noteCheck struct {
@@ -774,7 +776,7 @@ type noteCheck struct {
 	cl     hypercase.Claims
 	kind   string
 	cell   bool
-	nr     hypercase.Observed
+	this   hypercase.Observed
 	before *archive.Archive
 }
 
@@ -813,25 +815,25 @@ var claimChecks = map[string]claimCheck{
 		case !c.cell || c.n.Update:
 		case c.cl.Does != "" && c.cl.Does != u.cell.Fate:
 			return fmt.Sprintf("the closing says the update's fate is %q, and it is %q", c.cl.Does, u.cell.Fate)
-		case c.cl.Does != "" && sameCell(c.nr, u.cell):
+		case c.cl.Does != "" && sameCell(c.this, u.cell):
 			return "the closing says the update does otherwise with the cell than the normal run, and it does the same"
-		case !c.staged() && !sameCell(c.nr, u.cell):
+		case !c.staged() && !sameCell(c.this, u.cell):
 			return "the closing is the note's default, and the update does otherwise with the cell"
 		}
 		return ""
 	}},
 	"Another": {check: func(c *noteCheck, u *updated) string {
-		want := c.cell && c.cl.Does == "runs" && c.nr.OnValue
+		want := c.cell && c.cl.Does == "runs" && c.this.OnValue
 		switch {
 		case c.cl.Another != want:
 			return fmt.Sprintf("the closing says the update runs the cell on another value: %v, and the update runs a cell the normal run ran on a value: %v", c.cl.Another, want)
-		case c.cl.Another && maps.Equal(c.nr.View, u.cell.View):
+		case c.cl.Another && maps.Equal(c.this.View, u.cell.View):
 			return "the closing says the update runs the cell on another value, and it ran the cell on the input view the normal run did"
 		}
 		return ""
 	}},
 	"Variant": {check: func(c *noteCheck, u *updated) string {
-		differs := c.cell && !maps.Equal(c.nr.Root, u.cell.Root)
+		differs := c.cell && !maps.Equal(c.this.Root, u.cell.Root)
 		switch {
 		case !c.staged() && c.cl.Variant != "":
 			return "the note's default says the update stages the variant otherwise"
@@ -897,14 +899,14 @@ var claimChecks = map[string]claimCheck{
 		if err == nil && o.State == archive.Blocked {
 			wantFate = "blocked " + o.Detail
 		}
-		blocker, blocked := strings.CutPrefix(c.nr.Fate, "blocked ")
+		blocker, blocked := strings.CutPrefix(c.this.Fate, "blocked ")
 		switch {
-		case !accepted && c.nr.Fate != wantFate:
-			return fmt.Sprintf("the closing says a normal run reads %s's outcome, which the archive commits as %q, and the normal run's cell's fate is %q", want, data, c.nr.Fate)
+		case !accepted && c.this.Fate != wantFate:
+			return fmt.Sprintf("the closing says a normal run reads %s's outcome, which the archive commits as %q, and the normal run's cell's fate is %q", want, data, c.this.Fate)
 		case !accepted:
-		case !blocked && !maps.Equal(c.nr.View, product):
-			return fmt.Sprintf("the closing says a normal run reads %s's product, whose committed outcome is accepted, and the normal run's cell's input view isn't the committed product: %v", want, c.nr.View)
-		case blocked && (slices.Contains(u.cell.Path, blocker) || c.nr.Fate == c.cl.Does):
+		case !blocked && !maps.Equal(c.this.View, product):
+			return fmt.Sprintf("the closing says a normal run reads %s's product, whose committed outcome is accepted, and the normal run's cell's input view isn't the committed product: %v", want, c.this.View)
+		case blocked && (slices.Contains(u.cell.Path, blocker) || c.this.Fate == c.cl.Does):
 			return fmt.Sprintf("the closing says a normal run reads %s's product, whose committed outcome is accepted, and the normal run's cell is blocked by %s, a bytes lift on its path or the lift the update fails", want, blocker)
 		}
 		return ""
@@ -1006,16 +1008,17 @@ var claimChecks = map[string]claimCheck{
 		return ""
 	}},
 	// That the update's run may still write the file rests on the update
-	// running the cell on another value than the normal run's, which the
-	// check observes. That it may is all the claim says: whether the run
-	// writes the file or not, no observation refutes it.
+	// running the cell on another value than this run, which the check
+	// observes, so no update's note claims it. That it may is all the
+	// claim says: whether the run writes the file or not, no observation
+	// refutes it.
 	"MayWrite": {check: func(c *noteCheck, u *updated) string {
 		switch {
 		case c.cl.MayWrite == "":
 		case c.cl.MayWrite != c.n.File:
 			return fmt.Sprintf("the closing says the update's run may still write %s, and the note is about %s", c.cl.MayWrite, c.n.File)
-		case u.cell.Fate != "runs" || !u.cell.OnValue || maps.Equal(c.nr.View, u.cell.View):
-			return fmt.Sprintf("the closing says the update's run of the cell may still write the file, and the update didn't run the cell on another value than the normal run: its fate is %q, on a value: %v, on the normal run's view: %v", u.cell.Fate, u.cell.OnValue, maps.Equal(c.nr.View, u.cell.View))
+		case u.cell.Fate != "runs" || !u.cell.OnValue || maps.Equal(c.this.View, u.cell.View):
+			return fmt.Sprintf("the closing says the update's run of the cell may still write the file, and the update didn't run the cell on another value than this run: its fate is %q, on a value: %v, on this run's view: %v", u.cell.Fate, u.cell.OnValue, maps.Equal(c.this.View, u.cell.View))
 		}
 		return ""
 	}},
@@ -1037,7 +1040,7 @@ var claimChecks = map[string]claimCheck{
 		case c.cl.RunWrites && u.cell.Ran && u.cell.Writable:
 			writes = u.cell.Files["outcome"]
 		}
-		this, ok := c.nr.Files["outcome"]
+		this, ok := c.this.Files["outcome"]
 		switch {
 		case c.cl.Differs && writes != "" && (!ok || this == writes):
 			return fmt.Sprintf("the closing says the outcome the update writes, %q, isn't this run's, which is %q", writes, this)
