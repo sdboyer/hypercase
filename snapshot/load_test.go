@@ -118,8 +118,8 @@ func TestExtractVariant(t *testing.T) {
 // leaves it as it was. Extract of a variant the archive lacks fails,
 // naming it, and creates no dir; so does Extract of looped, which only a
 // transform's variant is, and the message says a transform's variant
-// isn't extracted. So does Extract to a dir whose parent is missing, and
-// of an archive Load refuses.
+// isn't extracted. So does Extract to a dir whose parent is missing, of an
+// archive Load refuses, and of an empty path, named as such.
 func TestExtractRefuses(t *testing.T) {
 	_, path := corpus(t)
 	dir := filepath.Join(t.TempDir(), "x")
@@ -147,6 +147,8 @@ func TestExtractRefuses(t *testing.T) {
 	writeFile(t, bad, []byte("A typo.\n-- ni/sheet/A1 --\n1\n"))
 	dir = filepath.Join(t.TempDir(), "x")
 	fails(t, Extract(bad, "", dir), bad+" has problems of form")
+	absent(t, dir)
+	fails(t, Extract("", "", dir), "the archive's path is empty.\nPass the path of the case's archive.")
 	absent(t, dir)
 }
 
@@ -189,6 +191,31 @@ func TestExtractFailsPartWay(t *testing.T) {
 	hooks.ExtractFile = nil
 	fails(t, err, "writing "+filepath.Join(dir, "sheet", "B1")+": the disk is full, so "+dir+" is removed.\nFix what stopped the write")
 	absent(t, dir)
+}
+
+// TestExtractRemoveFails: a write that fails part-way, after which Extract
+// can't remove dir, here because the hook made dir's parent read-only,
+// fails naming both failures, and says to remove the directory.
+func TestExtractRemoveFails(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root removes from a read-only directory")
+	}
+	_, path := corpus(t)
+	parent := t.TempDir()
+	t.Cleanup(func() { os.Chmod(parent, 0o755) })
+	dir := filepath.Join(parent, "x")
+	hooks.ExtractFile = func(p string) error {
+		if err := os.Chmod(parent, 0o555); err != nil {
+			return err
+		}
+		return errors.New("the disk is full")
+	}
+	err := Extract(path, "", dir)
+	hooks.ExtractFile = nil
+	fails(t, err, "writing "+filepath.Join(dir, "sheet", "A1")+": the disk is full, and removing "+dir+": unlinkat "+dir+": permission denied.\nRemove the directory. Fix what stopped the write, and extract the case again.")
+	if _, err := os.Stat(dir); err != nil {
+		t.Errorf("Extract removed %s, though its parent is read-only: %v", dir, err)
+	}
 }
 
 // TestExtractReadsBack: files that don't read back as the view, as on a
