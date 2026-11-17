@@ -9,14 +9,11 @@ import (
 	"testing"
 )
 
-// TestNewObjectFormat records a known gap, #50: the repository New makes
-// names its objects by git's default object format. So under a git whose
-// default is SHA-256, as the git first on PATH here is, every commit a test
-// makes has another name, and so does every golden that holds one. What is
-// right is SHA-1, whatever git's default. The git on PATH is a wrapper that
-// defaults GIT_DEFAULT_HASH to sha256 and keeps one that is set, so a fix
-// in New's git init or in Env fails the test. It sets PATH, so it can't run
-// in parallel.
+// TestNewObjectFormat: a repository New makes is SHA-1 under a git whose
+// default is SHA-256, so no golden that holds a commit's name depends on
+// git's default (#50). The git on PATH is a wrapper that makes SHA-256 its
+// default, as GIT_DEFAULT_HASH does, since Env drops every GIT_ variable a
+// caller sets. It sets PATH, so it can't run in parallel.
 func TestNewObjectFormat(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the wrapper is a shell script")
@@ -32,30 +29,16 @@ func TestNewObjectFormat(t *testing.T) {
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	// A plain git init under the wrapper, with no GIT_ variable set, makes a
-	// SHA-256 repository, so the test can't pass with a wrapper that
-	// doesn't.
-	plain := t.TempDir()
-	var env []string
-	for _, kv := range os.Environ() {
-		if !strings.HasPrefix(kv, "GIT_") {
-			env = append(env, kv)
-		}
-	}
-	for _, args := range [][]string{{"init", "-q"}, {"rev-parse", "--show-object-format"}} {
-		cmd := exec.Command("git", args...)
-		cmd.Dir, cmd.Env = plain, env
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
-		}
-		if args[0] == "rev-parse" && strings.TrimSpace(string(out)) != "sha256" {
-			t.Fatalf("a plain git init under the wrapper makes a %s repository, not sha256", strings.TrimSpace(string(out)))
-		}
+	// The wrapper's git makes a repository SHA-256 where nothing says
+	// otherwise, or the test below shows nothing.
+	plain := &Repo{t: t, Dir: t.TempDir()}
+	plain.Git("init", "-q")
+	if got := strings.TrimSpace(plain.Git("rev-parse", "--show-object-format")); got != "sha256" {
+		t.Fatalf("under the wrapper, git init makes a %s repository, want sha256", got)
 	}
 
 	r := New(t)
-	if got := strings.TrimSpace(r.Git("rev-parse", "--show-object-format")); got != "sha256" {
-		t.Errorf("the repository's object format is %s, where today it is git's default, sha256 (#50). If #50 is fixed, make this test show it is sha1.", got)
+	if got := strings.TrimSpace(r.Git("rev-parse", "--show-object-format")); got != "sha1" {
+		t.Errorf("New made a %s repository, want sha1", got)
 	}
 }
