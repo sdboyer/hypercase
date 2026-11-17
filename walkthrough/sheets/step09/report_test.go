@@ -225,10 +225,12 @@ func goEnv(updateVar string) []string {
 	return env
 }
 
-// TestGoEnv: the go env file, where go env -w writes it, applies to the go
-// commands the test runs, but for its GOFLAGS. The file holds a module
-// cache's location, which they use, and GOFLAGS with an overlay, which
-// would build the probe from another source.
+// TestGoEnv: the go env file applies to the go commands the test runs, but
+// for its GOFLAGS and the variables goEnv sets. The file, where go env -w
+// writes it, holds a module cache's location, which they use, GOFLAGS with
+// an overlay, which would build the probe from another source, and a
+// GOWORK, GOPROXY and GOTOOLCHAIN, which goEnv's replace. A file that the
+// caller's GOENV names elsewhere applies too.
 func TestGoEnv(t *testing.T) {
 	probe := t.TempDir()
 	for name, data := range map[string]string{
@@ -258,8 +260,9 @@ func TestGoEnv(t *testing.T) {
 
 	// The file's default location is in the user's config directory, which
 	// HOME, XDG_CONFIG_HOME or AppData names, by platform. The build cache
-	// stays this process's, which serves the probe's build, and the module
-	// cache is left to the file.
+	// stays this process's, which serves the probe's build. The module
+	// cache, GOWORK, GOPROXY and GOTOOLCHAIN are left to the file, so only
+	// goEnv keeps the file's out of them.
 	cache := gocmd(nil, "env", "GOCACHE")
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -267,21 +270,30 @@ func TestGoEnv(t *testing.T) {
 	t.Setenv("AppData", filepath.Join(home, "AppData"))
 	t.Setenv("GOENV", "")
 	t.Setenv("GOCACHE", cache)
-	t.Setenv("GOMODCACHE", "")
+	for _, k := range []string{"GOMODCACHE", "GOWORK", "GOPROXY", "GOTOOLCHAIN"} {
+		t.Setenv(k, "")
+	}
+	// Telemetry is kept in the same directory, and the first go command
+	// there turns it off. Any other go command, run there first, takes the
+	// upload token, and starts a process that writes there beside the
+	// test's go commands.
+	gocmd(nil, "telemetry", "off")
 	envFile := gocmd(nil, "env", "GOENV")
 	if !strings.HasPrefix(envFile, home+string(filepath.Separator)) {
 		t.Fatalf("the go env file is %s, outside the test's HOME, %s", envFile, home)
 	}
-	// Telemetry is kept in the same directory. Off, it starts no process
-	// that writes there after the test.
-	gocmd(nil, "telemetry", "off")
 	modcache := filepath.Join(home, "modcache")
-	if err := writeFile(envFile, []byte("GOFLAGS=-overlay=overlay.json\nGOMODCACHE="+modcache+"\n")); err != nil {
+	file := "GOFLAGS=-overlay=overlay.json\nGOMODCACHE=" + modcache + "\n" +
+		"GOWORK=" + filepath.Join(home, "go.work") + "\nGOPROXY=https://example.invalid\nGOTOOLCHAIN=path\n"
+	if err := writeFile(envFile, []byte(file)); err != nil {
 		t.Fatal(err)
 	}
 
 	if got := gocmd(goEnv(""), "env", "GOMODCACHE"); got != modcache {
 		t.Errorf("the go commands use the module cache %s, not the go env file's, %s", got, modcache)
+	}
+	if got, want := gocmd(goEnv(""), "env", "GOWORK", "GOPROXY", "GOTOOLCHAIN"), "off\noff\nlocal"; got != want {
+		t.Errorf("the go commands' GOWORK, GOPROXY and GOTOOLCHAIN are %q, not goEnv's, %q", got, want)
 	}
 	cmd := exec.Command("go", "run", ".")
 	cmd.Dir = probe
@@ -292,6 +304,16 @@ func TestGoEnv(t *testing.T) {
 	}
 	if string(out) != "main.go\n" {
 		t.Errorf("the probe built from the go env file's GOFLAGS, and wrote %q", out)
+	}
+
+	other := filepath.Join(t.TempDir(), "env")
+	otherModcache := filepath.Join(home, "other-modcache")
+	if err := writeFile(other, []byte("GOMODCACHE="+otherModcache+"\n")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GOENV", other)
+	if got := gocmd(goEnv(""), "env", "GOMODCACHE"); got != otherModcache {
+		t.Errorf("with GOENV=%s, the go commands use the module cache %s, not that file's, %s", other, got, otherModcache)
 	}
 }
 
