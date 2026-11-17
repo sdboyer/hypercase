@@ -7,6 +7,7 @@ import (
 
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/internal/diff"
+	"github.com/sdboyer/hypercase/internal/registry"
 )
 
 // Step 10: chaining, over the fixtures of fixtures_chain_test.go. The bytes
@@ -370,6 +371,75 @@ func TestChainTwiceShared(t *testing.T) {
 	s.lacks(b, "export ran")
 	update()
 	s.same(sheet, clean)
+	s.done()
+}
+
+// TestChainVariantAsUpdate: a normal run tells whether the update runs a
+// cell it finds blocked on a transform's variant by staging the variant as
+// the update does, on what the transform makes, where the normal run reads
+// the committed inputs. Here louder's committed inputs differ from what it
+// makes, each way: they hold an import/error louder doesn't make, so the
+// update runs list, which the committed outcome blocks; or a stale delete
+// hides the import/error louder makes, so the update blocks list too.
+func TestChainVariantAsUpdate(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "chain")
+	s.passes(s.update("chain"))
+	clean := s.read(prices)
+
+	s.edit(prices, "louder's committed inputs hold an import/error louder doesn't make, and import's committed outcome is rejected", func(a *archive.Archive) {
+		insert("transform/louder/in/import/error", "line 1: unclosed quote\n", "transform/louder/in/import/out/")(a)
+		set("transform/louder/out/import/outcome", "rejected\n")(a)
+	})
+	runs := "FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand."
+	s.fails(s.normal("chain"),
+		"louder's variant of the base differs from its committed inputs:\ntransform/louder/in/import/error is no longer made",
+		"transform/louder/out/list/outcome differs (-golden +got):\n- accepted\n+ blocked import\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs list, and writes the outcome of its run, not this one: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive.",
+		"transform/louder/out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome \"rejected\", in transform/louder/out/import/outcome.\n"+runs)
+	s.passes(s.update("chain"))
+	s.same(prices, clean)
+
+	s.edit(prices, "import now rejects the base, which says so, and so louder's variant", func(a *archive.Archive) {
+		insert("properties", "unterminated\n", "in/")(a)
+		insert("in/import/error", "line 2: unclosed quote\n", "in/import/out/")(a)
+		insert("variant/doubled/properties", "unterminated\n", "variant/doubled/in/")(a)
+	})
+	orphan := "transform/louder/out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, "
+	deleteByHand := "\nIf the cell should run, fix the lift or louder's jenny, which makes the variant. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place."
+	s.fails(s.update("chain"), orphan+"failed on the case."+deleteByHand)
+	s.hasSections(prices, map[string]string{"transform/louder/out/import/outcome": "rejected\n", "transform/louder/out/list/outcome": "blocked import\n"}, "transform/louder/delete", "transform/louder/in/import/error")
+	s.edit(prices, "a stale delete hides the import/error louder makes", insert("transform/louder/delete", "import/error\n", "transform/louder/out/"))
+	r := s.normal("chain")
+	s.fails(r,
+		"louder's variant of the base differs from its committed inputs:\ntransform/louder/delete is no longer made",
+		orphan+"has the committed outcome \"rejected\", in transform/louder/out/import/outcome."+deleteByHand)
+	s.lacks(r, "runs list")
+	s.fails(s.update("chain"), orphan+"failed on the case."+deleteByHand)
+	s.hasSections(prices, map[string]string{}, "transform/louder/delete")
+	s.done()
+}
+
+// TestChainProbeAsUpdate: a normal run tells whether the update runs a
+// cell it finds blocked past a bytes lift by its probe too, on the value
+// the update stages. Here import's committed outcome is stale, and import
+// now makes evaluate/probe, so the update stages the case, and evaluate's
+// probe says the case isn't for it.
+func TestChainProbeAsUpdate(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "chain")
+	s.passes(s.update("chain"))
+	s.edit(prices, "import's committed outcome is stale, and import now makes evaluate/probe", func(a *archive.Archive) {
+		set("out/import/outcome", "rejected\n")(a)
+		insert("in/import/out/evaluate/probe", "the script says evaluate is not for it\n", "in/import/out/quote/")(a)
+	})
+	skipped := "out/evaluate/values.txt is recorded, and "
+	r := s.normal("chain")
+	s.fails(r,
+		skipped+"the cell is blocked: the lift import, on evaluate's path, has the committed outcome \"rejected\", in out/import/outcome.\nIf the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.",
+		"out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome \"rejected\", in out/import/outcome."+updateRuns("list", "import"))
+	s.lacks(r, "runs evaluate")
+	s.fails(s.update("chain"), skipped+"evaluate's probe says the case isn't for it: the script says evaluate is not for it\nIf the suite should run on the case, fix the probe. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.")
+	s.hasSections(prices, map[string]string{"out/evaluate/outcome": "skipped the script says evaluate is not for it\n", "out/evaluate/values.txt": "a1 3\nb1 6\n"})
 	s.done()
 }
 
@@ -927,6 +997,74 @@ func TestChainSharedProjects(t *testing.T) {
 			"via/import/stray/x is not declared.",
 			"The update writes nothing for the cell of the lift import, on parse's path")
 		s.unchanged(before)
+		s.done()
+	})
+}
+
+// TestChainLiftEntries: the root-package check fails when the registries
+// that own or use a lift record it differently, naming the packages and
+// the field. A package that only uses a bytes lift tells by its own
+// declaration whether an update writes the lift's cell, and so the cells
+// past it, so it must declare the lift as the owner does.
+func TestChainLiftEntries(t *testing.T) {
+	t.Parallel()
+	const breakage = "the registries that own or use the lift import record different "
+	const fix = "\nEvery package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration."
+
+	// ./b uses a copy of import that declares no outputs, so its update
+	// holds the cells past import back on an error.txt it doesn't declare,
+	// where the owner's update writes import's cell.
+	t.Run("a copy with no outputs", func(t *testing.T) {
+		t.Parallel()
+		s := newSandbox(t, "chain-shared")
+		const quoted = "testdata/export/quoted.txtar"
+		s.write(quoted, []byte("import rejects the export.\n-- properties --\nunterminated\n-- in/import/error --\nline 1: unclosed quote\n"), "an export import rejects")
+		rs := s.parallel(childRun{"", "chain-a", true}, childRun{"b", "chain-b-nooutputs", true})
+		s.passes(rs[0])
+		s.fails(rs[1], "The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it.")
+		s.hasSections(quoted, map[string]string{"out/import/outcome": "rejected\n"}, "out/list/", "out/evaluate/")
+		s.fails(s.normal("chain-a"), breakage+"outputs:\n  .: error.txt \"Why the importer rejects the export.\"\n  ./b: none"+fix)
+		s.done()
+	})
+
+	// Each field of b's entry, changed in its registry by hand.
+	t.Run("each field", func(t *testing.T) {
+		t.Parallel()
+		s := newSandbox(t, "chain-shared")
+		for _, r := range s.parallel(childRun{"", "chain-a", true}, childRun{"b", "chain-b", true}) {
+			s.passes(r)
+		}
+		s.passes(s.normal("chain-a"))
+		const reg = "b/testdata/hypercase.json"
+		clean := s.read(reg)
+		for _, tt := range []struct {
+			field  string
+			change func(l *registry.Lift)
+			want   string
+		}{
+			{"description", func(l *registry.Lift) { l.Description = "Imports the export." }, "description:\n  .: \"Imports the export as a script, as its import/ tree says.\"\n  ./b: \"Imports the export.\""},
+			{"input", func(l *registry.Lift) { l.Input = "github.com/sdboyer/hypercase_test.Grid" }, "input:\n  .: github.com/sdboyer/hypercase_test.Export\n  ./b: github.com/sdboyer/hypercase_test.Grid"},
+			{"product", func(l *registry.Lift) { l.Product = "*github.com/sdboyer/hypercase_test.Parsed" }, "product:\n  .: github.com/sdboyer/hypercase_test.Script\n  ./b: *github.com/sdboyer/hypercase_test.Parsed"},
+			{"bytes", func(l *registry.Lift) { l.Bytes = false }, "bytes:\n  .: true\n  ./b: false"},
+			{"outputs", func(l *registry.Lift) { l.Outputs[0].Description = "Why." }, "outputs:\n  .: error.txt \"Why the importer rejects the export.\"\n  ./b: error.txt \"Why.\""},
+			{"productFiles", func(l *registry.Lift) { l.ProductFiles = l.ProductFiles[:1] }, "productFiles:\n  .: evaluate/* \"What evaluate does, as a script's evaluate/ tree says.\", evaluate/out/* \"An output evaluate returns.\", inputs/* \"A tree named as a cell's inputs file is.\", names/* \"Files named as a cell's own files are.\", parse/* \"What parse does, as a script's parse/ tree says.\", quote/* \"What a renderer of errors quotes.\", resolve/* \"What resolve does, as a script's resolve/ tree says.\"\n  ./b: evaluate/* \"What evaluate does, as a script's evaluate/ tree says.\""},
+			{"rejects", func(l *registry.Lift) { l.Rejects = nil }, "rejects:\n  .: unterminated\n  ./b: none"},
+		} {
+			g, err := registry.Parse(clean)
+			if err != nil {
+				t.Fatal(err)
+			}
+			i := slices.IndexFunc(g.Lifts, func(l registry.Lift) bool { return l.Name == "import" })
+			tt.change(&g.Lifts[i])
+			s.write(reg, g.Marshal(), "b's registry records another "+tt.field+" for import")
+			r := s.normal("chain-a")
+			s.fails(r, breakage+tt.want+fix)
+			if n := strings.Count(r.out, breakage); n != 1 {
+				t.Errorf("%s: the check reports %d fields of import, want 1:\n%s", tt.field, n, r.out)
+			}
+		}
+		s.write(reg, clean, "restore it")
+		s.passes(s.normal("chain-a"))
 		s.done()
 	})
 }

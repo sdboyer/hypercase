@@ -316,8 +316,9 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	owner := v.tr != nil && r.owned[v.tr]
 	// stale is whether a failing cell may be one the module's update
 	// fixes: another package's normal run reads committed inputs that may
-	// differ from what the transform makes.
+	// differ from what the transform makes. diffs says how they differ.
 	stale := false
+	var diffs *msg
 	switch {
 	case v.tr == nil:
 		c.setView(r, p, pc.base.VariantView(v.committed))
@@ -351,13 +352,18 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		}
 		stale = !owner
 		c.setView(r, p, view)
+		// A cell the inputs block may be one the update, which stages the
+		// variant on what the transform makes, runs.
+		if diffs = v.inputDiffs(pc.a); !diffs.empty() {
+			c.state.made = archive.NewFS(v.made)
+		}
 	}
 	results := r.runCells(t, c, p.cols, w)
 	if !stale || !t.Failed() {
 		return
 	}
 	// However its cells failed, the failures may be the inputs'.
-	m := v.inputDiffs(pc.a)
+	m := diffs
 	if m.empty() {
 		return
 	}

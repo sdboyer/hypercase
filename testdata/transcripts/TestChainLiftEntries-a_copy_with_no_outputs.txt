@@ -1,0 +1,102 @@
+$ edit testdata/export/quoted.txtar  # an export import rejects
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/quoted: parse is blocked: the lift import failed on the case, and testdata/export/quoted.txtar, out/import/error.txt, records its error.
+    export/quoted: resolve is blocked: the lift import failed on the case, and testdata/export/quoted.txtar, out/import/error.txt, records its error.
+    export/quoted/transform/louder: louder declines the base: the export makes no output of evaluate
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+        --- PASS: TestCorpus/export/quoted
+            --- PASS: TestCorpus/export/quoted/import
+            --- SKIP: TestCorpus/export/quoted/parse
+            --- SKIP: TestCorpus/export/quoted/resolve
+            --- SKIP: TestCorpus/export/quoted/transform/louder
+    --- PASS: TestCorpus/script
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-b-nooutputs
+    export/quoted: import rejects the export.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        The update writes nothing for the cell of the lift import, on evaluate's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
+    export/quoted: import rejects the export.
+        list: Lists the files of the script's input view, with their bytes.
+        The update writes nothing for the cell of the lift import, on list's path: the lift's cell says why, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so the update writes nothing for this cell either, and the cell runs nothing.
+        Fix what import's cell reports.
+    export/quoted/transform/louder: louder declines the base: the export makes no output of evaluate
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+        --- FAIL: TestCorpus/export/quoted
+            --- FAIL: TestCorpus/export/quoted/evaluate
+            --- FAIL: TestCorpus/export/quoted/list
+            --- SKIP: TestCorpus/export/quoted/transform/louder
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ go test  # chain-a
+    the registries that own or use the lift import record different outputs:
+          .: error.txt "Why the importer rejects the export."
+          ./b: none
+        Every package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration.
+    export/quoted: parse is blocked: testdata/export/quoted.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/quoted: resolve is blocked: testdata/export/quoted.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/quoted/transform/louder: louder declines the base: the export makes no output of evaluate
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+        --- PASS: TestCorpus/export/quoted
+            --- PASS: TestCorpus/export/quoted/import
+            --- SKIP: TestCorpus/export/quoted/parse
+            --- SKIP: TestCorpus/export/quoted/resolve
+            --- SKIP: TestCorpus/export/quoted/transform/louder
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]

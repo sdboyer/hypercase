@@ -335,6 +335,13 @@ var chainRegistrations = map[string]func(){
 	"chain-b":        func() { chainB(project) },
 	"chain-a-render": func() { chain(projectRender, exportType, own(importLift, parse, resolve)) },
 	"chain-b-render": func() { chainB(projectRender) },
+	// chain-b-nooutputs is chain-b with a copy of import that declares no
+	// outputs.
+	"chain-b-nooutputs": func() {
+		l := importLift
+		l.Outputs = nil
+		hypercase.Register(append([]any{project, scriptType, exportType, hypercase.Use(l, parse, resolve), own(evaluate, list, louder)}, chainProps...)...)
+	},
 
 	// Packages over one grid corpus: . owns export, and ./b uses it, and
 	// owns import and list.

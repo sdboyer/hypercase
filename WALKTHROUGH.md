@@ -1946,6 +1946,13 @@ whether each has a probe, and whether the package owns it.
   rewrite. A cell whose output on those sections differs from what the
   update wrote fails, and the failure shows how the sections differ from
   what the transform makes, and names the module's update.
+- When the committed sections differ from what the transform makes, a
+  cell that a lift blocks on them may be one the update runs. A normal run
+  stages the variant on what the transform makes, as the update does, to
+  tell, and runs the cell's probe, if it has one, on what that reaches.
+  When the update runs the cell, its committed files are no orphans: the
+  normal run says so, and to delete none of them by hand, and, from step 8
+  on, that the update writes the cell's outcome from its run.
 - An update replaces a transform's `in/…` and `delete` whole: a file the
   transform no longer produces is removed, and the removal shows in the diff.
 - When a transform no longer applies to a base, no cell runs on its
@@ -2765,25 +2772,38 @@ lift.
   all of. The framework walks the error's tree, through `Unwrap() error`
   and `Unwrap() []error`, and stops at each error `decl.Reject` made; an
   error that wraps none, reached without passing one, makes the whole error
-  a fault of the jenny. So a join of rejections is a rejection, a join of
-  one among them, as jenny joins the error of a jenny with one input, and a
-  rejection joined with any other error is a fault, as jenny's `Pipeline`
-  joins its jennies' errors. Jenny's own errors are faults too: two files
-  at one path, two whose paths differ only in case, a file that fails to
-  render. A fault fails the lift's cell, and an update writes nothing for
-  that cell.
+  a fault of the jenny. So a join of rejections is a rejection, and so is a
+  join that holds one rejection alone, as jenny joins the error of a jenny
+  with one input. A rejection joined with any other error is a fault, as
+  jenny's `Pipeline` joins its jennies' errors. Jenny's own errors are
+  faults too: two files at one path, two whose paths differ only in case, a
+  file that fails to render. A fault fails the lift's cell, and an update
+  writes nothing for that cell.
+- `decl.Reject` marks all of what it is given. A generator that runs a
+  jenny of its own, and marks that jenny's error, has jenny's faults in it
+  recorded as its rejection, so it marks only what it rejects.
+- The walk never calls an error's own `As` or `Is`. An error that reaches
+  the errors it holds through `As`, as go-multierror's does, is a fault
+  however many of them `decl.Reject` marks: when the importer rejects the
+  CSV with such an error, it marks that error whole. An error reached
+  through more than 100 `Unwrap` calls, as in an error whose `Unwrap` leads
+  back to itself, makes the whole error a fault.
 - In an update, when anything but a `gaps` line keeps a bytes lift's cell
   from being written, such as a fault of the jenny, a product an archive
   can't hold or a `RenderError` that panics, every cell past the lift
   fails, runs nothing, and is not written either: a normal run reads what
   the lift's cell commits. That is the owner's verdict, under its Project.
   A package that only uses the lift doesn't judge the lift's cell with its
-  own Project, which may differ from the owner's: it holds the cells past
-  the lift back only on what keeps the cell from being written under any
-  Project, such as a fault of the jenny or a product an archive can't
-  hold. When the owner's Project alone keeps its update from writing the
-  lift's cell, as a `RenderError` that panics on the lift's error does,
-  the using package's update writes the cells past the lift, and its
+  own Project, which may differ from the owner's: it judges the cell under
+  a bare Project, whose `RenderError` and `Codes` fail no cell, and by its
+  own declaration of the lift. When it registers the owner's declaration,
+  it holds the cells past the lift back on what keeps the cell from being
+  written under any Project, such as a fault of the jenny or a product an
+  archive can't hold. The root-package check fails when the declarations
+  differ in what the registries record, below; it can't compare two
+  jennies. When the owner's Project alone keeps its update from writing
+  the lift's cell, as a `RenderError` that panics on the lift's error
+  does, the using package's update writes the cells past the lift, and its
   normal runs, which read the lift's committed outcome, fail them until the
   owner's update writes that cell.
 - The lift's own cell files sit in `out/<lift>/`, like any column's. A
@@ -2809,10 +2829,13 @@ lift.
 - A cell that a normal run finds blocked past a bytes lift, by a committed
   outcome or by a lift that fails on a committed product, may run in the
   update, which reruns every lift on its path. Then the cell's committed
-  files, a bytes lift's product among them, are no orphans. A normal run
-  of a package that owns every bytes lift on the cell's path runs the path
-  as its update does, and says whether the update runs the cell: if it
-  does, to delete nothing by hand. Another package's normal run doesn't run
+  files, a bytes lift's product among them, are no orphans, and the update
+  writes the outcome of the cell's run. A normal run of a package that owns
+  every bytes lift on the cell's path stages the case as its update does,
+  on what a transform makes for its variant, and runs the cell's probe, if
+  it has one, on what that reaches. It says whether the update runs the
+  cell: if it does, to delete nothing by hand, and that the update writes
+  the cell's outcome from its run. Another package's normal run doesn't run
   the lifts it doesn't own, so it says to run the update before deleting
   any of them.
 - A bytes lift's frozen cell includes its `via/` product: no update writes
@@ -2843,6 +2866,10 @@ lift.
   lift a package owns over it; any other `via/` section is unclaimed, and
   its failure names `hypercase strip -column <lift>`, then the update, as
   it does for a removed suite (step 5).
+- The root-package check fails when the registries that own or use a lift
+  record it differently, any lift: its description, input, product,
+  `bytes`, outputs, `productFiles` or rejects. It names the packages and
+  the field.
 - A corpus check (step 8) receives a bytes lift's committed product as its
   cell's `Product`, by each file's path under `via/<lift>/`.
 - `testdata/sheet/prices.txtar` and `testdata/csv/prices.txtar` both reach
