@@ -41,7 +41,7 @@ func KeyPaths(t testing.TB, typ reflect.Type) []string {
 // in each list and map.
 func Full(t testing.TB, typ reflect.Type) any {
 	t.Helper()
-	data, err := json.Marshal(Populated(typ).Interface())
+	data, err := json.Marshal(Populated(t, typ).Interface())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,38 +54,46 @@ func Full(t testing.TB, typ reflect.Type) any {
 
 // Populated returns a value of type typ with every field set: each string
 // "x", each map's one key "*", each bool true and each number 1, each list
-// and map holding one element, and each pointer pointing at one. It panics
-// on a field encoding/json doesn't write, and on a kind a registry can't
-// hold.
-func Populated(typ reflect.Type) reflect.Value {
+// and map holding one element, and each pointer pointing at one. It fails
+// the test on a field encoding/json doesn't write, unexported or tagged
+// "-", and on a kind a registry can't hold.
+func Populated(t testing.TB, typ reflect.Type) reflect.Value {
+	t.Helper()
 	v := reflect.New(typ).Elem()
 	switch typ.Kind() {
 	case reflect.Struct:
 		for f := range typ.Fields() {
-			if !f.IsExported() {
-				panic("the unexported field " + f.Name + " of " + typ.String() + ": a registry type holds none")
+			switch {
+			case !f.IsExported():
+				t.Fatalf("the unexported field %s of %s: a registry type holds none", f.Name, typ)
+			case f.Tag.Get("json") == "-":
+				t.Fatalf("the field %s of %s is tagged json:\"-\", so encoding/json doesn't write it: a registry type holds none", f.Name, typ)
 			}
-			v.FieldByIndex(f.Index).Set(Populated(f.Type))
+			v.FieldByIndex(f.Index).Set(Populated(t, f.Type))
 		}
 	case reflect.Pointer:
 		v.Set(reflect.New(typ.Elem()))
-		v.Elem().Set(Populated(typ.Elem()))
+		v.Elem().Set(Populated(t, typ.Elem()))
 	case reflect.Slice:
-		v.Set(reflect.Append(v, Populated(typ.Elem())))
+		v.Set(reflect.Append(v, Populated(t, typ.Elem())))
 	case reflect.Map:
 		if typ.Key().Kind() != reflect.String {
-			panic("no registry key of " + typ.String())
+			t.Fatalf("no registry key of %s", typ)
 		}
 		v.Set(reflect.MakeMap(typ))
-		v.SetMapIndex(reflect.ValueOf("*").Convert(typ.Key()), Populated(typ.Elem()))
+		v.SetMapIndex(reflect.ValueOf("*").Convert(typ.Key()), Populated(t, typ.Elem()))
 	case reflect.String:
 		v.SetString("x")
 	case reflect.Bool:
 		v.SetBool(true)
-	case reflect.Int:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		v.SetInt(1)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		v.SetUint(1)
+	case reflect.Float32, reflect.Float64:
+		v.SetFloat(1)
 	default:
-		panic("no registry value of " + typ.String())
+		t.Fatalf("no registry value of %s", typ)
 	}
 	return v
 }
