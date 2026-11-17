@@ -27,7 +27,7 @@ $ go test  # pkg-a-circular
     the property circular has two different entries:
           .: "Some cell's formula refers back to itself, directly or through other cells."
           ./b: "A loop."
-        Declare the property once, in a package the others import, and register that declaration.
+        Declare the property once, in a package the others import, and register that declaration. If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/script
         --- PASS: TestCorpus/script/twice

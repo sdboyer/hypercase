@@ -312,7 +312,7 @@ func TestStripRootCheckViaBytesDisagree(t *testing.T) {
 		insert("via/parse/quote/A1", "3\n", "out/")(a)
 	})
 	s.fails(s.normal("strip-a"),
-		"the registries that own or use the lift parse record different bytes:\n  .: false\n  ./b: true\n",
+		"the registries that own or use the lift parse differ in bytes:\n  bytes:\n    .: false\n    ./b: true\n",
 		"testdata/export/prices.txtar: no registry claims via/parse/quote/A1: no bytes lift named parse runs over the corpus export.\nIf a bytes lift should write them, register it. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing.")
 
 	// Strip, with the line still there, leaves the section.

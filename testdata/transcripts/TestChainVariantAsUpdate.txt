@@ -115,9 +115,9 @@ $ go test  # chain
         transform/louder/out/evaluate/outcome differs (-golden +got):
         - accepted
         + blocked import
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate, and writes the outcome of its run, not this one: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's, not this outcome.
         transform/louder/out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has the committed outcome "rejected", in transform/louder/out/import/outcome.
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         import: Imports the export as a script, as its import/ tree says.
         import returned an error, but the variant states no property import rejects:
@@ -136,21 +136,21 @@ $ go test  # chain
         transform/louder/out/list/outcome differs (-golden +got):
         - accepted
         + blocked import
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list, and writes the outcome of its run, not this one: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's, not this outcome.
         transform/louder/out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in transform/louder/out/import/outcome.
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         parse: Parses the script, as its parse/ tree says.
         transform/louder/out/parse/outcome differs (-golden +got):
         - accepted
         + blocked import
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs parse, and writes the outcome of its run, not this one: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs parse: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's, not this outcome.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         resolve: Resolves the parsed script, as its resolve/ tree says.
         transform/louder/out/resolve/outcome differs (-golden +got):
         - accepted
         + blocked import
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve, and writes the outcome of its run, not this one: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds, and it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's, not this outcome.
     what ran, in order:
         parse ran on empty
         resolve ran on empty
@@ -503,7 +503,7 @@ $ go test  # chain
         + accepted
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         transform/louder/out/import/error.txt records an error, but the run returned none.
-        If the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Its run may still write the file: delete nothing by hand before it has run.
         transform/louder/via/import/evaluate/out/values.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         transform/louder/via/import/quote/A1 has no golden.

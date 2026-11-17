@@ -154,7 +154,51 @@ func TestRootCheckPropertyEntries(t *testing.T) {
 	// One property declared once and registered by both is one property.
 	s.passes(s.normal("pkg-a-circular"))
 	s.passes(s.run("b", "pkg-b-loop", true))
-	s.fails(s.normal("pkg-a-circular"), "the property circular has two different entries:\n  .: \"Some cell's formula refers back to itself, directly or through other cells.\"\n  ./b: \"A loop.\"\nDeclare the property once, in a package the others import, and register that declaration.")
+	s.fails(s.normal("pkg-a-circular"), "the property circular has two different entries:\n  .: \"Some cell's formula refers back to itself, directly or through other cells.\"\n  ./b: \"A loop.\"\nDeclare the property once, in a package the others import, and register that declaration."+staleRegistry)
+	s.done()
+}
+
+// staleRegistry is what the root-package check adds to the fix of two
+// registries' entries that differ: they may differ where the packages'
+// code agrees, in a registry that is stale.
+const staleRegistry = " If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests."
+
+// TestRootCheckStaleEntries: two registries whose entries of a corpus type
+// or a property differ fail the root-package check, though the packages
+// register one declaration, when one registry is stale, as after a hand
+// edit. The fix says so, and the module's update, which rewrites the
+// registries, ends it.
+func TestRootCheckStaleEntries(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	update := func() {
+		for _, r := range s.parallel(childRun{"", "pkg-a-circular", true}, childRun{"b", "pkg-b-circular", true}) {
+			s.passes(r)
+		}
+	}
+	update()
+	s.passes(s.normal("pkg-a-circular"))
+	const reg = "b/testdata/hypercase.json"
+	clean := s.read(reg)
+	for _, tt := range []struct {
+		what   string
+		change func(g *registry.Registry)
+		want   string
+	}{
+		{"the corpus type script's description", func(g *registry.Registry) { g.Types[0].Description = "Scripts." }, "the corpus directory script has two different corpus types:\n  .: github.com/sdboyer/hypercase_test.Script: \"Trees of instructions, under in/<tree>/, that the fixtures' columns follow.\"\n  ./b: github.com/sdboyer/hypercase_test.Script: \"Scripts.\"\nAn archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration." + staleRegistry},
+		{"the property circular's description", func(g *registry.Registry) { g.Properties[0].Description = "A loop." }, "the property circular has two different entries:\n  .: \"Some cell's formula refers back to itself, directly or through other cells.\"\n  ./b: \"A loop.\"\nDeclare the property once, in a package the others import, and register that declaration." + staleRegistry},
+	} {
+		g, err := registry.Parse(clean)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tt.change(g)
+		s.write(reg, g.Marshal(), "b's registry records another "+tt.what+", which b's code doesn't")
+		s.fails(s.normal("pkg-a-circular"), tt.want)
+		update()
+		s.same(reg, clean)
+		s.passes(s.normal("pkg-a-circular"))
+	}
 	s.done()
 }
 

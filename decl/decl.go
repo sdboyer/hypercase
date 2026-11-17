@@ -161,11 +161,16 @@ type Lift[In, Out any] struct {
 //
 // The framework finds the marks through Unwrap() error and
 // Unwrap() []error alone, never through an error's own As or Is method.
-// So an error that reaches the errors it holds through As, as
-// go-multierror's does, is a fault, however many of them Reject marks:
-// when the generator rejects the input, mark that error whole, with
-// Reject. An error reached through more than 100 Unwrap calls, as in an
-// error whose Unwrap leads back to itself, makes the whole error a fault.
+// So an error that reaches the errors it holds through As, and not
+// through Unwrap, is a fault, however many of them Reject marks.
+// go-multierror's is such an error when it holds two or more: its Unwrap
+// gives a chain, and each chain's Unwrap gives the chain of the rest,
+// never an error the chain holds, down to the last, which wraps none.
+// Holding one error, its Unwrap gives that error, so one error Reject
+// marks is a rejection there. When the generator rejects the input with
+// an error that holds others, mark that error whole, with Reject. An
+// error reached through more than 100 Unwrap calls, as in an error whose
+// Unwrap leads back to itself, makes the whole error a fault.
 //
 // The rejection's text is err's, and it wraps err, so errors.As reaches
 // err through it. Reject returns nil for a nil err.

@@ -88,10 +88,11 @@ PASS
 $ edit b/testdata/hypercase.json  # b's registry records parse as a bytes lift
 $ edit testdata/export/prices.txtar  # a product parse doesn't make, in parse's cell, which a gaps line marks
 $ go test  # strip-a
-    the registries that own or use the lift parse record different bytes:
-          .: false
-          ./b: true
-        Every package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration.
+    the registries that own or use the lift parse differ in bytes:
+          bytes:
+            .: false
+            ./b: true
+        Every package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration. If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
     testdata/export/prices.txtar: no registry claims via/parse/quote/A1: no bytes lift named parse runs over the corpus export.
         If a bytes lift should write them, register it. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -column parse at the module root, then FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing. The strip removes parse's sections from every archive under the module-root corpus, and the update writes back each one a registry claims, but not one whose cell the update writes nothing for, such as a cell that faults.
     what ran, in order:

@@ -1,6 +1,7 @@
 package hypercase
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -239,8 +240,8 @@ type caseState struct {
 	// stages the case on view.
 	made fs.FS
 	// asUpdate is, in a normal run, the case staged as the package's
-	// update stages it, made when a cell first asks whether the update
-	// runs it. Its normal is the normal run's state, whose runs it shares
+	// update stages it, made when a cell first asks what the update does
+	// with it. Its normal is the normal run's state, whose runs it shares
 	// for each lift no bytes lift precedes: such a lift's input is the same
 	// in both. A lift past a bytes lift runs once in each. When the update
 	// stages the case on made, no lift's input need be the same in both,
@@ -345,17 +346,36 @@ func (s *caseState) heldBack(l *lift, lr *liftRun, in any, view fs.FS) bool {
 	return !lr.bare.writable
 }
 
-// updateRuns reports, in a normal run, whether the package's update runs
+// An updateFate is what the package's update does with a cell, which a
+// normal run tells by staging the case as the update stages it. The
+// update runs the cell when nothing blocks it and its probe, if it has
+// one, says the case is for it, with no fault.
+type updateFate struct {
+	// block is what blocks the cell in the update, when something does.
+	block *blockage
+	// skip is the reason the cell's probe gives, on the value the update
+	// stages, for saying the case isn't for it, when it gives one an
+	// outcome can hold.
+	skip string
+	// fault says how the cell's probe fails the cell on the value the
+	// update stages, when it does: it panics, or says the case isn't for
+	// it with no reason, or with one an outcome can't hold.
+	fault string
+}
+
+// runs reports whether the update runs the cell.
+func (f updateFate) runs() bool { return f.block == nil && f.skip == "" && f.fault == "" }
+
+// updateFate tells, in a normal run, what the package's update does with
 // col's cell: whether the case, staged as the update stages it, reaches
-// the type col consumes with nothing to block it, and col's probe, if it
-// has one, says the case is for it. The update stages a transform's
-// variant on what the transform makes, where a normal run reads the
-// committed inputs, and runs each bytes lift, where a normal run reads
-// what the archive commits for it. A normal run runs only the bytes lifts
-// the package owns, so only a package that owns every bytes lift on the
-// way asks. A probe that panics leaves the update to run the cell, which
-// reports the panic.
-func (s *caseState) updateRuns(col *column) bool {
+// the type col consumes with nothing to block it, and if it does, what
+// col's probe, if it has one, says of the value it reaches. The update
+// stages a transform's variant on what the transform makes, where a normal
+// run reads the committed inputs, and runs each bytes lift, where a normal
+// run reads what the archive commits for it. A normal run runs only the
+// bytes lifts the package owns, so only a package that owns every bytes
+// lift on the way asks.
+func (s *caseState) updateFate(col *column) updateFate {
 	if s.asUpdate == nil {
 		s.asUpdate = &caseState{
 			r:      s.r,
@@ -374,14 +394,45 @@ func (s *caseState) updateRuns(col *column) bool {
 	}
 	in, _, b := s.asUpdate.stage(col.consumes)
 	if b != nil {
-		return false
+		return updateFate{block: b}
 	}
 	if col.probe == nil {
-		return true
+		return updateFate{}
 	}
+	var why string
 	var ok bool
-	p := call(func(*called) { _, ok = col.probe(in) })
-	return p.panicked || ok
+	p := call(func(*called) { why, ok = col.probe(in) })
+	switch {
+	case p.panicked:
+		return updateFate{fault: fmt.Sprintf("%s's probe panics: %v", col.name, p.panicValue)}
+	case ok:
+		return updateFate{}
+	case strings.TrimSpace(why) == "":
+		return updateFate{fault: fmt.Sprintf("%s's probe says the case isn't for it, and gives no reason", col.name)}
+	}
+	if err := archive.CheckDetail(why); err != nil {
+		return updateFate{fault: fmt.Sprintf("%s's probe says the case isn't for it, with a reason an outcome can't hold: %v", col.name, err)}
+	}
+	return updateFate{skip: why}
+}
+
+// restages reports, in a normal run, once updateFate says the update runs
+// col's cell, whether the update runs it on another value than this run
+// does. Past a bytes lift, the cell's value comes from the last bytes
+// lift's product alone, so it differs when that lift makes another
+// product than the one the archive commits. With no bytes lift on the
+// path, it differs when the update stages a transform's variant on what
+// the transform makes.
+func (s *caseState) restages(col *column) bool {
+	last, _ := s.plan.bytesOnPath(col.consumes)
+	if last == nil {
+		return s.made != nil
+	}
+	lr, ok := s.asUpdate.runs[last]
+	if !ok && s.asUpdate.normal != nil {
+		lr, ok = s.asUpdate.normal.runs[last]
+	}
+	return !ok || !maps.EqualFunc(lr.product, s.c.product(last), bytes.Equal)
 }
 
 // bytesOnPath returns the last bytes lift on the plan's path to typ, and

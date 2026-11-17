@@ -72,7 +72,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	typeOrder := map[string][]string{}              // directory → type entries, in the order of the packages
 	propEntries := map[string]map[string][]string{} // property → description → packages
 	propOrder := map[string][]string{}              // property → descriptions, in the order of the packages
-	liftEntries := map[string][]liftEntry{}         // lift → the entries of the registries that own or use it, in the order of the packages
+	liftEntries := map[string][]liftEntry{}         // lift → the entries of the registries with tests that own or use it, in the order of the packages
 	transforms := map[string]map[string]bool{}      // directory → the transforms its corpus types list
 	needOwner := map[string]map[string]bool{}       // directory → the transforms its corpus types list in packages with tests
 	trPkgs := map[trKey][]string{}                  // transform → the packages that own it
@@ -101,14 +101,16 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	for _, g := range regs {
 		// A registry in a package with no _test.go file records what no
 		// test runs, so its package owns and uses nothing: no column, lift
-		// or transform. Nor does a transform it lists need an owner. Its
+		// or transform. Nor does a transform it lists need an owner, nor
+		// is its entry of a lift compared with the others', which are
+		// compared for what each package's runs do with the lift. Its
 		// sections stay claimed, since the registry's own error reports
 		// them, and the lifts and transforms it owns are kept apart, so a
-		// message that finds no owner names it. Its root-package check,
-		// corpus types and properties still count where registries are
-		// compared, the stricter choice: a second root-package check, or a
-		// corpus type or property another package declares differently,
-		// still fails.
+		// message that finds no owner names it. What still counts where
+		// registries are compared is its root-package check, its corpus
+		// types and its properties, the stricter choice: a second
+		// root-package check, or a corpus type or property another package
+		// declares differently, still fails.
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
 		}
@@ -124,7 +126,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 		}
 		for _, l := range g.reg.Lifts {
-			liftEntries[l.Name] = append(liftEntries[l.Name], liftEntry{g.pkg, l})
+			if g.tested {
+				liftEntries[l.Name] = append(liftEntries[l.Name], liftEntry{g.pkg, l})
+			}
 			if !l.Owned {
 				if g.tested {
 					usedPkgs[l.Name] = append(usedPkgs[l.Name], g.pkg)
@@ -217,6 +221,10 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 		t.Errorf("%s\n%s", msg, fix)
 	}
+	// Registries that differ where the packages' code agrees are stale,
+	// such as one edited by hand, so each comparison's fix says how the
+	// update ends that.
+	stale := fmt.Sprintf("If they register one declaration already, a registry is stale: run %s, which rewrites the registry of every package with tests.", r.updateCmd())
 	for _, dir := range slices.Sorted(maps.Keys(typeEntries)) {
 		entries := typeEntries[dir]
 		if len(entries) < 2 {
@@ -228,9 +236,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			lines = append(lines, fmt.Sprintf("  %s: %s", andList(entries[e]), e))
 			raw = raw || e == rawEntry
 		}
-		fix := "Declare the type once, in a package the others import, and register that declaration."
+		fix := "Declare the type once, in a package the others import, and register that declaration. " + stale
 		if raw {
-			fix = "A suite that names the directory as its Corpus runs over its archives' raw input views, with no type. Make the suite consume the corpus type and remove its Corpus, or move one set of archives to another directory."
+			fix = fmt.Sprintf("A suite that names the directory as its Corpus runs over its archives' raw input views, with no type. Make the suite consume the corpus type and remove its Corpus, or move one set of archives to another directory. If the code does one of these already, a registry is stale: run %s, which rewrites the registry of every package with tests.", r.updateCmd())
 		}
 		t.Errorf("the corpus directory %s has two different corpus types:\n%s\nAn archive's directory gives its type. %s", dir, strings.Join(lines, "\n"), fix)
 	}
@@ -260,9 +268,14 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		for _, d := range propOrder[name] {
 			lines = append(lines, fmt.Sprintf("  %s: %q", andList(entries[d]), d))
 		}
-		t.Errorf("the property %s has two different entries:\n%s\nDeclare the property once, in a package the others import, and register that declaration.", name, strings.Join(lines, "\n"))
+		t.Errorf("the property %s has two different entries:\n%s\nDeclare the property once, in a package the others import, and register that declaration. %s", name, strings.Join(lines, "\n"), stale)
 	}
 	for _, name := range slices.Sorted(maps.Keys(liftEntries)) {
+		var differ, blocks []string
+		bytesLift := false
+		for _, e := range liftEntries[name] {
+			bytesLift = bytesLift || e.lift.Bytes
+		}
 		for _, f := range liftFields {
 			pkgs := map[string][]string{} // value → packages
 			var order []string
@@ -276,12 +289,20 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			if len(order) < 2 {
 				continue
 			}
-			var lines []string
+			differ = append(differ, f.name)
+			blocks = append(blocks, "  "+f.name+":")
 			for _, v := range order {
-				lines = append(lines, fmt.Sprintf("  %s: %s", andList(pkgs[v]), v))
+				blocks = append(blocks, fmt.Sprintf("    %s: %s", andList(pkgs[v]), v))
 			}
-			t.Errorf("the registries that own or use the lift %s record different %s:\n%s\nEvery package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration.", name, f.name, strings.Join(lines, "\n"))
 		}
+		if len(differ) == 0 {
+			continue
+		}
+		why := "a package that only uses a lift runs its own declaration of it to stage the cells past it, and the lift's cell, which the package that owns it writes, records what the owner's declaration does"
+		if bytesLift {
+			why = "a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it"
+		}
+		t.Errorf("the registries that own or use the lift %s differ in %s:\n%s\nEvery package that owns or uses a lift registers one declaration of it: %s. Declare the lift once, in a package the others import, and register that declaration. %s", name, andList(differ), strings.Join(blocks, "\n"), why, stale)
 	}
 
 	// The archives, and the directories that hold them.

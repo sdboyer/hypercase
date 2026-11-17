@@ -117,7 +117,7 @@ func TestRawCorpusOfType(t *testing.T) {
 	s.passes(s.run("b", "pkg-b", true))
 	s.fails(s.normal("raw-pkg-a"),
 		"the corpus directory script has two different corpus types:\n  .: the raw input view, fs.FS, which a suite's Corpus names\n  ./b: github.com/sdboyer/hypercase_test.Script: ",
-		"An archive's directory gives its type. A suite that names the directory as its Corpus runs over its archives' raw input views, with no type. Make the suite consume the corpus type and remove its Corpus, or move one set of archives to another directory.")
+		"An archive's directory gives its type. A suite that names the directory as its Corpus runs over its archives' raw input views, with no type. Make the suite consume the corpus type and remove its Corpus, or move one set of archives to another directory. If the code does one of these already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
 	s.done()
 }
 

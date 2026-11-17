@@ -22,7 +22,7 @@ $ go test  # ladder-a
     the corpus directory script has two different corpus types:
           .: github.com/sdboyer/hypercase_test.Script: "Trees of instructions, under in/<tree>/, that the fixtures' columns follow."
           ./b: github.com/sdboyer/hypercase_test.Grid: "A grid, in the script directory."
-        An archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration.
+        An archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration. If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
     what ran, in order:
         parse ran on x
         resolve ran on x
@@ -43,7 +43,7 @@ $ go test  # ladder-a
     the corpus directory script has two different corpus types:
           .: github.com/sdboyer/hypercase_test.Script: "Trees of instructions, under in/<tree>/, that the fixtures' columns follow."
           ./b: github.com/sdboyer/hypercase_test.Grid: "A grid, in the script directory."
-        An archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration.
+        An archive's directory gives its type. Declare the type once, in a package the others import, and register that declaration. If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
     what ran, in order:
         parse ran on x
         resolve ran on x

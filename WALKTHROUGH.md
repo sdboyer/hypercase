@@ -1161,7 +1161,9 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 - It reads every registry under the root and every archive in the
   directories they declare, and fails on:
   - a column two packages register;
-  - one property name with two different entries;
+  - one property name with two different entries, which the packages
+    declare differently, or which a stale registry records, as one edited
+    by hand: the update, which rewrites the registries, ends the second;
   - a section no registry claims, such as `out/<suite>/…` after that suite
     was removed, whose failure names `hypercase strip -column <suite>`,
     then the update. The failure says the strip reaches the column's
@@ -1185,7 +1187,8 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
   tested, and the result doesn't depend on the environment the check
   runs in. The check counts none of the registry's columns, lifts or
   transforms (steps 6 and 7) as owned, its lifts as used, or the
-  transforms its corpus types list as needing an owner. The sections of
+  transforms its corpus types list as needing an owner, and compares none
+  of its lifts' entries with other registries' (step 10). The sections of
   its suites, its owned lifts and its listed transforms stay claimed, so
   the registry's own failure is the one that reports them. A lift needs
   an owner when a package with tests uses it, and a transform when a
@@ -1947,12 +1950,21 @@ whether each has a probe, and whether the package owns it.
   update wrote fails, and the failure shows how the sections differ from
   what the transform makes, and names the module's update.
 - When the committed sections differ from what the transform makes, a
-  cell that a lift blocks on them may be one the update runs. A normal run
-  stages the variant on what the transform makes, as the update does, to
-  tell, and runs the cell's probe, if it has one, on what that reaches.
-  When the update runs the cell, its committed files are no orphans: the
-  normal run says so, and to delete none of them by hand, and, from step 8
-  on, that the update writes the cell's outcome from its run.
+  cell that a lift blocks on them, or whose probe says no on them, may be
+  one the update runs, or skips or blocks otherwise. A normal run stages
+  the variant on what the transform makes, as the update does, to tell,
+  and runs the cell's probe, if it has one, on what that reaches. It says
+  what the update does with the cell. When the update runs the cell, its
+  committed files are no orphans: the normal run says to delete none of
+  them by hand before the update has run, and, from step 8 on, that what
+  the update writes for the cell, if anything, is its run's. When the
+  update skips or blocks the cell otherwise, the normal run says why, and,
+  from step 8 on, which outcome the update writes; when the cell's probe
+  fails there, that the probe needs fixing. A cell that runs on the
+  committed sections, and no longer produces a file it commits, runs on
+  what the transform makes in the update, whose run may still write the
+  file: the normal run says to delete nothing by hand before the update
+  has run.
 - An update replaces a transform's `in/…` and `delete` whole: a file the
   transform no longer produces is removed, and the removal shows in the diff.
 - When a transform no longer applies to a base, no cell runs on its
@@ -2783,11 +2795,16 @@ lift.
   jenny of its own, and marks that jenny's error, has jenny's faults in it
   recorded as its rejection, so it marks only what it rejects.
 - The walk never calls an error's own `As` or `Is`. An error that reaches
-  the errors it holds through `As`, as go-multierror's does, is a fault
-  however many of them `decl.Reject` marks: when the importer rejects the
-  CSV with such an error, it marks that error whole. An error reached
-  through more than 100 `Unwrap` calls, as in an error whose `Unwrap` leads
-  back to itself, makes the whole error a fault.
+  the errors it holds through `As`, and not through `Unwrap`, is a fault
+  however many of them `decl.Reject` marks. go-multierror's is such an
+  error when it holds two or more: its `Unwrap` gives a chain, and each
+  chain's `Unwrap` gives the chain of the rest, never an error the chain
+  holds, down to the last, which wraps none. Holding one error, its
+  `Unwrap` gives that error, so one marked error is a rejection there.
+  When the importer rejects the CSV with an error that holds others, it
+  marks that error whole. An error reached through more than 100 `Unwrap`
+  calls, as in an error whose `Unwrap` leads back to itself, makes the
+  whole error a fault.
 - In an update, when anything but a `gaps` line keeps a bytes lift's cell
   from being written, such as a fault of the jenny, a product an archive
   can't hold or a `RenderError` that panics, every cell past the lift
@@ -2827,17 +2844,29 @@ lift.
   lift that is `accepted` with no product files gives its readers an empty
   view.
 - A cell that a normal run finds blocked past a bytes lift, by a committed
-  outcome or by a lift that fails on a committed product, may run in the
-  update, which reruns every lift on its path. Then the cell's committed
-  files, a bytes lift's product among them, are no orphans, and the update
-  writes the outcome of the cell's run. A normal run of a package that owns
+  outcome or by a lift that fails on a committed product, or whose probe
+  says no on a committed product, may run in the update, which reruns
+  every lift on its path, or be skipped or blocked there otherwise. When
+  the update runs the cell, the cell's committed files, a bytes lift's
+  product among them, are no orphans, and what the update writes for the
+  cell, if anything, is its run's. A normal run of a package that owns
   every bytes lift on the cell's path stages the case as its update does,
   on what a transform makes for its variant, and runs the cell's probe, if
-  it has one, on what that reaches. It says whether the update runs the
-  cell: if it does, to delete nothing by hand, and that the update writes
-  the cell's outcome from its run. Another package's normal run doesn't run
-  the lifts it doesn't own, so it says to run the update before deleting
-  any of them.
+  it has one, on what that reaches. It says what the update does with the
+  cell: if it runs the cell, to delete nothing by hand before it has run,
+  and that what it writes for the cell, if anything, is its run's; if it
+  skips or blocks the cell otherwise, why, and which outcome it writes, if
+  any; if the cell's probe fails there, that the probe needs fixing.
+  Another package's normal run doesn't run the lifts it doesn't own, so it
+  says to run the update before deleting any of them.
+- A cell past a bytes lift that runs on a committed product the lift no
+  longer makes, and no longer produces a file it commits, runs on what the
+  lift makes in the update, whose run may still write the file. A normal
+  run of a package that owns every bytes lift on the cell's path tells
+  whether the update runs the cell on another product, and if it does,
+  says to delete nothing by hand before the update has run. Another
+  package's can't tell, and says so, and to run the update before deleting
+  the file.
 - A bytes lift's frozen cell includes its `via/` product: no update writes
   it, and a product that differs from what the lift makes fails the cell,
   in every run. An update writes the cells past it from what the lift makes
@@ -2867,10 +2896,16 @@ lift.
   lift a package owns over it; any other `via/` section is unclaimed, and
   its failure names `hypercase strip -column <lift>`, then the update, as
   it does for a removed suite (step 5).
-- The root-package check fails when the registries that own or use a lift
-  record it differently, any lift: its description, input, product,
-  `bytes`, outputs, `productFiles` or rejects. It names the packages and
-  the field.
+- The root-package check fails when the registries of packages with tests
+  that own or use a lift record it differently, any lift: its
+  description, input, product, `bytes`, outputs, `productFiles` or
+  rejects. It fails once per lift, naming the packages and every field
+  that differs. A registry in a package with no `_test.go` file isn't
+  compared: no test runs what it records, and its own failure says to
+  delete it. When the packages register one declaration already, a
+  registry is stale, and the update, which rewrites the registries, ends
+  the failure. The comparisons of properties and corpus types (steps 5 and
+  6) say so too.
 - A corpus check (step 8) receives a bytes lift's committed product as its
   cell's `Product`, by each file's path under `via/<lift>/`.
 - `testdata/sheet/prices.txtar` and `testdata/csv/prices.txtar` both reach
