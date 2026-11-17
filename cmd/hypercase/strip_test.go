@@ -1250,10 +1250,12 @@ func TestStripFailedFindings(t *testing.T) {
 // TestStripLinks: nothing under the corpus root's testdata/ is a symbolic
 // link, so one there fails strip, exit 1, before it removes anything, the
 // registries included, whatever it names: a corpus's directory, an
-// archive, testdata/checks/, nothing, itself, or testdata/ itself.
+// archive, testdata/checks/, nothing, itself, or testdata/ itself, naming
+// a directory, nothing, itself or a file.
 func TestStripLinks(t *testing.T) {
 	t.Parallel()
-	const one = ". Nothing was removed.\nReplace it with a copy of what it names, or remove it, then run hypercase strip again.\n"
+	const one = ". Nothing was removed.\nRemove it, or replace it with a copy of what it names, if it names anything, then run hypercase strip again.\n"
+	const itself = "hypercase strip: testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none" + one
 	type link struct{ rel, target string } // a target of "" names what the link replaces
 	for _, tt := range []struct {
 		links []link
@@ -1264,8 +1266,11 @@ func TestStripLinks(t *testing.T) {
 		{[]link{{"testdata/checks", ""}}, "hypercase strip: testdata/ holds no symbolic links: testdata/checks is one" + one},
 		{[]link{{"testdata/sheet", "../shared/missing"}}, "hypercase strip: testdata/ holds no symbolic links: testdata/sheet is one" + one},
 		{[]link{{"testdata/sheet", "sheet"}}, "hypercase strip: testdata/ holds no symbolic links: testdata/sheet is one" + one},
-		{[]link{{"testdata", ""}}, "hypercase strip: testdata/ holds no symbolic links: testdata is one" + one},
-		{[]link{{"testdata/csv", ""}, {"testdata/sheet", ""}}, "hypercase strip: testdata/ holds no symbolic links: testdata/csv and testdata/sheet are links. Nothing was removed.\nReplace each with a copy of what it names, or remove it, then run hypercase strip again.\n"},
+		{[]link{{"testdata", ""}}, itself},
+		{[]link{{"testdata", "shared/missing"}}, itself},
+		{[]link{{"testdata", "testdata"}}, itself},
+		{[]link{{"testdata", "shared/testdata.d/hypercase.json"}}, itself},
+		{[]link{{"testdata/csv", ""}, {"testdata/sheet", ""}}, "hypercase strip: testdata/ holds no symbolic links: testdata/csv and testdata/sheet are links. Nothing was removed.\nRemove each, or replace it with a copy of what it names, if it names anything, then run hypercase strip again.\n"},
 	} {
 		files := stripModule()
 		top := writeTree(t, files)

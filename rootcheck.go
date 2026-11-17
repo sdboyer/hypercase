@@ -328,7 +328,11 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			t.Errorf("reading %s: %v", r.rel(td), err)
 		}
 		for _, l := range links {
-			t.Errorf("testdata/ holds no symbolic links: %s is one.\nReplace it with a copy of what it names, or remove it.", r.rel(l))
+			if l == td {
+				t.Errorf("%s is a symbolic link, and a corpus root's testdata/ is a directory that holds none.\nRemove it, or replace it with a copy of what it names, if it names anything.", r.rel(l))
+				continue
+			}
+			t.Errorf("testdata/ holds no symbolic links: %s is one.\nRemove it, or replace it with a copy of what it names, if it names anything.", r.rel(l))
 		}
 	}
 	for _, dir := range slices.Sorted(maps.Keys(undeclared)) {

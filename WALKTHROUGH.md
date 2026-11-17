@@ -491,9 +491,10 @@ Its `.gitignore` names the corpus root's lock, which an update takes
   `testdata/<corpus>/<archive>.txtar` with both names under the naming
   rule and `<corpus>` other than `checks`, and then exits non-zero. It
   goes by location alone, so it strips an archive in a directory that no
-  corpus type declares. A symbolic link anywhere under the corpus root's
-  `testdata/`, `testdata/` itself included, fails it before it removes
-  anything. Its last line is the update to run next.
+  corpus type declares. It doesn't reach into a nested module or another
+  corpus root under `testdata/`, and a symbolic link where it reaches,
+  `testdata/` itself included, fails it before it removes anything. Its
+  last line is the update to run next.
 - Stripping and then updating, repeated until an update changes nothing,
   reaches what updating the hand-written sections alone reaches, frozen
   cells excepted: a known state.
@@ -1192,9 +1193,10 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
   - a registry file whose directory holds no `_test.go` file;
   - a directory under `testdata/` that holds archives and that no registry
     declares;
-  - a symbolic link anywhere under the corpus root's `testdata/`,
-    `testdata/` itself included, whatever it names: a run reads through
-    one, where the check, `hypercase strip` and the report (step 9) don't.
+  - a symbolic link under the corpus root's `testdata/`, `testdata/`
+    itself included, whatever it names, but in a nested module or another
+    corpus root, which the check doesn't reach: a run reads through one,
+    where the check, `hypercase strip` and the report (step 9) don't.
 - A declared directory that doesn't exist yet is fine.
 - A package whose directory holds no `_test.go` file owns and uses
   nothing, whatever its registry records. Any file whose name ends in

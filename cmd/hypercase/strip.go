@@ -121,7 +121,11 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	if err != nil {
 		return fail("%v", err)
 	}
-	if fi, err := os.Stat(filepath.Join(corpusRoot, "testdata")); err != nil || !fi.IsDir() {
+	// A symbolic link in place of testdata/ is refused below, whatever it
+	// names.
+	td := filepath.Join(corpusRoot, "testdata")
+	tdInfo, err := os.Lstat(td)
+	if err != nil || !tdInfo.IsDir() && tdInfo.Mode()&fs.ModeSymlink == 0 {
 		return fail("%s holds no testdata/ directory, so it is no corpus root.\nName the corpus root with -root, relative to the current directory or by an absolute path.", corpusRoot)
 	}
 	mod, err := root.Module(corpusRoot)
@@ -142,6 +146,9 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	bare, err := findCorpusRoot(dir, "")
 	named := dir != mod || corpusRoot != mod || err != nil || bare != corpusRoot
 	again := rerun(dir, corpusRoot, named, sel)
+	if tdInfo.Mode()&fs.ModeSymlink != 0 {
+		return fail("%s is a symbolic link, and a corpus root's testdata/ is a directory that holds none. Nothing was removed.\nRemove it, or replace it with a copy of what it names, if it names anything, then run %s again.", rel(td), again)
+	}
 
 	// The registries, read before anything is removed: those that record
 	// the corpus root, and the corpus roots the others record.
@@ -196,7 +203,6 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	// The archives: every *.txtar under the root's testdata/, as the
 	// root-package check walks it, past nested modules and other corpus
 	// roots. A symbolic link under testdata/ fails strip.
-	td := filepath.Join(corpusRoot, "testdata")
 	var paths []string
 	links, err := walk.Testdata(td, others, func(p string, d fs.DirEntry) {
 		if strings.HasSuffix(d.Name(), ".txtar") {
@@ -215,7 +221,7 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 		if len(each) > 1 {
 			are, it = strings.Join(each[:len(each)-1], ", ")+" and "+each[len(each)-1]+" are links", "each"
 		}
-		return fail("testdata/ holds no symbolic links: %s. Nothing was removed.\nReplace %s with a copy of what it names, or remove it, then run %s again.", are, it, again)
+		return fail("testdata/ holds no symbolic links: %s. Nothing was removed.\nRemove %s, or replace it with a copy of what it names, if it names anything, then run %s again.", are, it, again)
 	}
 	if sel.Column != "" || sel.Transform != "" {
 		if ok, left := matches(corpusRoot, paths, sel); !ok && len(left) == 0 {
@@ -367,6 +373,11 @@ func findCorpusRoot(dir, given string) (string, error) {
 	switch {
 	case errors.Is(err, fs.ErrNotExist) && dir == mod:
 		return mod, nil
+	case err != nil && dir == mod && isLink(filepath.Join(dir, "testdata")):
+		// A symbolic link in place of testdata/ that can't be read
+		// through: strip takes the module-root corpus, as with no
+		// registry there, and refuses the link.
+		return mod, nil
 	case errors.Is(err, fs.ErrNotExist):
 		return "", fmt.Errorf("the current directory holds no registry, testdata/%s, to say which corpus root its package's tests read, and it isn't the module root, %s, where strip finds the module-root corpus.\nName the corpus root with -root, relative to the current directory or by an absolute path, or run strip at the module root.", registry.Name, root.Rel(dir, mod))
 	case err != nil:
@@ -384,6 +395,12 @@ func findCorpusRoot(dir, given string) (string, error) {
 		return "", fmt.Errorf("%s records the corpus root %s, which lies inside the module at %s, and not in the module at %s, the package's.\nMove the corpus root out of the module at %s, or name it with -root, relative to the current directory or by an absolute path, to strip it as a corpus root of that module.", root.Rel(dir, p), h.CorpusRoot, root.Rel(dir, m), root.Rel(dir, mod), root.Rel(dir, m))
 	}
 	return corpusRoot, nil
+}
+
+// isLink reports whether p is a symbolic link.
+func isLink(p string) bool {
+	fi, err := os.Lstat(p)
+	return err == nil && fi.Mode()&fs.ModeSymlink != 0
 }
 
 // matches reports whether sel selects a section of an archive of the

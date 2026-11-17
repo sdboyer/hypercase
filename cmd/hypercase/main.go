@@ -28,21 +28,22 @@
 // with no registry there, the module root, from any directory of the
 // module.
 //
-// strip removes update-written sections from the archives of a corpus
-// root, telling them from hand-written ones by name alone, and leaves every
+// strip removes update-written sections from the archives of a corpus root,
+// telling them from hand-written ones by name alone, and leaves every
 // hand-written section's bytes as they were. A person runs it, never an
-// update; the update that follows writes the sections again from the
-// inputs and the code. The archives are the *.txtar files directly in the
+// update; the update that follows writes the sections again from the inputs
+// and the code. The archives are the *.txtar files directly in the
 // directories directly under the corpus root's testdata/. Nothing under
-// testdata/ is a symbolic link: a run reads through one, where strip, the
-// root-package check and the report don't, so strip refuses one. With no
-// flags it strips every archive, and removes the registries that record
-// the corpus root and the findings files in their packages'
-// testdata/checks/. It keeps a package's registry while a findings file of
-// the package is left, so that strip run again finds it, and every
-// registry while it leaves a *.txtar file as it was, for a problem of form,
-// a failed write or a place that is no archive's, so that strip run again
-// reads the registries as this run did.
+// testdata/ that strip reaches, testdata/ itself included, is a symbolic
+// link: a run reads through one, where strip, the root-package check and
+// the report don't, so strip refuses one. It doesn't reach into a nested
+// module or another corpus root. With no flags it strips every archive, and
+// removes the registries that record the corpus root and the findings files
+// in their packages' testdata/checks/. It keeps a package's registry while
+// a findings file of the package is left, so that strip run again finds it,
+// and every registry while it leaves a *.txtar file as it was, for a
+// problem of form, a failed write or a place that is no archive's, so that
+// strip run again reads the registries as this run did.
 // -column limits it to a column's sections, at every level, and -transform
 // to those under a transform's variant, transform/<name>/; given together,
 // they limit it to the column's sections under that variant. Either leaves
@@ -63,13 +64,13 @@
 // or the module root, or the corpus root holds no testdata/; when a
 // registry under the module can't be read, or the registries that record
 // the corpus root record different update variables; when reading the
-// corpus root's testdata/ fails, or anything under it is a symbolic link;
-// and when no archive that strip strips holds a section -column or
-// -transform selects, counting a frozen cell's sections, which it leaves.
-// It exits 1 too when it left an archive or a file in place for a problem,
-// a failed write or removal included. It exits 2 for a usage error: a flag
-// given twice, an unknown flag, an argument, an empty -root, or an empty or
-// ill-formed -column or -transform.
+// corpus root's testdata/ fails, or testdata/, or anything strip reaches
+// under it, is a symbolic link; and when no archive that strip strips holds
+// a section -column or -transform selects, counting a frozen cell's
+// sections, which it leaves. It exits 1 too when it left an archive or a
+// file in place for a problem, a failed write or removal included. It exits
+// 2 for a usage error: a flag given twice, an unknown flag, an argument, an
+// empty -root, or an empty or ill-formed -column or -transform.
 //
 // strip's -root names the corpus root, relative to the current directory,
 // or by an absolute path. Without -root, the corpus root is the one the

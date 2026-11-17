@@ -639,8 +639,10 @@ func (s *sandbox) unlink(rel string) {
 // strip and the root-package check follow none, and the report reads none
 // from git. So the check fails on each link, naming it, whatever it names
 // and wherever it sits: a corpus's directory, an archive,
-// testdata/checks/, nothing, itself, or testdata/ itself. Strip refuses to
-// run, and removes nothing. With the link replaced, the check passes.
+// testdata/checks/, nothing, itself, or testdata/ itself, naming a
+// directory, nothing, itself or a file. Strip refuses to run, with the
+// same reason, and removes nothing. With the link replaced, the check
+// passes.
 func TestRootCheckLinks(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "strip")
@@ -652,15 +654,22 @@ func TestRootCheckLinks(t *testing.T) {
 		{"testdata/script", "../shared/missing"},
 		{"testdata/script", "script"},
 		{"testdata", ""},
+		{"testdata", "shared/missing"},
+		{"testdata", "testdata"},
+		{"testdata", "shared/testdata.d/hypercase.json"},
 	} {
+		why := "testdata/ holds no symbolic links: " + l.rel + " is one."
+		if l.rel == "testdata" {
+			why = "testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none."
+		}
 		before := s.snapshot()
 		s.link(l.rel, l.target)
-		s.fails(s.normal("strip-a"), "testdata/ holds no symbolic links: "+l.rel+" is one.\nReplace it with a copy of what it names, or remove it.")
+		s.fails(s.normal("strip-a"), why+"\nRemove it, or replace it with a copy of what it names, if it names anything.")
 		r := s.strip()
 		if r.code != 1 {
 			t.Errorf("hypercase strip exited %d, not 1, with %s a link:\n%s", r.code, l.rel, r.out)
 		}
-		s.contains(r, "hypercase strip: testdata/ holds no symbolic links: "+l.rel+" is one. Nothing was removed.")
+		s.contains(r, "hypercase strip: "+why+" Nothing was removed.\nRemove it, or replace it with a copy of what it names, if it names anything, then run hypercase strip again.")
 		s.unlink(l.rel)
 		s.unchanged(before)
 		s.passes(s.normal("strip-a"))
