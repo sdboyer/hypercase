@@ -889,9 +889,12 @@ type liftVerdict struct {
 }
 
 // liftVerdict judges a bytes lift's cell on the case once, from its one
-// run: the lift's own cell reports it, and in an update the cells past
-// the lift run only when the update writes the lift's cell, whose product
-// they read. A fault of the jenny keeps the update from writing the cell.
+// run, under the package's Project: the lift's own cell reports it, and in
+// the package that owns the lift, an update runs the cells past the lift
+// only when it writes the lift's cell, whose product they read. A fault of
+// the jenny keeps the update from writing the cell. A package that only
+// uses the lift holds the cells past it back on the cell's verdict under a
+// bare Project instead, which heldBack gives.
 func (s *caseState) liftVerdict(l *lift, lr *liftRun, in any, view fs.FS) *liftVerdict {
 	if lr.verdict == nil {
 		lr.verdict = s.judgeLift(s.r, l, lr, in, view)
@@ -916,7 +919,8 @@ func (s *caseState) judgeLift(r *runner, l *lift, lr *liftRun, in any, view fs.F
 // bare is the runner as it judges a cell under a bare Project: one whose
 // RenderError renders every error as an empty line, and which gives no
 // Codes, so neither fails a cell. What keeps an update from writing a cell
-// under the bare Project keeps it from writing the cell under any Project.
+// under the bare Project keeps it from writing the cell, as the same
+// declaration gives it, under any Project.
 func (r *runner) bare() *runner {
 	b := *r
 	b.renderError = func(fs.FS, error) []byte { return []byte("\n") }
@@ -1011,7 +1015,7 @@ func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why
 	if marked {
 		m.add("%s marks the cell, and %s's probe says the case isn't for it: %s\nRemove the line, or fix the probe.", c.gapAt(gap), col.name, why)
 	}
-	r.ranNothing(m, c, col, archive.Outcome{State: archive.Skipped, Detail: why}, marked && len(goldens) > 0, goldens, res)
+	r.ranNothing(m, c, col, archive.Outcome{State: archive.Skipped, Detail: why}, marked && len(goldens) > 0, goldens, res, "")
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		if p == outcomeFile {
 			continue
@@ -1029,9 +1033,10 @@ func (r *runner) skipped(t *testing.T, c *aCase, header string, col *column, why
 // the case, in this run or as the archive commits it. The cell runs
 // nothing, so it isn't checked for an expected error; its outcome is its
 // one file, and its other committed files are orphans, unless the update
-// runs the cell, as it may past a bytes lift. A blocked bytes lift has no
-// product, so its owner's update removes the committed one, which other
-// cells read.
+// runs the cell, as it may past a bytes lift, or on a transform's variant
+// whose committed inputs differ from what the transform makes. A blocked
+// bytes lift has no product, so its owner's update removes the committed
+// one, which other cells read.
 func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, b *blockage, gap archive.Gap, marked bool, cf cellFiles, res *cellResult) {
 	m := &msg{}
 	why := b.why(col)
@@ -1040,31 +1045,45 @@ func (r *runner) blocked(t *testing.T, c *aCase, header string, col *column, b *
 		m.add("%s marks the cell, and the cell is blocked: %s, so the cell runs nothing.\nRemove the line, or fix the lift or %s.", c.gapAt(gap), why, c.inputsAt())
 	}
 	frozen := cf.frozen(marked)
-	r.ranNothing(m, c, col, archive.Outcome{State: archive.Blocked, Detail: b.failed}, frozen, goldens, res)
-	// Past a bytes lift, a normal run reads what the archive commits for
-	// it, which may be stale, or missing, where an update reruns the lift.
-	// When the update runs the cell, its files are no orphans. Only the
-	// package that owns a bytes lift runs it in a normal run, so a package
-	// that doesn't own every bytes lift on the cell's path can't tell.
-	// keep is the advice for files that may be no orphans, asked for only
-	// when the cell has such files, since telling may run lifts again.
+	o := archive.Outcome{State: archive.Blocked, Detail: b.failed}
+	// A normal run reads what the archive commits for a bytes lift, and
+	// for a transform's variant, which may be stale, or missing, where an
+	// update reruns the lift, or reruns the transform. When the update runs
+	// the cell, its files are no orphans, and the outcome it writes is its
+	// run's. Only the package that owns a bytes lift runs it in a normal
+	// run, so a package that doesn't own every bytes lift on the cell's
+	// path can't tell. keep is the advice for files that may be no orphans,
+	// and runs says why the update runs the cell, when it does. They are
+	// asked for only when the cell has such files, or its committed outcome
+	// differs, since telling may run lifts again.
 	files := len(goldens)
-	if _, ok := goldens[outcomeFile]; ok {
+	g, hasOutcome := goldens[outcomeFile]
+	if hasOutcome {
 		files--
 	}
 	if col.lift != nil && col.lift.bytes && !frozen {
 		files += len(cf.product)
 	}
-	var keep string
-	if !r.update && files > 0 {
+	differs := hasOutcome && !frozen && !bytes.Equal(g, o.Format())
+	var keep, runs string
+	if !r.update && (files > 0 || differs) {
 		switch last, unowned := c.state.plan.bytesOnPath(col.consumes); {
-		case last == nil:
+		case last == nil && c.state.made == nil:
 		case unowned != nil:
 			keep = fmt.Sprintf("Only the package that owns %s runs it in a normal run, so this one can't tell whether an update runs %s. Run %s, which reruns %s, and delete nothing by hand before it has.", unowned.name, col.name, r.updateCmd(), unowned.name)
-		case c.state.updateRuns(col.consumes):
-			keep = fmt.Sprintf("%s runs %s: it reruns %s, whose outcome and product a normal run reads from the archive. Delete nothing by hand.", r.updateCmd(), col.name, last.name)
+		case c.state.updateRuns(col):
+			var reruns []string
+			if c.state.made != nil {
+				reruns = append(reruns, fmt.Sprintf("it runs the variant on what %s makes now, where a normal run reads the inputs the archive holds", c.tr.name))
+			}
+			if last != nil {
+				reruns = append(reruns, fmt.Sprintf("it reruns %s, whose outcome and product a normal run reads from the archive", last.name))
+			}
+			runs = strings.Join(reruns, ", and ")
+			keep = fmt.Sprintf("%s runs %s: %s. Delete nothing by hand.", r.updateCmd(), col.name, runs)
 		}
 	}
+	r.ranNothing(m, c, col, o, frozen, goldens, res, runs)
 	for _, p := range slices.Sorted(maps.Keys(goldens)) {
 		switch {
 		case p == outcomeFile:
@@ -1119,8 +1138,10 @@ func (b *blockage) why(col *column) string {
 // frozen cell, one a gaps line marks that has committed files, keeps them
 // as they are: its line fails it already, and since the run made none of
 // its files but the outcome, the upgrade that adds a missing outcome to a
-// frozen cell whose files match the run's doesn't apply.
-func (r *runner) ranNothing(m *msg, c *aCase, col *column, o archive.Outcome, frozen bool, goldens map[string][]byte, res *cellResult) {
+// frozen cell whose files match the run's doesn't apply. runs, when it
+// isn't "", says why the update runs the cell, so writes its run's outcome
+// in place of this one.
+func (r *runner) ranNothing(m *msg, c *aCase, col *column, o archive.Outcome, frozen bool, goldens map[string][]byte, res *cellResult, runs string) {
 	data := o.Format()
 	res.ran, res.writable, res.files = true, true, map[string][]byte{outcomeFile: data}
 	if frozen {
@@ -1133,6 +1154,8 @@ func (r *runner) ranNothing(m *msg, c *aCase, col *column, o archive.Outcome, fr
 	switch g, ok := goldens[outcomeFile]; {
 	case !ok:
 		m.add("%s has no golden.\nRun %s to write it, and read it before committing.", c.out(col.name, outcomeFile), r.updateCmd())
+	case !bytes.Equal(g, data) && runs != "":
+		m.add("%s differs (-golden +got):\n%s\n%s runs %s, and writes the outcome of its run, not this one: %s.", c.out(col.name, outcomeFile), strings.TrimSuffix(diff.Lines(g, data), "\n"), r.updateCmd(), col.name, runs)
 	case !bytes.Equal(g, data):
 		m.add("%s differs (-golden +got):\n%s\nIf the change is intended, run %s and read the diff before committing.", c.out(col.name, outcomeFile), strings.TrimSuffix(diff.Lines(g, data), "\n"), r.updateCmd())
 	}

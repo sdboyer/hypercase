@@ -430,6 +430,33 @@ func TestBlockedTransformVariant(t *testing.T) {
 	s.done()
 }
 
+// TestBlockedStaleTransformVariant: a normal run reads a transform's
+// variant's committed inputs, and an update what the transform makes. When
+// they differ, a cell the committed inputs block may be one the update
+// runs: the normal run stages the variant as the update does, and when the
+// update runs the cell, says so, of its outcome and its files (#44). Here
+// upper's committed inputs hold a resolve/error that upper doesn't make.
+func TestBlockedStaleTransformVariant(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.remove("testdata/script/errs.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.remove("testdata/script/garbled.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.edit(twice, "evaluate writes a file", set("in/evaluate/out/values.txt", "a1 six\n"))
+	s.passes(s.update("tr-ladder-eval"))
+	clean := s.read(twice)
+	s.edit(twice, "upper's committed inputs hold a resolve/error upper doesn't make", insert("transform/upper/in/resolve/error", "A1 -> A1: cycle\n", "transform/upper/out/"))
+	why := "it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds"
+	r := s.normal("tr-ladder-eval")
+	s.fails(r,
+		"upper's variant of the base differs from its committed inputs:\ntransform/upper/in/resolve/error is no longer made",
+		"transform/upper/out/evaluate/outcome differs (-golden +got):\n- accepted\n+ blocked resolve\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate, and writes the outcome of its run, not this one: "+why+".",
+		"transform/upper/out/evaluate/values.txt is recorded, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+why+". Delete nothing by hand.")
+	s.lacks(r, "delete the section by hand")
+	s.passes(s.update("tr-ladder-eval"))
+	s.same(twice, clean)
+	s.done()
+}
+
 // TestChecks: a corpus check reads every cell over the corpus root, from
 // the committed files, whichever package owns the column, and its
 // findings are a golden: sorted, each once, written by an update and

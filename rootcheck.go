@@ -71,6 +71,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	typeOrder := map[string][]string{}              // directory → type entries, in the order of the packages
 	propEntries := map[string]map[string][]string{} // property → description → packages
 	propOrder := map[string][]string{}              // property → descriptions, in the order of the packages
+	liftEntries := map[string][]liftEntry{}         // lift → the entries of the registries that own or use it, in the order of the packages
 	transforms := map[string]map[string]bool{}      // directory → the transforms its corpus types list
 	needOwner := map[string]map[string]bool{}       // directory → the transforms its corpus types list in packages with tests
 	trPkgs := map[trKey][]string{}                  // transform → the packages that own it
@@ -122,6 +123,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 		}
 		for _, l := range g.reg.Lifts {
+			liftEntries[l.Name] = append(liftEntries[l.Name], liftEntry{g.pkg, l})
 			if !l.Owned {
 				if g.tested {
 					usedPkgs[l.Name] = append(usedPkgs[l.Name], g.pkg)
@@ -259,6 +261,27 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		}
 		t.Errorf("the property %s has two different entries:\n%s\nDeclare the property once, in a package the others import, and register that declaration.", name, strings.Join(lines, "\n"))
 	}
+	for _, name := range slices.Sorted(maps.Keys(liftEntries)) {
+		for _, f := range liftFields {
+			pkgs := map[string][]string{} // value → packages
+			var order []string
+			for _, e := range liftEntries[name] {
+				v := f.value(e.lift)
+				if pkgs[v] == nil {
+					order = append(order, v)
+				}
+				pkgs[v] = append(pkgs[v], e.pkg)
+			}
+			if len(order) < 2 {
+				continue
+			}
+			var lines []string
+			for _, v := range order {
+				lines = append(lines, fmt.Sprintf("  %s: %s", andList(pkgs[v]), v))
+			}
+			t.Errorf("the registries that own or use the lift %s record different %s:\n%s\nEvery package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration.", name, f.name, strings.Join(lines, "\n"))
+		}
+	}
 
 	// The archives, and the directories that hold them.
 	td := filepath.Join(r.corpusRoot, "testdata")
@@ -383,6 +406,48 @@ func lowerFirst(s string) string { return strings.ToLower(s[:1]) + s[1:] }
 
 // trKey names a transform by its corpus directory and its name.
 type trKey struct{ dir, name string }
+
+// A liftEntry is one registry's entry of a lift, and the registry's
+// package.
+type liftEntry struct {
+	pkg  string
+	lift registry.Lift
+}
+
+// liftFields are the fields of a lift's registry entry that every registry
+// that owns or uses the lift records alike, each by its name in the
+// registry and as the root-package check shows it. Whether a package owns
+// the lift differs between them, and so may the corpora that reach it.
+var liftFields = []struct {
+	name  string
+	value func(registry.Lift) string
+}{
+	{"description", func(l registry.Lift) string { return fmt.Sprintf("%q", l.Description) }},
+	{"input", func(l registry.Lift) string { return l.Input }},
+	{"product", func(l registry.Lift) string { return l.Product }},
+	{"bytes", func(l registry.Lift) string { return fmt.Sprint(l.Bytes) }},
+	{"outputs", func(l registry.Lift) string { return outputsEntry(l.Outputs) }},
+	{"productFiles", func(l registry.Lift) string { return outputsEntry(l.ProductFiles) }},
+	{"rejects", func(l registry.Lift) string {
+		if len(l.Rejects) == 0 {
+			return "none"
+		}
+		return strings.Join(l.Rejects, ", ")
+	}},
+}
+
+// outputsEntry shows a registry's output declarations: each pattern, with
+// its description.
+func outputsEntry(outs []registry.Output) string {
+	if len(outs) == 0 {
+		return "none"
+	}
+	var es []string
+	for _, o := range outs {
+		es = append(es, fmt.Sprintf("%s %q", o.Pattern, o.Description))
+	}
+	return strings.Join(es, ", ")
+}
 
 // untestedOwners words what the root-package check knows of a lift or
 // transform that no package owns, and that the registries of pkgs, which
