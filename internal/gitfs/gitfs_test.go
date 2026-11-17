@@ -309,6 +309,24 @@ exec "$GIT" "$@"
 			t.Errorf("ReadFile(dir/b.txt): got %v, want %q", err, "readfile dir/b.txt: "+first)
 		}
 	})
+	// A bad header and a failure on stderr: the error holds both, for
+	// every read after it.
+	t.Run("header and stderr", func(t *testing.T) {
+		wrapGit(t, `if [ "$1" = cat-file ]; then read -r line; echo "nonsense"; echo "fatal: the wrapper's reason" >&2; exit 3; fi
+exec "$GIT" "$@"
+`)
+		r := open(t, g.Dir)
+		tree, err := r.Tree(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := `git cat-file gave "nonsense" for the blob ` + strings.TrimSpace(g.Git("rev-parse", c+":a.txt")) + `: fatal: the wrapper's reason`
+		for _, name := range []string{"a.txt", "dir/b.txt"} {
+			if _, err := fs.ReadFile(tree, name); err == nil || err.Error() != "readfile "+name+": "+want {
+				t.Errorf("ReadFile(%s): got %v, want %q", name, err, "readfile "+name+": "+want)
+			}
+		}
+	})
 	// A bad header, then more than a pipe holds, which no read takes:
 	// stopping cat-file closes the pipe it writes to, so it exits, and
 	// neither the read nor Close waits on it. The deadlines fail only a

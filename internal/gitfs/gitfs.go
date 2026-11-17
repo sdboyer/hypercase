@@ -232,11 +232,15 @@ func (r *Repo) blob(hash string) ([]byte, error) {
 	}
 	if size < 0 {
 		// The header doesn't say how much content follows it, so no later
-		// read can find its own header: each gives this error. Stopping
-		// cat-file before it has written what follows may fail it, so its
-		// exit says nothing the header doesn't.
-		r.catErr = fmt.Errorf("git cat-file gave %q for the blob %s", strings.TrimSpace(head), hash)
+		// read can find its own header: each gives this error, with what
+		// cat-file wrote on stderr, if anything. Stopping cat-file before it
+		// has written what follows may fail it with a broken pipe, so its
+		// exit status is left out.
 		r.stopCat()
+		r.catErr = fmt.Errorf("git cat-file gave %q for the blob %s", strings.TrimSpace(head), hash)
+		if msg := strings.TrimSpace(r.catStderr.String()); msg != "" {
+			r.catErr = fmt.Errorf("%w: %s", r.catErr, msg)
+		}
 		return nil, r.catErr
 	}
 	if fields[1] != "blob" {
