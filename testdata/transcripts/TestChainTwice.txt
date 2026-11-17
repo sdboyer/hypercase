@@ -53,7 +53,7 @@ $ go test  # chain-twice
         out/import/outcome differs (-golden +got):
         - accepted
         + blocked export
-        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import, and writes the outcome of its run, not this one: it reruns export, whose outcome and product a normal run reads from the archive.
         via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has no committed outcome, out/export/outcome, which a normal run reads.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand.
     what ran, in order:

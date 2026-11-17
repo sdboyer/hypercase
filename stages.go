@@ -233,11 +233,18 @@ type caseState struct {
 	// running the lift, as an update does, or by reading what the archive
 	// commits for it, as a normal run does.
 	update bool
+	// made is, in a normal run of a transform's variant whose committed
+	// inputs differ from what the transform makes, what it makes: the
+	// input view the update stages the case on. It is nil when the update
+	// stages the case on view.
+	made fs.FS
 	// asUpdate is, in a normal run, the case staged as the package's
 	// update stages it, made when a cell first asks whether the update
 	// runs it. Its normal is the normal run's state, whose runs it shares
 	// for each lift no bytes lift precedes: such a lift's input is the same
-	// in both. A lift past a bytes lift runs once in each.
+	// in both. A lift past a bytes lift runs once in each. When the update
+	// stages the case on made, no lift's input need be the same in both,
+	// so it has no normal, and shares no run.
 	asUpdate *caseState
 	normal   *caseState
 }
@@ -303,9 +310,9 @@ func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
 		return nil, nil, b
 	}
 	lr := s.runLift(l, in)
-	// Past a bytes lift, which runs here only in an update, a cell is
-	// written only with the lift's cell: a normal run reads what that
-	// writes.
+	// Past a bytes lift, which runs here only in an update, or in a normal
+	// run's staging of the case as its update stages it, a cell is written
+	// only with the lift's cell: a normal run reads what that writes.
 	if l.bytes && s.heldBack(l, lr, in, view) {
 		return nil, nil, &blockage{lift: l, failed: l.name, broken: true}
 	}
@@ -325,7 +332,9 @@ func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
 // l's cell, and the owner's may differ, so it holds them back on the
 // cell's verdict under a bare Project, which fails no cell: on what keeps
 // the update from writing the cell whatever the owner's Project, such as a
-// fault of the jenny or a product an archive can't hold.
+// fault of the jenny or a product an archive can't hold, when it registers
+// the owner's declaration of l. The root-package check fails on two
+// declarations whose registry entries differ.
 func (s *caseState) heldBack(l *lift, lr *liftRun, in any, view fs.FS) bool {
 	if l.owned {
 		return !s.liftVerdict(l, lr, in, view).writable
@@ -336,13 +345,17 @@ func (s *caseState) heldBack(l *lift, lr *liftRun, in any, view fs.FS) bool {
 	return !lr.bare.writable
 }
 
-// updateRuns reports, in a normal run, whether the package's update runs a
-// cell that consumes typ: whether the case, staged as the update stages it,
-// running each bytes lift where a normal run reads what the archive
-// commits for it, reaches typ with nothing to block it. A normal run runs
-// only the lifts the package owns, so only a package that owns every bytes
-// lift on the way asks.
-func (s *caseState) updateRuns(typ reflect.Type) bool {
+// updateRuns reports, in a normal run, whether the package's update runs
+// col's cell: whether the case, staged as the update stages it, reaches
+// the type col consumes with nothing to block it, and col's probe, if it
+// has one, says the case is for it. The update stages a transform's
+// variant on what the transform makes, where a normal run reads the
+// committed inputs, and runs each bytes lift, where a normal run reads
+// what the archive commits for it. A normal run runs only the bytes lifts
+// the package owns, so only a package that owns every bytes lift on the
+// way asks. A probe that panics leaves the update to run the cell, which
+// reports the panic.
+func (s *caseState) updateRuns(col *column) bool {
 	if s.asUpdate == nil {
 		s.asUpdate = &caseState{
 			r:      s.r,
@@ -355,9 +368,20 @@ func (s *caseState) updateRuns(typ reflect.Type) bool {
 			update: true,
 			normal: s,
 		}
+		if s.made != nil {
+			s.asUpdate.root, s.asUpdate.view, s.asUpdate.normal = s.plan.root.new(s.made), s.made, nil
+		}
 	}
-	_, _, b := s.asUpdate.stage(typ)
-	return b == nil
+	in, _, b := s.asUpdate.stage(col.consumes)
+	if b != nil {
+		return false
+	}
+	if col.probe == nil {
+		return true
+	}
+	var ok bool
+	p := call(func(*called) { _, ok = col.probe(in) })
+	return p.panicked || ok
 }
 
 // bytesOnPath returns the last bytes lift on the plan's path to typ, and
