@@ -10,22 +10,28 @@ import (
 	"testing"
 
 	"github.com/sdboyer/hypercase/internal/registry"
+	"github.com/sdboyer/hypercase/internal/registrytest"
 )
 
 // TestLiftFields: the root-package check compares each key of a lift's
 // registry entry across the registries that hold it, but for those that
 // may differ between them: liftFields has an entry for each other key, by
 // its name, and an entry's value moves when any key under its key does,
-// and with no other key. The keys are what encoding/json writes.
+// and with no other key. The keys are those encoding/json writes for an
+// entry with every field set, and each holds a leaf, which moves it.
 func TestLiftFields(t *testing.T) {
 	// The entries are grouped by name. A package owns the lift or only
 	// uses it, and the corpora that reach it are each package's own.
 	exempt := []string{"name", "owned", "corpora"}
-	var keys []string
-	for _, l := range leaves(t, reflect.TypeFor[registry.Lift]()) {
-		if !slices.Contains(keys, l.top) {
-			keys = append(keys, l.top)
-		}
+	typ := reflect.TypeFor[registry.Lift]()
+	full, ok := registrytest.Full(t, typ).(map[string]any)
+	if !ok {
+		t.Fatalf("encoding/json writes a lift's registry entry as no object")
+	}
+	keys := slices.Sorted(maps.Keys(full))
+	ls := leaves(t, typ)
+	unleaved(t, typ, ls)
+	for _, l := range ls {
 		base, set := l.base.Interface().(registry.Lift), l.set.Interface().(registry.Lift)
 		for _, e := range liftFields {
 			if moved := e.value(set) != e.value(base); moved != (e.name == l.top) {
@@ -60,13 +66,17 @@ func TestLiftFields(t *testing.T) {
 // TestTypeEntry: the root-package check compares a corpus type's
 // registry entry across the registries that hold it as typeEntry shows
 // it, which moves with each key under the entry but those that may differ
-// between them.
+// between them. Each key encoding/json writes for an entry with every
+// field set holds a leaf, which moves it.
 func TestTypeEntry(t *testing.T) {
 	// The entries are grouped by directory, and a package owns each
 	// transform or doesn't.
 	exempt := []string{"dir", "transforms[].owned"}
 	var paths []string
-	for _, l := range leaves(t, reflect.TypeFor[registry.Type]()) {
+	typ := reflect.TypeFor[registry.Type]()
+	ls := leaves(t, typ)
+	unleaved(t, typ, ls)
+	for _, l := range ls {
 		paths = append(paths, l.path)
 		base, set := l.base.Interface().(registry.Type), l.set.Interface().(registry.Type)
 		if moved, want := typeEntry(set) != typeEntry(base), !slices.Contains(exempt, l.path); moved != want {
@@ -129,6 +139,22 @@ func TestLeaves(t *testing.T) {
 	leaves(ft, reflect.TypeFor[hidden]())
 	if want := "the field Hidden, of hypercase.hidden, moves no key of what encoding/json writes, so it is no key of the registry's: give it one, or remove it"; !slices.Contains(ft.errs, want) {
 		t.Errorf("leaves of a field encoding/json doesn't write: got %q, want %q", ft.errs, want)
+	}
+}
+
+// unleaved fails on each key of what encoding/json writes for typ, with
+// every field set, that holds no leaf: a key with no scalar under it, as a
+// map of empty structs, which no leaf moves, so no comparison of leaves
+// checks it.
+func unleaved(t *testing.T, typ reflect.Type, ls []leaf) {
+	t.Helper()
+	for _, k := range registrytest.KeyPaths(t, typ) {
+		held := slices.ContainsFunc(ls, func(l leaf) bool {
+			return l.path == k || strings.HasPrefix(l.path, k+".") || strings.HasPrefix(l.path, k+"[]")
+		})
+		if !held {
+			t.Errorf("the key %s, of what encoding/json writes for %s, holds no leaf, so no test of its leaves can tell whether the root-package check compares it.\nGive it a scalar to hold, as a string, a bool or a number, under it.", k, typ)
+		}
 	}
 }
 
