@@ -63,7 +63,7 @@ func runStrip(dir string, args []string, stdout, stderr io.Writer) int {
 	}
 	var rootFlag, column, transform once
 	var frozen onceBool
-	set.Var(&rootFlag, "root", "the corpus root `dir`, relative to the current directory")
+	set.Var(&rootFlag, "root", "the corpus root `dir`, relative to the current directory or by an absolute path")
 	set.Var(&column, "column", "strip only the sections of the column `name`, at every level")
 	set.Var(&transform, "transform", "strip only the sections under the variant of the transform `name`")
 	set.Var(&frozen, "frozen", "strip frozen cells' sections too")
@@ -122,11 +122,11 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 		return fail("%v", err)
 	}
 	if fi, err := os.Stat(filepath.Join(corpusRoot, "testdata")); err != nil || !fi.IsDir() {
-		return fail("%s holds no testdata/ directory, so it is no corpus root.\nName the corpus root with -root, relative to the current directory.", corpusRoot)
+		return fail("%s holds no testdata/ directory, so it is no corpus root.\nName the corpus root with -root, relative to the current directory or by an absolute path.", corpusRoot)
 	}
 	mod, err := root.Module(corpusRoot)
 	if err != nil {
-		return fail("finding the module root of %s failed: %v.\nName a corpus root inside a Go module with -root, relative to the current directory.", corpusRoot, err)
+		return fail("finding the module root of %s failed: %v.\nName a corpus root inside a Go module with -root, relative to the current directory or by an absolute path.", corpusRoot, err)
 	}
 	rootRel := root.Rel(mod, corpusRoot)
 	rootName := "the corpus root " + rootRel
@@ -355,13 +355,13 @@ func findCorpusRoot(dir, given string) (string, error) {
 			p = filepath.Join(dir, p)
 		}
 		if fi, err := os.Stat(p); err != nil || !fi.IsDir() {
-			return "", fmt.Errorf("-root %s names no directory.\nName the corpus root relative to the current directory.", given)
+			return "", fmt.Errorf("-root %s names no directory.\nName the corpus root relative to the current directory or by an absolute path.", given)
 		}
 		return p, nil
 	}
 	mod, err := root.Module(dir)
 	if err != nil {
-		return "", fmt.Errorf("finding the module root failed: %v.\nRun strip inside a Go module, or name the corpus root with -root, relative to the current directory.", err)
+		return "", fmt.Errorf("finding the module root failed: %v.\nRun strip inside a Go module, or name the corpus root with -root, relative to the current directory or by an absolute path.", err)
 	}
 	p := filepath.Join(dir, "testdata", registry.Name)
 	data, err := os.ReadFile(p)
@@ -369,20 +369,20 @@ func findCorpusRoot(dir, given string) (string, error) {
 	case errors.Is(err, fs.ErrNotExist) && dir == mod:
 		return mod, nil
 	case errors.Is(err, fs.ErrNotExist):
-		return "", fmt.Errorf("the current directory holds no registry, testdata/%s, to say which corpus root its package's tests read, and it isn't the module root, %s, where strip finds the module-root corpus.\nName the corpus root with -root, relative to the current directory, or run strip at the module root.", registry.Name, root.Rel(dir, mod))
+		return "", fmt.Errorf("the current directory holds no registry, testdata/%s, to say which corpus root its package's tests read, and it isn't the module root, %s, where strip finds the module-root corpus.\nName the corpus root with -root, relative to the current directory or by an absolute path, or run strip at the module root.", registry.Name, root.Rel(dir, mod))
 	case err != nil:
-		return "", fmt.Errorf("reading %s failed: %v, so strip can't tell which corpus root it records.\nFix what failed, or name the corpus root with -root, relative to the current directory.", root.Rel(dir, p), err)
+		return "", fmt.Errorf("reading %s failed: %v, so strip can't tell which corpus root it records.\nFix what failed, or name the corpus root with -root, relative to the current directory or by an absolute path.", root.Rel(dir, p), err)
 	}
 	h, err := registry.Peek(data)
 	if err != nil {
-		return "", fmt.Errorf("%s can't be read as a registry: %v, so strip can't tell which corpus root it records.\nName the corpus root with -root, relative to the current directory.", root.Rel(dir, p), err)
+		return "", fmt.Errorf("%s can't be read as a registry: %v, so strip can't tell which corpus root it records.\nName the corpus root with -root, relative to the current directory or by an absolute path.", root.Rel(dir, p), err)
 	}
 	if !fs.ValidPath(h.CorpusRoot) {
-		return "", fmt.Errorf("%s records the corpus root %q, which isn't a slash path relative to the module root.\nName the corpus root with -root, relative to the current directory.", root.Rel(dir, p), h.CorpusRoot)
+		return "", fmt.Errorf("%s records the corpus root %q, which isn't a slash path relative to the module root.\nName the corpus root with -root, relative to the current directory or by an absolute path.", root.Rel(dir, p), h.CorpusRoot)
 	}
 	corpusRoot := filepath.Join(mod, filepath.FromSlash(h.CorpusRoot))
 	if m, err := root.Module(corpusRoot); err == nil && m != mod {
-		return "", fmt.Errorf("%s records the corpus root %s, which lies inside the module at %s, and not in the module at %s, the package's.\nMove the corpus root out of the module at %s, or name it with -root, relative to the current directory, to strip it as a corpus root of that module.", root.Rel(dir, p), h.CorpusRoot, root.Rel(dir, m), root.Rel(dir, mod), root.Rel(dir, m))
+		return "", fmt.Errorf("%s records the corpus root %s, which lies inside the module at %s, and not in the module at %s, the package's.\nMove the corpus root out of the module at %s, or name it with -root, relative to the current directory or by an absolute path, to strip it as a corpus root of that module.", root.Rel(dir, p), h.CorpusRoot, root.Rel(dir, m), root.Rel(dir, mod), root.Rel(dir, m))
 	}
 	return corpusRoot, nil
 }

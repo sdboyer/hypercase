@@ -531,7 +531,7 @@ func TestStripUsage(t *testing.T) {
 	} {
 		stripFails(t, top, "", 2, tt.args, tt.want, usage)
 	}
-	if r := stripIn(t, top, "", "-h"); r.code != 0 || r.stdout != "" || !strings.Contains(r.stderr, usage) {
+	if r := stripIn(t, top, "", "-h"); r.code != 0 || r.stdout != "" || !strings.Contains(r.stderr, usage) || !strings.Contains(r.stderr, "the corpus root dir, relative to the current directory or by an absolute path") {
 		t.Errorf("strip -h: exit %d, stdout %q, stderr %q", r.code, r.stdout, r.stderr)
 	}
 	sameTree(t, top, files)
@@ -883,9 +883,9 @@ func TestStripRoot(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"", []string{"-root", "nope"}, "hypercase strip: -root nope names no directory.\nName the corpus root relative to the current directory.\n"},
-		{"", []string{"-root", "a"}, "hypercase strip: " + filepath.Join(top, "a") + " holds no testdata/ directory, so it is no corpus root.\nName the corpus root with -root, relative to the current directory.\n"},
-		{"a/b", nil, "hypercase strip: the current directory holds no registry, testdata/hypercase.json, to say which corpus root its package's tests read, and it isn't the module root, ../.., where strip finds the module-root corpus.\nName the corpus root with -root, relative to the current directory, or run strip at the module root.\n"},
+		{"", []string{"-root", "nope"}, "hypercase strip: -root nope names no directory.\nName the corpus root relative to the current directory or by an absolute path.\n"},
+		{"", []string{"-root", "a"}, "hypercase strip: " + filepath.Join(top, "a") + " holds no testdata/ directory, so it is no corpus root.\nName the corpus root with -root, relative to the current directory or by an absolute path.\n"},
+		{"a/b", nil, "hypercase strip: the current directory holds no registry, testdata/hypercase.json, to say which corpus root its package's tests read, and it isn't the module root, ../.., where strip finds the module-root corpus.\nName the corpus root with -root, relative to the current directory or by an absolute path, or run strip at the module root.\n"},
 		{"step09/testdata", nil, "hypercase strip: the current directory holds no registry, testdata/hypercase.json, to say which corpus root its package's tests read, and it isn't the module root, ../.., where strip finds the module-root corpus.\n"},
 	} {
 		r := stripIn(t, top, tt.dir, tt.args...)
@@ -901,8 +901,8 @@ func TestStripRoot(t *testing.T) {
 	// The registry of the package strip runs in, when it can't say which
 	// root it records.
 	for _, tt := range []struct{ registry, want string }{
-		{"{\n", "hypercase strip: testdata/hypercase.json can't be read as a registry: it is not a registry: unexpected end of JSON input, so strip can't tell which corpus root it records.\nName the corpus root with -root, relative to the current directory.\n"},
-		{stripRegistry("../x", sheetsVar), "hypercase strip: testdata/hypercase.json records the corpus root \"../x\", which isn't a slash path relative to the module root.\nName the corpus root with -root, relative to the current directory.\n"},
+		{"{\n", "hypercase strip: testdata/hypercase.json can't be read as a registry: it is not a registry: unexpected end of JSON input, so strip can't tell which corpus root it records.\nName the corpus root with -root, relative to the current directory or by an absolute path.\n"},
+		{stripRegistry("../x", sheetsVar), "hypercase strip: testdata/hypercase.json records the corpus root \"../x\", which isn't a slash path relative to the module root.\nName the corpus root with -root, relative to the current directory or by an absolute path.\n"},
 	} {
 		files := with(stripModule(), map[string]string{"step09/testdata/hypercase.json": tt.registry})
 		top := writeTree(t, files)
@@ -912,7 +912,7 @@ func TestStripRoot(t *testing.T) {
 	// One that can't be read at all: a directory in its place.
 	files = with(stripModule(), map[string]string{"step09/testdata/hypercase.json": "", "step09/testdata/hypercase.json/x": "x\n"})
 	top = writeTree(t, files)
-	stripFails(t, top, "step09", 1, nil, "hypercase strip: reading testdata/hypercase.json failed: ", ", so strip can't tell which corpus root it records.\nFix what failed, or name the corpus root with -root, relative to the current directory.\n")
+	stripFails(t, top, "step09", 1, nil, "hypercase strip: reading testdata/hypercase.json failed: ", ", so strip can't tell which corpus root it records.\nFix what failed, or name the corpus root with -root, relative to the current directory or by an absolute path.\n")
 	sameTree(t, top, files)
 
 	// One whose corpus root lies inside a module nested in the package's:
@@ -923,7 +923,7 @@ func TestStripRoot(t *testing.T) {
 		"sub/corp/testdata/sheet/twice.txtar": twiceFull,
 	})
 	top = writeTree(t, files)
-	stripFails(t, top, "step09", 1, nil, "hypercase strip: testdata/hypercase.json records the corpus root sub/corp, which lies inside the module at ../sub, and not in the module at .., the package's.\nMove the corpus root out of the module at ../sub, or name it with -root, relative to the current directory, to strip it as a corpus root of that module.\n")
+	stripFails(t, top, "step09", 1, nil, "hypercase strip: testdata/hypercase.json records the corpus root sub/corp, which lies inside the module at ../sub, and not in the module at .., the package's.\nMove the corpus root out of the module at ../sub, or name it with -root, relative to the current directory or by an absolute path, to strip it as a corpus root of that module.\n")
 	sameTree(t, top, files)
 
 	// A directory in no module, run from or named with -root.
@@ -931,8 +931,8 @@ func TestStripRoot(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(out, "testdata", "sheet"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	stripFails(t, out, "", 1, nil, "hypercase strip: finding the module root failed: no go.mod in ", ".\nRun strip inside a Go module, or name the corpus root with -root, relative to the current directory.\n")
-	stripFails(t, top, "", 1, []string{"-root", out}, "hypercase strip: finding the module root of "+out+" failed: no go.mod in ", ".\nName a corpus root inside a Go module with -root, relative to the current directory.\n")
+	stripFails(t, out, "", 1, nil, "hypercase strip: finding the module root failed: no go.mod in ", ".\nRun strip inside a Go module, or name the corpus root with -root, relative to the current directory or by an absolute path.\n")
+	stripFails(t, top, "", 1, []string{"-root", out}, "hypercase strip: finding the module root of "+out+" failed: no go.mod in ", ".\nName a corpus root inside a Go module with -root, relative to the current directory or by an absolute path.\n")
 }
 
 // TestStripRerun: a frozen cell's line gives the command to strip the
