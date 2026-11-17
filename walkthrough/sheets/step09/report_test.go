@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -45,7 +46,7 @@ func TestReport(t *testing.T) {
 	hypercase := buildHypercase(t)
 	repo := t.TempDir()
 	modfile := scratch(t, repo)
-	stale.apply(t, repo)
+	stale(t, repo)
 	runUpdate(t, repo, modfile)
 	commit(t, repo, "main")
 
@@ -86,12 +87,26 @@ var change = []edit{
 
 // stale makes a cell of the copy differ from what the code writes for it, as
 // a copy taken in the module's update can find a cell the update has yet to
-// rewrite. The update before main's commit rewrites it, so the report shows
-// no change in it.
-var stale = edit{
-	path: "step09/testdata/sheet/prices.txtar",
-	old:  "-- out/calc/stdout.txt --\n4,6,10\n",
-	new:  "-- out/calc/stdout.txt --\n4,6,11\n",
+// rewrite: it puts a line before whatever prices' calc stdout.txt holds. The
+// update before main's commit rewrites it, so the report shows no change in
+// it.
+func stale(t *testing.T, repo string) {
+	t.Helper()
+	const section = "out/calc/stdout.txt"
+	p := filepath.Join(repo, "step09", "testdata", "sheet", "prices.txtar")
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := archive.Parse(data)
+	i := slices.IndexFunc(a.Sections, func(s archive.Section) bool { return s.Name == section })
+	if i < 0 {
+		t.Fatalf("%s has no section %s to make stale", p, section)
+	}
+	a.Sections[i].Data = append([]byte("stale\n"), a.Sections[i].Data...)
+	if err := archive.Write(p, a); err != nil {
+		t.Fatal(err)
+	}
 }
 
 const calcRun = `	Run: func(t testing.TB, archive string, in sheetcorpus.Sheet, stdout, stderr io.Writer) ([]hypercase.File, error) {
