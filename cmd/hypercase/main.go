@@ -33,7 +33,11 @@
 // hand-written section's bytes as they were. A person runs it, never an
 // update; the update that follows writes the sections again from the
 // inputs and the code. The archives are the *.txtar files directly in the
-// directories directly under the corpus root's testdata/. With no flags it
+// directories directly under the corpus root's testdata/. strip follows no
+// symbolic link to a directory, and a run reads archives through one, so
+// it refuses one in place of testdata/ or of a directory directly in it.
+// It reads an archive through a link in its place, and writes the archive
+// in the link's place, as the update does. With no flags it
 // strips every archive, and removes the registries that record the corpus
 // root and the findings files in their packages' testdata/checks/. It
 // keeps a package's registry while a findings file of the package is
@@ -61,12 +65,13 @@
 // or the module root, or the corpus root holds no testdata/; when a
 // registry under the module can't be read, or the registries that record
 // the corpus root record different update variables; when reading the
-// corpus root's testdata/ fails; and when no archive that strip strips
-// holds a section -column or -transform selects, counting a frozen cell's
-// sections, which it leaves. It exits 1 too when it left an archive or a
-// file in place for a problem, a failed write or removal included. It
-// exits 2 for a usage error: a flag given twice, an unknown flag, an
-// argument, an empty -root, or an empty or ill-formed -column or
+// corpus root's testdata/ fails, or a symbolic link stands in place of
+// testdata/ or of a directory directly in it; and when no archive that
+// strip strips holds a section -column or -transform selects, counting a
+// frozen cell's sections, which it leaves. It exits 1 too when it left an
+// archive or a file in place for a problem, a failed write or removal
+// included. It exits 2 for a usage error: a flag given twice, an unknown
+// flag, an argument, an empty -root, or an empty or ill-formed -column or
 // -transform.
 //
 // strip's -root names the corpus root, relative to the current directory,

@@ -1,0 +1,42 @@
+# testdata/script moves to shared/, and a symbolic link to it takes its place
+$ go test  # pkg-a
+    testdata/script is a symbolic link, and a corpus root's testdata/, and a corpus's directory in it, are read as directories: a normal run and the update read archives through a link, and this check and hypercase strip follow none, so they would read none of the archives there.
+        Replace the link with the directory it names.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ hypercase strip
+hypercase strip: testdata/script is a symbolic link, and a corpus root's testdata/, and a corpus's directory in it, are read as directories: a normal run and the update read archives through a link, and strip follows none, so it would strip none of the archives there. Nothing was removed.
+Replace each link with the directory it names, then run hypercase strip again.
+[exit 1]
+# testdata/script moves back, in place of the link
+$ go test  # pkg-a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS
+# testdata moves to shared/, and a symbolic link to it takes its place
+$ go test  # pkg-a
+    testdata is a symbolic link, and a corpus root's testdata/, and a corpus's directory in it, are read as directories: a normal run and the update read archives through a link, and this check and hypercase strip follow none, so they would read none of the archives there.
+        Replace the link with the directory it names.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ hypercase strip
+hypercase strip: testdata is a symbolic link, and a corpus root's testdata/, and a corpus's directory in it, are read as directories: a normal run and the update read archives through a link, and strip follows none, so it would strip none of the archives there. Nothing was removed.
+Replace each link with the directory it names, then run hypercase strip again.
+[exit 1]
+# testdata moves back, in place of the link
+$ go test  # pkg-a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+PASS

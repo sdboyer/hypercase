@@ -195,16 +195,28 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 
 	// The archives: every *.txtar under the root's testdata/, as the
 	// root-package check walks it, past nested modules and other corpus
-	// roots.
+	// roots. A link in place of testdata/ or of a corpus's directory
+	// fails strip, since it follows none, where a run reads through it.
 	td := filepath.Join(corpusRoot, "testdata")
 	var paths []string
-	err = walk.Testdata(td, others, func(p string, d fs.DirEntry) {
+	links, err := walk.Testdata(td, others, func(p string, d fs.DirEntry) {
 		if strings.HasSuffix(d.Name(), ".txtar") {
 			paths = append(paths, p)
 		}
 	})
 	if err != nil {
 		return fail("reading %s failed: %v. Nothing was removed.\nFix what failed, then run %s again.", rel(td), err, again)
+	}
+	if len(links) > 0 {
+		var each []string
+		for _, l := range links {
+			each = append(each, rel(l))
+		}
+		are := each[0] + " is a symbolic link"
+		if len(each) > 1 {
+			are = strings.Join(each[:len(each)-1], ", ") + " and " + each[len(each)-1] + " are symbolic links"
+		}
+		return fail("%s, and a corpus root's testdata/, and a corpus's directory in it, are read as directories: a normal run and the update read archives through a link, and strip follows none, so it would strip none of the archives there. Nothing was removed.\nReplace each link with the directory it names, then run %s again.", are, again)
 	}
 	if sel.Column != "" || sel.Transform != "" {
 		if ok, left := matches(corpusRoot, paths, sel); !ok && len(left) == 0 {

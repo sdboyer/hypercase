@@ -541,3 +541,62 @@ func TestStripFaultingLift(t *testing.T) {
 		"the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.")
 	s.done()
 }
+
+// TestStripLinkedArchive: a symbolic link in place of an archive names no
+// directory, and a normal run, the root-package check and hypercase strip
+// all read the archive through it. The run runs its cells, and the check
+// reports a section no registry claims. The strip the check names strips
+// it, and the update writes it, each by temp file and rename, as for any
+// archive. So each replaces the link with the archive it writes, and
+// leaves the file the link named as it was.
+func TestStripLinkedArchive(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	s.settle(stripModule...)
+	const shared = "shared/prices.txtar"
+	link := func() {
+		t.Helper()
+		if err := os.MkdirAll(s.path("shared"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(s.path(prices), s.path(shared)); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(filepath.Join("..", "..", shared), s.path(prices)); err != nil {
+			t.Skipf("making a symbolic link failed: %v", err)
+		}
+		s.note("%s moves to %s, and a symbolic link to it takes its place", prices, shared)
+	}
+	linked := func(after string) {
+		t.Helper()
+		if fi, err := os.Lstat(s.path(prices)); err != nil || fi.Mode()&os.ModeSymlink != 0 {
+			t.Errorf("after %s, %s is still a link, or is gone (%v), where the write puts the archive in its place", after, prices, err)
+		}
+	}
+	has := func(rel, section string) bool {
+		_, ok := archive.Parse(s.read(rel)).Section(section)
+		return ok
+	}
+
+	s.edit(prices, "a removed column's outcome", insert("out/nobody/outcome", "accepted\n", "out/parse/"))
+	link()
+	r := s.normal("strip-a")
+	s.fails(r, "testdata/export/prices.txtar: no registry claims out/nobody/outcome: no column named nobody runs over the corpus export.", "--- PASS: TestCorpus/export/prices/parse")
+	s.passes(s.strip(s.printedStrip(r, "-column", "nobody")...))
+	linked("the strip")
+	if has(prices, "out/nobody/outcome") || !has(shared, "out/nobody/outcome") {
+		t.Errorf("the strip left out/nobody/outcome in %s, or removed it from %s, the file the link named", prices, shared)
+	}
+
+	s.remove(shared, "the file the link named")
+	s.edit(prices, "parse's outcome, which the update writes back, removed", drop("out/parse/"))
+	link()
+	s.settle(stripModule...)
+	linked("the update")
+	if !has(prices, "out/parse/outcome") || has(shared, "out/parse/outcome") {
+		t.Errorf("the update didn't write out/parse/outcome to %s, or wrote it to %s, the file the link named", prices, shared)
+	}
+	s.passes(s.normal("strip-a"))
+	s.passes(s.run("b", "strip-b", false))
+	s.done()
+}

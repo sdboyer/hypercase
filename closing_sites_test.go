@@ -659,6 +659,7 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "the registries that own or use the lift %s differ in %s: %s Every package that owns or uses a lift registers one declaration of it: %s. Declare the lift once, in a package the others import, and register that declaration. %s", "a lift's differing registry entries, in the root-package check"},
 		{"Errorf", "%s is a temp file left by a write that was cut short. Delete it.", "a registry temp file a write left, in the root-package check"},
 		{"Errorf", "reading %s: %v", "testdata/, which can't be read, in the root-package check"},
+		{"Errorf", "%s is a symbolic link, and a corpus root's testdata/, and a corpus's directory in it, are read as directories: a normal run and the update read archives through a link, and this check and hypercase strip follow none, so they would read none of the archives there. Replace the link with the directory it names.", "a symbolic link in place of testdata/ or a corpus's directory, in the root-package check"},
 		{"Errorf", "%s holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/. Move the archives into one, or delete them.", "archives directly under testdata/, in the root-package check"},
 		{"Errorf", "%s holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus. Declare a decl.Type with that Dir, or move or delete the archives.", "a directory of archives no registry declares, in the root-package check"},
 	},

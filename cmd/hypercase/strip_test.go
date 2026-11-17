@@ -1244,6 +1244,58 @@ func TestStripFailedFindings(t *testing.T) {
 	sameTree(t, top, strippedModule())
 }
 
+// TestStripLinks: a symbolic link in place of the corpus root's testdata/,
+// or of a corpus's directory in it, fails strip, exit 1, before it removes
+// anything, the registries included. A run reads the archives through the
+// link, and strip follows none, so it would strip none of them.
+func TestStripLinks(t *testing.T) {
+	t.Parallel()
+	const fix = ". Nothing was removed.\nReplace each link with the directory it names, then run hypercase strip again.\n"
+	const read = ", and a corpus root's testdata/, and a corpus's directory in it, are read as directories: a normal run and the update read archives through a link, and strip follows none, so it would strip none of the archives there"
+	for _, tt := range []struct {
+		links []string
+		want  string
+	}{
+		{[]string{"testdata/sheet"}, "hypercase strip: testdata/sheet is a symbolic link" + read + fix},
+		{[]string{"testdata/csv", "testdata/sheet"}, "hypercase strip: testdata/csv and testdata/sheet are symbolic links" + read + fix},
+		{[]string{"testdata"}, "hypercase strip: testdata is a symbolic link" + read + fix},
+	} {
+		files := stripModule()
+		top := writeTree(t, files)
+		for _, l := range tt.links {
+			link := filepath.Join(top, filepath.FromSlash(l))
+			moved := filepath.Join(top, "shared", filepath.Base(l)+".d")
+			if err := os.MkdirAll(filepath.Dir(moved), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Rename(link, moved); err != nil {
+				t.Fatal(err)
+			}
+			target, err := filepath.Rel(filepath.Dir(link), moved)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(target, link); err != nil {
+				t.Skipf("making a symbolic link failed: %v", err)
+			}
+		}
+		stripFails(t, top, "", 1, nil, tt.want)
+		for _, l := range tt.links {
+			link := filepath.Join(top, filepath.FromSlash(l))
+			if err := os.Remove(link); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Rename(filepath.Join(top, "shared", filepath.Base(l)+".d"), link); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.Remove(filepath.Join(top, "shared")); err != nil {
+			t.Fatal(err)
+		}
+		sameTree(t, top, files)
+	}
+}
+
 // TestStripUnreadTestdata: a directory under the corpus root's testdata/
 // that can't be read fails strip's walk for archives, and strip exits 1
 // having removed nothing, as reading the corpus root's testdata/ fails.

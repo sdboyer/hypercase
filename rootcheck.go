@@ -312,7 +312,7 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	archives := map[string][]string{} // corpus → archive file names
 	undeclared := map[string]bool{}   // directories, relative to td
 	if _, err := os.Lstat(td); !errors.Is(err, fs.ErrNotExist) {
-		err := walk.Testdata(td, otherRoots, func(p string, d fs.DirEntry) {
+		links, err := walk.Testdata(td, otherRoots, func(p string, d fs.DirEntry) {
 			dir := filepath.ToSlash(mustRel(td, filepath.Dir(p)))
 			isCorpus := declared[dir]
 			switch {
@@ -326,6 +326,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		})
 		if err != nil {
 			t.Errorf("reading %s: %v", r.rel(td), err)
+		}
+		for _, l := range links {
+			t.Errorf("%s is a symbolic link, and a corpus root's testdata/, and a corpus's directory in it, are read as directories: a normal run and the update read archives through a link, and this check and hypercase strip follow none, so they would read none of the archives there.\nReplace the link with the directory it names.", r.rel(l))
 		}
 	}
 	for _, dir := range slices.Sorted(maps.Keys(undeclared)) {
