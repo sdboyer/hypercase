@@ -206,7 +206,7 @@ func TestChainReadsCommitted(t *testing.T) {
 	// files of evaluate's cell, which parse blocks, are no orphans either.
 	s.edit(prices, "the committed product has parse reject it", insert("via/import/parse/error", "a stale error\n", "via/import/quote/"))
 	s.fails(s.normal("chain"),
-		"via/import/parse/error is a file of import's product, which import no longer makes.",
+		"via/import/parse/error is a file of import's committed product, which this run of import doesn't make.",
 		"parse returned an error, but the case states no property parse rejects:\n  a stale error\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs parse on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.",
 		"out/evaluate/values.txt is recorded, and the cell is blocked: the lift parse, on evaluate's path, failed on the case."+keep)
 	s.passes(s.update("chain"))
@@ -245,7 +245,7 @@ func TestChainPastAFailingLift(t *testing.T) {
 		insert("properties", "unterminated\n", "in/")(a)
 		insert("in/unpack/error", "line 1: unclosed quote\n", "via/")(a)
 	})
-	blocked := "via/repack/evaluate/out/values.txt is recorded, and repack is blocked: the lift unpack, on repack's path, failed on the case, so it has no product.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing."
+	blocked := "via/repack/evaluate/out/values.txt is recorded, and repack is blocked: the lift unpack, on repack's path, failed on the case, so it has no product in this run.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing."
 	s.fails(s.normal("chain-past"), blocked)
 	s.fails(s.update("chain-past"), "out/evaluate/values.txt is recorded, and the cell is blocked: the lift unpack, on evaluate's path, failed on the case.")
 	s.hasSections(packed, map[string]string{"out/repack/outcome": "blocked unpack\n", "out/evaluate/values.txt": "a1 3\n"}, "via/")
@@ -299,7 +299,7 @@ func TestChainTwice(t *testing.T) {
 	s.fails(s.normal("chain-twice"),
 		"out/export/outcome has no golden.",
 		"out/import/outcome differs (-golden +got):\n- accepted\n+ blocked export",
-		"via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has no committed outcome, out/export/outcome, which a normal run reads."+updateRuns("import", "export"))
+		"via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has no committed outcome, out/export/outcome, which a normal run reads, so it has no product in this run."+updateRuns("import", "export"))
 	s.passes(s.update("chain-twice"))
 	s.same(sheet, clean)
 
@@ -311,7 +311,7 @@ func TestChainTwice(t *testing.T) {
 	s.fails(s.update("chain-twice"), "out/list/files.txt is recorded, and the cell is blocked: the lift export, on list's path, failed on the case.")
 	s.hasSections(sheet, map[string]string{"out/export/outcome": "rejected\n", "out/import/outcome": "blocked export\n", "out/list/files.txt": "1 files\nquote/A1 \"3\\n\"\n"}, "via/")
 	s.edit(sheet, "import's product back by hand", insert("via/import/quote/A1", "3\n", "out/"))
-	s.fails(s.normal("chain-twice"), "via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome \"rejected\", in out/export/outcome, so it has no product.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.")
+	s.fails(s.normal("chain-twice"), "via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome \"rejected\", in out/export/outcome, so it has no product in this run.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.")
 
 	// export accepts the grid again. list is blocked by import's committed
 	// outcome, which export's blocks in turn, and the update runs both.
@@ -322,7 +322,7 @@ func TestChainTwice(t *testing.T) {
 	})
 	s.fails(s.normal("chain-twice"),
 		"out/export/outcome differs (-golden +got):\n- rejected\n+ accepted",
-		"via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome \"rejected\", in out/export/outcome."+updateRuns("import", "export"),
+		"via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome \"rejected\", in out/export/outcome, so it has no product in this run."+updateRuns("import", "export"),
 		"out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome \"blocked export\", in out/import/outcome."+updateRuns("list", "import"))
 	s.passes(s.update("chain-twice"))
 	s.same(sheet, clean)
@@ -368,7 +368,7 @@ func TestChainTwiceShared(t *testing.T) {
 		drop("out/export/error.txt")(a)
 	})
 	b := s.run("b", "chain-twice-b", false)
-	s.fails(b, "out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome \"blocked export\", in out/import/outcome.\nOnly the package that owns export runs it in a normal run, so this one can't tell whether an update runs list. Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which reruns export, and delete nothing by hand before it has.")
+	s.fails(b, "out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome \"blocked export\", in out/import/outcome.\nOnly the package that owns export runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.")
 	s.lacks(b, "export ran")
 	update()
 	s.same(sheet, clean)
@@ -409,7 +409,7 @@ func TestChainTwiceStaleProduct(t *testing.T) {
 	s.edit(sheet, "export's committed product holds an import/error export doesn't make", insert("via/export/import/error", "stale\n", "via/export/import/out/"))
 	r = s.normal("chain-twice")
 	s.fails(r,
-		"via/export/import/error is a file of export's product, which export no longer makes.\nIf it should, fix export's jenny.",
+		"via/export/import/error is a file of export's committed product, which this run of export doesn't make.\nIf it should, fix export's jenny.",
 		"import returned an error, but the case states no property import rejects:\n  import: stale\n"+another+" Run it, fix what it reports, and read the diff before committing.",
 		"out/import/error.txt has no golden.\n"+another+" Run it, fix what it reports, and read the diff before committing.",
 		"out/import/outcome differs (-golden +got):\n- accepted\n+ rejected\n"+another+" What it writes for the cell, if anything, is its run's, not this outcome.",
@@ -438,7 +438,7 @@ func TestChainTwiceStaleProduct(t *testing.T) {
 		insert("via/import/quote/Z9", "9\n", "out/")(a)
 	})
 	r = s.normal("chain-twice")
-	s.fails(r, "via/import/quote/Z9 is a file of import's committed product, which this run of import doesn't make.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for import: "+reruns+", and it writes nothing for the cell of the lift export, on import's path, whose outcome and product a normal run reads.\nFix what export's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.")
+	s.fails(r, "via/import/quote/Z9 is a file of import's committed product, which this run of import doesn't make.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for import: "+reruns+", and it writes nothing for the cell of the lift export, on import's path, whose outcome and product a normal run reads. Fix what export's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.")
 	s.lacks(r, "which removes it")
 	before := s.snapshot()
 	s.fails(s.update("chain-twice"), "The update writes nothing for the cell of the lift export, on import's path")
@@ -471,7 +471,7 @@ func TestChainVariantAsUpdate(t *testing.T) {
 	runsImport := "FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds."
 	s.fails(s.normal("chain"),
 		"louder's variant of the base differs from its committed inputs:\ntransform/louder/in/import/error is no longer made",
-		"import returned an error, but the variant states no property import rejects:\n  import: line 1: unclosed quote\nThe variant states what louder gives, and each property it keeps that the base states. "+runsImport+" Run it, fix what it reports, and read the diff before committing.",
+		"import returned an error, but the variant states no property import rejects:\n  import: line 1: unclosed quote\nThe variant states what louder gives, and each property it keeps that the base states.\n"+runsImport+" Run it, fix what it reports, and read the diff before committing.",
 		"transform/louder/out/import/error.txt has no golden.\n"+runsImport+" Run it, fix what it reports, and read the diff before committing.",
 		"transform/louder/via/import/quote/A1 is recorded, and import failed on the case in this run, so this run has no product.\n"+runsImport+" Its run may still make the file: delete nothing by hand before it has run.",
 		"transform/louder/out/list/outcome differs (-golden +got):\n- accepted\n+ blocked import\n"+runs+" What it writes for the cell, if anything, is its run's, not this outcome.",
@@ -540,7 +540,7 @@ func TestChainProbeAsUpdate(t *testing.T) {
 		set("out/import/outcome", "rejected\n")(a)
 		insert("in/import/out/evaluate/probe-panic", "the probe gives up\n", "in/import/out/quote/")(a)
 	})
-	fails := "FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: " + reruns + ", and evaluate's probe panics: the probe gives up.\nFix the probe."
+	fails := "FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: " + reruns + ", and evaluate's probe panics: the probe gives up. Fix the probe."
 	r = s.normal("chain")
 	s.fails(r,
 		"out/evaluate/outcome differs (-golden +got):\n- accepted\n+ blocked import\n"+fails+" It writes the outcome \"panicked\", not this one, and the panic in error.txt.",
@@ -562,7 +562,7 @@ func TestChainProbeAsUpdate(t *testing.T) {
 			set("out/import/outcome", "rejected\n")(a)
 			insert("in/import/out/evaluate/probe", tt.probe, "in/import/out/quote/")(a)
 		})
-		fails := "FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: " + reruns + ", and " + tt.fault + ".\nFix the probe."
+		fails := "FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: " + reruns + ", and " + tt.fault + ". Fix the probe."
 		r = s.normal("chain")
 		s.fails(r,
 			"out/evaluate/outcome differs (-golden +got):\n- accepted\n+ blocked import\n"+fails+" It writes nothing for the cell.",
@@ -575,11 +575,11 @@ func TestChainProbeAsUpdate(t *testing.T) {
 
 	// A stale evaluate/probe in the committed product fails evaluate's
 	// probe in the normal run, and the update runs evaluate.
-	const badReason = "evaluate's probe said the case isn't for it, with a reason an outcome can't hold: \"one\\ntwo\" can't be held in an outcome: it is one line, not empty, with no space at either end.\nFix the probe."
+	const badReason = "evaluate's probe said the case isn't for it, with a reason an outcome can't hold: \"one\\ntwo\" can't be held in an outcome: it is one line, not empty, with no space at either end."
 	s.edit(prices, "import's committed product holds an evaluate/probe, which import doesn't make, with a reason an outcome can't hold", insert("via/import/evaluate/probe", "one\ntwo\n", "via/import/quote/"))
 	r = s.normal("chain")
 	s.fails(r,
-		badReason+" FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+reruns+". What it writes for the cell, if anything, is its run's.",
+		badReason+"\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+reruns+". What it writes for the cell, if anything, is its run's.",
 		"out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it, with a reason an outcome can't hold: \"one\\ntwo\" can't be held in an outcome: it is one line, not empty, with no space at either end.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+reruns+". Delete nothing by hand before it has run.")
 	s.lacks(r, "An update writes nothing for this cell")
 	s.passes(s.update("chain"))
@@ -589,7 +589,7 @@ func TestChainProbeAsUpdate(t *testing.T) {
 		drop("out/evaluate/values.txt")(a)
 	})
 	r = s.normal("chain")
-	s.fails(r, "evaluate's probe said the case isn't for it, and gave no reason.\nFix the probe: when it says no, it says why.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+reruns+". What it writes for the cell, if anything, is its run's.")
+	s.fails(r, "evaluate's probe said the case isn't for it, and gave no reason.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+reruns+". What it writes for the cell, if anything, is its run's.")
 	s.passes(s.update("chain"))
 	s.same(prices, clean)
 	// Where the update's probe fails the same way, it writes nothing for
@@ -599,7 +599,7 @@ func TestChainProbeAsUpdate(t *testing.T) {
 		insert("via/import/evaluate/probe", "one\ntwo\n", "via/import/quote/")(a)
 	})
 	r = s.normal("chain")
-	s.fails(r, badReason+" An update writes nothing for this cell.")
+	s.fails(r, badReason+"\nFix the probe. An update writes nothing for this cell.")
 	s.lacks(r, "runs evaluate")
 	s.write(prices, clean, "restore it")
 
@@ -607,7 +607,7 @@ func TestChainProbeAsUpdate(t *testing.T) {
 	runs := "FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: " + reruns + "."
 	r = s.normal("chain")
 	s.fails(r,
-		"via/import/evaluate/probe is a file of import's product, which import no longer makes.",
+		"via/import/evaluate/probe is a file of import's committed product, which this run of import doesn't make.",
 		"out/evaluate/outcome differs (-golden +got):\n- accepted\n+ skipped a stale reason\n"+runs+" What it writes for the cell, if anything, is its run's, not this outcome.",
 		"out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it: a stale reason\n"+runs+" Delete nothing by hand before it has run.")
 	s.lacks(r, "delete the section by hand")
@@ -669,8 +669,8 @@ func TestChainOutcomeAsUpdate(t *testing.T) {
 	nothing := "FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: " + reruns + ", and it writes nothing for the cell of the lift import, on list's path, whose outcome and product a normal run reads."
 	r = s.normal("chain")
 	s.fails(r,
-		"out/list/outcome differs (-golden +got):\n- accepted\n+ blocked import\n"+nothing,
-		"out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome \"rejected\", in out/import/outcome.\n"+nothing+"\nFix what import's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.")
+		"out/list/outcome differs (-golden +got):\n- accepted\n+ blocked import\n"+nothing+" Fix what import's cell reports.",
+		"out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome \"rejected\", in out/import/outcome.\n"+nothing+" Fix what import's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.")
 	s.lacks(r, "runs list")
 	before := s.snapshot()
 	s.fails(s.update("chain"), listHeldBack)
@@ -745,7 +745,7 @@ func TestChainLiftNowRejects(t *testing.T) {
 
 	s.edit(names, "a product beside the rejection", insert("via/import/inputs/x", "a tree named inputs\n", "out/"))
 	r := s.normal("chain")
-	s.fails(r, "via/import/inputs/x is recorded, and import failed on the case, so it has no product.\nIf it should make one, fix import or the case. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.", orphan)
+	s.fails(r, "via/import/inputs/x is recorded, and import failed on the case in this run, so this run has no product.\nIf it should make one, fix import or the case. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.", orphan)
 	s.fails(s.update("chain"), orphan)
 	s.hasSections(names, map[string]string{}, "via/")
 	s.done()
@@ -1109,6 +1109,29 @@ func TestChainRootCheck(t *testing.T) {
 	s.done()
 }
 
+// TestSameViewUnownedTransform: in a package that doesn't own a transform,
+// committed inputs that differ from what the transform makes only in a
+// delete line naming a path the base lacks give the input view the
+// transform makes, so a cell of the variant that fails, fails for its own
+// reason, and the run doesn't put the failure down to the inputs. Here the
+// root package, which doesn't own louder, runs parse on louder's variant,
+// whose committed outcome is stale.
+func TestSameViewUnownedTransform(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "chain-shared")
+	prices := "testdata/export/prices.txtar"
+	s.passes(s.update("chain-a"))
+	s.passes(s.run("b", "chain-b", true))
+	s.edit(prices, "louder's committed inputs delete a path the base lacks, and parse's cell of louder's variant commits a stale outcome", func(a *archive.Archive) {
+		insert("transform/louder/delete", "nothing/here\n", "transform/louder/via/")(a)
+		set("transform/louder/out/parse/outcome", "rejected\n")(a)
+	})
+	r := s.normal("chain-a")
+	s.fails(r, "transform/louder/out/parse/outcome differs (-golden +got):\n- rejected\n+ accepted\nIf the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.")
+	s.lacks(r, "A cell of the variant failed, and the archive's inputs", "on another value")
+	s.done()
+}
+
 // TestChainShared: across packages. The root package owns import, parse
 // and resolve; ./b uses them, and owns evaluate, list and the transform
 // louder. A package that only uses a bytes lift reads its committed
@@ -1152,14 +1175,14 @@ func TestChainShared(t *testing.T) {
 	// cells that import's missing outcome blocks.
 	s.edit(prices, "import's cell has no committed outcome", drop("out/import/outcome"))
 	b = s.run("b", "chain-b", false)
-	s.fails(b, "out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.\nOnly the package that owns import runs it in a normal run, so this one can't tell whether an update runs list. Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which reruns import, and delete nothing by hand before it has.")
+	s.fails(b, "out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.\nOnly the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.")
 	s.lacks(b, "import ran")
 	s.write(prices, clean, "restore it")
 
 	// import stops making quote/B1. Its owner's column fails, naming the
 	// file, and the module's update removes it.
 	s.edit(prices, "import no longer makes quote/B1", drop("in/import/out/quote/B1"))
-	s.fails(s.normal("chain-a"), "via/import/quote/B1 is a file of import's product, which import no longer makes.\nIf it should, fix import's jenny. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.")
+	s.fails(s.normal("chain-a"), "via/import/quote/B1 is a file of import's committed product, which this run of import doesn't make.\nIf it should, fix import's jenny. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.")
 	before := s.read(prices)
 	for _, r := range s.parallel(childRun{"", "chain-a", true}, childRun{"b", "chain-b", true}) {
 		s.passes(r)

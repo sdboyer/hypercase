@@ -318,7 +318,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	// fixes: another package's normal run reads committed inputs that may
 	// differ from what the transform makes. diffs says how they differ.
 	stale := false
-	var diffs *msg
+	var diffs string
 	switch {
 	case v.tr == nil:
 		c.setView(r, p, pc.base.VariantView(v.committed))
@@ -350,14 +350,15 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if owner {
 			r.judgeInputs(t, c, pc, v, w)
 		}
-		stale = !owner
 		c.setView(r, p, view)
 		// A cell the inputs block may be one the update, which stages the
 		// variant on what the transform makes, runs. Inputs that differ
 		// only in a delete line naming a path the base lacks give the same
-		// view, on which the update runs each cell as this run does.
-		if diffs = v.inputDiffs(pc.a); !diffs.empty() && !holdsExactly(view, v.made) {
+		// view, on which the update runs each cell as this run does, so no
+		// failure is theirs.
+		if diffs = v.inputDiffs(pc.a); diffs != "" && !holdsExactly(view, v.made) {
 			c.state.made = archive.NewFS(v.made)
+			stale = !owner
 		}
 	}
 	results := r.runCells(t, c, p.cols, w)
@@ -366,9 +367,6 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	}
 	// However its cells failed, the failures may be the inputs'.
 	m := diffs
-	if m.empty() {
-		return
-	}
 	// An update writes a frozen cell only to add an outcome it lacks, when
 	// its other files match the run and nothing keeps the update from
 	// writing it, so it rewrites none of those, and one whose files differ
@@ -405,27 +403,27 @@ func (r *runner) ifUnowned(v *plannedVariant) string {
 }
 
 // inputDiffs says how the committed inputs of a transform's variant differ
-// from those it made.
-func (v *plannedVariant) inputDiffs(a *archive.Archive) *msg {
+// from those it made, one difference to a line, or "" when they don't.
+func (v *plannedVariant) inputDiffs(a *archive.Archive) string {
 	committed := map[string][]byte{}
 	for _, s := range v.inputs(a) {
 		committed[s.Name] = s.Data
 	}
-	m := &msg{}
+	var lines []string
 	for _, s := range v.sections {
 		g, ok := committed[s.Name]
 		switch {
 		case !ok:
-			m.add("%s is new", s.Name)
+			lines = append(lines, fmt.Sprintf("%s is new", s.Name))
 		case !bytes.Equal(g, s.Data):
-			m.add("%s differs (-committed +made):\n%s", s.Name, strings.TrimSuffix(diff.Lines(g, s.Data), "\n"))
+			lines = append(lines, fmt.Sprintf("%s differs (-committed +made):\n%s", s.Name, strings.TrimSuffix(diff.Lines(g, s.Data), "\n")))
 		}
 		delete(committed, s.Name)
 	}
 	for _, name := range slices.Sorted(maps.Keys(committed)) {
-		m.add("%s is no longer made", name)
+		lines = append(lines, fmt.Sprintf("%s is no longer made", name))
 	}
-	return m
+	return strings.Join(lines, "\n")
 }
 
 // holdsExactly reports whether an input view holds files, and no other
@@ -456,8 +454,8 @@ func (r *runner) judgeInputs(t *testing.T, c *aCase, pc plannedCase, v *plannedV
 		t.Errorf("%s\n%s's variant of the base isn't written: the archive holds none of its inputs.\nRun %s to write them, and read them before committing.", c.header(), v.name, r.updateCmd())
 		return
 	}
-	if m := v.inputDiffs(pc.a); !m.empty() {
-		t.Errorf("%s\n%s's variant of the base differs from its committed inputs:\n%s\nIf the change is intended, run %s and read the diff before committing.", c.header(), v.name, m, r.updateCmd())
+	if d := v.inputDiffs(pc.a); d != "" {
+		t.Errorf("%s\n%s's variant of the base differs from its committed inputs:\n%s\nIf the change is intended, run %s and read the diff before committing.", c.header(), v.name, d, r.updateCmd())
 	}
 }
 
@@ -468,7 +466,8 @@ func (r *runner) judgeInputs(t *testing.T, c *aCase, pc plannedCase, v *plannedV
 // committed one, which other cells read, unless a gaps line marks its cell.
 func (r *runner) declined(t *testing.T, c *aCase, p *plan, pc plannedCase, v *plannedVariant, owner bool, w *caseWrites) {
 	t.Helper()
-	m := &msg{}
+	var ns notes
+	u := r.updateCmd()
 	if owner {
 		if r.update {
 			w.replaceInputs(v.name, nil)
@@ -477,16 +476,16 @@ func (r *runner) declined(t *testing.T, c *aCase, p *plan, pc plannedCase, v *pl
 			for _, s := range ins {
 				names = append(names, s.Name)
 			}
-			m.add("%s %s written, and %s declines the base: %s\nRun %s to remove them.", andList(names), isAre(len(names)), v.name, v.declined, r.updateCmd())
+			ns.add(aboutFault, fmt.Sprintf("%s %s written, and %s declines the base: %s", andList(names), isAre(len(names)), v.name, v.declined), fmt.Sprintf("Run %s to remove them.", u))
 		}
 	}
 	for _, col := range p.cols {
 		g, marked := c.gap(col.name)
 		if marked {
-			m.add("%s marks the cell of %s, and %s declines the base: %s\nRemove the line, or fix the transform.", c.gapAt(g), g.Cell(), v.name, v.declined)
+			ns.add(aboutGap, fmt.Sprintf("%s marks the cell of %s, and %s declines the base: %s", c.gapAt(g), g.Cell(), v.name, v.declined), "Remove the line, or fix the transform.")
 		}
 		for _, f := range slices.Sorted(maps.Keys(c.goldens(col.name))) {
-			m.add("%s is recorded, and %s declines the base: %s\nIf the transform should make the variant, fix it. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, f), v.name, v.declined, r.updateCmd())
+			ns.add(aboutOrphan, fmt.Sprintf("%s is recorded, and %s declines the base: %s", c.out(col.name, f), v.name, v.declined), fmt.Sprintf("If the transform should make the variant, fix it. If not, delete the section by hand; %s leaves it in place.", u))
 		}
 		if col.lift == nil || !col.lift.bytes || marked {
 			continue
@@ -497,11 +496,11 @@ func (r *runner) declined(t *testing.T, c *aCase, p *plan, pc plannedCase, v *pl
 			continue
 		}
 		for _, f := range slices.Sorted(maps.Keys(c.product(col.lift))) {
-			m.add("%s is recorded, and %s declines the base: %s\nRun %s, which removes it, and read the diff before committing.", dir+f, v.name, v.declined, r.updateCmd())
+			ns.add(aboutProductOrphan, fmt.Sprintf("%s is recorded, and %s declines the base: %s", dir+f, v.name, v.declined), fmt.Sprintf("Run %s, which removes it, and read the diff before committing.", u))
 		}
 	}
-	if !m.empty() {
-		t.Errorf("%s\n%s", c.header(), m)
+	if len(ns) > 0 {
+		report(t, c.header(), ns, r.declinedStaging(c))
 		return
 	}
 	t.Skipf("%s: %s declines the base: %s", c.name, v.name, v.declined)

@@ -53,7 +53,7 @@ $ edit testdata/grid/sheet.txtar  # export's committed product holds an import/e
 $ go test  # chain-twice
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         export: Exports the grid, as its export/ tree says.
-        via/export/import/error is a file of export's product, which export no longer makes.
+        via/export/import/error is a file of export's committed product, which this run of export doesn't make.
         If it should, fix export's jenny. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         import: Imports the export as a script, as its import/ tree says.
@@ -105,7 +105,7 @@ $ go test  # chain-twice
         - accepted
         + rejected
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
-        via/export/import/out/quote/A1 is recorded, and export failed on the case, so it has no product.
+        via/export/import/out/quote/A1 is recorded, and export failed on the case in this run, so this run has no product.
         If it should make one, fix export or the case. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         import: Imports the export as a script, as its import/ tree says.
@@ -164,8 +164,7 @@ $ go test  # chain-twice
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         import: Imports the export as a script, as its import/ tree says.
         via/import/quote/Z9 is a file of import's committed product, which this run of import doesn't make.
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for import: it reruns export, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift export, on import's path, whose outcome and product a normal run reads.
-        Fix what export's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for import: it reruns export, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift export, on import's path, whose outcome and product a normal run reads. Fix what export's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         list: Lists the files of the script's input view, with their bytes.
         out/list/files.txt differs (-golden +got):
@@ -173,7 +172,7 @@ $ go test  # chain-twice
         + 2 files
           quote/A1 "3\n"
         + quote/Z9 "9\n"
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift export, on list's path, whose outcome and product a normal run reads. Run it, fix what it reports, and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift export, on list's path, whose outcome and product a normal run reads. Fix what export's cell reports.
     what ran, in order:
         export ran
         import ran

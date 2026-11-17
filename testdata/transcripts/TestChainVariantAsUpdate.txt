@@ -122,7 +122,8 @@ $ go test  # chain
         import: Imports the export as a script, as its import/ tree says.
         import returned an error, but the variant states no property import rejects:
           import: line 1: unclosed quote
-        The variant states what louder gives, and each property it keeps that the base states. FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
+        The variant states what louder gives, and each property it keeps that the base states.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
         transform/louder/out/import/error.txt has no golden.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
         transform/louder/via/import/evaluate/out/values.txt is recorded, and import failed on the case in this run, so this run has no product.
@@ -497,7 +498,8 @@ $ go test  # chain
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         import: Imports the export as a script, as its import/ tree says.
         import returned no error, but the variant states unterminated, which import rejects.
-        The variant states what louder gives, and each property it keeps that the base states. FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
+        The variant states what louder gives, and each property it keeps that the base states.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it runs the variant on what louder makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
         transform/louder/out/import/outcome differs (-golden +got):
         - rejected
         + accepted

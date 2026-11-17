@@ -7,11 +7,13 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-props
         echo: Does what the case's do/ tree says.
         echo returned an error, but the variant states no property echo rejects:
           A1 -> A1: cycle
-        The variant states what looped gives, and each property it keeps that the base states. Fix the code or looped's jenny, or give the variant the property, in looped's Gives or Keeps, and list it in echo's Rejects.
+        The variant states what looped gives, and each property it keeps that the base states.
+        Fix the code or looped's jenny, or give the variant the property, in looped's Gives or Keeps, and list it in echo's Rejects.
     script/twice/transform/upper: Uppercases every file under do/out/.
         echo: Does what the case's do/ tree says.
         echo returned no error, but the variant states circular, which echo rejects.
-        The variant states what upper gives, and each property it keeps that the base states. Fix the code or upper's jenny, or correct upper's Gives or Keeps, or echo's Rejects.
+        The variant states what upper gives, and each property it keeps that the base states.
+        Fix the code or upper's jenny, or correct upper's Gives or Keeps, or echo's Rejects.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
         --- PASS: TestCorpus/script/errs

@@ -54,7 +54,7 @@ $ go test  # chain-twice
         - accepted
         + blocked export
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's, not this outcome.
-        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has no committed outcome, out/export/outcome, which a normal run reads.
+        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has no committed outcome, out/export/outcome, which a normal run reads, so it has no product in this run.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     what ran, in order:
         export ran
@@ -106,7 +106,7 @@ $ edit testdata/grid/sheet.txtar  # import's product back by hand
 $ go test  # chain-twice
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         import: Imports the export as a script, as its import/ tree says.
-        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome "rejected", in out/export/outcome, so it has no product.
+        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome "rejected", in out/export/outcome, so it has no product in this run.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         list: Lists the files of the script's input view, with their bytes.
@@ -136,7 +136,7 @@ $ go test  # chain-twice
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         import: Imports the export as a script, as its import/ tree says.
-        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome "rejected", in out/export/outcome.
+        via/import/quote/A1 is recorded, and import is blocked: the lift export, on import's path, has the committed outcome "rejected", in out/export/outcome, so it has no product in this run.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import: it reruns export, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         list: Lists the files of the script's input view, with their bytes.

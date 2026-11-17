@@ -49,7 +49,8 @@ $ go test  # tr-ladder-eval
         resolve: Resolves the parsed script, as its resolve/ tree says.
         resolve returned an error, but the variant states no property resolve rejects:
           A1 -> A1: cycle
-        The variant states what upper gives, and each property it keeps that the base states. FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve on another value than this run: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
+        The variant states what upper gives, and each property it keeps that the base states.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve on another value than this run: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
         transform/upper/out/resolve/error.txt has no golden.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve on another value than this run: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
         transform/upper/out/resolve/outcome differs (-golden +got):

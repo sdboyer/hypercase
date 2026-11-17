@@ -260,7 +260,7 @@ type liftRun struct {
 	out      *called
 	product  map[string][]byte // a bytes lift's product, by path in its view; nil when it made none
 	view     fs.FS
-	problems []string
+	problems notes
 	verdict  *liftVerdict // a bytes lift's cell's, once judged
 	bare     *liftVerdict // a bytes lift's cell's under a bare Project, once judged
 }
@@ -371,6 +371,21 @@ type updateFate struct {
 // runs reports whether the update runs the cell.
 func (f updateFate) runs() bool { return f.block == nil && f.skip == "" && f.fault == "" }
 
+// same reports whether two fates of a cell are one: both block it by the
+// failure of one lift, skip it for one reason, fail it with one fault of
+// its probe, or run it, on whatever value.
+func (f updateFate) same(g updateFate) bool {
+	if f.block != nil || g.block != nil {
+		return f.block != nil && g.block != nil && !f.block.broken && !g.block.broken && f.block.failed == g.block.failed
+	}
+	return f.skip == g.skip && f.fault == g.fault
+}
+
+// probePanics is the fault of col's probe that panics with v.
+func probePanics(col *column, v any) string {
+	return fmt.Sprintf("%s's probe panics: %v", col.name, v)
+}
+
 // updateFate tells, in a normal run, what the package's update does with
 // col's cell: whether the case, staged as the update stages it, reaches
 // the type col consumes with nothing to block it, and if it does, what
@@ -409,7 +424,7 @@ func (s *caseState) updateFate(col *column) updateFate {
 	p := call(func(*called) { why, ok = col.probe(in) })
 	switch {
 	case p.panicked:
-		return updateFate{fault: fmt.Sprintf("%s's probe panics: %v", col.name, p.panicValue), panicked: true}
+		return updateFate{fault: probePanics(col, p.panicValue), panicked: true}
 	case ok:
 		return updateFate{}
 	}
@@ -534,7 +549,9 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 		return lr
 	case lr.out.err != nil:
 		lr.out.jennyErr, lr.out.err = lr.out.err, nil
-		lr.problems = []string{fmt.Sprintf("%s's jenny failed on the case, with an error that is no rejection:\n  %s\nIf %s rejects the case, return the error as decl.Reject(err). If not, fix %s's jenny. An update writes nothing for this cell.", l.name, indent(lr.out.jennyErr.Error(), "  "), l.name, l.name)}
+		lr.problems.add(aboutFault,
+			fmt.Sprintf("%s's jenny failed on the case, with an error that is no rejection:\n  %s", l.name, indent(lr.out.jennyErr.Error(), "  ")),
+			fmt.Sprintf("If %s rejects the case, return the error as decl.Reject(err). If not, fix %s's jenny. An update writes nothing for this cell.", l.name, l.name))
 		return lr
 	}
 	lr.product, lr.problems = productOf(l, s.c.prefix, made)
@@ -551,15 +568,17 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 // file outside any tree, or in the tree params; a file that is also a
 // directory; a file no declaration matches, or two do; and a file an
 // archive would read back differently.
-func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, []string) {
+func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, notes) {
 	files := map[string][]byte{}
-	var problems []string
+	var problems notes
 	for _, f := range made.AsFiles() {
 		// A jenny's FS renders each file it adds, and AsFiles gives each
 		// one as Bytes, as for a transform's, so no test reaches this.
 		data, ok := jenny.BytesOf(f)
 		if !ok {
-			problems = append(problems, fmt.Sprintf("%s made %s, which its FS gave as a %T, not as rendered bytes. An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase.", l.name, f.Path(), f))
+			problems.add(aboutFault,
+				fmt.Sprintf("%s made %s, which its FS gave as a %T, not as rendered bytes.", l.name, f.Path(), f),
+				"An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase.")
 			continue
 		}
 		files[f.Path()] = data
@@ -570,24 +589,30 @@ func productOf(l *lift, prefix string, made *jenny.FS) (map[string][]byte, []str
 	var paths []string
 	for _, p := range slices.Sorted(maps.Keys(files)) {
 		if err := archive.HoldsName(dir + p); err != nil {
-			problems = append(problems, fmt.Sprintf("%q can't be held in an archive: %v.\nFix %s's jenny so the file's name can be held. An update writes nothing for this cell.", dir+p, err, l.name))
+			problems.add(aboutFault,
+				fmt.Sprintf("%q can't be held in an archive: %v.", dir+p, err),
+				fmt.Sprintf("Fix %s's jenny so the file's name can be held. An update writes nothing for this cell.", l.name))
 			continue
 		}
 		paths = append(paths, p)
 	}
 	for _, p := range archive.CheckVia(prefix, l.name, paths) {
-		problems = append(problems, fmt.Sprintf("%s.\nFix %s's jenny: what it makes is its product's input view, with the trees as its top-level directories. An update writes nothing for this cell.", p, l.name))
+		problems.add(aboutFault, p.String()+".",
+			fmt.Sprintf("Fix %s's jenny: what it makes is its product's input view, with the trees as its top-level directories. An update writes nothing for this cell.", l.name))
 	}
 	for _, p := range paths {
 		switch hit := l.declaredProduct(p); len(hit) {
 		case 0:
-			problems = append(problems, fmt.Sprintf("%s is not declared.\nDeclare it in %s's Product, with a description, or fix %s's jenny. An update writes nothing for this cell.", dir+p, l.name, l.name))
+			problems.add(aboutFault, fmt.Sprintf("%s is not declared.", dir+p),
+				fmt.Sprintf("Declare it in %s's Product, with a description, or fix %s's jenny. An update writes nothing for this cell.", l.name, l.name))
 		case 1:
 		default:
-			problems = append(problems, fmt.Sprintf("%s matches two of %s's product declarations, %s and %s.\nChange the patterns so that one declaration matches each file. An update writes nothing for this cell.", dir+p, l.name, hit[0], hit[1]))
+			problems.add(aboutFault, fmt.Sprintf("%s matches two of %s's product declarations, %s and %s.", dir+p, l.name, hit[0], hit[1]),
+				"Change the patterns so that one declaration matches each file. An update writes nothing for this cell.")
 		}
 		if err := archive.Holds(files[p]); err != nil {
-			problems = append(problems, fmt.Sprintf("%s can't be held in an archive: %v.\nFix %s's jenny so the file can be held. An update writes nothing for this cell.", dir+p, err, l.name))
+			problems.add(aboutFault, fmt.Sprintf("%s can't be held in an archive: %v.", dir+p, err),
+				fmt.Sprintf("Fix %s's jenny so the file can be held. An update writes nothing for this cell.", l.name))
 		}
 	}
 	return files, problems

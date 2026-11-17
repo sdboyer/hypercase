@@ -826,7 +826,7 @@ $ go test  # chain
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         import: Imports the export as a script, as its import/ tree says.
-        via/import/parse/error is a file of import's product, which import no longer makes.
+        via/import/parse/error is a file of import's committed product, which this run of import doesn't make.
         If it should, fix import's jenny. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         list: Lists the files of the script's input view, with their bytes.

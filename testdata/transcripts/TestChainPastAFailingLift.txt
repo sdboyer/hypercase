@@ -93,7 +93,7 @@ $ go test  # chain-past
         - accepted
         + blocked unpack
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
-        via/repack/evaluate/out/values.txt is recorded, and repack is blocked: the lift unpack, on repack's path, failed on the case, so it has no product.
+        via/repack/evaluate/out/values.txt is recorded, and repack is blocked: the lift unpack, on repack's path, failed on the case, so it has no product in this run.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
     export/packed: unpack and repack make a script that evaluate prints a1 from.
         unpack: Unpacks the export, as its unpack/ tree says.
