@@ -5,6 +5,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io/fs"
 	"maps"
 	"os"
@@ -12,6 +15,7 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -21,49 +25,65 @@ import (
 	"github.com/sdboyer/hypercase/internal/registry"
 )
 
-// TestClosings: every closing a normal run gives says what the update then
-// does. Each grid takes a fixture whose archive one update has written,
-// and runs scenarios on it: an edit of what a lift or the case makes now
-// (the code's side, F) crossed with an edit of what the archive commits
-// for a bytes lift, a transform's variant or a cell (the committed side,
-// C). Each scenario runs a normal run, then an update, of each of the
-// grid's packages, as go test ./... runs them, in children that record
-// each cell's fate and files and whether its test failed, and each run of
-// a lift's function, in both runs, and each note's closing and what it
-// claims. Then every note's closing
-// in the normal run must hold:
+// TestClosings: every closing a run gives says what the update then does.
+// Each grid takes a fixture whose archive one update has written, and runs
+// scenarios on it: an edit of what a lift or the case makes now (the
+// code's side, F) crossed with an edit of what the archive commits for a
+// bytes lift, a transform's variant or a cell (the committed side, C).
+// Each scenario runs a normal run, then an update, of each of the grid's
+// packages, as go test ./... runs them, in children that record each
+// cell's fate and files and whether its test failed, each run of a lift's
+// function, and each note's closing and what it claims, in both runs.
+// Where a note is of a frozen cell with cells past it, or its closing
+// claims what normal runs after the update do, the scenario runs one.
+// Then every note's closing must hold:
 //
-//   - A default closing, the note's own, only where the update does with
-//     the cell what the normal run does: its fate, its files and its
-//     product are the normal run's, and it writes them or doesn't alike.
-//   - A staged closing, which says what the update does, only where the
-//     update does otherwise, with the fate the update then has, in words
-//     that name it: it runs the cell, on another value than the normal
-//     run's or not, blocks it by the lift that fails, writes nothing for
-//     it past a lift whose cell it writes nothing for, skips it for the
-//     probe's reason, or fails it with the probe's fault.
-//   - A closing that says the package can't tell only in a package that
-//     doesn't own a bytes lift on the cell's path, where every closing of
-//     such a cell says so.
+//   - In a normal run, a default closing, the note's own, only where the
+//     update does with the cell what the normal run does: its fate, its
+//     files and its product are the normal run's, and it writes them or
+//     doesn't alike.
+//   - In a normal run, a staged closing, which says what the update does,
+//     only where the update does otherwise, with the fate the update then
+//     has, in words that name it: it runs the cell, on another value than
+//     the normal run's or not, blocks it by the lift that fails, writes
+//     nothing for it past a lift whose cell it writes nothing for, skips it
+//     for the probe's reason, or fails it with the probe's fault.
+//   - In a normal run, a closing that says the package can't tell only in a
+//     package that doesn't own a bytes lift on the cell's path, where every
+//     closing of such a cell says so.
 //   - Each of its claims, which give every sentence it says of the update,
 //     holds of what the update did (claimChecks): the outcome it writes, a
 //     file it writes, removes or leaves in place, nothing for the cell, the
-//     lift it reruns, a variant's inputs it writes, rewrites or removes.
+//     lift it reruns, the cells past a frozen lift that then fail, a
+//     variant's inputs it writes, rewrites or removes. An update's own
+//     notes close on their defaults, and each claim one of them makes is
+//     checked as a normal run's is.
 //   - A note of a variant about no one cell closes on its default.
+//   - No note's body says what a closing says: the update command, its
+//     variable, or a run of the words the claims render.
 //
 // In each run, a cell's test fails just where the run gives notes of the
 // cell. What each update record says it wrote is checked against the
 // archive after the update, and what it didn't write is unchanged. The
 // grids together must reach every pair of a note's kind and the form of
-// its closing that a note can give (closingPairs).
+// its closing that a note can give (closingPairs), and every field of a
+// closing's claims, set in some note and unset in another.
 func TestClosings(t *testing.T) {
 	t.Parallel()
 	kinds := hypercase.NoteKinds(t)
 	pairs := closingPairs(t, kinds)
+	markers := hypercase.ClaimMarkers(t)
+	fields := claimFields()
 	var mu sync.Mutex
 	reached := map[closingPair]string{} // each pair, and the scenario first by name that reached it
 	count := map[closingPair]int{}      // how many notes give each pair
+	set, unset := map[string]string{}, map[string]string{}
 	total, ran := 0, 0
+	first := func(m map[string]string, k, name string) {
+		if was, ok := m[k]; !ok || name < was {
+			m[k] = name
+		}
+	}
 	t.Run("grid", func(t *testing.T) {
 		for _, g := range closingGrids() {
 			total += len(g.scenarios)
@@ -73,16 +93,22 @@ func TestClosings(t *testing.T) {
 				for _, sc := range g.scenarios {
 					t.Run(sc.name, func(t *testing.T) {
 						t.Parallel()
-						got := g.run(t, clean, sc, kinds)
+						got := g.run(t, clean, sc, kinds, markers)
 						mu.Lock()
 						defer mu.Unlock()
 						ran++
 						name := g.name + "/" + sc.name
-						for _, p := range got {
+						for _, p := range got.pairs {
 							count[p]++
 							if first, ok := reached[p]; !ok || name < first {
 								reached[p] = name
 							}
+						}
+						for f := range got.set {
+							first(set, f, name)
+						}
+						for f := range got.unset {
+							first(unset, f, name)
 						}
 					})
 				}
@@ -93,9 +119,14 @@ func TestClosings(t *testing.T) {
 	for _, p := range slices.SortedFunc(maps.Keys(count), comparePairs) {
 		fmt.Fprintf(&b, "\n%s %s: %d, first in %s", p.kind, p.form, count[p], reached[p])
 	}
-	t.Logf("the notes the scenarios give, by kind and closing:%s", b.String())
+	t.Logf("the notes the %d scenarios give, by kind and closing:%s", ran, b.String())
+	b.Reset()
+	for _, f := range fields {
+		fmt.Fprintf(&b, "\n%s: first set in %s", f, set[f])
+	}
+	t.Logf("the fields of the claims their closings make:%s", b.String())
 	if ran < total {
-		t.Logf("%d of the grids' %d scenarios ran, so the pairs they reach aren't checked.", ran, total)
+		t.Logf("%d of the grids' %d scenarios ran, so the pairs and the claims they reach aren't checked.", ran, total)
 		return
 	}
 	for _, p := range pairs {
@@ -108,6 +139,23 @@ func TestClosings(t *testing.T) {
 			t.Errorf("%s gives a note of kind %s a closing of the form %s, which closingPairs says no note can.", reached[p], p.kind, p.form)
 		}
 	}
+	for _, f := range fields {
+		if _, ok := set[f]; !ok {
+			t.Errorf("no scenario gives a note whose closing claims %s, so no check of it runs.\nAdd a scenario that does to a grid in closingGrids.", f)
+		}
+		if _, ok := unset[f]; !ok {
+			t.Errorf("every note the scenarios give claims %s, so none shows a closing without it.\nAdd a scenario whose note doesn't to a grid in closingGrids.", f)
+		}
+	}
+}
+
+// claimFields are the names of the fields of a closing's claims.
+func claimFields() []string {
+	var out []string
+	for f := range reflect.TypeFor[hypercase.Claims]().Fields() {
+		out = append(out, f.Name)
+	}
+	return out
 }
 
 // A closingPair is a note's kind, and the form of its closing: default,
@@ -283,8 +331,16 @@ func (g closingGrid) runAll(s *sandbox, update bool, observe string) []result {
 	return results
 }
 
-// run runs one scenario, judges it, and returns the pairs its notes give.
-func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario, kinds map[int]string) []closingPair {
+// What a scenario's notes reach: the pairs of a normal run's notes, and
+// the fields of the claims some note sets, and some note leaves unset.
+type reach struct {
+	pairs      []closingPair
+	set, unset map[string]bool
+}
+
+// run runs one scenario, and the runs after it that its closings' claims
+// need, judges it, and returns what its notes reach.
+func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario, kinds map[int]string, markers []string) reach {
 	s := newSandbox(t, "")
 	for _, p := range slices.Sorted(maps.Keys(clean)) {
 		s.write(p, clean[p], "the clean fixture")
@@ -294,23 +350,35 @@ func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario,
 	}
 	before := archive.Parse(s.read(g.archive))
 	dir := t.TempDir()
-	normal := g.runAll(s, false, filepath.Join(dir, "normal"))
-	update := g.runAll(s, true, filepath.Join(dir, "update"))
-	after := archive.Parse(s.read(g.archive))
-	j := &judge{g: g, t: t, kinds: kinds, before: before, after: after, owners: g.owners(t, s)}
-	for i := range g.pkgs {
-		j.normalOut = append(j.normalOut, normal[i].out)
-		j.normal = append(j.normal, readObserved(t, filepath.Join(dir, fmt.Sprintf("normal-%d.jsonl", i)))...)
-		j.update = append(j.update, readObserved(t, filepath.Join(dir, fmt.Sprintf("update-%d.jsonl", i)))...)
+	var logs []string
+	runs := func(name string, update bool) ([]hypercase.Observed, []result) {
+		rs := g.runAll(s, update, filepath.Join(dir, name))
+		var obs []hypercase.Observed
+		for i, r := range rs {
+			logs = append(logs, fmt.Sprintf("the %s run of %s:\n%s", name, g.pkgs[i].registration, r.out))
+			obs = append(obs, readObserved(t, filepath.Join(dir, fmt.Sprintf("%s-%d.jsonl", name, i)))...)
+		}
+		return obs, rs
 	}
-	j.lifts = liftRuns(j.update)
+	j := &judge{g: g, t: t, kinds: kinds, markers: markers, before: before}
+	var normal []result
+	j.normal, normal = runs("normal", false)
+	for _, r := range normal {
+		j.normalOut = append(j.normalOut, r.out)
+	}
+	j.update, _ = runs("update", true)
+	j.u = &updated{after: archive.Parse(s.read(g.archive)), cells: cells(j.update), lifts: liftRuns(j.update), owners: g.owners(t, s)}
+	if j.needsPost() {
+		obs, _ := runs("post", false)
+		j.u.post = cells(obs)
+	}
 	j.judge()
 	if t.Failed() {
-		for i, c := range g.pkgs {
-			t.Logf("the normal run of %s:\n%s\nits update:\n%s", c.registration, normal[i].out, update[i].out)
+		for _, l := range logs {
+			t.Log(l)
 		}
 	}
-	return j.pairs
+	return j.reach
 }
 
 // owners are the transforms that some package's registry, after the
@@ -332,6 +400,28 @@ func (g closingGrid) owners(t *testing.T, s *sandbox) map[string]bool {
 		}
 	}
 	return out
+}
+
+// marked reports whether a gaps line marks a cell, by its case's prefix
+// and its column, as the judge reads the gaps itself, apart from the
+// archive package: the base's gaps marks the base's cells and, with lines
+// that start with transform/<name>, a transform's variant's, and a
+// hand-written variant's own gaps mark its cells.
+func marked(a *archive.Archive, prefix, col string) bool {
+	section, lead := "gaps", col+" "
+	switch kind, name, _ := strings.Cut(strings.TrimSuffix(prefix, "/"), "/"); kind {
+	case "transform":
+		lead = "transform/" + name + " " + col + " "
+	case "variant":
+		section = prefix + "gaps"
+	}
+	data, _ := a.Section(section)
+	for _, l := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(l, lead) {
+			return true
+		}
+	}
+	return false
 }
 
 func readObserved(t *testing.T, path string) []hypercase.Observed {
@@ -361,15 +451,39 @@ type judge struct {
 	g              closingGrid
 	t              *testing.T
 	kinds          map[int]string
-	before, after  *archive.Archive
+	markers        []string
+	before         *archive.Archive
 	normal, update []hypercase.Observed
-	lifts          map[liftKey]bool // the lifts whose functions the update ran
-	owners         map[string]bool  // the transforms some package's registry, after the update, records it owns
-	normalOut      []string         // each package's normal run's output
-	pairs          []closingPair
+	normalOut      []string // each package's normal run's output
+	u              *updated
+	reach          reach
 }
 
-type cellKey struct{ pkg, c, col string }
+// updated is what the update did, which a claim's check observes: every
+// cell's record in the update, and the note's cell's, the archive after
+// it, the lifts whose functions it ran, the transforms the registries it
+// wrote record a package owns, and each cell's record in the normal run
+// after it, where the scenario runs one.
+type updated struct {
+	cell   hypercase.Observed
+	cells  map[cellKey]hypercase.Observed
+	after  *archive.Archive
+	lifts  map[liftKey]bool
+	owners map[string]bool
+	post   map[cellKey]hypercase.Observed
+}
+
+type cellKey struct{ pkg, c, prefix, col string }
+
+func cells(os []hypercase.Observed) map[cellKey]hypercase.Observed {
+	m := map[cellKey]hypercase.Observed{}
+	for _, o := range os {
+		if o.Record == "cell" {
+			m[cellKey{o.Pkg, o.Case, o.Prefix, o.Column}] = o
+		}
+	}
+	return m
+}
 
 // A liftKey is a lift whose function ran on a case, in a package.
 type liftKey struct{ pkg, c, lift string }
@@ -387,40 +501,72 @@ func liftRuns(os []hypercase.Observed) map[liftKey]bool {
 	return m
 }
 
-func cells(os []hypercase.Observed) map[cellKey]hypercase.Observed {
-	m := map[cellKey]hypercase.Observed{}
-	for _, o := range os {
-		if o.Record == "cell" {
-			m[cellKey{o.Pkg, o.Case, o.Column}] = o
+// needsPost reports whether the scenario's claims need a normal run after
+// the update: for a frozen note of a cell with cells past it, whose
+// closing says whether they fail in normal runs, or a note that claims
+// they do.
+func (j *judge) needsPost() bool {
+	for _, n := range slices.Concat(j.normal, j.update) {
+		if n.Record == "note" && (n.Claims.PastFresh || j.kinds[n.Kind] == "frozen" && len(past(j.u.cells, n)) > 0) {
+			return true
 		}
 	}
-	return m
+	return false
+}
+
+// past returns the cells past a note's cell, in its package and case, by
+// the update's records: those whose path holds the cell's column.
+func past(cells map[cellKey]hypercase.Observed, n hypercase.Observed) []cellKey {
+	var out []cellKey
+	for _, k := range slices.SortedFunc(maps.Keys(cells), compareCells) {
+		if n.Column != "" && k.pkg == n.Pkg && k.c == n.Case && slices.Contains(cells[k].Path, n.Column) {
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 func (j *judge) judge() {
 	t := j.t
 	t.Helper()
-	nc, uc := cells(j.normal), cells(j.update)
-	for _, n := range j.normal {
-		if n.Record != "note" || n.Update {
+	nc := cells(j.normal)
+	fields := claimFields()
+	j.reach.set, j.reach.unset = map[string]bool{}, map[string]bool{}
+	for _, n := range slices.Concat(j.normal, j.update) {
+		if n.Record != "note" {
 			continue
 		}
-		key := cellKey{n.Pkg, n.Case, n.Column}
+		key := cellKey{n.Pkg, n.Case, n.Prefix, n.Column}
+		u := *j.u
+		c := &noteCheck{g: j.g, n: n, cl: *n.Claims, kind: j.kinds[n.Kind], before: j.before, normalOut: j.normalOut}
 		bad := func(format string, args ...any) {
-			t.Errorf("%s, %s, in %s: %s\nthe note: %s\n%s\nits claims: %+v\nthe normal run's cell: %+v\nthe update's: %+v", n.Case, n.Column, n.Pkg, fmt.Sprintf(format, args...), n.Body, n.Closing, *n.Claims, nc[key], uc[key])
+			t.Errorf("%s, %s, in %s, in the %s: %s\nthe note: %s\n%s\nits claims: %+v\nthe normal run's cell: %+v\nthe update's: %+v", n.Case, n.Column, n.Pkg, runName(n.Update), fmt.Sprintf(format, args...), n.Body, n.Closing, *n.Claims, c.nr, u.cell)
 		}
-		c := &noteCheck{j: j, n: n, cl: *n.Claims, uc: uc}
 		if n.Column != "" {
+			// A normal run's note is of a cell both runs record, and an
+			// update's of one the update records: a normal run that finds a
+			// variant's inputs invalid runs none of its cells.
 			var nok, uok bool
 			c.nr, nok = nc[key]
-			c.ur, uok = uc[key]
-			if !nok || !uok {
+			u.cell, uok = j.u.cells[key]
+			if !uok || !nok && !n.Update {
 				bad("the normal run recorded the cell: %v, the update: %v", nok, uok)
 				continue
 			}
 			c.cell = true
-			if c.nr.Fate != n.This {
-				bad("the note's staging has this run's fate as %q, and the cell's is %q", n.This, c.nr.Fate)
+			if this := map[bool]hypercase.Observed{false: c.nr, true: u.cell}[n.Update]; this.Fate != n.This {
+				bad("the note's staging has this run's fate as %q, and the cell's is %q", n.This, this.Fate)
+			}
+		}
+		for _, msg := range j.adviceInBody(n.Body) {
+			bad("the note's body says %s, which is a closing's to say", msg)
+		}
+		cl := reflect.ValueOf(c.cl)
+		for _, f := range fields {
+			if cl.FieldByName(f).IsZero() {
+				j.reach.unset[f] = true
+			} else {
+				j.reach.set[f] = true
 			}
 		}
 		form := n.Form
@@ -439,30 +585,59 @@ func (j *judge) judge() {
 		default:
 			bad("the note's form is %q", form)
 		}
+		for _, name := range slices.Sorted(maps.Keys(claimChecks)) {
+			if msg := claimChecks[name].check(c, &u); msg != "" {
+				bad("%s: %s", name, msg)
+			}
+		}
+		if n.Update {
+			// An update tells nothing of itself: each note closes on its
+			// default, whose claims hold of the update, as checked.
+			if form != "default" {
+				bad("an update's note has a %s closing", form)
+			}
+			continue
+		}
 		if n.Column == "" && form != "default" {
 			bad("a variant's note about no one cell has a %s closing", form)
 		}
 		if n.Declined {
 			// The update declines the variant too.
-			for k := range uc {
+			for k := range j.u.cells {
 				if k.pkg == n.Pkg && k.c == n.Case {
 					bad("the update runs %s's cell of the variant the normal run finds declined", k.col)
 				}
-			}
-		}
-		for _, name := range slices.Sorted(maps.Keys(claimChecks)) {
-			if msg := claimChecks[name](c); msg != "" {
-				bad("%s: %s", name, msg)
 			}
 		}
 		kind, ok := j.kinds[n.Kind]
 		if !ok {
 			bad("the note's kind is %d, which no noteKind is", n.Kind)
 		}
-		j.pairs = append(j.pairs, closingPair{kind, form})
+		j.reach.pairs = append(j.reach.pairs, closingPair{kind, form})
 	}
-	j.written(uc)
+	j.written()
 	j.failedWithNotes()
+}
+
+// adviceInBody says what a note's body says that is a closing's: the
+// update command, or its variable, or a run of the words the claims
+// render, which ClaimMarkers gives.
+func (j *judge) adviceInBody(body string) []string {
+	var out []string
+	cmd := fixtureUpdate + "=1 go test ./..."
+	switch {
+	case strings.Contains(body, cmd):
+		out = append(out, fmt.Sprintf("the update command, %s", cmd))
+	case strings.Contains(body, fixtureUpdate):
+		out = append(out, fmt.Sprintf("the update variable, %s", fixtureUpdate))
+	}
+	padded := " " + strings.Join(hypercase.MarkerWords(body), " ") + " "
+	for _, m := range j.markers {
+		if strings.Contains(padded, " "+m+" ") {
+			out = append(out, fmt.Sprintf("%q, which a closing's claims render", m))
+		}
+	}
+	return out
 }
 
 // failedWithNotes checks that, in each run, a cell's test fails where the
@@ -472,14 +647,14 @@ func (j *judge) failedWithNotes() {
 		noted := map[cellKey]bool{}
 		for _, o := range run {
 			if o.Record == "note" && o.Column != "" {
-				noted[cellKey{o.Pkg, o.Case, o.Column}] = true
+				noted[cellKey{o.Pkg, o.Case, o.Prefix, o.Column}] = true
 			}
 		}
 		for _, o := range run {
 			if o.Record != "cell" {
 				continue
 			}
-			switch k := (cellKey{o.Pkg, o.Case, o.Column}); {
+			switch k := (cellKey{o.Pkg, o.Case, o.Prefix, o.Column}); {
 			case o.Failed && !noted[k]:
 				j.t.Errorf("%s, %s, in %s: the cell's test fails in the %s with no note of the cell: %+v", o.Case, o.Column, o.Pkg, runName(o.Update), o)
 			case !o.Failed && noted[k]:
@@ -496,16 +671,21 @@ func runName(update bool) string {
 	return "normal run"
 }
 
-// A noteCheck is what a claim's check reads: the note, what its closing
-// claims, and, for a note of a cell, the cell's records in the normal run
-// and the update.
+// A noteCheck is what a claim's check reads of the run that gave the
+// note: the note, what its closing claims, the note's kind, as NoteKinds
+// names it, the archive before the runs, each package's normal run's
+// output, and, for a note of a cell, the cell's record in the normal run.
+// What the update did is the check's other argument, so a check that
+// observes nothing of it names no such argument.
 type noteCheck struct {
-	j      *judge
-	n      hypercase.Observed
-	cl     hypercase.Claims
-	cell   bool
-	nr, ur hypercase.Observed
-	uc     map[cellKey]hypercase.Observed
+	g         closingGrid
+	n         hypercase.Observed
+	cl        hypercase.Claims
+	kind      string
+	cell      bool
+	nr        hypercase.Observed
+	before    *archive.Archive
+	normalOut []string
 }
 
 // staged reports whether the closing says what the update does, or that
@@ -521,37 +701,47 @@ func section(a *archive.Archive, name string) (string, bool) {
 // out names a file of the note's cell, by its path under out/<column>/.
 func (c *noteCheck) out(p string) string { return c.n.Prefix + "out/" + c.n.Column + "/" + p }
 
-// claimChecks check each field of a closing's claims against what the
-// update did: each returns what is wrong, or "". TestClaimChecks fails on
-// a field of the claims with no check here, so no closing claims what
-// TestClosings doesn't check.
-var claimChecks = map[string]func(c *noteCheck) string{
-	"Does": func(c *noteCheck) string {
+// A claimCheck checks one field of a closing's claims against what the
+// update did, u, and returns what is wrong, or "". unobserved says why
+// the check observes nothing the update did, where it doesn't, and only
+// there: TestClaimChecks requires it of a check whose u goes unused.
+type claimCheck struct {
+	check      func(c *noteCheck, u *updated) string
+	unobserved string
+}
+
+// claimChecks check each field of a closing's claims. TestClaimChecks
+// fails on a field of the claims with no check here, so no closing claims
+// what TestClosings doesn't check.
+var claimChecks = map[string]claimCheck{
+	"Does": {check: func(c *noteCheck, u *updated) string {
 		switch {
 		case !c.cell && c.cl.Does != "":
 			return "a variant's note about no one cell says what the update does with a cell"
-		case !c.cell:
-		case c.cl.Does != "" && c.cl.Does != c.ur.Fate:
-			return fmt.Sprintf("the closing says the update's fate is %q, and it is %q", c.cl.Does, c.ur.Fate)
-		case c.cl.Does != "" && sameCell(c.nr, c.ur):
+		case c.n.Update && c.cl.Does != "":
+			return "an update's note says what the update does otherwise than itself"
+		case !c.cell || c.n.Update:
+		case c.cl.Does != "" && c.cl.Does != u.cell.Fate:
+			return fmt.Sprintf("the closing says the update's fate is %q, and it is %q", c.cl.Does, u.cell.Fate)
+		case c.cl.Does != "" && sameCell(c.nr, u.cell):
 			return "the closing says the update does otherwise with the cell than the normal run, and it does the same"
-		case !c.staged() && !sameCell(c.nr, c.ur):
+		case !c.staged() && !sameCell(c.nr, u.cell):
 			return "the closing is the note's default, and the update does otherwise with the cell"
 		}
 		return ""
-	},
-	"Another": func(c *noteCheck) string {
+	}},
+	"Another": {check: func(c *noteCheck, u *updated) string {
 		want := c.cell && c.cl.Does == "runs" && c.nr.OnValue
 		switch {
 		case c.cl.Another != want:
 			return fmt.Sprintf("the closing says the update runs the cell on another value: %v, and the update runs a cell the normal run ran on a value: %v", c.cl.Another, want)
-		case c.cl.Another && maps.Equal(c.nr.View, c.ur.View):
+		case c.cl.Another && maps.Equal(c.nr.View, u.cell.View):
 			return "the closing says the update runs the cell on another value, and it ran the cell on the input view the normal run did"
 		}
 		return ""
-	},
-	"Variant": func(c *noteCheck) string {
-		differs := c.cell && !maps.Equal(c.nr.Root, c.ur.Root)
+	}},
+	"Variant": {check: func(c *noteCheck, u *updated) string {
+		differs := c.cell && !maps.Equal(c.nr.Root, u.cell.Root)
 		switch {
 		case !c.staged() && c.cl.Variant != "":
 			return "the note's default says the update stages the variant otherwise"
@@ -562,95 +752,124 @@ var claimChecks = map[string]func(c *noteCheck) string{
 			return fmt.Sprintf("the closing names the transform %s, and the case is %s", c.cl.Variant, c.n.Case)
 		}
 		return ""
-	},
+	}},
 	// The lift a closing says the update reruns is one whose function the
 	// update ran on the case, as its records of each run of a lift show:
 	// where the package can't tell, the lift it doesn't own, which the
 	// package that owns it runs, and otherwise the last bytes lift on the
 	// cell's path that the package's update ran.
-	"Reruns": func(c *noteCheck) string {
+	"Reruns": {check: func(c *noteCheck, u *updated) string {
 		var want string
 		switch {
 		case c.cl.CantTell != "":
 			want = c.cl.CantTell
 			ran := false
-			for k := range c.j.lifts {
+			for k := range u.lifts {
 				ran = ran || k.c == c.n.Case && k.lift == want
 			}
 			if !ran {
 				return fmt.Sprintf("the closing says the update reruns %s, and no package's update ran its function on the case", want)
 			}
 		case c.cl.Does != "":
-			for _, l := range c.ur.Path {
-				if c.j.lifts[liftKey{c.n.Pkg, c.n.Case, l}] {
+			for _, l := range u.cell.Path {
+				if u.lifts[liftKey{c.n.Pkg, c.n.Case, l}] {
 					want = l
 					break
 				}
 			}
 		}
 		if c.cl.Reruns != want {
-			return fmt.Sprintf("the closing says the update reruns %q, and the last bytes lift on the cell's path, %v, whose function the update ran on the case is %q", c.cl.Reruns, c.ur.Path, want)
+			return fmt.Sprintf("the closing says the update reruns %q, and the last bytes lift on the cell's path, %v, whose function the update ran on the case is %q", c.cl.Reruns, u.cell.Path, want)
 		}
 		return ""
-	},
-	"CantTell": func(c *noteCheck) string {
+	}},
+	"CantTell": {check: func(c *noteCheck, _ *updated) string {
 		var want string
-		if c.cell {
-			want = c.j.g.unowned[c.n.Pkg+" "+c.n.Column]
+		if c.cell && !c.n.Update {
+			want = c.g.unowned[c.n.Pkg+" "+c.n.Column]
 		}
 		if c.cl.CantTell != want {
 			return fmt.Sprintf("the closing says the package can't tell, as it doesn't own %q, and the bytes lift on the cell's path it doesn't own is %q", c.cl.CantTell, want)
 		}
 		return ""
-	},
-	"PastFresh": func(c *noteCheck) string {
-		if !c.cl.PastFresh {
+	}, unobserved: "the claim is that this package doesn't own the lift, so it can't tell what the update does: which package owns which lift is the grid's registrations, which unowned records, and no run of the update shows what a package can't tell. What it says of the update, the lift it reruns, is Reruns'"},
+	// The cells past a frozen lift fail in normal runs when the update
+	// writes them from what the lift makes now, and a normal run reads the
+	// frozen cell's committed outcome and product, which the update leaves
+	// in place: a normal run after the update fails such a cell, and gives
+	// it another fate, other files or another product than the update
+	// wrote. A frozen note of a cell with cells past it, closing on its
+	// default, says so just where they do. A staged closing says what the
+	// update does with the cell, and to run it and fix what it reports: the
+	// update's own note of the cell closes on its default, and says it.
+	"PastFresh": {check: func(c *noteCheck, u *updated) string {
+		switch {
+		case !c.cell && c.cl.PastFresh:
+			return "a variant's note about no one cell says the cells past it fail"
+		case !c.cell, !c.cl.PastFresh && (c.kind != "frozen" || c.staged()):
 			return ""
-		}
-		if !c.cell || !c.j.cellSame(c.n.Prefix, c.n.Column) {
+		case c.cl.PastFresh && !maps.Equal(cellSections(c.before, c.n.Prefix, c.n.Column), cellSections(u.after, c.n.Prefix, c.n.Column)):
 			return "the closing says the update leaves the cell's committed outcome and product in place, and they changed"
 		}
-		for _, k := range slices.SortedFunc(maps.Keys(c.uc), compareCells) {
-			u := c.uc[k]
-			if k.pkg == c.n.Pkg && k.c == c.n.Case && len(u.Path) > 0 && u.Path[0] == c.n.Column && u.OnValue && !maps.Equal(u.View, c.ur.Product) {
-				return fmt.Sprintf("the closing says the update runs the cells past %s on what it makes now, and it runs %s on %v, where %s makes %v", c.n.Column, k.col, u.View, c.n.Column, c.ur.Product)
+		var parted []string
+		for _, k := range slices.SortedFunc(maps.Keys(u.cells), compareCells) {
+			uk := u.cells[k]
+			if k.pkg != c.n.Pkg || k.c != c.n.Case || !slices.Contains(uk.Path, c.n.Column) || !uk.Ran || !uk.Writable {
+				continue
+			}
+			pk, ok := u.post[k]
+			if !ok {
+				return fmt.Sprintf("the normal run after the update recorded no cell of %s", k.col)
+			}
+			if pk.Failed && (pk.Fate != uk.Fate || !maps.Equal(pk.Files, uk.Files) || !maps.Equal(pk.Product, uk.Product)) {
+				parted = append(parted, k.col)
 			}
 		}
+		switch {
+		case c.cl.PastFresh && len(parted) == 0:
+			return fmt.Sprintf("the closing says the cells past %s fail in normal runs, and a normal run after the update fails none the update wrote, giving it other than the update wrote", c.n.Column)
+		case !c.cl.PastFresh && len(parted) > 0:
+			return fmt.Sprintf("the closing doesn't say the cells past %s fail in normal runs, and a normal run after the update fails %v, giving them other than the update wrote", c.n.Column, parted)
+		}
 		return ""
-	},
-	"RunWrites": func(c *noteCheck) string {
-		if c.cl.RunWrites && (c.ur.Fate != "runs" || !c.ur.OnValue) {
+	}},
+	"RunWrites": {check: func(c *noteCheck, u *updated) string {
+		if c.cl.RunWrites && (u.cell.Fate != "runs" || !u.cell.OnValue) {
 			return "the closing says what the update writes for the cell is its run's, and the update didn't run it"
 		}
 		return ""
-	},
-	"MayWrite": func(c *noteCheck) string {
+	}},
+	// That the update's run may still write the file rests on the update
+	// running the cell on another value than the normal run's, which the
+	// check observes. That it may is all the claim says: whether the run
+	// writes the file or not, no observation refutes it.
+	"MayWrite": {check: func(c *noteCheck, u *updated) string {
 		switch {
 		case c.cl.MayWrite == "":
 		case c.cl.MayWrite != c.n.File:
 			return fmt.Sprintf("the closing says the update's run may still write %s, and the note is about %s", c.cl.MayWrite, c.n.File)
-		case !c.cl.Another:
-			return "the closing says the update's run of the cell may still write the file, and doesn't say it runs the cell on another value"
+		case u.cell.Fate != "runs" || !u.cell.OnValue || maps.Equal(c.nr.View, u.cell.View):
+			return fmt.Sprintf("the closing says the update's run of the cell may still write the file, and the update didn't run the cell on another value than the normal run: its fate is %q, on a value: %v, on the normal run's view: %v", u.cell.Fate, u.cell.OnValue, maps.Equal(c.nr.View, u.cell.View))
 		}
 		return ""
-	},
-	"Outcome": func(c *noteCheck) string {
+	}},
+	"Outcome": {check: func(c *noteCheck, u *updated) string {
 		if c.cl.Outcome == "" {
 			return ""
 		}
-		if got, _ := section(c.j.after, c.out("outcome")); got != c.cl.Outcome+"\n" {
+		if got, _ := section(u.after, c.out("outcome")); got != c.cl.Outcome+"\n" {
 			return fmt.Sprintf("the closing says the update writes the outcome %q, and the archive has %q", c.cl.Outcome, got)
 		}
 		return ""
-	},
-	"Differs": func(c *noteCheck) string {
+	}},
+	"Differs": {check: func(c *noteCheck, u *updated) string {
 		// What the closing says the update writes, if it says.
 		var writes string
 		switch {
 		case c.cl.Outcome != "":
 			writes = c.cl.Outcome + "\n"
-		case c.cl.RunWrites && c.ur.Ran && c.ur.Writable:
-			writes = c.ur.Files["outcome"]
+		case c.cl.RunWrites && u.cell.Ran && u.cell.Writable:
+			writes = u.cell.Files["outcome"]
 		}
 		this, ok := c.nr.Files["outcome"]
 		switch {
@@ -660,160 +879,174 @@ var claimChecks = map[string]func(c *noteCheck) string{
 			return fmt.Sprintf("the closing doesn't say the outcome the update writes, %q, isn't this run's, which is %q", writes, this)
 		}
 		return ""
-	},
-	"Panic": func(c *noteCheck) string {
+	}},
+	"Panic": {check: func(c *noteCheck, u *updated) string {
 		if !c.cl.Panic {
 			return ""
 		}
-		_, v, ok := strings.Cut(c.ur.Fate, "'s probe panics: ")
-		got, _ := section(c.j.after, c.out("error.txt"))
+		_, v, ok := strings.Cut(u.cell.Fate, "'s probe panics: ")
+		got, _ := section(u.after, c.out("error.txt"))
 		switch {
 		case c.cl.Outcome != "panicked":
 			return fmt.Sprintf("the closing says the update writes a panic, and the outcome %q", c.cl.Outcome)
 		case !ok:
-			return fmt.Sprintf("the closing says the update writes the probe's panic, and its fate is %q", c.ur.Fate)
+			return fmt.Sprintf("the closing says the update writes the probe's panic, and its fate is %q", u.cell.Fate)
 		case got != v+"\n":
 			return fmt.Sprintf("the closing says the update writes the panic %q in error.txt, and the archive has %q", v, got)
 		}
 		return ""
-	},
-	"Nothing": func(c *noteCheck) string {
+	}},
+	"Nothing": {check: func(c *noteCheck, u *updated) string {
 		switch {
 		case !c.cl.Nothing:
 		case !c.cell:
 			return "a variant's note about no one cell says the update writes nothing for a cell"
-		case c.ur.Ran && c.ur.Writable:
+		case u.cell.Ran && u.cell.Writable:
 			return "the closing says the update writes nothing for the cell, and it records that it wrote it"
-		case !c.j.cellSame(c.n.Prefix, c.n.Column):
+		case !maps.Equal(cellSections(c.before, c.n.Prefix, c.n.Column), cellSections(u.after, c.n.Prefix, c.n.Column)):
 			return "the closing says the update writes nothing for the cell, and it changed"
 		}
 		return ""
-	},
-	"Frozen": func(c *noteCheck) string {
-		if c.cl.Frozen && !c.ur.Frozen {
-			return "the closing says a gaps line freezes the cell, and the update has it unfrozen"
+	}},
+	// A gaps line freezes a cell that it marks, as the judge reads the
+	// gaps itself, and that has committed files: the update leaves each of
+	// them as it was.
+	"Frozen": {check: func(c *noteCheck, u *updated) string {
+		if !c.cl.Frozen {
+			return ""
+		}
+		was := cellSections(c.before, c.n.Prefix, c.n.Column)
+		switch {
+		case !c.cell:
+			return "a variant's note about no one cell says a gaps line freezes a cell"
+		case !marked(c.before, c.n.Prefix, c.n.Column):
+			return "the closing says a gaps line freezes the cell, and no gaps line marks it"
+		case len(was) == 0:
+			return "the closing says a gaps line freezes the cell, and the cell has no committed files"
+		case !maps.Equal(was, cellSections(u.after, c.n.Prefix, c.n.Column)):
+			return "the closing says a gaps line freezes the cell, and the update changed it"
 		}
 		return ""
-	},
-	"Writes": func(c *noteCheck) string {
+	}},
+	"Writes": {check: func(c *noteCheck, u *updated) string {
 		if c.cl.Writes == "" {
 			return ""
 		}
-		got, ok := section(c.j.after, c.cl.Writes)
+		got, ok := section(u.after, c.cl.Writes)
 		// A file of the cell's, or of its bytes lift's product.
 		want, made := "", false
 		if rel, ok := strings.CutPrefix(c.cl.Writes, c.n.Prefix+"out/"+c.n.Column+"/"); ok {
-			want, made = c.ur.Files[rel]
-		} else if rel, ok := strings.CutPrefix(c.cl.Writes, c.n.Prefix+"via/"+c.n.Column+"/"); ok && c.ur.Via {
-			want, made = c.ur.Product[rel]
+			want, made = u.cell.Files[rel]
+		} else if rel, ok := strings.CutPrefix(c.cl.Writes, c.n.Prefix+"via/"+c.n.Column+"/"); ok && u.cell.Via {
+			want, made = u.cell.Product[rel]
 		}
-		if !ok || !made || !c.ur.Ran || !c.ur.Writable || got != want {
+		if !ok || !made || !u.cell.Ran || !u.cell.Writable || got != want {
 			return fmt.Sprintf("the closing says the update writes %s, and the archive has %q", c.cl.Writes, got)
 		}
 		return ""
-	},
-	"OnlyOutcome": func(c *noteCheck) string {
+	}},
+	"OnlyOutcome": {check: func(c *noteCheck, u *updated) string {
 		if c.cl.OnlyOutcome == "" {
 			return ""
 		}
-		was, is := c.j.cellSections(c.j.before, c.n.Prefix, c.n.Column), c.j.cellSections(c.j.after, c.n.Prefix, c.n.Column)
+		was, is := cellSections(c.before, c.n.Prefix, c.n.Column), cellSections(u.after, c.n.Prefix, c.n.Column)
 		_, had := was[c.cl.OnlyOutcome]
-		was[c.cl.OnlyOutcome] = c.ur.Files["outcome"]
+		was[c.cl.OnlyOutcome] = u.cell.Files["outcome"]
 		if had || c.cl.OnlyOutcome != c.out("outcome") || !maps.Equal(was, is) {
 			return fmt.Sprintf("the closing says the update adds %s and changes nothing else of the cell, and the cell had it: %v, or the cell is %v", c.cl.OnlyOutcome, had, is)
 		}
 		return ""
-	},
-	"Leaves": func(c *noteCheck) string {
+	}},
+	"Leaves": {check: func(c *noteCheck, u *updated) string {
 		if c.cl.Leaves == "" {
 			return ""
 		}
-		was, ok := section(c.j.before, c.cl.Leaves)
-		is, still := section(c.j.after, c.cl.Leaves)
+		was, ok := section(c.before, c.cl.Leaves)
+		is, still := section(u.after, c.cl.Leaves)
 		if !ok || !still || was != is {
 			return fmt.Sprintf("the closing says the update leaves %s in place, and the archive had it: %v, and has it as it was: %v", c.cl.Leaves, ok, still && was == is)
 		}
 		return ""
-	},
-	"Removes": func(c *noteCheck) string {
+	}},
+	"Removes": {check: func(c *noteCheck, u *updated) string {
 		if c.cl.Removes == "" {
 			return ""
 		}
-		_, ok := section(c.j.before, c.cl.Removes)
-		if _, still := section(c.j.after, c.cl.Removes); !ok || still {
+		_, ok := section(c.before, c.cl.Removes)
+		if _, still := section(u.after, c.cl.Removes); !ok || still {
 			return fmt.Sprintf("the closing says the update removes %s, and the archive had it: %v, and still has it: %v", c.cl.Removes, ok, still)
 		}
 		return ""
-	},
-	"RemovesInputs": func(c *noteCheck) string {
+	}},
+	"RemovesInputs": {check: func(c *noteCheck, u *updated) string {
 		if c.cl.RemovesInputs == "" {
 			return ""
 		}
-		if was, is := c.j.inputs(c.j.before, c.cl.RemovesInputs), c.j.inputs(c.j.after, c.cl.RemovesInputs); len(was) == 0 || len(is) > 0 {
+		if was, is := inputs(c.before, c.cl.RemovesInputs), inputs(u.after, c.cl.RemovesInputs); len(was) == 0 || len(is) > 0 {
 			return fmt.Sprintf("the closing says the update removes %s's inputs, and the archive had %v, and has %v", c.cl.RemovesInputs, slices.Sorted(maps.Keys(was)), slices.Sorted(maps.Keys(is)))
 		}
 		return ""
-	},
-	"WritesInputs": func(c *noteCheck) string {
+	}},
+	"WritesInputs": {check: func(c *noteCheck, u *updated) string {
 		if c.cl.WritesInputs == "" {
 			return ""
 		}
-		if was := c.j.inputs(c.j.before, c.cl.WritesInputs); len(was) > 0 {
+		if was := inputs(c.before, c.cl.WritesInputs); len(was) > 0 {
 			return fmt.Sprintf("the closing says the update writes %s's inputs, which the archive lacks, and it had %v", c.cl.WritesInputs, slices.Sorted(maps.Keys(was)))
 		}
-		return c.inputsMade(c.cl.WritesInputs)
-	},
+		return inputsMade(c, u, c.cl.WritesInputs)
+	}},
 	// The package that owns the transform rewrites its variant's inputs,
 	// and its registry, after the update, records that it owns it.
-	"RewritesInputs": func(c *noteCheck) string {
+	"RewritesInputs": {check: func(c *noteCheck, u *updated) string {
 		tr := c.cl.RewritesInputs
 		switch {
 		case tr == "":
 			return ""
-		case !c.j.owners[tr]:
+		case !u.owners[tr]:
 			return fmt.Sprintf("the closing says this package's update rewrites %s's inputs, and no registry records a package owns it", tr)
-		case maps.Equal(c.j.inputs(c.j.before, tr), c.j.inputs(c.j.after, tr)):
+		case maps.Equal(inputs(c.before, tr), inputs(u.after, tr)):
 			return fmt.Sprintf("the closing says this package's update rewrites %s's inputs, and they are as they were", tr)
 		}
-		return c.inputsMade(tr)
-	},
+		return inputsMade(c, u, tr)
+	}},
 	// In a package that doesn't own the transform, the closing says the
 	// owner's update rewrites the inputs, and, if no package owns it, that
 	// the root-package check says so, and no update rewrites them: which
 	// holds is what the registries the update wrote record.
-	"OwnerRewritesInputs": func(c *noteCheck) string {
+	"OwnerRewritesInputs": {check: func(c *noteCheck, u *updated) string {
 		tr := c.cl.OwnerRewritesInputs
 		if tr == "" {
 			return ""
 		}
-		same := maps.Equal(c.j.inputs(c.j.before, tr), c.j.inputs(c.j.after, tr))
+		same := maps.Equal(inputs(c.before, tr), inputs(u.after, tr))
 		switch {
-		case c.j.owners[tr] && same:
+		case u.owners[tr] && same:
 			return fmt.Sprintf("the closing says the update of the package that owns %s rewrites its inputs, and they are as they were", tr)
-		case c.j.owners[tr]:
-			return c.inputsMade(tr)
+		case u.owners[tr]:
+			return inputsMade(c, u, tr)
 		case !same:
 			return fmt.Sprintf("the closing says that if no package owns %s, no update rewrites its inputs, and no registry records a package owns it, and the update changed them", tr)
 		}
 		says := regexp.MustCompile(regexp.QuoteMeta("the transform "+tr+", of testdata/") + `\S*, is owned by no package`)
-		for _, out := range c.j.normalOut {
+		for _, out := range c.normalOut {
 			if says.MatchString(out) {
 				return ""
 			}
 		}
 		return fmt.Sprintf("the closing says that if no package owns %s, the root-package check says so, and no normal run says %q", tr, says)
-	},
+	}},
 }
 
 // inputsMade checks that, after the update, the inputs the archive holds
 // for the note's variant, of the transform tr, give the input view the
 // update ran the variant's cells on: what the transform makes.
-func (c *noteCheck) inputsMade(tr string) string {
+func inputsMade(c *noteCheck, u *updated, tr string) string {
 	if c.n.Prefix != archive.Transform+"/"+tr+"/" {
 		return fmt.Sprintf("the closing names %s's inputs, and the note is of %s", tr, c.n.Case)
 	}
 	var vc *archive.VariantCase
-	for _, v := range c.j.after.Variants() {
+	for _, v := range u.after.Variants() {
 		if v.Kind == archive.Transform && v.Name == tr {
 			vc = &v
 		}
@@ -821,7 +1054,7 @@ func (c *noteCheck) inputsMade(tr string) string {
 	if vc == nil || !vc.Inputs {
 		return fmt.Sprintf("the closing says the update writes %s's inputs, and the archive holds none", tr)
 	}
-	view, ps := c.j.after.Base().InputView(*vc)
+	view, ps := u.after.Base().InputView(*vc)
 	if len(ps) > 0 {
 		return fmt.Sprintf("the closing says the update writes %s's inputs, and those the archive holds are invalid: %v", tr, ps)
 	}
@@ -830,11 +1063,11 @@ func (c *noteCheck) inputsMade(tr string) string {
 		return err.Error()
 	}
 	ran := false
-	for _, k := range slices.SortedFunc(maps.Keys(c.uc), compareCells) {
-		if u := c.uc[k]; k.c == c.n.Case && u.OnValue {
+	for _, k := range slices.SortedFunc(maps.Keys(u.cells), compareCells) {
+		if uk := u.cells[k]; k.c == c.n.Case && uk.OnValue {
 			ran = true
-			if !maps.Equal(u.Root, files) {
-				return fmt.Sprintf("the closing says the update writes %s's inputs, which give %v, and it ran %s, in %s, on %v", tr, files, k.col, k.pkg, u.Root)
+			if !maps.Equal(uk.Root, files) {
+				return fmt.Sprintf("the closing says the update writes %s's inputs, which give %v, and it ran %s, in %s, on %v", tr, files, k.col, k.pkg, uk.Root)
 			}
 		}
 	}
@@ -862,7 +1095,10 @@ func viewFiles(view fs.FS) (map[string]string, error) {
 }
 
 // TestClaimChecks: claimChecks checks each field of a closing's claims,
-// and names no other.
+// and names no other. A check observes what the update did through its
+// second argument alone, so one that names it _, or never uses it, observes
+// nothing the update did: it, and only it, says why in unobserved. The
+// checks' source is read from this file.
 func TestClaimChecks(t *testing.T) {
 	var fields []string
 	for f := range reflect.TypeFor[hypercase.Claims]().Fields() {
@@ -876,6 +1112,76 @@ func TestClaimChecks(t *testing.T) {
 			t.Errorf("claimChecks checks %s, which no field of a closing's claims is", name)
 		}
 	}
+	observes := checksObserving(t)
+	for _, name := range slices.Sorted(maps.Keys(claimChecks)) {
+		o, ok := observes[name]
+		unobserved := strings.TrimSpace(claimChecks[name].unobserved)
+		switch {
+		case !ok:
+			t.Errorf("claimChecks' check of %s is no func literal in claimChecks' source, so TestClaimChecks can't tell what it observes", name)
+		case !o && unobserved == "":
+			t.Errorf("claimChecks' check of %s observes nothing the update did: it never uses its second argument.\nCheck the claim against what the update did, or say in unobserved why no observation of the update can check it.", name)
+		case o && unobserved != "":
+			t.Errorf("claimChecks' check of %s says it observes nothing the update did, and uses its second argument", name)
+		}
+	}
+}
+
+// checksObserving reports, for each check of claimChecks, by its field,
+// whether its func literal uses its second parameter, what the update did,
+// reading claimChecks' source in this file.
+func checksObserving(t *testing.T) map[string]bool {
+	t.Helper()
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "closings_test.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]bool{}
+	for _, d := range f.Decls {
+		gd, ok := d.(*ast.GenDecl)
+		if !ok || gd.Tok != token.VAR {
+			continue
+		}
+		for _, sp := range gd.Specs {
+			vs := sp.(*ast.ValueSpec)
+			if len(vs.Names) != 1 || vs.Names[0].Name != "claimChecks" || len(vs.Values) != 1 {
+				continue
+			}
+			for _, el := range vs.Values[0].(*ast.CompositeLit).Elts {
+				kv := el.(*ast.KeyValueExpr)
+				name, err := strconv.Unquote(kv.Key.(*ast.BasicLit).Value)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, fel := range kv.Value.(*ast.CompositeLit).Elts {
+					fkv, ok := fel.(*ast.KeyValueExpr)
+					if !ok || fkv.Key.(*ast.Ident).Name != "check" {
+						continue
+					}
+					lit, ok := fkv.Value.(*ast.FuncLit)
+					if !ok {
+						continue
+					}
+					var params []*ast.Ident
+					for _, p := range lit.Type.Params.List {
+						params = append(params, p.Names...)
+					}
+					used := false
+					if len(params) == 2 && params[1].Name != "_" {
+						ast.Inspect(lit.Body, func(n ast.Node) bool {
+							if id, ok := n.(*ast.Ident); ok && id.Name == params[1].Name {
+								used = true
+							}
+							return true
+						})
+					}
+					out[name] = used
+				}
+			}
+		}
+	}
+	return out
 }
 
 // sameCell reports whether the update did with a cell what the normal run
@@ -902,7 +1208,7 @@ func compareCells(a, b cellKey) int {
 
 // cellSections returns a cell's files and product in an archive, by
 // section.
-func (j *judge) cellSections(a *archive.Archive, prefix, col string) map[string]string {
+func cellSections(a *archive.Archive, prefix, col string) map[string]string {
 	m := map[string]string{}
 	for _, s := range a.Sections {
 		if strings.HasPrefix(s.Name, prefix+"out/"+col+"/") || strings.HasPrefix(s.Name, prefix+"via/"+col+"/") {
@@ -914,7 +1220,7 @@ func (j *judge) cellSections(a *archive.Archive, prefix, col string) map[string]
 
 // inputs returns a transform's variant's committed inputs in an archive,
 // by section.
-func (j *judge) inputs(a *archive.Archive, tr string) map[string]string {
+func inputs(a *archive.Archive, tr string) map[string]string {
 	m := map[string]string{}
 	prefix := "transform/" + tr + "/"
 	for _, s := range a.Sections {
@@ -928,54 +1234,49 @@ func (j *judge) inputs(a *archive.Archive, tr string) map[string]string {
 // written checks each cell the update records against the archive after
 // it: a cell it wrote holds its files, and a bytes lift's its product, and
 // a cell it didn't write is as it was.
-func (j *judge) written(uc map[cellKey]hypercase.Observed) {
+func (j *judge) written() {
 	t := j.t
 	t.Helper()
-	for _, k := range slices.SortedFunc(maps.Keys(uc), func(a, b cellKey) int { return strings.Compare(a.c+" "+a.col, b.c+" "+b.col) }) {
-		ur := uc[k]
+	for _, k := range slices.SortedFunc(maps.Keys(j.u.cells), func(a, b cellKey) int { return strings.Compare(a.c+" "+a.col, b.c+" "+b.col) }) {
+		ur := j.u.cells[k]
 		prefix := ur.Prefix
 		if !ur.Ran || !ur.Writable {
-			if !j.cellSame(prefix, k.col) {
+			if !maps.Equal(cellSections(j.before, prefix, k.col), cellSections(j.u.after, prefix, k.col)) {
 				t.Errorf("%s, %s, in %s: the update records it wrote nothing for the cell, and the cell changed: %+v", k.c, k.col, k.pkg, ur)
 			}
 			continue
 		}
-		for p, data := range ur.Files {
-			if got, ok := j.after.Section(prefix + "out/" + k.col + "/" + p); !ok || string(got) != data {
-				t.Errorf("%s, %s, in %s: the update records it wrote %s as %q, and the archive has %q", k.c, k.col, k.pkg, p, data, got)
-			}
-		}
-		if ur.Via {
-			got := map[string]string{}
-			for _, s := range j.after.Sections {
-				if rest, ok := strings.CutPrefix(s.Name, prefix+"via/"+k.col+"/"); ok {
-					got[rest] = string(s.Data)
-				}
-			}
-			want := ur.Product
-			if want == nil {
-				want = map[string]string{}
-			}
-			if !maps.Equal(got, want) {
-				t.Errorf("%s, %s, in %s: the update records it wrote the product %v, and the archive has %v", k.c, k.col, k.pkg, want, got)
-			}
+		if msg := holdsCell(j.u.after, ur); msg != "" {
+			t.Errorf("%s, %s, in %s: %s", k.c, k.col, k.pkg, msg)
 		}
 	}
 }
 
-// cellSame reports whether a cell's files and product are as they were
-// before the update.
-func (j *judge) cellSame(prefix, col string) bool {
-	sections := func(a *archive.Archive) map[string]string {
-		m := map[string]string{}
+// holdsCell says how an archive doesn't hold what an update records it
+// wrote for a cell: its files, and a bytes lift's product, or "".
+func holdsCell(a *archive.Archive, ur hypercase.Observed) string {
+	for _, p := range slices.Sorted(maps.Keys(ur.Files)) {
+		data := ur.Files[p]
+		if got, ok := a.Section(ur.Prefix + "out/" + ur.Column + "/" + p); !ok || string(got) != data {
+			return fmt.Sprintf("the update records it wrote %s as %q, and the archive has %q", p, data, got)
+		}
+	}
+	if ur.Via {
+		got := map[string]string{}
 		for _, s := range a.Sections {
-			if strings.HasPrefix(s.Name, prefix+"out/"+col+"/") || strings.HasPrefix(s.Name, prefix+"via/"+col+"/") {
-				m[s.Name] = string(s.Data)
+			if rest, ok := strings.CutPrefix(s.Name, ur.Prefix+"via/"+ur.Column+"/"); ok {
+				got[rest] = string(s.Data)
 			}
 		}
-		return m
+		want := ur.Product
+		if want == nil {
+			want = map[string]string{}
+		}
+		if !maps.Equal(got, want) {
+			return fmt.Sprintf("the update records it wrote the product %v, and the archive has %v", want, got)
+		}
 	}
-	return maps.Equal(sections(j.before), sections(j.after))
+	return ""
 }
 
 // The chain fixture's edits of what import makes now, each under
@@ -1036,6 +1337,7 @@ var (
 		{"V8 inputs import/panic", insert("transform/louder/in/import/panic", "x\n", "transform/louder/in/import/out/")},
 		{"V9 inputs probe", insert("transform/louder/in/import/out/evaluate/probe", "r9\n", "transform/louder/in/import/out/evaluate/out/")},
 		{"V10 inputs import/error, and via drops A1", seq(insert("transform/louder/in/import/error", "line 1\n", "transform/louder/in/import/out/"), drop("transform/louder/via/import/quote/A1"))},
+		{"V11 no inputs", drop("transform/louder/in/")},
 	}
 )
 
@@ -1101,6 +1403,12 @@ var (
 	}
 )
 
+// gapNoOutcome marks a column's cell of the base with a gaps line, and
+// removes the outcome it commits.
+func gapNoOutcome(col string) gridEdit {
+	return gridEdit{"gap " + col + ", no outcome", seq(gapOn(col).fn, drop("out/"+col+"/outcome"))}
+}
+
 // closingGrids are the grids TestClosings runs.
 func closingGrids() []closingGrid {
 	const prices = "testdata/export/prices.txtar"
@@ -1127,6 +1435,8 @@ func closingGrids() []closingGrid {
 		frozenF = append(frozenF, gapOn(col))
 	}
 	add("frozen", chain, cross(frozenF, editsOf(chainF, "F0", "F1", "F2", "F3", "F5", "F8", "F9", "F12"), editsOf(chainC, "C0", "C1", "C4", "C5", "C8", "C10", "C11")))
+	// frozen-outcome: a gaps line freezes a cell that commits no outcome.
+	add("frozen-outcome", chain, cross([]gridEdit{gapNoOutcome("evaluate"), gapNoOutcome("import")}, editsOf(chainF, "F0", "F9")))
 	// chain-render: import rejects quoted, and the project's RenderError
 	// panics on its error, so the update writes nothing for import's cell,
 	// and holds back the cells past it.

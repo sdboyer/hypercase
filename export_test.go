@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"io/fs"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
+	"unicode"
 
 	"github.com/sdboyer/hypercase/archive"
 )
@@ -107,6 +109,62 @@ func FateVerbs(t *testing.T) []string {
 
 // FateString words a fate in an Observed, as fateWords does.
 func FateString(f updateFate) string { return fateWords(f) }
+
+// ClaimMarkers are the runs of six words or more, as MarkerWords splits
+// them, that a closing's claims render: each field of the claims set
+// alone, as claimsAlone sets it, rendered as textStaging's note's closing,
+// and cut where it names the update command, a name textStaging or
+// claimsAlone gives, or punctuates. Shorter runs, such as "failed on the
+// case", are a body's own words too. Does is left out: its sentences word
+// the update's fate as any run's fate is worded, so a body that says this
+// run's fate says the same words, as in "evaluate's probe says the case
+// isn't for it", and the update command each opens with is checked apart.
+// No note's body says a marker, so none says what a closing says of the
+// update.
+func ClaimMarkers(t *testing.T) []string {
+	t.Helper()
+	st := textStaging(markerVar)
+	names := []string{"x", st.col.name, st.c.tr.name}
+	seen := map[string]bool{}
+	var out []string
+	for _, one := range claimsAlone(t) {
+		if one.cl.Does != "" {
+			continue
+		}
+		text := strings.ReplaceAll(st.text(note{}, closing{claims: one.cl}), st.r.updateCmd(), ".")
+		for _, part := range strings.FieldsFunc(text, func(r rune) bool { return strings.ContainsRune(".,:;\"()\n", r) }) {
+			var run []string
+			flush := func() {
+				if m := strings.Join(run, " "); len(run) >= 6 && !seen[m] {
+					seen[m] = true
+					out = append(out, m)
+				}
+				run = nil
+			}
+			for _, w := range MarkerWords(part) {
+				if slices.Contains(names, strings.TrimSuffix(w, "'s")) {
+					flush()
+					continue
+				}
+				run = append(run, w)
+			}
+			flush()
+		}
+	}
+	return out
+}
+
+// markerVar is the update variable ClaimMarkers renders the claims under.
+const markerVar = "FIXTURE_UPDATE_GOLDEN"
+
+// MarkerWords are the words of s, lower-cased, as ClaimMarkers counts
+// them: each run of letters, digits, apostrophes, slashes, hyphens and
+// underscores.
+func MarkerWords(s string) []string {
+	return strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune("'/-_", r)
+	})
+}
 
 func observeTo(path string) {
 	var mu sync.Mutex
