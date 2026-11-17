@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/sdboyer/hypercase/internal/gittest"
@@ -187,6 +188,8 @@ func TestProducts(t *testing.T) {
 		name string
 		a, b string
 		want string
+		// problem is what the page lists as b's problem, if anything.
+		problem string
 	}{
 		{
 			name: "the product alone",
@@ -237,10 +240,18 @@ func TestProducts(t *testing.T) {
 		{
 			// A cell exists where its outcome file does, its product's
 			// files included.
-			name: "a product with no outcome file is no cell's",
-			a:    head + "-- via/import/sheet/A1 --\n4\n",
-			b:    head + "-- via/import/sheet/A1 --\n5\n",
-			want: "",
+			name:    "a product with no outcome file is no cell's",
+			a:       head + "-- via/import/sheet/A1 --\n4\n",
+			b:       head + "-- via/import/sheet/A1 --\n5\n",
+			want:    "",
+			problem: "<code>testdata/csv/x.txtar, via/import/</code>: the cell has its product and no outcome file.",
+		},
+		{
+			name:    "nor are files and a product",
+			a:       head + "-- out/import/error.txt --\nno\n-- via/import/sheet/A1 --\n4\n",
+			b:       head + "-- out/import/error.txt --\nno\n-- via/import/sheet/A1 --\n5\n",
+			want:    "",
+			problem: "<code>testdata/csv/x.txtar, out/import/ and via/import/</code>: the cell has files and its product, and no outcome file.",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -250,6 +261,43 @@ func TestProducts(t *testing.T) {
 			if got := ok(t, g, "", "report", "-text", c[0], c[1]); got != tt.want {
 				t.Errorf("got:\n%s\nwant:\n%s", got, tt.want)
 			}
+			if tt.problem != "" {
+				ps := section(t, ok(t, g, "", "report", c[0], c[1]), `<section id="problems">`, "</section>")
+				holds(t, "the problems", ps, `<h3>At <span class="rev">`+c[1]+`</span></h3>`, tt.problem)
+			}
+		})
+	}
+}
+
+// TestProductsLeftOut: a revision whose registries declare no bytes lift
+// of a via/<lift>/ section's name leaves the section out, and the report
+// compares no product of its cell with the other revision's, either way
+// round, so a product only one revision places is no change of its cell.
+func TestProductsLeftOut(t *testing.T) {
+	t.Parallel()
+	const x = "A CSV.\n-- in/csv/x.csv --\n4\n-- via/import/sheet/A1 --\nV\n-- out/import/outcome --\naccepted\n"
+	plain := productRegistry()
+	plain.Lifts[0].Bytes, plain.Lifts[0].ProductFiles = false, nil
+	for _, tt := range []struct {
+		name string
+		at   int // the revision that leaves the product out
+	}{{"at a", 0}, {"at b", 1}} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mods := []map[string]string{
+				productModule(map[string]string{"x": strings.ReplaceAll(x, "V", "4")}),
+				productModule(map[string]string{"x": strings.ReplaceAll(x, "V", "5")}),
+			}
+			mods[tt.at]["testdata/hypercase.json"] = string(plain.Marshal())
+			g := gittest.New(t)
+			c := revisions(t, g, mods[0], mods[1])
+			if got := ok(t, g, "", "report", "-text", c[0], c[1]); got != "" {
+				t.Errorf("got:\n%s\nwant no change", got)
+			}
+			ps := section(t, ok(t, g, "", "report", c[0], c[1]), `<section id="problems">`, "</section>")
+			holds(t, "the problems", ps, `<h3>At <span class="rev">`+c[tt.at]+`</span></h3>`,
+				"<code>testdata/csv/x.txtar, via/import/sheet/A1</code>: the section is a product of import, and no registry declares a bytes lift of that name over testdata/csv/, so the report leaves it out, and doesn&#39;t compare its cell&#39;s product.</li>")
+			lacks(t, "the problems", ps, `<h3>At <span class="rev">`+c[1-tt.at]+`</span></h3>`)
 		})
 	}
 }

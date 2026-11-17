@@ -259,8 +259,9 @@ func findModule(tree fs.FS, dir string) (string, bool) {
 
 // changes compares every cell of the two snapshots, and ranks those that
 // changed. A cell whose state is unknown at either revision has no outcome
-// to compare, so it ranks on its files alone when it is at both. props
-// holds each property's description.
+// to compare, so it ranks on its files alone when it is at both, and one
+// whose product either revision leaves out has no product to compare.
+// props holds each property's description.
 func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 	keys := map[cellKey]bool{}
 	for k := range a.cells {
@@ -287,7 +288,7 @@ func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 		default:
 			ch.Rank, ch.Before, ch.After = BytesChanged, ca.line, cb.line
 		}
-		ch.Files = fileChanges(ca, cb, k.column)
+		ch.Files = fileChanges(ca, cb, k.column, !a.leftOut[k] && !b.leftOut[k])
 		if ch.Rank == BytesChanged && len(ch.Files) == 0 {
 			continue
 		}
@@ -303,14 +304,17 @@ func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 
 // fileChanges returns a cell's files, other than its outcome, that differ
 // between two revisions, by path, then its product's, by path, each with
-// its diff. Either cell may be nil.
-func fileChanges(a, b *cellAt, column string) []FileChange {
+// its diff, when products says to compare them. Either cell may be nil.
+func fileChanges(a, b *cellAt, column string, products bool) []FileChange {
 	var fa, fb, pa, pb map[string][]byte
 	if a != nil {
 		fa, pa = a.files, a.product
 	}
 	if b != nil {
 		fb, pb = b.files, b.product
+	}
+	if !products {
+		pa, pb = nil, nil
 	}
 	return append(changedFiles(fa, fb, ""), changedFiles(pa, pb, archive.Via+"/"+column+"/")...)
 }
