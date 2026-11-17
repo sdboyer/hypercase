@@ -261,16 +261,9 @@ func recorded(c root.Corpus, dir, updateVar string) error {
 		if err != nil {
 			return unreadable(f.Path, tested, err)
 		}
-		dirs := map[string]bool{}
-		for _, t := range g.Types {
-			dirs[t.Dir] = true
-		}
-		for _, s := range g.Suites {
-			if s.Consumes == registry.RawInput {
-				for _, d := range s.Corpora {
-					dirs[d] = true
-				}
-			}
+		dirs := map[string]bool{} // a set: two suites over the raw input may share a corpus
+		for _, d := range g.Declarations() {
+			dirs[d.Dir] = true
 		}
 		if !tested {
 			stale = append(stale, f.Path)

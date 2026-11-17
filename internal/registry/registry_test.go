@@ -100,6 +100,34 @@ func TestPeek(t *testing.T) {
 	}
 }
 
+// TestDeclarations: a registry declares the corpora of each suite over the
+// raw input, in the suites' order, then each corpus type's Dir, with its
+// type. A suite over a corpus type declares nothing.
+func TestDeclarations(t *testing.T) {
+	r := Registry{
+		Types: []Type{{Dir: "sheet"}, {Dir: "grid"}},
+		Suites: []Suite{
+			{Name: "count", Consumes: RawInput, Corpora: []string{"csv"}},
+			{Name: "evaluate", Consumes: "example.com/m.Sheet", Corpora: []string{"sheet", "book"}},
+			{Name: "tally", Consumes: RawInput, Corpora: []string{"loose"}},
+		},
+	}
+	var got []string
+	for _, d := range r.Declarations() {
+		switch {
+		case d.Type == nil:
+			got = append(got, d.Dir+" (raw)")
+		case d.Type != &r.Types[slices.IndexFunc(r.Types, func(ct Type) bool { return ct.Dir == d.Dir })]:
+			t.Errorf("the declaration of %s points at another type than the registry's %s", d.Dir, d.Dir)
+		default:
+			got = append(got, d.Dir)
+		}
+	}
+	if want := []string{"csv (raw)", "loose (raw)", "sheet", "grid"}; !slices.Equal(got, want) {
+		t.Errorf("Declarations = %q, want %q", got, want)
+	}
+}
+
 // TestFindFS: registries are found where go list ./... looks, and nowhere
 // else.
 func TestFindFS(t *testing.T) {

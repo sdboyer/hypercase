@@ -109,15 +109,17 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
 		}
+		for _, d := range g.reg.Declarations() {
+			entry := rawEntry
+			if d.Type != nil {
+				entry = typeEntry(*d.Type)
+			}
+			declare(d.Dir, entry, g.pkg)
+		}
 		for _, s := range g.reg.Suites {
 			claim(s.Name, s.Corpora)
 			if g.tested {
 				columnPkgs[s.Name] = append(columnPkgs[s.Name], g.pkg)
-			}
-			if s.Consumes == registry.RawInput {
-				for _, dir := range s.Corpora {
-					declare(dir, rawEntry, g.pkg)
-				}
 			}
 		}
 		for _, l := range g.reg.Lifts {
@@ -136,7 +138,6 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 		}
 		for _, ct := range g.reg.Types {
-			declare(ct.Dir, typeEntry(ct), g.pkg)
 			if transforms[ct.Dir] == nil {
 				transforms[ct.Dir] = map[string]bool{}
 			}
