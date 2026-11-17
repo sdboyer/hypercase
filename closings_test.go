@@ -26,8 +26,9 @@ import (
 // for a bytes lift, a transform's variant or a cell (the committed side,
 // C). Each scenario runs a normal run, then an update, of each of the
 // grid's packages, as go test ./... runs them, in children that record
-// each cell's fate and files and whether its test failed, in both runs,
-// and each note's closing and what it claims. Then every note's closing
+// each cell's fate and files and whether its test failed, and each run of
+// a lift's function, in both runs, and each note's closing and what it
+// claims. Then every note's closing
 // in the normal run must hold:
 //
 //   - A default closing, the note's own, only where the update does with
@@ -44,8 +45,8 @@ import (
 //     such a cell says so.
 //   - Each of its claims, which give every sentence it says of the update,
 //     holds of what the update did (claimChecks): the outcome it writes, a
-//     file it writes, removes or leaves in place, nothing for the cell, a
-//     variant's inputs it writes, rewrites or removes.
+//     file it writes, removes or leaves in place, nothing for the cell, the
+//     lift it reruns, a variant's inputs it writes, rewrites or removes.
 //   - A note of a variant about no one cell closes on its default.
 //
 // In each run, a cell's test fails just where the run gives notes of the
@@ -299,6 +300,7 @@ func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario,
 		j.normal = append(j.normal, readObserved(t, filepath.Join(dir, fmt.Sprintf("normal-%d.jsonl", i)))...)
 		j.update = append(j.update, readObserved(t, filepath.Join(dir, fmt.Sprintf("update-%d.jsonl", i)))...)
 	}
+	j.lifts = liftRuns(j.update)
 	j.judge()
 	if t.Failed() {
 		for i, c := range g.pkgs {
@@ -337,10 +339,27 @@ type judge struct {
 	kinds          map[int]string
 	before, after  *archive.Archive
 	normal, update []hypercase.Observed
+	lifts          map[liftKey]bool // the lifts whose functions the update ran
 	pairs          []closingPair
 }
 
 type cellKey struct{ pkg, c, col string }
+
+// A liftKey is a lift whose function ran on a case, in a package.
+type liftKey struct{ pkg, c, lift string }
+
+// liftRuns are the lifts whose functions a run ran, on each case, in each
+// package, but in a normal run's staging of a case as its update stages
+// it.
+func liftRuns(os []hypercase.Observed) map[liftKey]bool {
+	m := map[liftKey]bool{}
+	for _, o := range os {
+		if o.Record == "lift" && !o.AsUpdate {
+			m[liftKey{o.Pkg, o.Case, o.Lift}] = true
+		}
+	}
+	return m
+}
 
 func cells(os []hypercase.Observed) map[cellKey]hypercase.Observed {
 	m := map[cellKey]hypercase.Observed{}
@@ -518,19 +537,33 @@ var claimChecks = map[string]func(c *noteCheck) string{
 		}
 		return ""
 	},
+	// The lift a closing says the update reruns is one whose function the
+	// update ran on the case, as its records of each run of a lift show:
+	// where the package can't tell, the lift it doesn't own, which the
+	// package that owns it runs, and otherwise the last bytes lift on the
+	// cell's path that the package's update ran.
 	"Reruns": func(c *noteCheck) string {
 		var want string
 		switch {
 		case c.cl.CantTell != "":
 			want = c.cl.CantTell
-			if !slices.Contains(c.ur.Path, want) {
-				return fmt.Sprintf("the closing says the update reruns %s, which is no bytes lift on the cell's path, %v", want, c.ur.Path)
+			ran := false
+			for k := range c.j.lifts {
+				ran = ran || k.c == c.n.Case && k.lift == want
 			}
-		case c.cl.Does != "" && len(c.ur.Path) > 0:
-			want = c.ur.Path[0]
+			if !ran {
+				return fmt.Sprintf("the closing says the update reruns %s, and no package's update ran its function on the case", want)
+			}
+		case c.cl.Does != "":
+			for _, l := range c.ur.Path {
+				if c.j.lifts[liftKey{c.n.Pkg, c.n.Case, l}] {
+					want = l
+					break
+				}
+			}
 		}
 		if c.cl.Reruns != want {
-			return fmt.Sprintf("the closing says the update reruns %q, and the bytes lift it reruns, last on the cell's path, is %q", c.cl.Reruns, want)
+			return fmt.Sprintf("the closing says the update reruns %q, and the last bytes lift on the cell's path, %v, whose function the update ran on the case is %q", c.cl.Reruns, c.ur.Path, want)
 		}
 		return ""
 	},

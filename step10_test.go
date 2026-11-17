@@ -427,7 +427,7 @@ func TestChainTwiceStaleProduct(t *testing.T) {
 	s.fails(r,
 		"import returned no error, but the case states unterminated, which import rejects.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... blocks import: "+reruns+", and the lift export, on import's path, failed on the case. Run it, fix what it reports, and read the diff before committing.",
 		"via/import/quote/Z9 is a file of import's committed product, which this run of import doesn't make.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... blocks import: "+reruns+", and the lift export, on import's path, failed on the case. It removes the file: read the diff before committing.",
-		"out/list/files.txt differs (-golden +got):\n- 1 files\n+ 2 files\n  quote/A1 \"3\\n\"\n+ quote/Z9 \"9\\n\"\nFIXTURE_UPDATE_GOLDEN=1 go test ./... blocks list: it reruns import, whose outcome and product a normal run reads from the archive, and the lift export, on list's path, failed on the case. Run it, fix what it reports, and read the diff before committing.")
+		"out/list/files.txt differs (-golden +got):\n- 1 files\n+ 2 files\n  quote/A1 \"3\\n\"\n+ quote/Z9 \"9\\n\"\nFIXTURE_UPDATE_GOLDEN=1 go test ./... blocks list: "+reruns+", and the lift export, on list's path, failed on the case. Run it, fix what it reports, and read the diff before committing.")
 	s.lacks(r, "Fix the code, or correct the case's properties")
 	s.fails(s.update("chain-twice"), "out/list/files.txt is recorded, and the cell is blocked: the lift export, on list's path, failed on the case.")
 	s.hasSections(sheet, map[string]string{"out/import/outcome": "blocked export\n"}, "via/")

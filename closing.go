@@ -185,11 +185,12 @@ type staging struct {
 	// a bytes lift runs it in a normal run.
 	unowned *lift
 	// f is the cell's fate in the update, and otherwise says whether the
-	// update does otherwise with the cell than this run. last is the last
-	// bytes lift on the cell's path.
+	// update does otherwise with the cell than this run. reran is the last
+	// bytes lift on the cell's path that the update runs, nil where it runs
+	// none.
 	f         updateFate
 	otherwise bool
-	last      *lift
+	reran     *lift
 }
 
 // staging makes a cell's staging, untold: this is the cell's fate in this
@@ -238,7 +239,7 @@ func (st *staging) tell() {
 	if st.f.same(st.this) && !(st.ran && st.this.runs() && s.restages(st.col)) {
 		return
 	}
-	st.otherwise, st.last = true, last
+	st.otherwise, st.reran = true, s.plan.reran(st.col.consumes, st.f)
 }
 
 // differs reports whether the update does otherwise with the cell than
@@ -265,8 +266,8 @@ func (st *staging) close(n note) (string, claims) {
 	case st.otherwise:
 		c = st.tail(n)
 		c.claims.Does, c.claims.Another = fateWords(st.f), st.f.runs() && st.ran
-		if st.last != nil {
-			c.claims.Reruns = st.last.name
+		if st.reran != nil {
+			c.claims.Reruns = st.reran.name
 		}
 	default:
 		return st.text(n, n.def), n.def.claims
@@ -518,7 +519,12 @@ func (st *staging) does(cl claims) string {
 		return fmt.Sprintf("%s writes nothing for %s: %s, and it writes nothing for the cell of the lift %s, on %s's path, whose outcome and product a normal run reads.", u, col, how, detail, col)
 	case fateBlocked:
 		// The update runs every lift on the cell's path, so a lift that
-		// blocks the cell there failed on the case.
+		// blocks the cell there failed on the case. One that fails before
+		// the first bytes lift on the path leaves the update none to rerun,
+		// and, with no variant, nothing it stages otherwise.
+		if how == "" {
+			return fmt.Sprintf("%s blocks %s: the lift %s, on %s's path, failed on the case, before any bytes lift there.", u, col, detail, col)
+		}
 		return fmt.Sprintf("%s blocks %s: %s, and the lift %s, on %s's path, failed on the case.", u, col, how, detail, col)
 	}
 	panic(fmt.Sprintf("hypercase: no words for what an update does with a cell, %q", cl.Does))
@@ -577,11 +583,13 @@ func report(t *testing.T, header string, ns notes, st *staging) {
 
 // observe is nil but in hypercase's own tests, which set its functions in
 // the test binaries they run as children, to see each cell's result and
-// fate in every run, and each note's closing in a normal run, and check
-// what a normal run says the update does against what the update did.
+// fate in every run, each note's closing, and each run of a lift's
+// function, and check what a normal run says the update does against what
+// the update did.
 var observe struct {
 	cell func(c *aCase, col *column, res *cellResult, failed bool)
 	note func(st *staging, n note, closing string, cl claims)
+	lift func(s *caseState, l *lift)
 }
 
 // outcomeLine is an outcome as its file holds it, less its newline.

@@ -120,7 +120,7 @@ $ go test  # chain-twice
         + 2 files
           quote/A1 "3\n"
         + quote/Z9 "9\n"
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... blocks list: it reruns import, whose outcome and product a normal run reads from the archive, and the lift export, on list's path, failed on the case. Run it, fix what it reports, and read the diff before committing.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... blocks list: it reruns export, whose outcome and product a normal run reads from the archive, and the lift export, on list's path, failed on the case. Run it, fix what it reports, and read the diff before committing.
     what ran, in order:
         export ran
         import ran
@@ -172,7 +172,7 @@ $ go test  # chain-twice
         + 2 files
           quote/A1 "3\n"
         + quote/Z9 "9\n"
-        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift export, on list's path, whose outcome and product a normal run reads. Fix what export's cell reports.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: it reruns export, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift export, on list's path, whose outcome and product a normal run reads. Fix what export's cell reports.
     what ran, in order:
         export ran
         import ran

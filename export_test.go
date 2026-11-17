@@ -32,9 +32,9 @@ func init() {
 type Claims = claims
 
 // An Observed is one record of a child's run: a cell's result and fate,
-// or a note's closing.
+// a note's closing, or a run of a lift's function.
 type Observed struct {
-	Record string `json:"record"` // "cell" or "note"
+	Record string `json:"record"` // "cell", "note" or "lift"
 	Update bool   `json:"update"`
 	Pkg    string `json:"pkg"` // the package's directory, from the module root
 	Case   string `json:"case"`
@@ -73,6 +73,12 @@ type Observed struct {
 	This     string  `json:"this,omitempty"`
 	Claims   *Claims `json:"claims,omitempty"`
 	Declined bool    `json:"declined,omitempty"`
+
+	// A lift's run: the lift whose function ran on the case, and whether
+	// it ran in a normal run's staging of the case as its update stages
+	// it, not in the run itself.
+	Lift     string `json:"lift,omitempty"`
+	AsUpdate bool   `json:"asUpdate,omitempty"`
 }
 
 // NoteKinds names each noteKind the package declares, by its value, as
@@ -184,5 +190,12 @@ func observeTo(path string) {
 			o.Form = "default"
 		}
 		write(o)
+	}
+	observe.lift = func(s *caseState, l *lift) {
+		r := s.r
+		write(Observed{
+			Record: "lift", Update: r.update, Pkg: r.rel(r.pkgDir), Case: s.c.name, Prefix: s.c.prefix,
+			Lift: l.name, AsUpdate: s.update && !r.update,
+		})
 	}
 }
