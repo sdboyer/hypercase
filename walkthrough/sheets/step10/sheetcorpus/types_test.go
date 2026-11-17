@@ -37,6 +37,7 @@ func TestImportInput(t *testing.T) {
 		{"space", fstest.MapFS{"csv/ .csv": csv}, `["csv/ .csv"]`},
 		{"spaces", fstest.MapFS{"csv/   .csv": csv}, `["csv/   .csv"]`},
 		{"tab", fstest.MapFS{"csv/\t.csv": csv}, `["csv/\t.csv"]`},
+		{"nbsp", fstest.MapFS{"csv/\u00a0.csv": csv}, `["csv/\u00a0.csv"]`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: tt.in})
@@ -54,10 +55,19 @@ func TestImportInput(t *testing.T) {
 		})
 	}
 	// Only a name that is empty or white space alone is refused: one dot is
-	// a name, and so is a letter between spaces.
-	for _, p := range []string{"csv/one.csv", "csv/..csv", "csv/ a .csv"} {
-		t.Run(p, func(t *testing.T) {
-			files, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: fstest.MapFS{p: csv}})
+	// a name, and so is a letter between spaces. U+200B, U+FEFF and U+2060
+	// are no white space, so a name of one of them alone is a name too,
+	// though nothing shows.
+	for _, tt := range []struct{ name, path string }{
+		{"word", "csv/one.csv"},
+		{"dot", "csv/..csv"},
+		{"letter", "csv/ a .csv"},
+		{"zwsp", "csv/\u200b.csv"},
+		{"bom", "csv/\ufeff.csv"},
+		{"joiner", "csv/\u2060.csv"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			files, err := sheetcorpus.Import.Jenny.Generate(sheetcorpus.CSV{FS: fstest.MapFS{tt.path: csv}})
 			if err != nil {
 				t.Fatal(err)
 			}
