@@ -38,7 +38,9 @@ var (
 // its files, against its imports' export data, which go list builds. It
 // uses the go command and the standard library alone, so the module needs
 // no loader: golang.org/x/tools/go/packages would bring in
-// golang.org/x/mod, a module hypercase doesn't otherwise require.
+// golang.org/x/mod, a module hypercase doesn't otherwise require. It
+// fails on a file of the package that build constraints exclude here,
+// which it can't read, so no check of the source misses one.
 func loadSource(t *testing.T) *source {
 	t.Helper()
 	loadedOnce.Do(func() { loaded, loadErr = typeCheck() })
@@ -49,7 +51,7 @@ func loadSource(t *testing.T) *source {
 }
 
 func typeCheck() (*source, error) {
-	cmd := exec.Command("go", "list", "-export", "-deps", "-json=ImportPath,Dir,GoFiles,Export,DepOnly", ".")
+	cmd := exec.Command("go", "list", "-export", "-deps", "-json=ImportPath,Dir,GoFiles,IgnoredGoFiles,Export,DepOnly", ".")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -58,7 +60,7 @@ func typeCheck() (*source, error) {
 	}
 	type listed struct {
 		ImportPath, Dir, Export string
-		GoFiles                 []string
+		GoFiles, IgnoredGoFiles []string
 		DepOnly                 bool
 	}
 	exports := map[string]string{}
@@ -78,6 +80,9 @@ func typeCheck() (*source, error) {
 	}
 	if self == nil {
 		return nil, errors.New("go list gave no package for .")
+	}
+	if len(self.IgnoredGoFiles) > 0 {
+		return nil, fmt.Errorf("build constraints exclude %v from the package on this platform, so the type check can't read them, and a check of the source would miss what they hold. Keep every file of the package in every build, or check it on each platform", self.IgnoredGoFiles)
 	}
 	s := &source{fset: token.NewFileSet()}
 	for _, name := range self.GoFiles {
