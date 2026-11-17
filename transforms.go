@@ -348,7 +348,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 			// An update reads what the transform makes instead, and its
 			// owner's rewrites them.
 			var ns notes
-			ns.add(aboutInputs, fmt.Sprintf("The archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s", v.name, problemList(invalid)), closing{claims: claims{RewritesInputs: v.name}})
+			ns.add(aboutInputs, fmt.Sprintf("The archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s", v.name, problemList(invalid)), closing{claims: r.rewritesInputs(v.tr)})
 			report(t, c.header(), ns, r.variantStaging(c))
 			return
 		}
@@ -373,19 +373,19 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	// However its cells failed, the failures may be the inputs'. Each
 	// cell's notes say what the update does with it.
 	var ns notes
-	ns.add(aboutInputs, fmt.Sprintf("A cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes.", v.name, v.name, diffs, v.name), closing{claims: claims{RewritesInputs: v.name}})
+	ns.add(aboutInputs, fmt.Sprintf("A cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes.", v.name, v.name, diffs, v.name), closing{claims: r.rewritesInputs(v.tr)})
 	report(t, c.header(), ns, r.variantStaging(c))
 }
 
-// ifUnowned is what a message that names the update in the package that
-// owns a transform adds, in a package that doesn't own it: that package
-// can't know some package does, and the root-package check reports a
-// transform no package owns.
-func (r *runner) ifUnowned(tr *transform) string {
+// rewritesInputs is what a package's update does with a variant's inputs
+// that differ from what the transform tr makes: in the package that owns
+// tr, its update rewrites them, and in one that doesn't, the update of the
+// package that owns it does, if a package does.
+func (r *runner) rewritesInputs(tr *transform) claims {
 	if r.owned[tr] {
-		return ""
+		return claims{RewritesInputs: tr.name}
 	}
-	return fmt.Sprintf(" If no package owns %s, the root-package check says so, and no update rewrites the inputs.", tr.name)
+	return claims{OwnerRewritesInputs: tr.name}
 }
 
 // inputDiffs says how the committed inputs of a transform's variant differ

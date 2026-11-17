@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/sdboyer/hypercase"
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/internal/registry"
 )
 
 // TestClosings: every closing a normal run gives says what the update then
@@ -295,8 +297,9 @@ func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario,
 	normal := g.runAll(s, false, filepath.Join(dir, "normal"))
 	update := g.runAll(s, true, filepath.Join(dir, "update"))
 	after := archive.Parse(s.read(g.archive))
-	j := &judge{g: g, t: t, kinds: kinds, before: before, after: after}
+	j := &judge{g: g, t: t, kinds: kinds, before: before, after: after, owners: g.owners(t, s)}
 	for i := range g.pkgs {
+		j.normalOut = append(j.normalOut, normal[i].out)
 		j.normal = append(j.normal, readObserved(t, filepath.Join(dir, fmt.Sprintf("normal-%d.jsonl", i)))...)
 		j.update = append(j.update, readObserved(t, filepath.Join(dir, fmt.Sprintf("update-%d.jsonl", i)))...)
 	}
@@ -308,6 +311,27 @@ func (g closingGrid) run(t *testing.T, clean map[string][]byte, sc gridScenario,
 		}
 	}
 	return j.pairs
+}
+
+// owners are the transforms that some package's registry, after the
+// update, records it owns.
+func (g closingGrid) owners(t *testing.T, s *sandbox) map[string]bool {
+	t.Helper()
+	out := map[string]bool{}
+	for _, c := range g.pkgs {
+		reg, err := registry.Parse(s.read(filepath.Join(c.pkg, "testdata", registry.Name)))
+		if err != nil {
+			t.Fatalf("reading %s's registry: %v", c.registration, err)
+		}
+		for _, typ := range reg.Types {
+			for _, tr := range typ.Transforms {
+				if tr.Owned {
+					out[tr.Name] = true
+				}
+			}
+		}
+	}
+	return out
 }
 
 func readObserved(t *testing.T, path string) []hypercase.Observed {
@@ -340,6 +364,8 @@ type judge struct {
 	before, after  *archive.Archive
 	normal, update []hypercase.Observed
 	lifts          map[liftKey]bool // the lifts whose functions the update ran
+	owners         map[string]bool  // the transforms some package's registry, after the update, records it owns
+	normalOut      []string         // each package's normal run's output
 	pairs          []closingPair
 }
 
@@ -737,14 +763,45 @@ var claimChecks = map[string]func(c *noteCheck) string{
 		}
 		return c.inputsMade(c.cl.WritesInputs)
 	},
+	// The package that owns the transform rewrites its variant's inputs,
+	// and its registry, after the update, records that it owns it.
 	"RewritesInputs": func(c *noteCheck) string {
-		if c.cl.RewritesInputs == "" {
+		tr := c.cl.RewritesInputs
+		switch {
+		case tr == "":
+			return ""
+		case !c.j.owners[tr]:
+			return fmt.Sprintf("the closing says this package's update rewrites %s's inputs, and no registry records a package owns it", tr)
+		case maps.Equal(c.j.inputs(c.j.before, tr), c.j.inputs(c.j.after, tr)):
+			return fmt.Sprintf("the closing says this package's update rewrites %s's inputs, and they are as they were", tr)
+		}
+		return c.inputsMade(tr)
+	},
+	// In a package that doesn't own the transform, the closing says the
+	// owner's update rewrites the inputs, and, if no package owns it, that
+	// the root-package check says so, and no update rewrites them: which
+	// holds is what the registries the update wrote record.
+	"OwnerRewritesInputs": func(c *noteCheck) string {
+		tr := c.cl.OwnerRewritesInputs
+		if tr == "" {
 			return ""
 		}
-		if maps.Equal(c.j.inputs(c.j.before, c.cl.RewritesInputs), c.j.inputs(c.j.after, c.cl.RewritesInputs)) {
-			return fmt.Sprintf("the closing says the module's update rewrites %s's inputs, and they are as they were", c.cl.RewritesInputs)
+		same := maps.Equal(c.j.inputs(c.j.before, tr), c.j.inputs(c.j.after, tr))
+		switch {
+		case c.j.owners[tr] && same:
+			return fmt.Sprintf("the closing says the update of the package that owns %s rewrites its inputs, and they are as they were", tr)
+		case c.j.owners[tr]:
+			return c.inputsMade(tr)
+		case !same:
+			return fmt.Sprintf("the closing says that if no package owns %s, no update rewrites its inputs, and no registry records a package owns it, and the update changed them", tr)
 		}
-		return c.inputsMade(c.cl.RewritesInputs)
+		says := regexp.MustCompile(regexp.QuoteMeta("the transform "+tr+", of testdata/") + `\S*, is owned by no package`)
+		for _, out := range c.j.normalOut {
+			if says.MatchString(out) {
+				return ""
+			}
+		}
+		return fmt.Sprintf("the closing says that if no package owns %s, the root-package check says so, and no normal run says %q", tr, says)
 	},
 }
 
@@ -1040,6 +1097,7 @@ var (
 		{"U8 evaluate outcome blocked foo", set("transform/upper/out/evaluate/outcome", "blocked foo\n")},
 		{"U9 inputs evaluate error", insert("transform/upper/in/evaluate/error", "stale\n", "transform/upper/out/")},
 		{"U10 inputs delete resolve/error, and evaluate outcome blocked foo", seq(insert("transform/upper/delete", "resolve/error\n", "transform/upper/out/"), set("transform/upper/out/evaluate/outcome", "blocked foo\n"))},
+		{"U11 inputs delete empty", insert("transform/upper/delete", "", "transform/upper/out/")},
 	}
 )
 
@@ -1104,5 +1162,22 @@ func closingGrids() []closingGrid {
 		pkgs: []childRun{{pkg: "", registration: "tr-ladder-eval"}},
 	}
 	add("transforms", tr, cross(transformsF, transformsC))
+	// transforms-unowned: no package owns upper, or looped. The root
+	// package owned them for the first update, which wrote their variants'
+	// inputs.
+	unowned := closingGrid{
+		fixture: "transforms", archive: "testdata/script/twice.txtar",
+		remove: []string{"testdata/script/errs.txtar", "testdata/script/garbled.txtar"},
+		prep: func(s *sandbox) {
+			writeB(s)
+			s.passes(s.update("transforms"))
+		},
+		pkgs: []childRun{{pkg: "", registration: "tr-unowned"}, {pkg: "b", registration: "tr-b"}},
+	}
+	add("transforms-unowned", unowned, cross([]gridEdit{
+		{"W0 none", func(*archive.Archive) {}},
+		{"W1 inputs values stale", set("transform/upper/in/do/out/values.txt", "A1 SEVEN\n")},
+		{"W2 inputs delete empty", insert("transform/upper/delete", "", "transform/upper/out/")},
+	}))
 	return gs
 }

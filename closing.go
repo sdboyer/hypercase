@@ -145,12 +145,15 @@ type claims struct {
 	Leaves      string `json:"leaves,omitempty"`
 	Removes     string `json:"removes,omitempty"`
 	// RemovesInputs names the transform whose variant's inputs the update
-	// removes, WritesInputs one whose variant's inputs, which the archive
-	// lacks, the update writes, and RewritesInputs one whose variant's
-	// inputs the module's update rewrites, in the package that owns it.
-	RemovesInputs  string `json:"removesInputs,omitempty"`
-	WritesInputs   string `json:"writesInputs,omitempty"`
-	RewritesInputs string `json:"rewritesInputs,omitempty"`
+	// removes, and WritesInputs one whose variant's inputs, which the
+	// archive lacks, the update writes. RewritesInputs names one this
+	// package owns, whose variant's inputs its update rewrites, and
+	// OwnerRewritesInputs one it doesn't, whose variant's inputs the update
+	// of the package that owns it rewrites, if a package does.
+	RemovesInputs       string `json:"removesInputs,omitempty"`
+	WritesInputs        string `json:"writesInputs,omitempty"`
+	RewritesInputs      string `json:"rewritesInputs,omitempty"`
+	OwnerRewritesInputs string `json:"ownerRewritesInputs,omitempty"`
 }
 
 // A staging is what a normal run tells of what the package's update does
@@ -453,7 +456,13 @@ func (st *staging) text(n note, c closing) string {
 		says = append(says, said{fmt.Sprintf("Run %s to write them, and read them before committing.", u), fmt.Sprintf("run %s to write them, and read them before committing.", u)})
 	}
 	if cl.RewritesInputs != "" {
-		says = append(says, said{fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s.%s", u, cl.RewritesInputs, st.r.ifUnowned(st.c.tr)), fmt.Sprintf("the module's update, %s, rewrites them, in the package that owns %s.%s", u, cl.RewritesInputs, st.r.ifUnowned(st.c.tr))})
+		says = append(says, said{fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s.", u, cl.RewritesInputs), fmt.Sprintf("the module's update, %s, rewrites them, in the package that owns %s.", u, cl.RewritesInputs)})
+	}
+	if cl.OwnerRewritesInputs != "" {
+		// This package can't know some package owns the transform, and the
+		// root-package check reports one no package owns.
+		tr := cl.OwnerRewritesInputs
+		says = append(says, said{fmt.Sprintf("The module's update, %s, rewrites them, in the package that owns %s. If no package owns %s, the root-package check says so, and no update rewrites the inputs.", u, tr, tr), fmt.Sprintf("the module's update, %s, rewrites them, in the package that owns %s. If no package owns %s, the root-package check says so, and no update rewrites the inputs.", u, tr, tr)})
 	}
 	var rest []string
 	if c.advice != "" {
