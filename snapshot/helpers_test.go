@@ -170,6 +170,16 @@ func fails(t *testing.T, err error, want ...string) {
 	}
 }
 
+// begins checks err's message starts with prefix, which fails can't: a
+// message naming a path from the module root holds that text too when it
+// names the path absolutely.
+func begins(t *testing.T, err error, prefix string) {
+	t.Helper()
+	if err == nil || !strings.HasPrefix(err.Error(), prefix) {
+		t.Errorf("the error doesn't start with %q:\n%v", prefix, err)
+	}
+}
+
 func format(ss []archive.Section) []byte { return (&archive.Archive{Sections: ss}).Format() }
 
 func serialize(t *testing.T, trees map[string]fs.FS) []archive.Section {
