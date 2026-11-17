@@ -20,7 +20,7 @@ PASS
 $ edit testdata/grid/six.txtar  # a person describes the case
 $ rm b/corpus_test.go  # remove b's tests, and leave its registry
 # snapshot.Create into testdata/grid/ is refused:
-the directory grid is declared under the corpus root "." only by registries in packages with no _test.go file, $SANDBOX/b/testdata/hypercase.json, so no test would read the case: the registries in packages with tests declare "script".
+the directory testdata/grid/, of the corpus root ".", is declared only by a registry in a package with no _test.go file, $SANDBOX/b/testdata/hypercase.json, so no test would read the case: the registries in packages with tests declare testdata/script/.
 Restore the package's tests, or pass the corpus type a package with tests registers.
 $ go test  # ladder
     b/testdata/hypercase.json is a registry, and b holds no _test.go file, so no test compares it, and it still claims sections.

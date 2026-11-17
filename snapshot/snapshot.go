@@ -25,6 +25,7 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -127,10 +128,11 @@ func noCorpus(fn string) error {
 // package's registry, so Create works once the package's first update has
 // run. With no case yet, that update fails for each suite the package
 // registers, since the suite applies to no case, and writes the registry
-// still. Create reads the head of every registry under the module root,
-// which names its corpus root, and the whole of each registry of c, in a
-// package with a _test.go file or not, and writes nothing while one of
-// those reads fails. project is the project's
+// still. Create reads every registry under the module root, and each must
+// be valid JSON. Of another corpus root's registry it uses only the
+// head's fields, which name the corpus root; each registry of c it
+// parses whole, in a package with a _test.go file or not. While one of
+// those reads fails, Create writes nothing. project is the project's
 // declaration, as the project registers it: no update creates a case, so
 // while the variable its UpdateVar names is set, Create fails, naming it,
 // and writes nothing.
@@ -212,17 +214,20 @@ func Create[T ~struct{ fs.FS }](c root.Corpus, project decl.Project, typ decl.Ty
 // in a package with a _test.go file, records as its package's corpus
 // root, and a corpus directory, dir, that none of those registries
 // declares, as a corpus type's directory or the corpus of a suite over the
-// raw input. A registry in a package with no _test.go file records what no
-// test runs, so it counts for neither. Those are the kinds of declaration
-// the root-package check counts, and Create is the stricter: the check
-// counts what every registry of the corpus root declares, those in
-// packages with no _test.go file included, and Create counts only what
-// those in packages with one declare. Each refusal names what the
-// registries do record, or declare, and the registries in packages with
-// no _test.go file that alone record the root, or declare dir.
+// raw input, by [registry.Registry.Declarations]. A registry in a package
+// with no _test.go file records what no test runs, so it counts for
+// neither. Those are the kinds of declaration the root-package check
+// counts, by the same rule, and Create is the stricter: the check counts
+// what every registry of the corpus root declares, those in packages with
+// no _test.go file included, and Create counts only what those in packages
+// with one declare. Each refusal names what the registries do record, or
+// declare, and the registries in packages with no _test.go file that
+// alone record the root, or declare dir. It names a directory by its path
+// from the module root, as the root-package check does.
 //
-// It reads the head of every registry under the module root, which names
-// the registry's corpus root, and parses each registry of c, whether its
+// It reads every registry under the module root, each of which must be
+// valid JSON: of another corpus root's, only the head's fields, which name
+// the registry's corpus root, and each registry of c whole, whether its
 // package has a _test.go file or not. One it can't read fails Create
 // before it writes anything.
 func recorded(c root.Corpus, dir, updateVar string) error {
@@ -276,13 +281,21 @@ func recorded(c root.Corpus, dir, updateVar string) error {
 			}
 		}
 	}
+	// dirPath names a corpus directory as the root-package check does, by
+	// its path from the module root.
+	dirPath := func(d string) string { return path.Join(c.Rel(), "testdata", d) + "/" }
 	testedDeclare := "the registries in packages with tests declare none"
 	if len(declared) > 0 {
-		testedDeclare = "the registries in packages with tests declare " + quotedList(declared)
+		var ds []string
+		for _, d := range slices.Sorted(maps.Keys(declared)) {
+			ds = append(ds, dirPath(d))
+		}
+		testedDeclare = "the registries in packages with tests declare " + strings.Join(ds, ", ")
 	}
 	switch {
 	case !roots[c.Rel()] && len(stale) > 0:
-		return fmt.Errorf("the corpus root %q is recorded only by registries in packages with no _test.go file, %s, so no test reads cases under it.\nRestore the package's tests, or pass root.Find the corpus root of a package that has them.", c.Rel(), strings.Join(stale, ", "))
+		who, restore := staleOnly(stale)
+		return fmt.Errorf("the corpus root %q is recorded only by %s, so no test reads cases under it.\n%s, or pass root.Find the corpus root of a package that has them.", c.Rel(), who, restore)
 	case !roots[c.Rel()]:
 		have := "no registry of a package with tests is under it"
 		if len(roots) > 0 {
@@ -290,11 +303,23 @@ func recorded(c root.Corpus, dir, updateVar string) error {
 		}
 		return fmt.Errorf("no registry under the module root %s records the corpus root %q, so no package's tests would read the case: %s.\nPass root.Find the path a package passes to hypercase.Root, or . for one that passes none. A new package's first update, %s=1 go test ./..., writes its registry: with no case yet, it fails for each suite the package registers, which applies to no case, and writes the registry still.", c.Module(), c.Rel(), have, updateVar)
 	case !declared[dir] && len(staleDirs[dir]) > 0:
-		return fmt.Errorf("the directory %s is declared under the corpus root %q only by registries in packages with no _test.go file, %s, so no test would read the case: %s.\nRestore the package's tests, or pass the corpus type a package with tests registers.", dir, c.Rel(), strings.Join(staleDirs[dir], ", "), testedDeclare)
+		who, restore := staleOnly(staleDirs[dir])
+		return fmt.Errorf("the directory %s, of the corpus root %q, is declared only by %s, so no test would read the case: %s.\n%s, or pass the corpus type a package with tests registers.", dirPath(dir), c.Rel(), who, testedDeclare, restore)
 	case !declared[dir]:
-		return fmt.Errorf("no registry of the corpus root %q declares the directory %s, as a corpus type's directory or the corpus of a suite over the raw input, so no package's tests would read the case: %s.\nPass the corpus type a package of the corpus root registers.", c.Rel(), dir, testedDeclare)
+		return fmt.Errorf("no registry of the corpus root %q declares the directory %s, as a corpus type's directory or the corpus of a suite over the raw input, so no package's tests would read the case: %s.\nPass the corpus type a package of the corpus root registers.", c.Rel(), dirPath(dir), testedDeclare)
 	}
 	return nil
+}
+
+// staleOnly names the registries in packages with no _test.go file that
+// alone record a corpus root, or declare a directory, and says what
+// restoring their tests takes: one registry's package's, or one of
+// several packages'.
+func staleOnly(paths []string) (who, restore string) {
+	if len(paths) == 1 {
+		return "a registry in a package with no _test.go file, " + paths[0], "Restore the package's tests"
+	}
+	return "registries in packages with no _test.go file, " + strings.Join(paths, ", "), "Restore the tests of one of those packages"
 }
 
 // quotedList lists a set's members, sorted and quoted.

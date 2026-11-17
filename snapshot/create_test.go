@@ -194,8 +194,9 @@ func TestCreateUnrecordedRoot(t *testing.T) {
 
 // TestCreateStaleRegistry: a registry in a package with no _test.go file
 // records what no test runs, so a corpus root that only such a registry
-// records is refused, naming it, and nothing is written. Once a tested
-// package's registry records the root, Create writes.
+// records is refused, naming it, and nothing is written; with two such
+// registries, the refusal names both, and says to restore one package's
+// tests. Once a tested package's registry records the root, Create writes.
 func TestCreateStaleRegistry(t *testing.T) {
 	mod := newModule(t)
 	if err := os.Remove(filepath.Join(mod, testFile)); err != nil {
@@ -207,10 +208,14 @@ func TestCreateStaleRegistry(t *testing.T) {
 	before := dirs(t, mod)
 	reg := filepath.Join(mod, "testdata", registry.Name)
 	_, err := Create(corpusIn(t, mod, "corp"), project, sheetType, "twice", serialize(t, cells))
-	fails(t, err, `the corpus root "corp" is recorded only by registries in packages with no _test.go file, `+reg+`, so no test reads cases under it.`, "Restore the package's tests, or pass root.Find the corpus root of a package that has them.")
+	fails(t, err, `the corpus root "corp" is recorded only by a registry in a package with no _test.go file, `+reg+`, so no test reads cases under it.`, "Restore the package's tests, or pass root.Find the corpus root of a package that has them.")
 	if got := dirs(t, mod); !slices.Equal(got, before) {
 		t.Errorf("a refused Create left %q, not %q", got, before)
 	}
+	old := filepath.Join(mod, "old", "testdata", registry.Name)
+	writeRegistryOf(t, filepath.Join(mod, "old"), registry.Registry{CorpusRoot: "corp"}, false)
+	_, err = Create(corpusIn(t, mod, "corp"), project, sheetType, "twice", serialize(t, cells))
+	fails(t, err, `the corpus root "corp" is recorded only by registries in packages with no _test.go file, `+reg+`, `+old+`, so no test reads cases under it.`, "Restore the tests of one of those packages, or pass root.Find the corpus root of a package that has them.")
 	writeRegistry(t, filepath.Join(mod, "pkg"), "corp")
 	if _, err := Create(corpusIn(t, mod, "corp"), project, sheetType, "twice", serialize(t, cells)); err != nil {
 		t.Errorf("Create refused a root a tested package's registry records: %v", err)
@@ -218,12 +223,14 @@ func TestCreateStaleRegistry(t *testing.T) {
 }
 
 // TestCreateUnreadableRegistry: a registry Create can't read fails it,
-// naming the registry and why, and nothing is written. That is one whose
-// head can't be read, and one of the corpus root whose head reads and
-// whose body doesn't, as one of the previous format, whether or not its
-// package has a _test.go file. The refusal of a registry in a package with
-// no _test.go file says so. A registry of another corpus root is read
-// only to its head, so one of the previous format leaves Create to write.
+// naming the registry and why, and nothing is written. That is one that
+// isn't valid JSON, even another corpus root's whose head's fields are
+// whole, and one of the corpus root whose head reads and whose body
+// doesn't, as one of the previous format, whether or not its package has a
+// _test.go file. The refusal of a registry in a package with no _test.go
+// file says so. Of another corpus root's registry, only the head's fields
+// are read, so one of the previous format, in a package with or without a
+// _test.go file, leaves Create to write.
 func TestCreateUnreadableRegistry(t *testing.T) {
 	old := fmt.Sprintf(`{"format": %d, "corpusRoot": %%q}`, registry.Format-1)
 	oldWhy := fmt.Sprintf(" can't be read: it holds format %d, and this hypercase reads format %d", registry.Format-1, registry.Format)
@@ -238,7 +245,9 @@ func TestCreateUnreadableRegistry(t *testing.T) {
 		{fmt.Sprintf(old, "corp"), true, []string{oldWhy + refused + update}},
 		{fmt.Sprintf(old, "corp"), false, []string{oldWhy + refused + untested}},
 		{"{", false, []string{" can't be read: it is not a registry: ", refused + untested}},
+		{fmt.Sprintf(`{"format": %d, "corpusRoot": "other", "types": [`, registry.Format-1), true, []string{" can't be read: it is not a registry: unexpected end of JSON input" + refused + update}},
 		{fmt.Sprintf(old, "other"), true, nil},
+		{fmt.Sprintf(old, "other"), false, nil},
 	} {
 		corp := newCorpus(t)
 		pkg := filepath.Join(corp.Module(), "pkg")
@@ -284,16 +293,18 @@ func TestCreateRegistryReadFails(t *testing.T) {
 
 // TestCreateUndeclaredDir: a corpus type's directory that no tested
 // registry of the corpus root declares is refused, naming the directories
-// they declare, and nothing is written. A suite over the raw input
-// declares its corpus, as a corpus type declares its directory. A
-// registry in a package with no _test.go file declares nothing, and a
-// directory only such registries declare is refused, naming them. Nor
-// does a registry of another corpus root declare anything.
+// they declare by their paths from the module root, and nothing is
+// written. A suite over the raw input declares its corpus, as a corpus
+// type declares its directory. A registry in a package with no _test.go
+// file declares nothing, and a directory only such registries declare is
+// refused, naming each once, though two of one registry's suites declare
+// it, and saying to restore one package's tests when there are several.
+// Nor does a registry of another corpus root declare anything.
 func TestCreateUndeclaredDir(t *testing.T) {
 	corp := newCorpus(t)
 	ss := serialize(t, cells)
 	_, err := Create(corp, project, decl.Type[Sheet]{Dir: "undeclared"}, "twice", ss)
-	fails(t, err, `no registry of the corpus root "corp" declares the directory undeclared, as a corpus type's directory or the corpus of a suite over the raw input, so no package's tests would read the case: the registries in packages with tests declare "sheet".`, "Pass the corpus type a package of the corpus root registers.")
+	fails(t, err, `no registry of the corpus root "corp" declares the directory corp/testdata/undeclared/, as a corpus type's directory or the corpus of a suite over the raw input, so no package's tests would read the case: the registries in packages with tests declare corp/testdata/sheet/.`, "Pass the corpus type a package of the corpus root registers.")
 	if got := dirs(t, corp.Dir()); len(got) > 0 {
 		t.Errorf("a refused Create wrote %q", got)
 	}
@@ -306,11 +317,47 @@ func TestCreateUndeclaredDir(t *testing.T) {
 	stale := filepath.Join(corp.Module(), "stale", "testdata", registry.Name)
 	writeRegistryOf(t, filepath.Join(corp.Module(), "stale"), registry.Registry{CorpusRoot: "corp", Types: []registry.Type{{Dir: "loose"}}}, false)
 	_, err = Create(corp, project, decl.Type[Sheet]{Dir: "loose"}, "twice", ss)
-	fails(t, err, `the directory loose is declared under the corpus root "corp" only by registries in packages with no _test.go file, `+stale+`, so no test would read the case: the registries in packages with tests declare "sheet", "undeclared".`, "Restore the package's tests, or pass the corpus type a package with tests registers.")
+	declare := "so no test would read the case: the registries in packages with tests declare corp/testdata/sheet/, corp/testdata/undeclared/."
+	fails(t, err, `the directory corp/testdata/loose/, of the corpus root "corp", is declared only by a registry in a package with no _test.go file, `+stale+`, `+declare, "Restore the package's tests, or pass the corpus type a package with tests registers.")
+	tally := filepath.Join(corp.Module(), "tally", "testdata", registry.Name)
+	writeRegistryOf(t, filepath.Join(corp.Module(), "tally"), registry.Registry{CorpusRoot: "corp", Suites: []registry.Suite{
+		{Name: "count", Consumes: registry.RawInput, Corpora: []string{"loose"}},
+		{Name: "tally", Consumes: registry.RawInput, Corpora: []string{"loose"}},
+	}}, false)
+	_, err = Create(corp, project, decl.Type[Sheet]{Dir: "loose"}, "twice", ss)
+	fails(t, err, `the directory corp/testdata/loose/, of the corpus root "corp", is declared only by registries in packages with no _test.go file, `+stale+`, `+tally+`, `+declare, "Restore the tests of one of those packages, or pass the corpus type a package with tests registers.")
 	absent(t, filepath.Join(corp.Dir(), "testdata", "loose"))
 	writeRegistryOf(t, filepath.Join(corp.Module(), "elsewhere"), registry.Registry{CorpusRoot: "other", Types: []registry.Type{{Dir: "away"}}}, true)
 	_, err = Create(corp, project, decl.Type[Sheet]{Dir: "away"}, "twice", ss)
-	fails(t, err, `no registry of the corpus root "corp" declares the directory away`, `the registries in packages with tests declare "sheet", "undeclared".`)
+	fails(t, err, `no registry of the corpus root "corp" declares the directory corp/testdata/away/`, `the registries in packages with tests declare corp/testdata/sheet/, corp/testdata/undeclared/.`)
+}
+
+// TestCreateNoneDeclared: under a corpus root whose one tested registry
+// declares no directory, as one that registers only the root-package check,
+// Create refuses, saying the registries in packages with tests declare
+// none, beside a registry in a package with no _test.go file that
+// declares the directory too. Nothing is written.
+func TestCreateNoneDeclared(t *testing.T) {
+	mod := newBareModule(t)
+	writeRegistryOf(t, mod, registry.Registry{CorpusRoot: "corp", RootPackage: true}, true)
+	if err := os.Mkdir(filepath.Join(mod, "corp"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	corp := corpusIn(t, mod, "corp")
+	before := dirs(t, mod)
+	_, err := Create(corp, project, sheetType, "twice", serialize(t, cells))
+	fails(t, err, `no registry of the corpus root "corp" declares the directory corp/testdata/sheet/, as a corpus type's directory or the corpus of a suite over the raw input, so no package's tests would read the case: the registries in packages with tests declare none.`, "Pass the corpus type a package of the corpus root registers.")
+	if got := dirs(t, mod); !slices.Equal(got, before) {
+		t.Errorf("a refused Create left %q, not %q", got, before)
+	}
+	stale := filepath.Join(mod, "stale", "testdata", registry.Name)
+	writeRegistryOf(t, filepath.Join(mod, "stale"), registry.Registry{CorpusRoot: "corp", Types: []registry.Type{{Dir: sheetType.Dir}}}, false)
+	before = dirs(t, mod)
+	_, err = Create(corp, project, sheetType, "twice", serialize(t, cells))
+	fails(t, err, `the directory corp/testdata/sheet/, of the corpus root "corp", is declared only by a registry in a package with no _test.go file, `+stale+`, so no test would read the case: the registries in packages with tests declare none.`, "Restore the package's tests, or pass the corpus type a package with tests registers.")
+	if got := dirs(t, mod); !slices.Equal(got, before) {
+		t.Errorf("a refused Create left %q, not %q", got, before)
+	}
 }
 
 // TestCreateMkdirFails: testdata/sheet/ there as a file fails Create's
