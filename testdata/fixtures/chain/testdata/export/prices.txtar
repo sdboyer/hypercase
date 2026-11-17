@@ -1,0 +1,19 @@
+One export of prices: import makes a script whose evaluate prints a1 and b1.
+-- in/import/out/evaluate/out/values.txt --
+a1 3
+b1 6
+-- in/import/out/quote/A1 --
+3
+-- in/import/out/quote/B1 --
+=A1*2
+-- variant/unclosed/about --
+An unclosed quote, which the importer rejects.
+-- variant/unclosed/properties --
+unterminated
+-- variant/unclosed/in/import/error --
+line 1: unclosed quote
+-- variant/doubled/about --
+The prices doubled. The rest of the export is the base's.
+-- variant/doubled/in/import/out/evaluate/out/values.txt --
+a1 6
+b1 12

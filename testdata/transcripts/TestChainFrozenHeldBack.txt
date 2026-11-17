@@ -1,0 +1,55 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-render
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/quoted: evaluate is blocked: the lift resolve failed on the case, and testdata/export/quoted.txtar, out/resolve/error.txt, records its error.
+    what ran, in order:
+        import ran
+        parse ran on quoted
+        resolve ran on quoted
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/quoted
+            --- SKIP: TestCorpus/export/quoted/evaluate
+            --- PASS: TestCorpus/export/quoted/import
+            --- PASS: TestCorpus/export/quoted/parse
+            --- PASS: TestCorpus/export/quoted/resolve
+    --- PASS: TestCorpus/script
+PASS
+$ edit testdata/export/quoted.txtar  # a gaps line marks import's cell, import now rejects quoted, and the renderer panics on its error
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-render
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/quoted: import makes a script with a cycle, whose quote/text the renderer of resolve's error quotes.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        The cell of the lift import, on evaluate's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on evaluate's path, nor for this cell.
+    export/quoted: import makes a script with a cycle, whose quote/text the renderer of resolve's error quotes.
+        import: Imports the export as a script, as its import/ tree says.
+        The project's RenderError panicked on import's error: the renderer panicked
+        Fix RenderError. An update writes nothing for this cell.
+        The cell is frozen by its known gap, gaps line 1: "import The importer reads quoted fields. Waits on sheets#9."
+        Its committed files record today's behavior, and the run now produces different ones:
+        out/import/outcome differs (-committed +got):
+        - accepted
+        + rejected
+        via/import/quote/text is no longer produced
+        via/import/resolve/error is no longer produced
+        Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.
+    export/quoted: import makes a script with a cycle, whose quote/text the renderer of resolve's error quotes.
+        parse: Parses the script, as its parse/ tree says.
+        The cell of the lift import, on parse's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on parse's path, nor for this cell.
+    export/quoted: import makes a script with a cycle, whose quote/text the renderer of resolve's error quotes.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        The cell of the lift import, on resolve's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on resolve's path, nor for this cell.
+    what ran, in order:
+        import ran
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/quoted
+            --- FAIL: TestCorpus/export/quoted/evaluate
+            --- FAIL: TestCorpus/export/quoted/import
+            --- FAIL: TestCorpus/export/quoted/parse
+            --- FAIL: TestCorpus/export/quoted/resolve
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]

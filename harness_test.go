@@ -33,6 +33,7 @@ import (
 const (
 	fixtureEnv     = "HYPERCASE_SELFTEST"
 	reverseEnv     = "HYPERCASE_SELFTEST_REVERSE"
+	observeEnv     = "HYPERCASE_SELFTEST_OBSERVE"
 	fixtureUpdate  = "FIXTURE_UPDATE_GOLDEN"
 	transcriptsVar = "HYPERCASE_UPDATE_GOLDEN"
 )
@@ -54,6 +55,12 @@ func init() {
 	}
 	if !ok {
 		register, ok = outcomeRegistrations[name]
+	}
+	if !ok {
+		register, ok = chainRegistrations[name]
+	}
+	if !ok {
+		register, ok = topologyRegistration(name)
 	}
 	if !ok {
 		panic("selftest: no registration named " + name)
@@ -198,12 +205,39 @@ func (c childRun) env() []string {
 // exec runs the child, and returns its normalized output and exit code.
 // It only reports a failure to start it, so it can run on any goroutine.
 func (s *sandbox) exec(pkg, registration string, extra []string, args ...string) result {
+	r := s.execRaw(pkg, registration, extra, args...)
+	return result{out: s.shown(r), code: r.code}
+}
+
+// A rawResult is what one child run left: its output as the child wrote
+// it, its exit code, and what kept it from starting, if anything did.
+type rawResult struct {
+	out  []byte
+	code int
+	err  error
+}
+
+func (r rawResult) ok() bool { return r.code == 0 }
+
+// shown is a child's output, normalized, as exec gives it.
+func (s *sandbox) shown(r rawResult) string {
+	out := s.normalize(r.out)
+	if r.err != nil {
+		out += fmt.Sprintf("running the child: %v\n", r.err)
+	}
+	return out
+}
+
+// execRaw runs the child, as exec does, and returns what it left, its
+// output as the child wrote it, for a caller that shows it only on a
+// failure.
+func (s *sandbox) execRaw(pkg, registration string, extra []string, args ...string) rawResult {
 	cmd := exec.Command(os.Args[0], append([]string{"-test.run=^TestCorpus$", "-test.v", "-test.count=1"}, args...)...)
 	cmd.Dir = filepath.Join(s.dir, pkg)
 	var env []string
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
-		if k != fixtureEnv && k != reverseEnv && k != fixtureUpdate && k != transcriptsVar && k != "GOFLAGS" && k != "PWD" {
+		if k != fixtureEnv && k != reverseEnv && k != observeEnv && k != fixtureUpdate && k != transcriptsVar && k != "GOFLAGS" && k != "PWD" {
 			env = append(env, kv)
 		}
 	}
@@ -211,13 +245,12 @@ func (s *sandbox) exec(pkg, registration string, extra []string, args ...string)
 	env = append(env, extra...)
 	cmd.Env = env
 	out, err := cmd.CombinedOutput()
-	r := result{out: s.normalize(out)}
+	r := rawResult{out: out}
 	var exit *exec.ExitError
 	if errors.As(err, &exit) {
 		r.code = exit.ExitCode()
 	} else if err != nil {
-		r.code = -1
-		r.out += fmt.Sprintf("running the child: %v\n", err)
+		r.code, r.err = -1, err
 	}
 	return r
 }

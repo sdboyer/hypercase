@@ -1,0 +1,105 @@
+$ edit b/corpus_test.go  # ./b, which owns import and list, and uses export
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-twice-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        export ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/sheet
+            --- PASS: TestCorpus/grid/sheet/export
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-twice-b
+    what ran, in order:
+        export ran
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/sheet
+            --- PASS: TestCorpus/grid/sheet/import
+            --- PASS: TestCorpus/grid/sheet/list
+    --- PASS: TestCorpus/script
+PASS
+$ go test  # chain-twice-a
+    what ran, in order:
+        export ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/sheet
+            --- PASS: TestCorpus/grid/sheet/export
+PASS
+$ go test ./b  # chain-twice-b
+    what ran, in order:
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/sheet
+            --- PASS: TestCorpus/grid/sheet/import
+            --- PASS: TestCorpus/grid/sheet/list
+    --- PASS: TestCorpus/script
+PASS
+$ edit testdata/grid/sheet.txtar  # export now rejects the grid, which says so
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-twice-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        export ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/sheet
+            --- PASS: TestCorpus/grid/sheet/export
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-twice-b
+    grid/sheet: import is blocked: the lift export failed on the case, and testdata/grid/sheet.txtar, out/export/error.txt, records its error.
+    grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
+        list: Lists the files of the script's input view, with their bytes.
+        out/list/files.txt is recorded, and the cell is blocked: the lift export, on list's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    what ran, in order:
+        export ran
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+    --- FAIL: TestCorpus/grid
+        --- FAIL: TestCorpus/grid/sheet
+            --- SKIP: TestCorpus/grid/sheet/import
+            --- FAIL: TestCorpus/grid/sheet/list
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ edit testdata/grid/sheet.txtar  # export accepts the grid again, and its error is deleted by hand
+$ go test ./b  # chain-twice-b
+    grid/sheet: import is blocked: testdata/grid/sheet.txtar, out/export/outcome, records the lift export's outcome as "rejected".
+    grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
+        list: Lists the files of the script's input view, with their bytes.
+        out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "blocked export", in out/import/outcome.
+        Only the package that owns export runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads export's outcome and product from the archive. Delete nothing by hand before it has run.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+    --- FAIL: TestCorpus/grid
+        --- FAIL: TestCorpus/grid/sheet
+            --- SKIP: TestCorpus/grid/sheet/import
+            --- FAIL: TestCorpus/grid/sheet/list
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-twice-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        export ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/sheet
+            --- PASS: TestCorpus/grid/sheet/export
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-twice-b
+    what ran, in order:
+        export ran
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/sheet
+            --- PASS: TestCorpus/grid/sheet/import
+            --- PASS: TestCorpus/grid/sheet/list
+    --- PASS: TestCorpus/script
+PASS

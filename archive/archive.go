@@ -87,13 +87,11 @@ const (
 // archive carries: in/params/ is a problem of the archive's form.
 const ParamsTree = "params"
 
-// topLevel is the closed set, each with whether this hypercase reads it yet.
-// A section under a name it doesn't read yet is a problem of form, so it
-// can't pass unread while an update rewrites the goldens beside it.
+// topLevel is the closed set.
 var topLevel = map[string]bool{
 	In:         true,
 	Out:        true,
-	Via:        false,
+	Via:        true,
 	Properties: true,
 	Gaps:       true,
 	Variant:    true,
@@ -151,13 +149,8 @@ func (a *Archive) Check() []Problem {
 		}
 		names = append(names, s.Name)
 		top, rest, _ := strings.Cut(s.Name, "/")
-		read, ok := topLevel[top]
-		switch {
-		case !ok:
+		if !topLevel[top] {
 			ps = append(ps, Problem{Section: s.Name, Msg: fmt.Sprintf("%s is not one of the framework's top-level names (%s)", top, topLevelList())})
-			continue
-		case !read:
-			ps = append(ps, Problem{Section: s.Name, Msg: fmt.Sprintf("the top-level name %s is reserved for a later step, and this hypercase doesn't read it yet", top)})
 			continue
 		}
 		switch top {
@@ -165,6 +158,8 @@ func (a *Archive) Check() []Problem {
 			ps = append(ps, checkIn(s.Name, rest)...)
 		case Out:
 			ps = append(ps, checkOut(s.Name, rest)...)
+		case Via:
+			ps = append(ps, checkVia(s.Name, rest)...)
 		case Properties, Gaps:
 			if rest != "" {
 				ps = append(ps, Problem{Section: s.Name, Msg: fmt.Sprintf("%s is one section, with nothing below it", top)})
@@ -211,6 +206,44 @@ func checkOut(section, rest string) []Problem {
 		return []Problem{{Section: section, Msg: fmt.Sprintf("an output belongs under its column, as %s<column>/<file>", strings.TrimSuffix(section, rest))}}
 	}
 	return nil
+}
+
+// checkVia reports the problems of the name of one file of a bytes lift's
+// product: section is the whole name, and rest its part below via/, empty
+// for a section named via itself. The product is an input view, laid out
+// as an archive's in/ is.
+func checkVia(section, rest string) []Problem {
+	prefix := strings.TrimSuffix(section, rest)
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+	lift, file, _ := strings.Cut(rest, "/")
+	tree, below, _ := strings.Cut(file, "/")
+	switch {
+	case lift == "" || file == "":
+		return []Problem{{Section: section, Msg: fmt.Sprintf("a product belongs under its lift, as %s<lift>/<tree>/<file>", prefix)}}
+	case below == "":
+		return []Problem{{Section: section, Msg: fmt.Sprintf("a product's file belongs in a tree, as %s%s/<tree>/<file>", prefix, lift)}}
+	case tree == ParamsTree:
+		return []Problem{{Section: section, Msg: "the tree name params is reserved in every input view, a product's included"}}
+	}
+	return nil
+}
+
+// CheckVia reports the problems of form that the sections holding a bytes
+// lift's product would have: the product's files are at paths in its
+// input view, and its sections are via/<lift>/<path>, after the prefix of
+// the case's sections. It reports a file outside any tree or in the tree
+// params, and one that is also the directory of another.
+func CheckVia(prefix, lift string, paths []string) []Problem {
+	var ps []Problem
+	var names []string
+	for _, p := range paths {
+		name := prefix + Via + "/" + lift + "/" + p
+		names = append(names, name)
+		ps = append(ps, checkVia(name, lift+"/"+p)...)
+	}
+	return append(ps, Conflicts(names)...)
 }
 
 func topLevelList() string {
@@ -399,4 +432,21 @@ func Holds(data []byte) error {
 		}
 	}
 	return fmt.Errorf("it doesn't read back as written")
+}
+
+// HoldsName reports why a section of the given name can't be held in an
+// archive, or nil when it can: what an archive holds reads back as
+// written, and a name ends at its marker line's end, less the spaces
+// around it.
+func HoldsName(name string) error {
+	got := Parse(txtar.Format(&txtar.Archive{Files: []txtar.File{{Name: name, Data: []byte("x\n")}}}))
+	switch {
+	case len(got.Sections) == 1 && got.Sections[0].Name == name:
+		return nil
+	case strings.Contains(name, "\n"):
+		return fmt.Errorf("its name holds a newline, which ends a section's marker line")
+	case len(got.Sections) == 1:
+		return fmt.Errorf("its name reads back as %q, since an archive trims the spaces around a section's name", got.Sections[0].Name)
+	}
+	return fmt.Errorf("its name doesn't read back as written")
 }

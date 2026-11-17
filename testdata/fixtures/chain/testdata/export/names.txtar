@@ -1,0 +1,7 @@
+import makes files named as a cell's own files are, which list reads.
+-- in/import/out/inputs/x --
+a tree named inputs
+-- in/import/out/names/error.txt --
+not an error
+-- in/import/out/names/outcome --
+not an outcome

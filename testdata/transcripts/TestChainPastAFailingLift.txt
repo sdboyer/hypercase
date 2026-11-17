@@ -1,0 +1,176 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-past
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/stuck: evaluate is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
+    export/stuck: list is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
+    export/stuck: parse is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
+    export/stuck: repack is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
+    export/stuck: resolve is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
+    what ran, in order:
+        unpack ran on packed
+        repack ran
+        parse ran on packed
+        resolve ran on packed
+        evaluate's probe ran
+        evaluate ran on packed
+        unpack ran on stuck
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/packed
+            --- PASS: TestCorpus/export/packed/evaluate
+            --- PASS: TestCorpus/export/packed/list
+            --- PASS: TestCorpus/export/packed/parse
+            --- PASS: TestCorpus/export/packed/repack
+            --- PASS: TestCorpus/export/packed/resolve
+            --- PASS: TestCorpus/export/packed/unpack
+        --- PASS: TestCorpus/export/stuck
+            --- SKIP: TestCorpus/export/stuck/evaluate
+            --- SKIP: TestCorpus/export/stuck/list
+            --- SKIP: TestCorpus/export/stuck/parse
+            --- SKIP: TestCorpus/export/stuck/repack
+            --- SKIP: TestCorpus/export/stuck/resolve
+            --- PASS: TestCorpus/export/stuck/unpack
+    --- PASS: TestCorpus/script
+PASS
+$ cat testdata/export/stuck.txtar
+unpack rejects the export, so repack, and every column past it, is blocked.
+-- properties --
+unterminated
+-- in/repack/out/evaluate/out/values.txt --
+a1 3
+-- in/unpack/error --
+line 1: unclosed quote
+-- out/evaluate/outcome --
+blocked unpack
+-- out/list/outcome --
+blocked unpack
+-- out/parse/outcome --
+blocked unpack
+-- out/repack/outcome --
+blocked unpack
+-- out/resolve/outcome --
+blocked unpack
+-- out/unpack/error.txt --
+line 1: unclosed quote
+-- out/unpack/outcome --
+rejected
+$ go test  # chain-past
+    export/stuck: evaluate is blocked: testdata/export/stuck.txtar, out/repack/outcome, records the lift repack's outcome as "blocked unpack".
+    export/stuck: list is blocked: testdata/export/stuck.txtar, out/repack/outcome, records the lift repack's outcome as "blocked unpack".
+    export/stuck: parse is blocked: testdata/export/stuck.txtar, out/repack/outcome, records the lift repack's outcome as "blocked unpack".
+    export/stuck: repack is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
+    export/stuck: resolve is blocked: testdata/export/stuck.txtar, out/repack/outcome, records the lift repack's outcome as "blocked unpack".
+    what ran, in order:
+        parse ran on packed
+        resolve ran on packed
+        evaluate's probe ran
+        evaluate ran on packed
+        unpack ran on packed
+        repack ran
+        unpack ran on stuck
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/packed
+            --- PASS: TestCorpus/export/packed/evaluate
+            --- PASS: TestCorpus/export/packed/list
+            --- PASS: TestCorpus/export/packed/parse
+            --- PASS: TestCorpus/export/packed/repack
+            --- PASS: TestCorpus/export/packed/resolve
+            --- PASS: TestCorpus/export/packed/unpack
+        --- PASS: TestCorpus/export/stuck
+            --- SKIP: TestCorpus/export/stuck/evaluate
+            --- SKIP: TestCorpus/export/stuck/list
+            --- SKIP: TestCorpus/export/stuck/parse
+            --- SKIP: TestCorpus/export/stuck/repack
+            --- SKIP: TestCorpus/export/stuck/resolve
+            --- PASS: TestCorpus/export/stuck/unpack
+    --- PASS: TestCorpus/script
+PASS
+$ edit testdata/export/packed.txtar  # unpack now rejects packed, which says so
+$ go test  # chain-past
+    export/packed: unpack and repack make a script that evaluate prints a1 from.
+        repack: Repacks the unpacked export as a script, as its repack/ tree says.
+        out/repack/outcome differs (-golden +got):
+        - accepted
+        + blocked unpack
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        via/repack/evaluate/out/values.txt is recorded, and repack is blocked: the lift unpack, on repack's path, failed on the case, so it has no product in this run.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
+    export/packed: unpack and repack make a script that evaluate prints a1 from.
+        unpack: Unpacks the export, as its unpack/ tree says.
+        out/unpack/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/unpack/outcome differs (-golden +got):
+        - accepted
+        + rejected
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    export/stuck: evaluate is blocked: testdata/export/stuck.txtar, out/repack/outcome, records the lift repack's outcome as "blocked unpack".
+    export/stuck: list is blocked: testdata/export/stuck.txtar, out/repack/outcome, records the lift repack's outcome as "blocked unpack".
+    export/stuck: parse is blocked: testdata/export/stuck.txtar, out/repack/outcome, records the lift repack's outcome as "blocked unpack".
+    export/stuck: repack is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
+    export/stuck: resolve is blocked: testdata/export/stuck.txtar, out/repack/outcome, records the lift repack's outcome as "blocked unpack".
+    what ran, in order:
+        parse ran on packed
+        resolve ran on packed
+        evaluate's probe ran
+        evaluate ran on packed
+        unpack ran on packed
+        unpack ran on stuck
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/packed
+            --- PASS: TestCorpus/export/packed/evaluate
+            --- PASS: TestCorpus/export/packed/list
+            --- PASS: TestCorpus/export/packed/parse
+            --- FAIL: TestCorpus/export/packed/repack
+            --- PASS: TestCorpus/export/packed/resolve
+            --- FAIL: TestCorpus/export/packed/unpack
+        --- PASS: TestCorpus/export/stuck
+            --- SKIP: TestCorpus/export/stuck/evaluate
+            --- SKIP: TestCorpus/export/stuck/list
+            --- SKIP: TestCorpus/export/stuck/parse
+            --- SKIP: TestCorpus/export/stuck/repack
+            --- SKIP: TestCorpus/export/stuck/resolve
+            --- PASS: TestCorpus/export/stuck/unpack
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-past
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/packed: unpack and repack make a script that evaluate prints a1 from.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/values.txt is recorded, and the cell is blocked: the lift unpack, on evaluate's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/packed: unpack and repack make a script that evaluate prints a1 from.
+        list: Lists the files of the script's input view, with their bytes.
+        out/list/files.txt is recorded, and the cell is blocked: the lift unpack, on list's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/packed: parse is blocked: the lift unpack failed on the case, and testdata/export/packed.txtar, out/unpack/error.txt, records its error.
+    export/packed: repack is blocked: the lift unpack failed on the case, and testdata/export/packed.txtar, out/unpack/error.txt, records its error.
+    export/packed: resolve is blocked: the lift unpack failed on the case, and testdata/export/packed.txtar, out/unpack/error.txt, records its error.
+    export/stuck: evaluate is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
+    export/stuck: list is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
+    export/stuck: parse is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
+    export/stuck: repack is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
+    export/stuck: resolve is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
+    what ran, in order:
+        unpack ran on packed
+        unpack ran on stuck
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/packed
+            --- FAIL: TestCorpus/export/packed/evaluate
+            --- FAIL: TestCorpus/export/packed/list
+            --- SKIP: TestCorpus/export/packed/parse
+            --- SKIP: TestCorpus/export/packed/repack
+            --- SKIP: TestCorpus/export/packed/resolve
+            --- PASS: TestCorpus/export/packed/unpack
+        --- PASS: TestCorpus/export/stuck
+            --- SKIP: TestCorpus/export/stuck/evaluate
+            --- SKIP: TestCorpus/export/stuck/list
+            --- SKIP: TestCorpus/export/stuck/parse
+            --- SKIP: TestCorpus/export/stuck/repack
+            --- SKIP: TestCorpus/export/stuck/resolve
+            --- PASS: TestCorpus/export/stuck/unpack
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]

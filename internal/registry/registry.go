@@ -23,7 +23,7 @@ import (
 
 // Format is the version of what a registry holds. It changes on any change
 // to that.
-const Format = 5
+const Format = 6
 
 // Name is a registry's file name, in its package's testdata/ directory.
 const Name = "hypercase.json"
@@ -123,10 +123,17 @@ type Lift struct {
 	Product string `json:"product"`
 	// Owned records that the package owns the lift's column.
 	Owned bool `json:"owned"`
+	// Bytes records a bytes lift: its product is a corpus type's input
+	// view, which each case commits under via/<Name>/, beside the lift's
+	// cell files under out/<Name>/.
+	Bytes bool `json:"bytes"`
 	// Corpora are the directories of the corpus types that reach the
 	// lift's input, under the corpus root's testdata/.
 	Corpora []string `json:"corpora"`
 	Outputs []Output `json:"outputs"`
+	// ProductFiles declares a bytes lift's product's files, by their paths
+	// under via/<Name>/. Any other lift's is empty.
+	ProductFiles []Output `json:"productFiles"`
 	// Rejects names the properties the lift rejects.
 	Rejects []string `json:"rejects"`
 }
@@ -184,6 +191,7 @@ func (r Registry) Marshal() []byte {
 	for i, l := range lifts {
 		l.Corpora = sorted(l.Corpora, func(n string) string { return n })
 		l.Outputs = sorted(l.Outputs, func(o Output) string { return o.Pattern })
+		l.ProductFiles = sorted(l.ProductFiles, func(o Output) string { return o.Pattern })
 		l.Rejects = sorted(l.Rejects, func(n string) string { return n })
 		lifts[i] = l
 	}
@@ -263,9 +271,11 @@ const OutcomeFormat = 5
 
 // added is what each format version added to the one before it, by the
 // key that holds it, which a registry of an older format doesn't hold.
-// Format 4 added each corpus type's transforms, and format 5 whether the
-// project supplies Codes and each suite's classifier. Neither changed what
-// an earlier key holds.
+// Format 4 added each corpus type's transforms, format 5 whether the
+// project supplies Codes and each suite's classifier, and format 6 whether
+// each lift is a bytes lift and its product's declarations. None changed
+// what an earlier key holds. Each format's keys are in
+// testdata/keys-<N>.txt, which TestFormatKeys checks the table against.
 var added = []struct {
 	format int
 	key    string
@@ -278,6 +288,12 @@ var added = []struct {
 	{5, "suites[].classifier", func(p presence) bool {
 		return slices.ContainsFunc(p.Suites, func(s suitePresence) bool { return s.Classifier != nil })
 	}},
+	{6, "lifts[].bytes", func(p presence) bool {
+		return slices.ContainsFunc(p.Lifts, func(l liftPresence) bool { return l.Bytes != nil })
+	}},
+	{6, "lifts[].productFiles", func(p presence) bool {
+		return slices.ContainsFunc(p.Lifts, func(l liftPresence) bool { return l.ProductFiles != nil })
+	}},
 }
 
 // presence records which keys that a later format added a registry
@@ -285,7 +301,13 @@ var added = []struct {
 type presence struct {
 	Codes  json.RawMessage `json:"codes"`
 	Types  []typePresence  `json:"types"`
+	Lifts  []liftPresence  `json:"lifts"`
 	Suites []suitePresence `json:"suites"`
+}
+
+type liftPresence struct {
+	Bytes        json.RawMessage `json:"bytes"`
+	ProductFiles json.RawMessage `json:"productFiles"`
 }
 
 type typePresence struct {

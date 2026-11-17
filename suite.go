@@ -8,8 +8,10 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/internal/erase"
+	"github.com/sdboyer/jenny"
 )
 
 // A File is one output of a run: its path under the column's directory,
@@ -167,6 +169,11 @@ type lift struct {
 	run         func(archive string, in any, stderr io.Writer) (any, error)
 	jenny       bool
 	owned       bool
+	// A bytes lift's: its product is a corpus type, whose input view its
+	// jenny makes, and whose files product declares.
+	bytes    bool
+	generate func(in any) (*jenny.FS, error)
+	product  []decl.Output
 }
 
 func newLift(e *erase.Lift, owned bool) *lift {
@@ -178,9 +185,14 @@ func newLift(e *erase.Lift, owned bool) *lift {
 		run:         e.Run,
 		jenny:       e.Jenny,
 		owned:       owned,
+		bytes:       isCorpusShape(e.Out),
+		generate:    e.Generate,
 	}
 	for _, o := range e.Outputs {
 		l.outputs = append(l.outputs, decl.Output(o))
+	}
+	for _, o := range e.Product {
+		l.product = append(l.product, decl.Output(o))
 	}
 	for _, p := range e.Rejects {
 		l.rejects = append(l.rejects, decl.Property(p))
@@ -190,6 +202,24 @@ func newLift(e *erase.Lift, owned bool) *lift {
 
 func (l *lift) describe() string {
 	return "the lift " + l.name + ", from " + l.in.String() + " to " + l.out.String()
+}
+
+// viaDir is the prefix of a bytes lift's product's sections in a case
+// whose sections start with prefix.
+func (l *lift) viaDir(prefix string) string {
+	return prefix + archive.Via + "/" + l.name + "/"
+}
+
+// declaredProduct returns the patterns of a bytes lift's product
+// declarations that match a file's path in its product.
+func (l *lift) declaredProduct(p string) []string {
+	var hit []string
+	for _, o := range l.product {
+		if ok, _ := path.Match(o.Pattern, p); ok {
+			hit = append(hit, o.Pattern)
+		}
+	}
+	return hit
 }
 
 // column is the lift's column, in the package that owns it.

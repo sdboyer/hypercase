@@ -1,0 +1,7 @@
+unpack rejects the export, so repack, and every column past it, is blocked.
+-- properties --
+unterminated
+-- in/repack/out/evaluate/out/values.txt --
+a1 3
+-- in/unpack/error --
+line 1: unclosed quote

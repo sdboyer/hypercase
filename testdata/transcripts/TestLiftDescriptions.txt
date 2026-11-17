@@ -51,6 +51,7 @@ $ go test  # lift-nodesc
         +           "description": "What it writes."
                   }
                 ],
+                "productFiles": [],
                 "rejects": [
                   "malformed"
                 ]
@@ -61,6 +62,7 @@ $ go test  # lift-nodesc
         -       "input": "*github.com/sdboyer/hypercase_test.Parsed",
         -       "product": "*github.com/sdboyer/hypercase_test.Graph",
         -       "owned": true,
+        -       "bytes": false,
         -       "corpora": [
         -         "script"
         -       ],
@@ -74,6 +76,7 @@ $ go test  # lift-nodesc
         -           "description": "What the lift writes to stderr."
         -         }
         -       ],
+        -       "productFiles": [],
         -       "rejects": [
         -         "circular",
         -         "dangling"

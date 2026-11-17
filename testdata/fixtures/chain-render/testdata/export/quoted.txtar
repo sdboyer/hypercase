@@ -1,0 +1,9 @@
+import makes a script with a cycle, whose quote/text the renderer of resolve's error quotes.
+-- properties --
+circular
+-- in/import/out/quote/text --
+the product's text
+-- in/import/out/resolve/error --
+A1 -> A1: cycle
+-- in/quote/text --
+the export's own text

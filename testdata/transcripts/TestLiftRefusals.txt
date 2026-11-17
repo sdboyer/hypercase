@@ -1,5 +1,5 @@
 $ go test  # fs-product
-panic: hypercase: the lift copy's product, hypercase_test.Other, is a corpus type, and this hypercase doesn't run lifts whose product is a corpus type. Make the product a stage, a type that isn't a named fs.FS wrapper.
+panic: hypercase: the lift copy's product, hypercase_test.Other, is a corpus type, and the lift gives Run. Give it Jenny in place of Run: the files the jenny generates from the input are the product's input view.
 [stack]
 [exit 2]
 $ go test  # jenny-lift

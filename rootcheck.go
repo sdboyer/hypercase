@@ -64,12 +64,14 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	liftPkgs := map[string][]string{}               // lift → the packages that own it
 	untestedLifts := map[string][]string{}          // lift → the packages with no _test.go file whose registries own it
 	claimed := map[string]map[string]bool{}         // corpus → the columns over it
+	products := map[string]map[string]bool{}        // corpus → the bytes lifts whose columns are over it
 	usedPkgs := map[string][]string{}               // lift → the packages that only use it
 	declared := map[string]bool{}                   // the corpus types' directories, and the suites' Corpus
 	typeEntries := map[string]map[string][]string{} // directory → type entry → packages
 	typeOrder := map[string][]string{}              // directory → type entries, in the order of the packages
 	propEntries := map[string]map[string][]string{} // property → description → packages
 	propOrder := map[string][]string{}              // property → descriptions, in the order of the packages
+	liftEntries := map[string][]liftEntry{}         // lift → the entries of the registries with tests that own or use it, in the order of the packages
 	transforms := map[string]map[string]bool{}      // directory → the transforms its corpus types list
 	needOwner := map[string]map[string]bool{}       // directory → the transforms its corpus types list in packages with tests
 	trPkgs := map[trKey][]string{}                  // transform → the packages that own it
@@ -98,14 +100,16 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	for _, g := range regs {
 		// A registry in a package with no _test.go file records what no
 		// test runs, so its package owns and uses nothing: no column, lift
-		// or transform. Nor does a transform it lists need an owner. Its
+		// or transform. Nor does a transform it lists need an owner, nor
+		// is its entry of a lift compared with the others', which are
+		// compared for what each package's runs do with the lift. Its
 		// sections stay claimed, since the registry's own error reports
 		// them, and the lifts and transforms it owns are kept apart, so a
-		// message that finds no owner names it. Its root-package check,
-		// corpus types and properties still count where registries are
-		// compared, the stricter choice: a second root-package check, or a
-		// corpus type or property another package declares differently,
-		// still fails.
+		// message that finds no owner names it. What still counts where
+		// registries are compared is its root-package check, its corpus
+		// types and its properties, the stricter choice: a second
+		// root-package check, or a corpus type or property another package
+		// declares differently, still fails.
 		if g.reg.RootPackage {
 			rootPkgs = append(rootPkgs, g.pkg)
 		}
@@ -121,6 +125,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			}
 		}
 		for _, l := range g.reg.Lifts {
+			if g.tested {
+				liftEntries[l.Name] = append(liftEntries[l.Name], liftEntry{g.pkg, l})
+			}
 			if !l.Owned {
 				if g.tested {
 					usedPkgs[l.Name] = append(usedPkgs[l.Name], g.pkg)
@@ -128,6 +135,14 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 				continue
 			}
 			claim(l.Name, l.Corpora)
+			if l.Bytes {
+				for _, corpus := range l.Corpora {
+					if products[corpus] == nil {
+						products[corpus] = map[string]bool{}
+					}
+					products[corpus][l.Name] = true
+				}
+			}
 			if g.tested {
 				liftPkgs[l.Name] = append(liftPkgs[l.Name], g.pkg)
 			} else {
@@ -182,19 +197,19 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		columns[name] = true
 	}
 	for _, name := range slices.Sorted(maps.Keys(columns)) {
-		if msg := duplicateColumn(name, suitePkgs[name], liftPkgs[name], usedPkgs[name]); msg != "" {
-			t.Error(msg)
+		if holders, why, fix := duplicateColumn(suitePkgs[name], liftPkgs[name], usedPkgs[name]); holders != "" {
+			t.Errorf("the column %s is %s. %s\n%s", name, holders, why, fix)
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(usedPkgs)) {
 		if len(liftPkgs[name]) > 0 {
 			continue
 		}
-		msg := fmt.Sprintf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.", name, andList(usedPkgs[name]))
+		var untested string
 		fix := "Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use."
 		if pkgs := untestedLifts[name]; len(pkgs) > 0 {
 			why, restore := untestedOwners("lift", pkgs)
-			msg += " " + why
+			untested = " " + why
 			fix = restore + " own the lift in one of the packages that use it: give it to hypercase.Own in place of hypercase.Use."
 		}
 		// Owning the lift while a suite holds its name would make the
@@ -203,8 +218,12 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		if len(suitePkgs[name]) > 0 {
 			fix = "Once no suite shares the lift's name, " + lowerFirst(fix)
 		}
-		t.Errorf("%s\n%s", msg, fix)
+		t.Errorf("the lift %s is used by %s, and no package owns it, so its error is recorded nowhere.%s\n%s", name, andList(usedPkgs[name]), untested, fix)
 	}
+	// Registries that differ where the packages' code agrees are stale,
+	// such as one edited by hand, so each comparison's fix says how the
+	// update ends that.
+	stale := fmt.Sprintf("If they register one declaration already, a registry is stale: run %s, which rewrites the registry of every package with tests.", r.updateCmd())
 	for _, dir := range slices.Sorted(maps.Keys(typeEntries)) {
 		entries := typeEntries[dir]
 		if len(entries) < 2 {
@@ -216,9 +235,9 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			lines = append(lines, fmt.Sprintf("  %s: %s", andList(entries[e]), e))
 			raw = raw || e == rawEntry
 		}
-		fix := "Declare the type once, in a package the others import, and register that declaration."
+		fix := "Declare the type once, in a package the others import, and register that declaration. " + stale
 		if raw {
-			fix = "A suite that names the directory as its Corpus runs over its archives' raw input views, with no type. Make the suite consume the corpus type and remove its Corpus, or move one set of archives to another directory."
+			fix = fmt.Sprintf("A suite that names the directory as its Corpus runs over its archives' raw input views, with no type. Make the suite consume the corpus type and remove its Corpus, or move one set of archives to another directory. If the code does one of these already, a registry is stale: run %s, which rewrites the registry of every package with tests.", r.updateCmd())
 		}
 		t.Errorf("the corpus directory %s has two different corpus types:\n%s\nAn archive's directory gives its type. %s", dir, strings.Join(lines, "\n"), fix)
 	}
@@ -226,14 +245,14 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		for _, name := range slices.Sorted(maps.Keys(needOwner[dir])) {
 			switch pkgs := trPkgs[trKey{dir, name}]; {
 			case len(pkgs) == 0:
-				msg := fmt.Sprintf("the transform %s, of testdata/%s/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.", name, dir)
+				var untested string
 				fix := "Give it to hypercase.Own in one package that registers its corpus type."
 				if u := untestedTrs[trKey{dir, name}]; len(u) > 0 {
 					why, restore := untestedOwners("transform", u)
-					msg += " " + why
+					untested = " " + why
 					fix = restore + " give the transform to hypercase.Own in another package that registers its corpus type."
 				}
-				t.Errorf("%s\n%s", msg, fix)
+				t.Errorf("the transform %s, of testdata/%s/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.%s\n%s", name, dir, untested, fix)
 			case len(pkgs) > 1:
 				t.Errorf("the transform %s, of testdata/%s/, is owned by %s. One package owns each transform.\nOwn it in one of them.", name, dir, andList(pkgs))
 			}
@@ -248,7 +267,41 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 		for _, d := range propOrder[name] {
 			lines = append(lines, fmt.Sprintf("  %s: %q", andList(entries[d]), d))
 		}
-		t.Errorf("the property %s has two different entries:\n%s\nDeclare the property once, in a package the others import, and register that declaration.", name, strings.Join(lines, "\n"))
+		t.Errorf("the property %s has two different entries:\n%s\nDeclare the property once, in a package the others import, and register that declaration. %s", name, strings.Join(lines, "\n"), stale)
+	}
+	for _, name := range slices.Sorted(maps.Keys(liftEntries)) {
+		var differ, blocks []string
+		bytesLift := false
+		for _, e := range liftEntries[name] {
+			bytesLift = bytesLift || e.lift.Bytes
+		}
+		for _, f := range liftFields {
+			pkgs := map[string][]string{} // value → packages
+			var order []string
+			for _, e := range liftEntries[name] {
+				v := f.value(e.lift)
+				if pkgs[v] == nil {
+					order = append(order, v)
+				}
+				pkgs[v] = append(pkgs[v], e.pkg)
+			}
+			if len(order) < 2 {
+				continue
+			}
+			differ = append(differ, f.name)
+			blocks = append(blocks, "  "+f.name+":")
+			for _, v := range order {
+				blocks = append(blocks, fmt.Sprintf("    %s: %s", andList(pkgs[v]), v))
+			}
+		}
+		if len(differ) == 0 {
+			continue
+		}
+		why := "a package that only uses a lift runs its own declaration of it to stage the cells past it, and the lift's cell, which the package that owns it writes, records what the owner's declaration does"
+		if bytesLift {
+			why = "a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it"
+		}
+		t.Errorf("the registries that own or use the lift %s differ in %s:\n%s\nEvery package that owns or uses a lift registers one declaration of it: %s. Declare the lift once, in a package the others import, and register that declaration. %s", name, andList(differ), strings.Join(blocks, "\n"), why, stale)
 	}
 
 	// The archives, and the directories that hold them.
@@ -296,22 +349,23 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	for _, corpus := range slices.Sorted(maps.Keys(archives)) {
 		cols := claimed[corpus]
 		for _, file := range archives[corpus] {
-			r.checkArchive(t, filepath.Join(td, corpus, file), corpus, cols, transforms[corpus], props)
+			r.checkArchive(t, filepath.Join(td, corpus, file), corpus, cols, products[corpus], transforms[corpus], props)
 		}
 	}
 }
 
 // duplicateColumn words the failure of a name that two or more columns
-// hold, or returns "" when fewer do. suites are the packages that own the
-// name as a suite, lifts those that own it as a lift, and users those
-// that use the lift. Each suite's owner counts as one column, and each
-// lift's owner as one. When no package owns the lift, its users together
-// count as one column, the one owning the lift would make; when one does,
-// they count for nothing. The fix leaves one column of the name. Only a
-// lift's owners are offered hypercase.Use, and only when more than one
-// owns the lift, since a lift that one package owns has an owner it
-// needs.
-func duplicateColumn(name string, suites, lifts, users []string) string {
+// hold: who holds it, why that fails, and the fix, which rootCheck's
+// message gives in turn. It returns "" for each when fewer hold it. suites
+// are the packages that own the name as a suite, lifts those that own it
+// as a lift, and users those that use the lift. Each suite's owner counts
+// as one column, and each lift's owner as one. When no package owns the
+// lift, its users together count as one column, the one owning the lift
+// would make; when one does, they count for nothing. The fix leaves one
+// column of the name. Only a lift's owners are offered hypercase.Use, and
+// only when more than one owns the lift, since a lift that one package
+// owns has an owner it needs.
+func duplicateColumn(suites, lifts, users []string) (holders, why, fix string) {
 	if len(lifts) > 0 {
 		users = nil
 	}
@@ -320,7 +374,7 @@ func duplicateColumn(name string, suites, lifts, users []string) string {
 		n++
 	}
 	if n < 2 {
-		return ""
+		return "", "", ""
 	}
 	// A lift owner that only reads the lift's product removes its column
 	// with hypercase.Use, so that is how the fix says to remove one.
@@ -328,7 +382,6 @@ func duplicateColumn(name string, suites, lifts, users []string) string {
 	if len(lifts) > 1 {
 		useHint = fmt.Sprintf(" Of %s, which own the lift, one that only reads its product removes its column by giving the lift to hypercase.Use in place of hypercase.Own.", andList(lifts))
 	}
-	var holders, why, fix string
 	switch {
 	case len(lifts) == 0 && len(users) == 0:
 		holders = "owned by " + pkgsAs(suites, "suite")
@@ -347,7 +400,7 @@ func duplicateColumn(name string, suites, lifts, users []string) string {
 		why = "Lifts share the suites' column names, which are unique per corpus root. No package owns the lift, and owning it would add a column of the name."
 		fix = leaveOne(n, "the suite or the lift", "the suites and the lift") + " To remove the lift, drop it from hypercase.Use in every package that uses it."
 	}
-	return fmt.Sprintf("the column %s is %s. %s\n%s", name, holders, why, fix)
+	return holders, why, fix
 }
 
 // leaveOne words the fix that leaves one of n columns of a name: of two,
@@ -374,6 +427,48 @@ func lowerFirst(s string) string { return strings.ToLower(s[:1]) + s[1:] }
 
 // trKey names a transform by its corpus directory and its name.
 type trKey struct{ dir, name string }
+
+// A liftEntry is one registry's entry of a lift, and the registry's
+// package.
+type liftEntry struct {
+	pkg  string
+	lift registry.Lift
+}
+
+// liftFields are the fields of a lift's registry entry that every registry
+// that owns or uses the lift records alike, each by its name in the
+// registry and as the root-package check shows it. Whether a package owns
+// the lift differs between them, and so may the corpora that reach it.
+var liftFields = []struct {
+	name  string
+	value func(registry.Lift) string
+}{
+	{"description", func(l registry.Lift) string { return fmt.Sprintf("%q", l.Description) }},
+	{"input", func(l registry.Lift) string { return l.Input }},
+	{"product", func(l registry.Lift) string { return l.Product }},
+	{"bytes", func(l registry.Lift) string { return fmt.Sprint(l.Bytes) }},
+	{"outputs", func(l registry.Lift) string { return outputsEntry(l.Outputs) }},
+	{"productFiles", func(l registry.Lift) string { return outputsEntry(l.ProductFiles) }},
+	{"rejects", func(l registry.Lift) string {
+		if len(l.Rejects) == 0 {
+			return "none"
+		}
+		return strings.Join(l.Rejects, ", ")
+	}},
+}
+
+// outputsEntry shows a registry's output declarations: each pattern, with
+// its description.
+func outputsEntry(outs []registry.Output) string {
+	if len(outs) == 0 {
+		return "none"
+	}
+	var es []string
+	for _, o := range outs {
+		es = append(es, fmt.Sprintf("%s %q", o.Pattern, o.Description))
+	}
+	return strings.Join(es, ", ")
+}
 
 // untestedOwners words what the root-package check knows of a lift or
 // transform that no package owns, and that the registries of pkgs, which
@@ -407,8 +502,9 @@ func typeEntry(ct registry.Type) string {
 }
 
 // checkArchive reports the problems of one archive as a whole. cols are
-// the columns over its corpus, and transforms its corpus type's.
-func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bool, transforms map[string]bool, props func(string) bool) {
+// the columns over its corpus, products the bytes lifts among them, and
+// transforms its corpus type's.
+func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, transforms map[string]bool, props func(string) bool) {
 	t.Helper()
 	rel := r.rel(p)
 	if name := strings.TrimSuffix(filepath.Base(p), ".txtar"); !validName(name) {
@@ -457,8 +553,9 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bo
 		marked(v.Prefix()+archive.Gaps, v.Gaps)
 	}
 
-	// Sections no registry claims: a column's outputs, in any case, and a
-	// transform's variant, whole, when no corpus type lists the transform.
+	// Sections no registry claims: a column's outputs and a bytes lift's
+	// product, in any case, and a transform's variant, whole, when no
+	// corpus type lists the transform.
 	type claim struct{ what, why string }
 	unclaimed := map[claim][]string{}
 	for _, s := range a.Sections {
@@ -471,6 +568,12 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols map[string]bo
 		if out, ok := strings.CutPrefix(rest, archive.Out+"/"); ok {
 			if col, _, _ := strings.Cut(out, "/"); !cols[col] {
 				c := claim{col, fmt.Sprintf("no column named %s runs over the corpus %s.\nIf a column should write them, register the column", col, corpus)}
+				unclaimed[c] = append(unclaimed[c], s.Name)
+			}
+		}
+		if via, ok := strings.CutPrefix(rest, archive.Via+"/"); ok {
+			if l, _, _ := strings.Cut(via, "/"); !products[l] {
+				c := claim{archive.Via + "/" + l, fmt.Sprintf("no bytes lift named %s runs over the corpus %s.\nIf a bytes lift should write them, register it", l, corpus)}
 				unclaimed[c] = append(unclaimed[c], s.Name)
 			}
 		}

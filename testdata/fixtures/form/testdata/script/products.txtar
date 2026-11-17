@@ -1,0 +1,11 @@
+Sections under via/ that hold no product's file: one under no lift, one outside any tree, and one in the tree params.
+-- in/do/out/values.txt --
+A1 6
+-- via/A1 --
+4
+-- via/import/A1 --
+4
+-- via/import/params/x --
+4
+-- out/echo/values.txt --
+stale

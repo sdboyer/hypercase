@@ -87,7 +87,7 @@ func TestOutcomeFailures(t *testing.T) {
 	clPanic := s.read("testdata/script/cl-panic.txtar")
 	s.edit("testdata/script/cl-panic.txtar", "commit a values.txt the run no longer gives", set("out/echo/values.txt", "A1 7\n"))
 	r = s.normal("outcomes")
-	s.fails(r, "script/cl-panic: The classifier panics.\n    echo: Does what the case's do/ tree says.\n    echo's classifier steered panicked: classifier boom\n    Fix the classifier. An update writes nothing for this cell.\n    out/echo/values.txt differs (-golden +got):\n    - A1 7\n    + A1 6\n    An update writes nothing for this cell until the problems above are fixed.")
+	s.fails(r, "script/cl-panic: The classifier panics.\n    echo: Does what the case's do/ tree says.\n    echo's classifier steered panicked: classifier boom\n    Fix the classifier. An update writes nothing for this cell.\n    out/echo/values.txt differs (-golden +got):\n    - A1 7\n    + A1 6\n    Fix the problems above first. An update writes nothing for this cell.")
 	s.lacks(r, "has no golden", "If the change is intended")
 	s.write("testdata/script/cl-panic.txtar", clPanic, "restore the cell")
 
@@ -143,7 +143,7 @@ func TestOutcomeFailures(t *testing.T) {
 	committed = s.read(clError)
 	for _, update := range []bool{false, true} {
 		r := s.run(".", "outcomes", update)
-		s.fails(r, frozen+"    out/echo/values.txt differs (-committed +got):\n    - A1 7\n    + A1 6\n    The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.")
+		s.fails(r, frozen+"    out/echo/values.txt differs (-committed +got):\n    - A1 7\n    + A1 6\n    Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.")
 		s.lacks(r, "the next update writes")
 	}
 	s.same(clError, committed)
@@ -151,7 +151,7 @@ func TestOutcomeFailures(t *testing.T) {
 	committed = s.read(clError)
 	for _, update := range []bool{false, true} {
 		r := s.run(".", "outcomes", update)
-		s.fails(r, frozen+"    out/echo/values.txt is new\n    The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.")
+		s.fails(r, frozen+"    out/echo/values.txt is new\n    Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.")
 		s.lacks(r, "the next update writes")
 	}
 	s.same(clError, committed)
@@ -162,7 +162,7 @@ func TestOutcomeFailures(t *testing.T) {
 	committed = s.read(clError)
 	for _, update := range []bool{false, true} {
 		r := s.run(".", "outcomes", update)
-		s.fails(r, frozen+"    out/echo/g.txt is no longer produced\n    The problems above keep an update from writing this cell, and so does the known gap's line while it freezes the cell.")
+		s.fails(r, frozen+"    out/echo/g.txt is no longer produced\n    Fix the problems above. An update writes nothing for this cell, which a gaps line freezes.")
 		s.lacks(r, "the next update writes")
 	}
 	s.same(clError, committed)
@@ -427,6 +427,112 @@ func TestBlockedTransformVariant(t *testing.T) {
 		"gaps, line 1, marks the cell, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case, so the cell runs nothing.\n    Remove the line, or fix the lift or looped's jenny, which makes the variant.",
 		"transform/looped/out/evaluate/a.txt is recorded, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case.\n    If the cell should run, fix the lift or looped's jenny, which makes the variant. If not, delete the section by hand;")
 	s.lacks(r, "fix the lift or the case", "out of their place")
+	s.done()
+}
+
+// TestBlockedStaleTransformVariant: a normal run reads a transform's
+// variant's committed inputs, and an update what the transform makes. When
+// they differ, a cell the committed inputs block may be one the update
+// runs: the normal run stages the variant as the update does, and when the
+// update runs the cell, says so, of its outcome and its files (#44). Here
+// upper's committed inputs hold a resolve/error that upper doesn't make.
+func TestBlockedStaleTransformVariant(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.remove("testdata/script/errs.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.remove("testdata/script/garbled.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.edit(twice, "evaluate writes a file", set("in/evaluate/out/values.txt", "a1 six\n"))
+	s.passes(s.update("tr-ladder-eval"))
+	clean := s.read(twice)
+	s.edit(twice, "upper's committed inputs hold a resolve/error upper doesn't make", insert("transform/upper/in/resolve/error", "A1 -> A1: cycle\n", "transform/upper/out/"))
+	why := "it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds"
+	r := s.normal("tr-ladder-eval")
+	s.fails(r,
+		"upper's variant of the base differs from its committed inputs:\ntransform/upper/in/resolve/error is no longer made",
+		"transform/upper/out/evaluate/outcome differs (-golden +got):\n- accepted\n+ blocked resolve\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+why+". What it writes for the cell, if anything, is its run's.",
+		"transform/upper/out/evaluate/values.txt is recorded, and the cell is blocked: the lift resolve, on evaluate's path, failed on the case.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: "+why+". Delete nothing by hand before it has run.")
+	s.lacks(r, "delete the section by hand")
+	s.passes(s.update("tr-ladder-eval"))
+	s.same(twice, clean)
+	s.done()
+}
+
+// TestOrphanStaleTransformVariant: as TestBlockedStaleTransformVariant,
+// for a cell that runs on the committed inputs, and no longer produces a
+// file it commits, which its run on what the transform makes, in the
+// update, still writes. Here a stale delete hides the evaluate/out/
+// values.txt that upper's variant keeps from the base.
+func TestOrphanStaleTransformVariant(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.remove("testdata/script/errs.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.remove("testdata/script/garbled.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.edit(twice, "evaluate writes a file", set("in/evaluate/out/values.txt", "a1 six\n"))
+	s.passes(s.update("tr-ladder-eval"))
+	clean := s.read(twice)
+	s.edit(twice, "a stale delete hides evaluate/out/values.txt from upper's variant", insert("transform/upper/delete", "evaluate/out/values.txt\n", "transform/upper/out/"))
+	r := s.normal("tr-ladder-eval")
+	s.fails(r,
+		"upper's variant of the base differs from its committed inputs:\ntransform/upper/delete is no longer made",
+		"transform/upper/out/evaluate/values.txt is an output the run no longer produces.\nFIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate on another value than this run: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Its run may still write the file: delete nothing by hand before it has run.")
+	s.lacks(r, "delete the section by hand")
+	s.passes(s.update("tr-ladder-eval"))
+	s.same(twice, clean)
+	s.done()
+}
+
+// TestOrphanSameViewTransformVariant: committed inputs that differ from
+// what the transform makes only in a delete line naming a path the base
+// lacks give the input view the transform makes, so the update runs each
+// cell on the value the normal run does, and a file the cell no longer
+// produces is its orphan in both. Here such a delete line sits beside a
+// stray file in evaluate's cell of upper's variant.
+func TestOrphanSameViewTransformVariant(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.remove("testdata/script/errs.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.remove("testdata/script/garbled.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.edit(twice, "evaluate writes a file", set("in/evaluate/out/values.txt", "a1 six\n"))
+	s.passes(s.update("tr-ladder-eval"))
+	s.edit(twice, "upper's committed inputs delete a path the base lacks, and evaluate's cell of upper's variant commits a stray file", func(a *archive.Archive) {
+		insert("transform/upper/delete", "nothing/here\n", "transform/upper/out/")(a)
+		insert("transform/upper/out/evaluate/stray.txt", "a stray\n", "transform/upper/out/evaluate/values.txt")(a)
+	})
+	orphan := "transform/upper/out/evaluate/stray.txt is an output the run no longer produces.\nIf the run should still write it, fix the code. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place."
+	r := s.normal("tr-ladder-eval")
+	s.fails(r,
+		"upper's variant of the base differs from its committed inputs:\ntransform/upper/delete is no longer made",
+		orphan)
+	s.lacks(r, "on another value")
+	s.fails(s.update("tr-ladder-eval"), orphan)
+	s.hasSections(twice, map[string]string{"transform/upper/out/evaluate/stray.txt": "a stray\n"}, "transform/upper/delete")
+	s.done()
+}
+
+// TestSkippedStaleTransformVariant: as TestBlockedStaleTransformVariant,
+// for a cell whose probe says no on the committed inputs, where the
+// update's probe reads what the transform makes. Here upper's committed
+// inputs hold an evaluate/probe that upper doesn't make, so the normal
+// run's probe says the case isn't for evaluate, and the update runs
+// evaluate.
+func TestSkippedStaleTransformVariant(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "transforms")
+	s.remove("testdata/script/errs.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.remove("testdata/script/garbled.txtar", "leave twice, whose cases the lifts run on as they should")
+	s.edit(twice, "evaluate writes a file", set("in/evaluate/out/values.txt", "a1 six\n"))
+	s.passes(s.update("tr-ladder-eval"))
+	clean := s.read(twice)
+	s.edit(twice, "upper's committed inputs hold an evaluate/probe upper doesn't make", insert("transform/upper/in/evaluate/probe", "a stale reason\n", "transform/upper/out/"))
+	runs := "FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds."
+	r := s.normal("tr-ladder-eval")
+	s.fails(r,
+		"upper's variant of the base differs from its committed inputs:\ntransform/upper/in/evaluate/probe is no longer made",
+		"transform/upper/out/evaluate/outcome differs (-golden +got):\n- accepted\n+ skipped a stale reason\n"+runs+" What it writes for the cell, if anything, is its run's.",
+		"transform/upper/out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it: a stale reason\n"+runs+" Delete nothing by hand before it has run.")
+	s.lacks(r, "delete the section by hand")
+	s.passes(s.update("tr-ladder-eval"))
+	s.same(twice, clean)
 	s.done()
 }
 

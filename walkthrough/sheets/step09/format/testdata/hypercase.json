@@ -1,5 +1,5 @@
 {
-  "format": 5,
+  "format": 6,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step09",
   "rootPackage": false,
@@ -57,6 +57,7 @@
       "input": "github.com/sdboyer/hypercase/walkthrough/sheets/step09/sheetcorpus.Sheet",
       "product": "*github.com/sdboyer/hypercase/walkthrough/sheets/sheet.Parsed",
       "owned": false,
+      "bytes": false,
       "corpora": [
         "sheet"
       ],
@@ -66,6 +67,7 @@
           "description": "The cell that is neither a number nor a formula."
         }
       ],
+      "productFiles": [],
       "rejects": [
         "malformed"
       ]

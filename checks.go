@@ -64,6 +64,10 @@ type Cell struct {
 	// Files are the cell's committed files, the outcome among them, by
 	// their paths under out/<Column>/.
 	Files map[string][]byte
+	// Product is a bytes lift's committed product, by its files' paths
+	// under via/<Column>/, and empty when the case commits none. It is nil
+	// for every other column.
+	Product map[string][]byte
 	// Gap is the text of the gaps line that marks the cell, and so
 	// freezes it while it has committed files: what is right, and the
 	// issue it waits on. It is "" when no line marks the cell. A
@@ -225,6 +229,7 @@ func (r *runner) orphanFindings(t *testing.T) {
 // type lists, or one its transform declines.
 func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 	columns := map[string][]Entry{}                          // corpus → its columns
+	products := map[string]bool{}                            // the bytes lifts, by name
 	transforms := map[string]map[string]registry.Transform{} // corpus → transform → its declaration
 	for _, f := range found {
 		data, err := os.ReadFile(f.Path)
@@ -253,6 +258,7 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 				continue
 			}
 			e := Entry{Kind: "lift", Name: l.Name, Description: l.Description, Package: pkg, Rejects: l.Rejects}
+			products[l.Name] = l.Bytes
 			for _, corpus := range l.Corpora {
 				columns[corpus] = append(columns[corpus], e)
 			}
@@ -327,6 +333,9 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 							cell.Files[f] = s.Data
 						}
 					}
+					if col.Kind == "lift" && products[col.Name] {
+						cell.Product = committedUnder(a, c.prefix+archive.Via+"/"+col.Name+"/")
+					}
 					if data, ok := cell.Files[archive.OutcomeFile]; ok {
 						if cell.Outcome, err = archive.ParseOutcome(data); err != nil {
 							return nil, fmt.Errorf("%s, %s%s/%s/%s: %v", r.rel(p), c.prefix, archive.Out, col.Name, archive.OutcomeFile, err)
@@ -364,6 +373,13 @@ func cloneCells(cells []Cell) []Cell {
 			files[p] = bytes.Clone(data)
 		}
 		c.Files = files
+		if c.Product != nil {
+			product := make(map[string][]byte, len(c.Product))
+			for p, data := range c.Product {
+				product[p] = bytes.Clone(data)
+			}
+			c.Product = product
+		}
 		out[i] = c
 	}
 	return out

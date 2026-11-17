@@ -246,7 +246,10 @@ func TestOutcomeBoundary(t *testing.T) {
 	c := revisions(t, g, a, b)
 	const root = "walkthrough/sheets/step06"
 	forward := ok(t, g, root, "report", "-text", c[0], c[1])
-	want := "appeared\n" +
+	problems := "problems\n  at " + c[0] + "\n" +
+		"    " + blank + ", out/format/outcome: the section is an outcome file, and registry format 4 predates outcome files, so the report leaves it out.\n" +
+		"    " + divide + ", out/format/outcome: the section is an outcome file, and registry format 4 predates outcome files, so the report leaves it out.\n"
+	want := problems + "appeared\n" +
 		"  sheet/notes calc: rejected\n    error.txt added\n" +
 		"  sheet/notes evaluate: blocked parse\n" +
 		"  sheet/notes format: blocked parse\n" +
@@ -263,7 +266,7 @@ func TestOutcomeBoundary(t *testing.T) {
 		t.Errorf("from format 4 to 5, the report is:\n%s\nwant:\n%s", forward, want)
 	}
 	backward := ok(t, g, root, "report", "-text", c[1], c[0])
-	want = "appeared\n" +
+	want = problems + "appeared\n" +
 		"  sheet/stray calc: unknown\n    error.txt added\n" +
 		"  sheet/stray evaluate: unknown\n" +
 		"  sheet/stray format: unknown\n" +
@@ -305,7 +308,8 @@ func TestPreOutcomeTransforms(t *testing.T) {
 	a[root+"/testdata/sheet/blank.txtar"] += "-- transform/doubled/in/sheet/A1 --\n2\n-- transform/gone/in/sheet/A1 --\n2\n-- transform/gone/out/calc/error.txt --\nA1 is gone\n"
 	g := gittest.New(t)
 	c := revisions(t, g, history(t, "b7e82fe"), a)
-	want := "appeared\n"
+	want := "problems\n  at " + c[1] + "\n    " + root + "/testdata/sheet/blank.txtar, transform/gone/: no corpus type of testdata/sheet/ lists the transform gone, so the report can't say what its variant states.\n" +
+		"appeared\n"
 	for _, col := range []string{"calc", "evaluate", "format", "parse", "resolve"} {
 		want += "  sheet/blank/transform/doubled " + col + ": unknown\n"
 	}

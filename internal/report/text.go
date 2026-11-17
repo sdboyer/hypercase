@@ -6,13 +6,30 @@ import (
 	"strings"
 )
 
-// WriteText writes the ranked changes as plain text. Each rank that has
-// changes has a heading, in rank order. Under it is one line per cell: its
-// case, its column, and its outcome, or the change in it, so the outcome
-// file is never listed as a file. Under each cell is one line per other
-// file of the cell that was added, changed or removed.
+// WriteText writes the problems and the ranked changes as plain text. The
+// problems, when there are any, come first, under the heading problems:
+// under it, a line per revision that has them, in the report's order, and
+// under that, one line per problem, its place, where it has one, then what
+// it is. Each rank that has changes has a heading, in rank order. Under it
+// is one line per cell: its case, its column, and its outcome, or the
+// change in it, so the outcome file is never listed as a file. Under each
+// cell is one line per other file of the cell that was added, changed or
+// removed.
 func (r *Report) WriteText(w io.Writer) error {
 	bw := bufio.NewWriter(w)
+	if len(r.Problems) > 0 {
+		bw.WriteString("problems\n")
+	}
+	for _, g := range problemGroups(r.Problems) {
+		bw.WriteString("  at " + g.At + "\n")
+		for _, p := range g.Problems {
+			line := p.Msg
+			if p.Where != "" {
+				line = p.Where + ": " + line
+			}
+			bw.WriteString("    " + line + "\n")
+		}
+	}
 	for i, ch := range r.Changes {
 		if i == 0 || r.Changes[i-1].Rank != ch.Rank {
 			bw.WriteString(ch.Rank.String() + "\n")

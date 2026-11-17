@@ -114,8 +114,8 @@ func TestFrameworkNamesFail(t *testing.T) {
 // TestUnwritableCell: a cell whose outputs an update won't write, for any
 // of the reasons the run gives, fails on that reason first. A file of it
 // with no golden isn't asked for, and one that differs from its golden
-// says the update writes nothing until the problems above are fixed. An
-// orphan is reported as in any other cell.
+// says to fix the problems above first, and that an update writes nothing
+// for the cell. An orphan is reported as in any other cell.
 func TestUnwritableCell(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "basic")
@@ -153,7 +153,7 @@ func TestUnwritableCell(t *testing.T) {
 		s.edit("testdata/script/"+c.name+".txtar", "commit a values.txt the run no longer gives", set("out/echo/values.txt", "A1 7\n"))
 		committed[c.name] = s.read("testdata/script/" + c.name + ".txtar")
 	}
-	differs := "out/echo/values.txt differs (-golden +got):\n- A1 7\n+ A1 6\nAn update writes nothing for this cell until the problems above are fixed."
+	differs := "out/echo/values.txt differs (-golden +got):\n- A1 7\n+ A1 6\nFix the problems above first. An update writes nothing for this cell."
 	r = s.normal("unwritable")
 	s.fails(r, want...)
 	if n := strings.Count(flat(r.out), flat(differs)); n != len(causes) {
@@ -189,7 +189,7 @@ func TestFailedTestWritesNothing(t *testing.T) {
 	s := newSandbox(t, "fatal")
 	before := s.read("testdata/script/fatal.txtar")
 	s.fails(s.normal("echo"), "the fixture's database won't start")
-	s.fails(s.update("echo"), "The run failed its test, through its testing.TB. The update writes nothing for this cell.")
+	s.fails(s.update("echo"), "The run failed its test, through its testing.TB.\nFix the code. An update writes nothing for this cell.")
 	s.same("testdata/script/fatal.txtar", before)
 	s.done()
 }
@@ -301,7 +301,7 @@ func TestSuiteWithoutDescription(t *testing.T) {
 func TestProblemsOfForm(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "form")
-	names := []string{"duplicate", "paths", "reserved", "shape", "typo"}
+	names := []string{"duplicate", "paths", "products", "shape", "typo"}
 	before := map[string][]byte{}
 	for _, n := range names {
 		before[n] = s.read("testdata/script/" + n + ".txtar")
@@ -309,7 +309,9 @@ func TestProblemsOfForm(t *testing.T) {
 	want := []string{
 		"testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it:\n",
 		"ni/do/out/values.txt: ni is not one of the framework's top-level names",
-		"via/import/sheet/A1: the top-level name via is reserved",
+		"via/A1: a product belongs under its lift, as via/<lift>/<tree>/<file>",
+		"via/import/A1: a product's file belongs in a tree, as via/import/<tree>/<file>",
+		"via/import/params/x: the tree name params is reserved in every input view, a product's included",
 		"in/do/out/values.txt: the section appears twice",
 		"in/../x: the name is not a valid slash path",
 		"in//x: the name is not a valid slash path",

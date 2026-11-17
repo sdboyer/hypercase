@@ -1,0 +1,62 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-render
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/quoted: evaluate is blocked: the lift resolve failed on the case, and testdata/export/quoted.txtar, out/resolve/error.txt, records its error.
+    what ran, in order:
+        import ran
+        parse ran on quoted
+        resolve ran on quoted
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/quoted
+            --- SKIP: TestCorpus/export/quoted/evaluate
+            --- PASS: TestCorpus/export/quoted/import
+            --- PASS: TestCorpus/export/quoted/parse
+            --- PASS: TestCorpus/export/quoted/resolve
+    --- PASS: TestCorpus/script
+PASS
+$ go test  # chain-render
+    export/quoted: evaluate is blocked: the lift resolve failed on the case, and testdata/export/quoted.txtar, out/resolve/error.txt, records its error.
+    what ran, in order:
+        parse ran on quoted
+        resolve ran on quoted
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/quoted
+            --- SKIP: TestCorpus/export/quoted/evaluate
+            --- PASS: TestCorpus/export/quoted/import
+            --- PASS: TestCorpus/export/quoted/parse
+            --- PASS: TestCorpus/export/quoted/resolve
+    --- PASS: TestCorpus/script
+PASS
+$ edit testdata/export/quoted.txtar  # the committed product's text differs
+$ go test  # chain-render
+    export/quoted: evaluate is blocked: the lift resolve failed on the case, and testdata/export/quoted.txtar, out/resolve/error.txt, records its error.
+    export/quoted: import makes a script with a cycle, whose quote/text the renderer of resolve's error quotes.
+        import: Imports the export as a script, as its import/ tree says.
+        via/import/quote/text differs (-golden +got):
+        - the committed text
+        + the product's text
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    export/quoted: import makes a script with a cycle, whose quote/text the renderer of resolve's error quotes.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        out/resolve/error.txt differs (-golden +got):
+          rendered: A1 -> A1: cycle
+        -   quote: the product's text
+        +   quote: the committed text
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
+    what ran, in order:
+        parse ran on quoted
+        resolve ran on quoted
+        import ran
+        parse ran on quoted
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/quoted
+            --- SKIP: TestCorpus/export/quoted/evaluate
+            --- FAIL: TestCorpus/export/quoted/import
+            --- PASS: TestCorpus/export/quoted/parse
+            --- FAIL: TestCorpus/export/quoted/resolve
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]

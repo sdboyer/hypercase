@@ -150,6 +150,7 @@ type plannedVariant struct {
 	tr       *transform
 	declined string            // why the transform declines the base
 	problem  string            // what went wrong making the variant
+	fix      string            // what to do about it
 	made     map[string][]byte // the input view the transform made
 	sections []archive.Section // the sections that record it
 }
@@ -234,10 +235,10 @@ func (r *runner) makeVariant(v *plannedVariant, base archive.Base, view fs.FS) {
 		c := call(func(*called) { why, ok = tr.probe(view) })
 		switch {
 		case c.panicked:
-			v.problem = fmt.Sprintf("%s's probe panicked on the base: %v\nFix the probe.", tr.name, c.panicValue)
+			v.problem, v.fix = fmt.Sprintf("%s's probe panicked on the base: %v", tr.name, c.panicValue), "Fix the probe."
 			return
 		case !ok && strings.TrimSpace(why) == "":
-			v.problem = fmt.Sprintf("%s's probe said the base isn't for it, and gave no reason.\nFix the probe: when it says no, it says why.", tr.name)
+			v.problem, v.fix = fmt.Sprintf("%s's probe said the base isn't for it, and gave no reason.", tr.name), "Fix the probe: when it says no, it says why."
 			return
 		case !ok:
 			v.declined = why
@@ -249,10 +250,10 @@ func (r *runner) makeVariant(v *plannedVariant, base archive.Base, view fs.FS) {
 	c := call(func(*called) { made, err = tr.generate(view) })
 	switch {
 	case c.panicked:
-		v.problem = fmt.Sprintf("%s panicked on the base: %v\nFix its jenny.", tr.name, c.panicValue)
+		v.problem, v.fix = fmt.Sprintf("%s panicked on the base: %v", tr.name, c.panicValue), "Fix its jenny."
 		return
 	case err != nil:
-		v.problem = fmt.Sprintf("%s failed on the base: %v\nFix its jenny, or make its probe decline such a base.", tr.name, err)
+		v.problem, v.fix = fmt.Sprintf("%s failed on the base: %v", tr.name, err), "Fix its jenny, or make its probe decline such a base."
 		return
 	}
 	files := map[string][]byte{}
@@ -264,7 +265,7 @@ func (r *runner) makeVariant(v *plannedVariant, base archive.Base, view fs.FS) {
 		// an unrendered file as empty bytes.
 		data, ok := jenny.BytesOf(f)
 		if !ok {
-			v.problem = fmt.Sprintf("%s made %s, which its FS gave as a %T, not as rendered bytes. An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase.", tr.name, f.Path(), f)
+			v.problem, v.fix = fmt.Sprintf("%s made %s, which its FS gave as a %T, not as rendered bytes.", tr.name, f.Path(), f), "An FS renders each file it adds, so this is a bug in hypercase or jenny: report it to hypercase."
 			return
 		}
 		if err := archive.Holds(data); err != nil {
@@ -273,23 +274,23 @@ func (r *runner) makeVariant(v *plannedVariant, base archive.Base, view fs.FS) {
 		files[f.Path()] = data
 	}
 	if len(held) > 0 {
-		v.problem = fmt.Sprintf("%s made files an archive can't hold:\n%s\nFix its jenny.", tr.name, strings.Join(held, "\n"))
+		v.problem, v.fix = fmt.Sprintf("%s made files an archive can't hold:\n%s", tr.name, strings.Join(held, "\n")), "Fix its jenny."
 		return
 	}
 	if ns := archive.Nested(files); len(ns) > 0 {
-		v.problem = fmt.Sprintf("%s made an input view no file tree holds: it holds %s.\nFix its jenny.", tr.name, strings.Join(ns, "; "))
+		v.problem, v.fix = fmt.Sprintf("%s made an input view no file tree holds: it holds %s.", tr.name, strings.Join(ns, "; ")), "Fix its jenny."
 		return
 	}
 	sections := base.VariantSections(archive.Transform, tr.name, files)
 	if len(sections) == 0 {
-		v.problem = fmt.Sprintf("%s made an input view equal to the base's. A variant changes the base.\nMake its probe decline such a base.", tr.name)
+		v.problem, v.fix = fmt.Sprintf("%s made an input view equal to the base's. A variant changes the base.", tr.name), "Make its probe decline such a base."
 		return
 	}
 	// The variant's sections, as an archive of their own, have no problem
 	// of form. The base's are left out: the archive's check passed them,
 	// and it reads a transform's variant apart from the base.
 	if ps := (&archive.Archive{Sections: sections}).Check(); len(ps) > 0 {
-		v.problem = fmt.Sprintf("%s made a variant an archive can't hold:\n%s\nFix its jenny: what it makes is the variant's whole input view, with the trees as its top-level directories.", tr.name, problemList(ps))
+		v.problem, v.fix = fmt.Sprintf("%s made a variant an archive can't hold:\n%s", tr.name, problemList(ps)), "Fix its jenny: what it makes is the variant's whole input view, with the trees as its top-level directories."
 		return
 	}
 	v.made, v.sections = files, sections
@@ -316,13 +317,16 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	owner := v.tr != nil && r.owned[v.tr]
 	// stale is whether a failing cell may be one the module's update
 	// fixes: another package's normal run reads committed inputs that may
-	// differ from what the transform makes.
+	// differ from what the transform makes. diffs says how they differ.
 	stale := false
+	var diffs string
 	switch {
 	case v.tr == nil:
-		c.setView(p, pc.base.VariantView(v.committed))
+		c.setView(r, p, pc.base.VariantView(v.committed))
 	case v.problem != "" && owner:
-		t.Errorf("%s\n%s", c.header(), v.problem)
+		var ns notes
+		ns.add(aboutFault, v.problem, closing{advice: v.fix})
+		report(t, c.header(), ns, r.variantStaging(c))
 		return
 	case v.problem != "":
 		t.Skipf("%s: the transform %s failed on the base, and the package that owns it reports why.", c.name, v.name)
@@ -336,88 +340,92 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if owner {
 			r.judgeInputs(t, c, pc, v, w)
 		}
-		c.setView(p, archive.NewFS(v.made))
+		c.setView(r, p, archive.NewFS(v.made))
 	default:
 		// A normal run reads the inputs the archive holds.
 		view, invalid := pc.base.InputView(v.committed)
 		if len(invalid) > 0 {
 			// An update reads what the transform makes instead, and its
 			// owner's rewrites them.
-			t.Errorf("%s\nThe archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s\nThe module's update, %s, rewrites them, in the package that owns %s.%s", c.header(), v.name, problemList(invalid), r.updateCmd(), v.name, r.ifUnowned(v))
+			var ns notes
+			ns.add(aboutInputs, fmt.Sprintf("The archive's inputs for %s's variant are invalid, and no cell runs on them:\n%s", v.name, problemList(invalid)), closing{claims: r.rewritesInputs(v.tr)})
+			report(t, c.header(), ns, r.variantStaging(c))
 			return
 		}
 		if owner {
 			r.judgeInputs(t, c, pc, v, w)
 		}
-		stale = !owner
-		c.setView(p, view)
+		c.setView(r, p, view)
+		// A cell the inputs block may be one the update, which stages the
+		// variant on what the transform makes, runs. Inputs that differ
+		// only in a delete line naming a path the base lacks give the same
+		// view, on which the update runs each cell as this run does, so no
+		// failure is theirs.
+		if diffs = v.inputDiffs(pc.a); diffs != "" && !holdsExactly(view, v.made) {
+			c.state.made = archive.NewFS(v.made)
+			stale = !owner
+		}
 	}
-	results := r.runCells(t, c, p.cols, w)
+	r.runCells(t, c, p.cols, w)
 	if !stale || !t.Failed() {
 		return
 	}
-	// However its cells failed, the failures may be the inputs'.
-	m := v.inputDiffs(pc.a)
-	if m.empty() {
-		return
-	}
-	// An update writes a frozen cell only to add an outcome it lacks, when
-	// its other files match the run and nothing keeps the update from
-	// writing it, so it rewrites none of those, and one whose files differ
-	// from its run's is checked on the new inputs.
-	cells := "the variant's cells."
-	frozen := false
-	var differs []string
-	for i, col := range p.cols {
-		if _, marked := c.gap(col.name); marked && len(c.goldens(col.name)) > 0 {
-			frozen = true
-		}
-		if results[i].frozenDiffers {
-			differs = append(differs, col.name+"'s")
-		}
-	}
-	if frozen {
-		cells = "the variant's cells but the frozen ones, to which an update only adds an outcome they lack, when their other files match the run and nothing keeps the update from writing them."
-	}
-	if len(differs) > 0 {
-		cells += fmt.Sprintf(" A normal run checks each frozen cell whose files differ, here %s, again on the rewritten inputs, against its committed files.", andList(differs))
-	}
-	t.Logf("%s\nA cell of the variant failed, and the archive's inputs for %s's variant differ from what %s makes now:\n%s\nA normal run reads the inputs, and an update what %s makes. The module's update, %s, rewrites them, in the package that owns %s, and %s%s", c.header(), v.name, v.name, m, v.name, r.updateCmd(), v.name, cells, r.ifUnowned(v))
+	// However its cells failed, the failures may be the inputs'. Each
+	// cell's notes say what the update does with it.
+	var ns notes
+	ns.add(aboutInputs, fmt.Sprintf("A cell of the variant failed, and the archive's inputs for %s's variant, which a normal run reads, differ from what %s makes now:\n%s", v.name, v.name, diffs), closing{claims: r.rewritesInputs(v.tr)})
+	report(t, c.header(), ns, r.variantStaging(c))
 }
 
-// ifUnowned is what a message that names the update in the package that
-// owns a transform adds, in a package that doesn't own it: that package
-// can't know some package does, and the root-package check reports a
-// transform no package owns.
-func (r *runner) ifUnowned(v *plannedVariant) string {
-	if r.owned[v.tr] {
-		return ""
+// rewritesInputs is what a package's update does with a variant's inputs
+// that differ from what the transform tr makes: in the package that owns
+// tr, its update rewrites them, and in one that doesn't, the update of the
+// package that owns it does, if a package does.
+func (r *runner) rewritesInputs(tr *transform) claims {
+	if r.owned[tr] {
+		return claims{RewritesInputs: tr.name}
 	}
-	return fmt.Sprintf(" If no package owns %s, the root-package check says so, and no update rewrites the inputs.", v.name)
+	return claims{OwnerRewritesInputs: tr.name}
 }
 
 // inputDiffs says how the committed inputs of a transform's variant differ
-// from those it made.
-func (v *plannedVariant) inputDiffs(a *archive.Archive) *msg {
+// from those it made, one difference to a line, or "" when they don't.
+func (v *plannedVariant) inputDiffs(a *archive.Archive) string {
 	committed := map[string][]byte{}
 	for _, s := range v.inputs(a) {
 		committed[s.Name] = s.Data
 	}
-	m := &msg{}
+	var lines []string
 	for _, s := range v.sections {
 		g, ok := committed[s.Name]
 		switch {
 		case !ok:
-			m.add("%s is new", s.Name)
+			lines = append(lines, fmt.Sprintf("%s is new", s.Name))
 		case !bytes.Equal(g, s.Data):
-			m.add("%s differs (-committed +made):\n%s", s.Name, strings.TrimSuffix(diff.Lines(g, s.Data), "\n"))
+			lines = append(lines, fmt.Sprintf("%s differs (-committed +made):\n%s", s.Name, strings.TrimSuffix(diff.Lines(g, s.Data), "\n")))
 		}
 		delete(committed, s.Name)
 	}
 	for _, name := range slices.Sorted(maps.Keys(committed)) {
-		m.add("%s is no longer made", name)
+		lines = append(lines, fmt.Sprintf("%s is no longer made", name))
 	}
-	return m
+	return strings.Join(lines, "\n")
+}
+
+// holdsExactly reports whether an input view holds files, and no other
+// file.
+func holdsExactly(view fs.FS, files map[string][]byte) bool {
+	paths, err := archive.Paths(view)
+	if err != nil || len(paths) != len(files) {
+		return false
+	}
+	for _, p := range paths {
+		data, err := fs.ReadFile(view, p)
+		if want, ok := files[p]; err != nil || !ok || !bytes.Equal(data, want) {
+			return false
+		}
+	}
+	return true
 }
 
 // judgeInputs compares a transform's committed inputs with those it made,
@@ -428,21 +436,25 @@ func (r *runner) judgeInputs(t *testing.T, c *aCase, pc plannedCase, v *plannedV
 		w.replaceInputs(v.name, v.sections)
 		return
 	}
+	var ns notes
 	if !v.committed.Inputs {
-		t.Errorf("%s\n%s's variant of the base isn't written: the archive holds none of its inputs.\nRun %s to write them, and read them before committing.", c.header(), v.name, r.updateCmd())
-		return
+		ns.add(aboutInputs, fmt.Sprintf("%s's variant of the base isn't written: the archive holds none of its inputs.", v.name), closing{claims: claims{WritesInputs: v.name}})
+	} else if d := v.inputDiffs(pc.a); d != "" {
+		ns.add(aboutInputs, fmt.Sprintf("%s's variant of the base differs from its committed inputs:\n%s", v.name, d), closing{advice: fmt.Sprintf("If the change is intended, run %s and read the diff before committing.", r.updateCmd())})
 	}
-	if m := v.inputDiffs(pc.a); !m.empty() {
-		t.Errorf("%s\n%s's variant of the base differs from its committed inputs:\n%s\nIf the change is intended, run %s and read the diff before committing.", c.header(), v.name, m, r.updateCmd())
+	if len(ns) > 0 {
+		report(t, c.header(), ns, r.variantStaging(c))
 	}
 }
 
 // declined finishes a transform's variant that the transform declines:
 // no cell runs. Its owner's update removes the variant's inputs, and what
-// is left under transform/<name>/out/ is each column's orphan.
+// is left under transform/<name>/out/ is each column's orphan. A bytes
+// lift has no product on the variant, so its owner's update removes the
+// committed one, which other cells read, unless a gaps line marks its cell.
 func (r *runner) declined(t *testing.T, c *aCase, p *plan, pc plannedCase, v *plannedVariant, owner bool, w *caseWrites) {
 	t.Helper()
-	m := &msg{}
+	var ns notes
 	if owner {
 		if r.update {
 			w.replaceInputs(v.name, nil)
@@ -451,19 +463,31 @@ func (r *runner) declined(t *testing.T, c *aCase, p *plan, pc plannedCase, v *pl
 			for _, s := range ins {
 				names = append(names, s.Name)
 			}
-			m.add("%s %s written, and %s declines the base: %s\nRun %s to remove them.", andList(names), isAre(len(names)), v.name, v.declined, r.updateCmd())
+			ns.add(aboutInputs, fmt.Sprintf("%s %s written, and %s declines the base: %s", andList(names), isAre(len(names)), v.name, v.declined), closing{claims: claims{RemovesInputs: v.name}})
 		}
 	}
 	for _, col := range p.cols {
-		if g, ok := c.gap(col.name); ok {
-			m.add("%s marks the cell of %s, and %s declines the base: %s\nRemove the line, or fix the transform.", c.gapAt(g), g.Cell(), v.name, v.declined)
+		g, marked := c.gap(col.name)
+		if marked {
+			ns.add(aboutGap, fmt.Sprintf("%s marks the cell of %s, and %s declines the base: %s", c.gapAt(g), g.Cell(), v.name, v.declined), closing{advice: "Remove the line, or fix the transform."})
 		}
 		for _, f := range slices.Sorted(maps.Keys(c.goldens(col.name))) {
-			m.add("%s is recorded, and %s declines the base: %s\nIf the transform should make the variant, fix it. If not, delete the section by hand; %s leaves it in place.", c.out(col.name, f), v.name, v.declined, r.updateCmd())
+			ns.addFile(aboutOrphan, c.out(col.name, f), fmt.Sprintf("%s is recorded, and %s declines the base: %s", c.out(col.name, f), v.name, v.declined), closing{"If the transform should make the variant, fix it. If not, delete the section by hand;", claims{Leaves: c.out(col.name, f)}})
+		}
+		if col.lift == nil || !col.lift.bytes || marked {
+			continue
+		}
+		dir := col.lift.viaDir(c.prefix)
+		if r.update {
+			w.replaceProduct(dir, nil)
+			continue
+		}
+		for _, f := range slices.Sorted(maps.Keys(c.product(col.lift))) {
+			ns.addFile(aboutProductOrphan, dir+f, fmt.Sprintf("%s is recorded, and %s declines the base: %s", dir+f, v.name, v.declined), closing{claims: claims{Removes: dir + f}})
 		}
 	}
-	if !m.empty() {
-		t.Errorf("%s\n%s", c.header(), m)
+	if len(ns) > 0 {
+		report(t, c.header(), ns, r.declinedStaging(c))
 		return
 	}
 	t.Skipf("%s: %s declines the base: %s", c.name, v.name, v.declined)

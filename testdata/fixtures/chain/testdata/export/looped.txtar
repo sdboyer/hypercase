@@ -1,0 +1,5 @@
+import makes a script with a cycle, which resolve rejects, and the export states.
+-- properties --
+circular
+-- in/import/out/resolve/error --
+A1 -> A1: cycle

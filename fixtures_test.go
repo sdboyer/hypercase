@@ -57,6 +57,7 @@ var (
 //	<tree>/error           returned as the error, less its final newline
 //	<tree>/panic           panicked with, less its final newline
 //	<tree>/fatal           given to t.Fatal
+//	<tree>/errorf          given to t.Errorf, less its final newline
 //	<tree>/skip            given to t.Skip
 //	<tree>/tempdir         returned as dir.txt: the path of a t.TempDir
 //	<tree>/archive         returned as archive.txt: the archive's name
@@ -135,6 +136,8 @@ func runSteered(t testing.TB, archiveName, tree string, in fs.FS, stdout, stderr
 			panic(text)
 		case "fatal":
 			t.Fatal(text)
+		case "errorf":
+			t.Errorf("%s", text)
 		case "skip":
 			t.Skip(text)
 		case "tempdir":
@@ -433,6 +436,12 @@ var fixturePackages = map[string][]fixturePkg{
 	"outcomes":         {{".", "outcomes"}},
 	"outcome-failures": {{".", "outcomes"}},
 	"check-gaps":       {{".", "check-gaps"}},
+
+	"chain":        {{".", "chain"}},
+	"chain-render": {{".", "chain-render"}},
+	"chain-past":   {{".", "chain-past"}},
+	"chain-twice":  {{".", "chain-twice"}},
+	"chain-shared": {{".", "chain-a"}, {"b", "chain-b"}},
 }
 
 type fixturePkg struct{ dir, registration string }

@@ -37,7 +37,7 @@ $ go test  # two-types
 PASS
 $ cat testdata/hypercase.json
 {
-  "format": 5,
+  "format": 6,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -70,6 +70,7 @@ $ cat testdata/hypercase.json
       "input": "github.com/sdboyer/hypercase_test.Grid",
       "product": "*github.com/sdboyer/hypercase_test.Parsed",
       "owned": true,
+      "bytes": false,
       "corpora": [
         "grid"
       ],
@@ -83,6 +84,7 @@ $ cat testdata/hypercase.json
           "description": "What the lift writes to stderr."
         }
       ],
+      "productFiles": [],
       "rejects": []
     },
     {
@@ -91,6 +93,7 @@ $ cat testdata/hypercase.json
       "input": "github.com/sdboyer/hypercase_test.Script",
       "product": "*github.com/sdboyer/hypercase_test.Parsed",
       "owned": true,
+      "bytes": false,
       "corpora": [
         "script"
       ],
@@ -104,6 +107,7 @@ $ cat testdata/hypercase.json
           "description": "What the lift writes to stderr."
         }
       ],
+      "productFiles": [],
       "rejects": [
         "malformed"
       ]

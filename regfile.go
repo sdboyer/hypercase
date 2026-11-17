@@ -46,14 +46,16 @@ func (r *runner) ownRegistry() registry.Registry {
 	}
 	for _, l := range r.lifts {
 		g.Lifts = append(g.Lifts, registry.Lift{
-			Name:        l.name,
-			Description: l.description,
-			Input:       goTypeName(l.in),
-			Product:     goTypeName(l.out),
-			Owned:       l.owned,
-			Corpora:     r.corpora[l.name],
-			Outputs:     registryOutputs(l.outputs),
-			Rejects:     propertyNames(l.rejects),
+			Name:         l.name,
+			Description:  l.description,
+			Input:        goTypeName(l.in),
+			Product:      goTypeName(l.out),
+			Owned:        l.owned,
+			Bytes:        l.bytes,
+			Corpora:      r.corpora[l.name],
+			Outputs:      registryOutputs(l.outputs),
+			ProductFiles: registryOutputs(l.product),
+			Rejects:      propertyNames(l.rejects),
 		})
 	}
 	for _, c := range r.columns {
