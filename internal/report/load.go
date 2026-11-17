@@ -35,6 +35,9 @@ type snapshot struct {
 	props   map[string]string // property → description
 	// transforms holds each corpus's transforms, by name.
 	transforms map[string]map[string]registry.Transform // corpus → transform → its declaration
+	// bytesLifts holds the names of the bytes lifts any registry declares
+	// over each corpus, whose cells commit a product under via/<lift>/.
+	bytesLifts map[string]map[string]bool
 	cases      map[caseKey]*caseAt
 	cells      map[cellKey]*cellAt
 	gaps       map[cellKey]string // the text of the gaps line that marks a cell
@@ -45,9 +48,11 @@ type snapshot struct {
 // package owns.
 type column struct {
 	description string
-	outputs     []registry.Output
-	classifier  *registry.Classifier
-	corpora     map[string]bool
+	// outputs are its output declarations, and a bytes lift's product
+	// declarations, each as via/<lift>/<pattern>.
+	outputs    []registry.Output
+	classifier *registry.Classifier
+	corpora    map[string]bool
 	// registries are the registries that claim the column, by path. When
 	// two do, the column is in conflict, and the report shows neither one's
 	// description, outputs or classifier.
@@ -136,17 +141,19 @@ const (
 	Kept  = "kept"  // the transform keeps it, and the base states it
 )
 
-// A cellAt is a cell's committed files: its outcome, and the rest. A cell
-// exists at a revision when its outcome file does. Before
-// registry.OutcomeFormat, every cell of a case that runs under a column the
-// registries claim exists, and so does every cell with files, whether or
-// not its case runs or a registry claims its column; and its state is
-// unknown.
+// A cellAt is a cell's committed files: its outcome, the rest of its
+// files under out/<column>/, and, for a bytes lift's cell, its product
+// under via/<column>/. A cell exists at a revision when its outcome file
+// does. Before registry.OutcomeFormat, every cell of a case that runs under
+// a column the registries claim exists, and so does every cell with files,
+// whether or not its case runs or a registry claims its column; and its
+// state is unknown.
 type cellAt struct {
 	known   bool // whether its state is: whether it has an outcome
 	outcome archive.Outcome
-	line    string // the outcome file, less its newline, or Unknown
-	files   map[string][]byte
+	line    string            // the outcome file, less its newline, or Unknown
+	files   map[string][]byte // by path under out/<column>/
+	product map[string][]byte // by path under via/<column>/
 }
 
 // Unknown is the outcome of a cell whose state is unknown: at a revision
@@ -224,6 +231,7 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 		columns:    map[string]*column{},
 		props:      map[string]string{},
 		transforms: map[string]map[string]registry.Transform{},
+		bytesLifts: map[string]map[string]bool{},
 		cases:      map[caseKey]*caseAt{},
 		cells:      map[cellKey]*cellAt{},
 		gaps:       map[cellKey]string{},
@@ -278,8 +286,23 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 			claim(suite.Name, suite.Description, suite.Outputs, suite.Classifier, suite.Corpora)
 		}
 		for _, l := range g.Lifts {
+			if l.Bytes {
+				for _, corpus := range l.Corpora {
+					if s.bytesLifts[corpus] == nil {
+						s.bytesLifts[corpus] = map[string]bool{}
+					}
+					s.bytesLifts[corpus][l.Name] = true
+				}
+			}
 			if l.Owned {
-				claim(l.Name, l.Description, l.Outputs, nil, l.Corpora)
+				// A bytes lift's product declarations are described with
+				// its outputs, each named via/<lift>/<pattern>, as its
+				// product's files are shown.
+				outputs := slices.Clone(l.Outputs)
+				for _, o := range l.ProductFiles {
+					outputs = append(outputs, registry.Output{Pattern: archive.Via + "/" + l.Name + "/" + o.Pattern, Description: o.Description})
+				}
+				claim(l.Name, l.Description, outputs, nil, l.Corpora)
 			}
 		}
 	}
@@ -322,8 +345,9 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 
 // addArchive reads the cases and cells of the archive at p. It places each
 // section by its name: a case's inputs and its other hand-written
-// sections, and a transform's in/ and delete, belong to the case, and its
-// out/<column>/ sections to its cells. A section it can't place is a
+// sections, and a transform's in/ and delete, belong to the case, its
+// out/<column>/ sections to its cells, and its via/<lift>/ sections, a
+// bytes lift's product, to the lift's cell. A section it can't place is a
 // problem. From registry.OutcomeFormat on, so is a cell with no outcome
 // file, which doesn't exist; before it, an outcome file is, and the case's
 // cells are those of [cellAt]. It reads what a case states and what a
@@ -351,6 +375,15 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 	}
 	cantPlace := func(section string) {
 		s.problem(p+", "+section, "the report can't place the section in a case or a cell, and leaves it out.")
+	}
+	cellOf := func(ck cellKey) *cellAt {
+		c := s.cells[ck]
+		if c == nil {
+			c = &cellAt{line: Unknown, files: map[string][]byte{}, product: map[string][]byte{}}
+			s.cells[ck] = c
+			cells = append(cells, ck)
+		}
+		return c
 	}
 	seen := map[string]bool{}
 	for _, sec := range a.Sections {
@@ -383,13 +416,7 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 				continue
 			}
 			place(k)
-			ck := cellKey{c: k, column: col}
-			c := s.cells[ck]
-			if c == nil {
-				c = &cellAt{line: Unknown, files: map[string][]byte{}}
-				s.cells[ck] = c
-				cells = append(cells, ck)
-			}
+			c := cellOf(cellKey{c: k, column: col})
 			if file != archive.OutcomeFile {
 				c.files[file] = sec.Data
 				continue
@@ -399,6 +426,20 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 				return problem(sec.Name, 0, err.Error())
 			}
 			c.known, c.outcome, c.line = true, o, strings.TrimSuffix(string(sec.Data), "\n")
+		case top == archive.Via:
+			// A file of a bytes lift's product, which belongs to the lift's
+			// cell.
+			lift, file, _ := strings.Cut(below, "/")
+			if lift == "" || file == "" || !fs.ValidPath(below) {
+				cantPlace(sec.Name)
+				continue
+			}
+			if !s.bytesLifts[corpus][lift] {
+				s.problem(p+", "+sec.Name, fmt.Sprintf("the section is a product of %s, and no registry declares a bytes lift of that name over testdata/%s/, so the report leaves it out.", lift, corpus))
+				continue
+			}
+			place(k)
+			cellOf(cellKey{c: k, column: lift}).product[file] = sec.Data
 		case top == archive.In && below != "", kind != "" && rest == archive.Delete:
 			// An input, or a variant's deleted inputs, which the report
 			// doesn't read.

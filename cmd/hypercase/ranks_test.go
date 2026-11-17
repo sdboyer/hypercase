@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/sdboyer/hypercase/internal/gittest"
+	"github.com/sdboyer/hypercase/internal/registry"
 )
 
 // TestRanks: changed outcomes come first, then cells that appeared, then
@@ -133,6 +134,119 @@ func TestRanks(t *testing.T) {
 			t.Parallel()
 			g := gittest.New(t)
 			c := revisions(t, g, module(tt.a), module(tt.b))
+			if got := ok(t, g, "", "report", "-text", c[0], c[1]); got != tt.want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, tt.want)
+			}
+		})
+	}
+}
+
+// productModule returns a module whose corpus root is its root, with the
+// registry productRegistry, and the archives of the corpus csv given by
+// name.
+func productModule(archives map[string]string) map[string]string {
+	files := map[string]string{
+		"go.mod":                  "module example.com/m\n\ngo 1.27\n",
+		"testdata/hypercase.json": string(productRegistry().Marshal()),
+	}
+	for name, data := range archives {
+		files["testdata/csv/"+name+".txtar"] = data
+	}
+	return files
+}
+
+// productRegistry declares the bytes lift import, which makes a sheet of
+// a CSV, and the suite calc, which runs on sheets, the CSVs' among them.
+func productRegistry() registry.Registry {
+	csv := registry.Type{Dir: "csv", Description: "A CSV export.", GoType: "example.com/m.CSV"}
+	sheet := registry.Type{Dir: "sheet", Description: "A sheet.", GoType: "example.com/m.Sheet"}
+	return registry.Registry{
+		UpdateVar: "M_UPDATE_GOLDEN", CorpusRoot: ".", RootPackage: true, Codes: true,
+		Types: []registry.Type{csv, sheet},
+		Lifts: []registry.Lift{{
+			Name: "import", Description: "Imports the CSV as a sheet.", Input: csv.GoType, Product: sheet.GoType,
+			Owned: true, Bytes: true, Corpora: []string{"csv"},
+			Outputs:      []registry.Output{{Pattern: "error.txt", Description: "Why the importer rejects the CSV."}},
+			ProductFiles: []registry.Output{{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them."}},
+		}},
+		Suites: []registry.Suite{{Name: "calc", Description: "Runs calc.", Consumes: sheet.GoType, Corpora: []string{"csv", "sheet"}}},
+	}
+}
+
+// TestProducts: a bytes lift's product, under via/<lift>/, is files of the
+// lift's cell, each shown as via/<lift>/<path>, after the cell's own
+// files. A change to the product alone ranks the lift's cell bytes
+// changed, and each cell past the lift ranks on its own files.
+func TestProducts(t *testing.T) {
+	t.Parallel()
+	const head = "A CSV.\n-- in/csv/x.csv --\n4\n"
+	accepted := func(product string) string {
+		return head + "-- via/import/sheet/A1 --\n" + product + "\n-- out/import/outcome --\naccepted\n"
+	}
+	for _, tt := range []struct {
+		name string
+		a, b string
+		want string
+	}{
+		{
+			name: "the product alone",
+			a:    accepted("4") + "-- out/calc/outcome --\naccepted\n-- out/calc/stdout.txt --\n4\n",
+			b:    accepted("=2*2") + "-- out/calc/outcome --\naccepted\n-- out/calc/stdout.txt --\n4\n",
+			want: "bytes changed\n  csv/x import: accepted\n    via/import/sheet/A1 changed\n",
+		},
+		{
+			name: "the product and a cell past the lift, each its own cell's",
+			a:    accepted("4") + "-- out/calc/outcome --\naccepted\n-- out/calc/stdout.txt --\n4\n",
+			b:    accepted("5") + "-- out/calc/outcome --\naccepted\n-- out/calc/stdout.txt --\n5\n",
+			want: "bytes changed\n  csv/x calc: accepted\n    stdout.txt changed\n  csv/x import: accepted\n    via/import/sheet/A1 changed\n",
+		},
+		{
+			name: "a product's files added and removed",
+			a:    accepted("4"),
+			b:    head + "-- via/import/sheet/B1 --\n4\n-- out/import/outcome --\naccepted\n",
+			want: "bytes changed\n  csv/x import: accepted\n    via/import/sheet/A1 removed\n    via/import/sheet/B1 added\n",
+		},
+		{
+			name: "the outcome and the product, ranked once",
+			a:    accepted("4") + "-- out/calc/outcome --\naccepted\n-- out/calc/stdout.txt --\n4\n",
+			b: head + "-- out/calc/outcome --\nblocked import\n" +
+				"-- out/import/error.txt --\nline 1: no\n-- out/import/outcome --\nrejected C101\n",
+			want: "outcome changed\n  csv/x calc: accepted -> blocked import\n    stdout.txt removed\n" +
+				"  csv/x import: accepted -> rejected C101\n    error.txt added\n    via/import/sheet/A1 removed\n",
+		},
+		{
+			name: "the cell's own files, then its product's",
+			a:    accepted("4"),
+			b:    accepted("5") + "-- out/import/zz.txt --\nz\n",
+			want: "bytes changed\n  csv/x import: accepted\n    zz.txt added\n    via/import/sheet/A1 changed\n",
+		},
+		{
+			name: "a variant's product and a transform's",
+			a: accepted("4") + "-- variant/v/in/csv/x.csv --\n5\n-- variant/v/via/import/sheet/A1 --\n5\n-- variant/v/out/import/outcome --\naccepted\n" +
+				"-- transform/t/in/csv/x.csv --\n6\n-- transform/t/via/import/sheet/A1 --\n6\n-- transform/t/out/import/outcome --\naccepted\n",
+			b: accepted("4") + "-- variant/v/in/csv/x.csv --\n5\n-- variant/v/via/import/sheet/A1 --\n=2+3\n-- variant/v/out/import/outcome --\naccepted\n" +
+				"-- transform/t/in/csv/x.csv --\n6\n-- transform/t/via/import/sheet/A1 --\n=3+3\n-- transform/t/out/import/outcome --\naccepted\n",
+			want: "bytes changed\n  csv/x/variant/v import: accepted\n    via/import/sheet/A1 changed\n  csv/x/transform/t import: accepted\n    via/import/sheet/A1 changed\n",
+		},
+		{
+			name: "a lift's cell appears with its product",
+			a:    head,
+			b:    accepted("4"),
+			want: "appeared\n  csv/x import: accepted\n    via/import/sheet/A1 added\n",
+		},
+		{
+			// A cell exists where its outcome file does, its product's
+			// files included.
+			name: "a product with no outcome file is no cell's",
+			a:    head + "-- via/import/sheet/A1 --\n4\n",
+			b:    head + "-- via/import/sheet/A1 --\n5\n",
+			want: "",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			g := gittest.New(t)
+			c := revisions(t, g, productModule(map[string]string{"x": tt.a}), productModule(map[string]string{"x": tt.b}))
 			if got := ok(t, g, "", "report", "-text", c[0], c[1]); got != tt.want {
 				t.Errorf("got:\n%s\nwant:\n%s", got, tt.want)
 			}

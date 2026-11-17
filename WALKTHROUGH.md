@@ -2565,15 +2565,14 @@ rejected S201
   revision, and doesn't pick: a column two registries claim, whose
   descriptions it shows neither of; a committed column no registry claims; a
   stated property no registry lists; a `gaps` line naming a column, or a
-  transform, no registry has; a section it can't place in a case or a cell,
-  such as `via/…` before step 10; a cell with files and no `outcome`, whose
-  files it leaves out; an `outcome` at a revision whose registries predate
-  `outcome` files, which it leaves out unread; a transform's variant whose
-  transform no corpus type lists; and a link pattern at `<b>` that is not a
-  regular expression, which links nothing. A `properties` or `gaps` section
-  it can't parse, an `outcome` section it can't parse at a revision of
-  format 5 or later, and a section an archive holds twice, each fail the
-  report.
+  transform, no registry has; a section it can't place in a case or a cell;
+  a cell with files and no `outcome`, whose files it leaves out; an
+  `outcome` at a revision whose registries predate `outcome` files, which it
+  leaves out unread; a transform's variant whose transform no corpus type
+  lists; and a link pattern at `<b>` that is not a regular expression, which
+  links nothing. A `properties` or `gaps` section it can't parse, an
+  `outcome` section it can't parse at a revision of format 5 or later, and a
+  section an archive holds twice, each fail the report.
 - hypercase's own CI runs the report over the toy on each pull request, from
   its merge base to its head, once per corpus root, and keeps the pages.
 - Step 11 adds input lines and corpus-check findings.
@@ -2954,6 +2953,14 @@ lift.
   6) say so too.
 - A corpus check (step 8) receives a bytes lift's committed product as its
   cell's `Product`, by each file's path under `via/<lift>/`.
+- The report (step 9) shows a bytes lift's product as files of the lift's
+  cell, after the cell's own files, each as `via/<lift>/` and its path in
+  the product: `via/import/sheet/A1`, under the same name in a variant. So
+  a change to the product alone ranks the lift's cell bytes changed, and
+  each cell past the lift ranks on its own files. The lift's product
+  declarations are described with its outputs, each as `via/<lift>/` and
+  its pattern. A `via/<lift>/` section whose lift no registry declares as a
+  bytes lift over its corpus is a problem, which the report leaves out.
 - `testdata/sheet/prices.txtar` and `testdata/csv/prices.txtar` both reach
   `evaluate`, the second through `import`. Their cases are `sheet/prices` and
   `csv/prices` (step 3), and their cells' subtests
@@ -2962,8 +2969,9 @@ lift.
 ### What can now be seen
 
 - The sheet a CSV yields, as committed bytes beside the CSV. A change to the
-  import shows as a change to `via/import/`, and fails `import`'s column
-  alone until the update; the columns downstream read the committed sheet.
+  import shows as a change to `via/import/`, which the report ranks on
+  `import`'s cell, and fails `import`'s column alone until the update; the
+  columns downstream read the committed sheet.
 - Where a chained input stops: `open-quote` at `import`, with every column
   past it `blocked import`.
 - A CSV and a hand-written sheet with the same cells side by side in the

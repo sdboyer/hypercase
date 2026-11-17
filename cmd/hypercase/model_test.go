@@ -201,7 +201,7 @@ func TestProblems(t *testing.T) {
 		x + ", properties, line 2</code>: the case states looped, and no registry lists a property of that name.</li>",
 		x + ", gaps, line 1</code>: the line names the column nope, and no registry claims a column of that name over testdata/sheet/.</li>",
 		x + ", gaps, line 2</code>: the line names transform/gone, and no corpus type of testdata/sheet/ lists a transform of that name.</li>",
-		x + ", via/import/sheet/A1</code>: the report can&#39;t place the section in a case or a cell, and leaves it out.</li>",
+		x + ", via/import/sheet/A1</code>: the section is a product of import, and no registry declares a bytes lift of that name over testdata/sheet/, so the report leaves it out.</li>",
 		x + ", delete</code>: the report can&#39;t place the section",
 		x + ", out/outcome</code>: the report can&#39;t place the section",
 		x + ", variant//out/calc/outcome</code>: the report can&#39;t place the section",
@@ -437,4 +437,40 @@ func TestPageDescribeConflict(t *testing.T) {
 	lacks(t, "the sheet corpus's descriptions", d, "at a.", "only at")
 	holds(t, "the problems", section(t, page, `<section id="problems">`, "</section>"),
 		"each claim the column calc, and a column&#39;s name is unique per corpus root")
+}
+
+// TestPageProducts: the page shows a change to a bytes lift's product in
+// the lift's cell, with its line diff, and describes the lift's product
+// declarations with its outputs, each as via/<lift>/<pattern>. A
+// via/<lift>/ section whose lift no registry declares as a bytes lift over
+// its corpus is a problem, which the report leaves out: a suite's, or a
+// bytes lift's over another corpus.
+func TestPageProducts(t *testing.T) {
+	t.Parallel()
+	const x = "A CSV.\n-- in/csv/x.csv --\n4\n-- via/import/sheet/A1 --\nV\n-- via/calc/sheet/A1 --\nV\n" +
+		"-- out/calc/outcome --\naccepted\n-- out/import/outcome --\naccepted\n"
+	ra := productRegistry()
+	ra.Lifts[0].ProductFiles = append(ra.Lifts[0].ProductFiles, registry.Output{Pattern: "notes/*", Description: "A note, only at a."})
+	a := productModule(map[string]string{"x": strings.ReplaceAll(x, "V", "4")})
+	a["testdata/hypercase.json"] = string(ra.Marshal())
+	b := productModule(map[string]string{"x": strings.ReplaceAll(x, "V", "5")})
+	b["testdata/sheet/y.txtar"] = "A sheet.\n-- in/sheet/A1 --\n1\n-- via/import/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"
+	g := gittest.New(t)
+	c := revisions(t, g, a, b)
+	page := ok(t, g, "", "report", c[0], c[1])
+
+	holds(t, "x import's change", change(t, page, "csv/x", "import"),
+		`<li class="changed"><details><summary><code>via/import/sheet/A1</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>`+"\n"+
+			`<pre class="diff"><span class="del">- 4</span><span class="add">&#43; 5</span></pre></details></li>`)
+	lacks(t, "the changes", section(t, page, `<section id="changes">`, "</section>"), `<span class="case">csv/x</span> <span class="col">calc</span>`)
+
+	only := ` <span class="badge">only at ` + c[0] + `</span>`
+	holds(t, "the csv corpus's descriptions", section(t, page, `<section class="corpus" id="describe-csv">`, "</section>"),
+		`<dt>import</dt><dd>Imports the CSV as a sheet.<ul class="outputs"><li><code>error.txt</code>: Why the importer rejects the CSV.</li>`+
+			`<li><code>via/import/notes/*</code>`+only+`: A note, only at a.</li>`+
+			`<li><code>via/import/sheet/*</code>: One file per cell, as a sheet&#39;s in/sheet/ holds them.</li></ul></dd>`)
+
+	holds(t, "the problems", section(t, page, `<section id="problems">`, "</section>"),
+		"<code>testdata/csv/x.txtar, via/calc/sheet/A1</code>: the section is a product of calc, and no registry declares a bytes lift of that name over testdata/csv/, so the report leaves it out.</li>",
+		"<code>testdata/sheet/y.txtar, via/import/sheet/A1</code>: the section is a product of import, and no registry declares a bytes lift of that name over testdata/sheet/, so the report leaves it out.</li>")
 }
