@@ -459,8 +459,6 @@ Its `.gitignore` names the corpus root's lock, which an update takes
   hand-written section keeps its bytes, and the sections left keep their
   order. A person runs it, never an update. It strips each archive under
   the corpus root's lock (step 5), and writes it by temp file and rename.
-  An archive that is a symbolic link is read through it, and the write
-  puts the archive in the link's place, as an update's does.
 - With no flags it strips every archive under the corpus root, and removes
   the registries that record the root and the findings files in their
   packages' `testdata/checks/` (steps 5 and 8). It keeps a package's
@@ -493,10 +491,9 @@ Its `.gitignore` names the corpus root's lock, which an update takes
   `testdata/<corpus>/<archive>.txtar` with both names under the naming
   rule and `<corpus>` other than `checks`, and then exits non-zero. It
   goes by location alone, so it strips an archive in a directory that no
-  corpus type declares. It follows no symbolic link to a directory, where
-  a run reads archives through one, so a link in place of the corpus
-  root's `testdata/`, or of a directory directly in it, fails it before it
-  removes anything. Its last line is the update to run next.
+  corpus type declares. A symbolic link anywhere under the corpus root's
+  `testdata/`, `testdata/` itself included, fails it before it removes
+  anything. Its last line is the update to run next.
 - Stripping and then updating, repeated until an update changes nothing,
   reaches what updating the hand-written sections alone reaches, frozen
   cells excepted: a known state.
@@ -1195,9 +1192,9 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
   - a registry file whose directory holds no `_test.go` file;
   - a directory under `testdata/` that holds archives and that no registry
     declares;
-  - a symbolic link in place of the corpus root's `testdata/`, or of a
-    directory directly in it: a run reads archives through it, and the
-    check and `hypercase strip` follow none.
+  - a symbolic link anywhere under the corpus root's `testdata/`,
+    `testdata/` itself included, whatever it names: a run reads through
+    one, where the check, `hypercase strip` and the report (step 9) don't.
 - A declared directory that doesn't exist yet is fine.
 - A package whose directory holds no `_test.go` file owns and uses
   nothing, whatever its registry records. Any file whose name ends in

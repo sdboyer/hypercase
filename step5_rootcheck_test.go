@@ -2,9 +2,6 @@ package hypercase_test
 
 import (
 	"fmt"
-	"os"
-	"path"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -255,60 +252,6 @@ func TestRootCheckArchives(t *testing.T) {
 		"--- PASS: TestCorpus/script/loopy/echo")
 	s.passes(s.run("b", "pkg-b", true))
 	s.same("testdata/script/typo.txtar", typo)
-	s.done()
-}
-
-// link moves the directory rel into shared/, as <name>.d, where no run
-// reads it as a package's testdata/, and puts a symbolic link to it in its
-// place; unlink moves it back.
-func (s *sandbox) link(rel string) {
-	s.t.Helper()
-	p, moved := s.path(rel), s.path("shared/"+path.Base(rel)+".d")
-	if err := os.MkdirAll(filepath.Dir(moved), 0o755); err != nil {
-		s.t.Fatal(err)
-	}
-	if err := os.Rename(p, moved); err != nil {
-		s.t.Fatal(err)
-	}
-	target, err := filepath.Rel(filepath.Dir(p), moved)
-	if err != nil {
-		s.t.Fatal(err)
-	}
-	if err := os.Symlink(target, p); err != nil {
-		s.t.Skipf("making a symbolic link failed: %v", err)
-	}
-	s.note("%s moves to shared/, and a symbolic link to it takes its place", rel)
-}
-
-func (s *sandbox) unlink(rel string) {
-	s.t.Helper()
-	p := s.path(rel)
-	if err := os.Remove(p); err != nil {
-		s.t.Fatal(err)
-	}
-	if err := os.Rename(s.path("shared/"+path.Base(rel)+".d"), p); err != nil {
-		s.t.Fatal(err)
-	}
-	s.note("%s moves back, in place of the link", rel)
-}
-
-// TestRootCheckLinks: a normal run reads a corpus's archives through a
-// symbolic link in place of the corpus's directory, or of testdata/, and
-// the root-package check and hypercase strip follow none. So the check
-// fails on each such link, naming it, and strip refuses to run.
-func TestRootCheckLinks(t *testing.T) {
-	t.Parallel()
-	s := newSandbox(t, "shared")
-	const read = " is a symbolic link, and a corpus root's testdata/, and a corpus's directory in it, are read as directories: a normal run and the update read archives through a link, and this check and hypercase strip follow none, so they would read none of the archives there.\nReplace the link with the directory it names."
-	for _, l := range []string{"testdata/script", "testdata"} {
-		s.link(l)
-		s.fails(s.normal("pkg-a"), l+read, "--- PASS: TestCorpus/script/twice/echo")
-		if r := s.strip(); r.code != 1 {
-			t.Errorf("hypercase strip exited %d, not 1, with %s a link:\n%s", r.code, l, r.out)
-		}
-		s.unlink(l)
-		s.passes(s.normal("pkg-a"))
-	}
 	s.done()
 }
 

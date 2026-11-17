@@ -439,21 +439,24 @@ Fix them, then run hypercase strip -column nutrition again.
 	}
 	sameTree(t, top, files)
 
-	// An archive that can't be read, a link to no file, may hold them, and
-	// is listed with why.
-	files = stripModule()
+	// An archive that can't be read, one with no permissions, may hold
+	// them, and is listed with why.
+	files = with(stripModule(), map[string]string{"testdata/sheet/locked.txtar": stray})
 	top = writeTree(t, files)
-	gone := filepath.Join(top, "testdata", "sheet", "gone.txtar")
-	if err := os.Symlink(filepath.Join(top, "nowhere"), gone); err != nil {
+	locked := filepath.Join(top, "testdata", "sheet", "locked.txtar")
+	if err := os.Chmod(locked, 0); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { os.Chmod(locked, 0o644) })
+	if _, err := os.ReadFile(locked); err == nil {
+		t.Skip("a file with no permissions reads here, as it does for root, so no read fails on it")
+	}
 	r = stripIn(t, top, "", "-column", "nutrition")
-	want = "hypercase strip: -column nutrition matches no section that strip removes under the module-root corpus. Only archives that it leaves as they are hold out/nutrition/… or via/nutrition/…, at any level, or can't be read:\ntestdata/sheet/gone.txtar: reading it failed: open " + gone + ": no such file or directory.\nFix them, then run hypercase strip -column nutrition again.\n"
+	want = "hypercase strip: -column nutrition matches no section that strip removes under the module-root corpus. Only archives that it leaves as they are hold out/nutrition/… or via/nutrition/…, at any level, or can't be read:\ntestdata/sheet/locked.txtar: reading it failed: open " + locked + ": permission denied.\nFix them, then run hypercase strip -column nutrition again.\n"
 	if r.code != 1 || r.stdout != "" || r.stderr != want {
 		t.Errorf("strip -column nutrition exited %d, printing %q, with stderr (-want +got):\n%s", r.code, r.stdout, diff.Lines([]byte(want), []byte(r.stderr)))
 	}
-	// tree reads every file, and the link reads as none.
-	if err := os.Remove(gone); err != nil {
+	if err := os.Chmod(locked, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	sameTree(t, top, files)
@@ -1244,48 +1247,55 @@ func TestStripFailedFindings(t *testing.T) {
 	sameTree(t, top, strippedModule())
 }
 
-// TestStripLinks: a symbolic link in place of the corpus root's testdata/,
-// or of a corpus's directory in it, fails strip, exit 1, before it removes
-// anything, the registries included. A run reads the archives through the
-// link, and strip follows none, so it would strip none of them.
+// TestStripLinks: nothing under the corpus root's testdata/ is a symbolic
+// link, so one there fails strip, exit 1, before it removes anything, the
+// registries included, whatever it names: a corpus's directory, an
+// archive, testdata/checks/, nothing, itself, or testdata/ itself.
 func TestStripLinks(t *testing.T) {
 	t.Parallel()
-	const fix = ". Nothing was removed.\nReplace each link with the directory it names, then run hypercase strip again.\n"
-	const read = ", and a corpus root's testdata/, and a corpus's directory in it, are read as directories: a normal run and the update read archives through a link, and strip follows none, so it would strip none of the archives there"
+	const one = ". Nothing was removed.\nReplace it with a copy of what it names, or remove it, then run hypercase strip again.\n"
+	type link struct{ rel, target string } // a target of "" names what the link replaces
 	for _, tt := range []struct {
-		links []string
+		links []link
 		want  string
 	}{
-		{[]string{"testdata/sheet"}, "hypercase strip: testdata/sheet is a symbolic link" + read + fix},
-		{[]string{"testdata/csv", "testdata/sheet"}, "hypercase strip: testdata/csv and testdata/sheet are symbolic links" + read + fix},
-		{[]string{"testdata"}, "hypercase strip: testdata is a symbolic link" + read + fix},
+		{[]link{{"testdata/sheet", ""}}, "hypercase strip: testdata/ holds no symbolic links: testdata/sheet is one" + one},
+		{[]link{{"testdata/sheet/twice.txtar", ""}}, "hypercase strip: testdata/ holds no symbolic links: testdata/sheet/twice.txtar is one" + one},
+		{[]link{{"testdata/checks", ""}}, "hypercase strip: testdata/ holds no symbolic links: testdata/checks is one" + one},
+		{[]link{{"testdata/sheet", "../shared/missing"}}, "hypercase strip: testdata/ holds no symbolic links: testdata/sheet is one" + one},
+		{[]link{{"testdata/sheet", "sheet"}}, "hypercase strip: testdata/ holds no symbolic links: testdata/sheet is one" + one},
+		{[]link{{"testdata", ""}}, "hypercase strip: testdata/ holds no symbolic links: testdata is one" + one},
+		{[]link{{"testdata/csv", ""}, {"testdata/sheet", ""}}, "hypercase strip: testdata/ holds no symbolic links: testdata/csv and testdata/sheet are links. Nothing was removed.\nReplace each with a copy of what it names, or remove it, then run hypercase strip again.\n"},
 	} {
 		files := stripModule()
 		top := writeTree(t, files)
 		for _, l := range tt.links {
-			link := filepath.Join(top, filepath.FromSlash(l))
-			moved := filepath.Join(top, "shared", filepath.Base(l)+".d")
+			p := filepath.Join(top, filepath.FromSlash(l.rel))
+			moved := filepath.Join(top, "shared", filepath.Base(l.rel)+".d")
 			if err := os.MkdirAll(filepath.Dir(moved), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.Rename(link, moved); err != nil {
+			if err := os.Rename(p, moved); err != nil {
 				t.Fatal(err)
 			}
-			target, err := filepath.Rel(filepath.Dir(link), moved)
-			if err != nil {
-				t.Fatal(err)
+			target := filepath.FromSlash(l.target)
+			if l.target == "" {
+				var err error
+				if target, err = filepath.Rel(filepath.Dir(p), moved); err != nil {
+					t.Fatal(err)
+				}
 			}
-			if err := os.Symlink(target, link); err != nil {
+			if err := os.Symlink(target, p); err != nil {
 				t.Skipf("making a symbolic link failed: %v", err)
 			}
 		}
 		stripFails(t, top, "", 1, nil, tt.want)
 		for _, l := range tt.links {
-			link := filepath.Join(top, filepath.FromSlash(l))
-			if err := os.Remove(link); err != nil {
+			p := filepath.Join(top, filepath.FromSlash(l.rel))
+			if err := os.Remove(p); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.Rename(filepath.Join(top, "shared", filepath.Base(l)+".d"), link); err != nil {
+			if err := os.Rename(filepath.Join(top, "shared", filepath.Base(l.rel)+".d"), p); err != nil {
 				t.Fatal(err)
 			}
 		}

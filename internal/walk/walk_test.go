@@ -50,14 +50,14 @@ func TestTestdata(t *testing.T) {
 	}
 }
 
-// TestTestdataLinks: Testdata follows no symbolic link. It returns each
-// link in place of testdata/, or directly in it and naming a directory,
-// where a run reads a corpus's archives through it. It visits any other
-// link as a file: one to a file, one that names nothing, and one below a
-// corpus's directory, where no run reads.
+// TestTestdataLinks: Testdata follows no symbolic link, and returns each
+// one under testdata/, whatever it names and wherever it sits: a link to
+// a directory, to a file, to another corpus root, under testdata/checks/,
+// below a corpus's directory, one that names nothing, a loop, and one in
+// place of testdata/. It calls file with none of them.
 func TestTestdataLinks(t *testing.T) {
 	dir := t.TempDir()
-	for _, f := range []string{"shared/sheet/x.txtar", "shared/old/y.txtar", "td/a/z.txtar", "td/b.txtar"} {
+	for _, f := range []string{"shared/sheet/x.txtar", "shared/other/w.txtar", "td/a/z.txtar", "td/b.txtar", "td/checks/found.txt"} {
 		p := filepath.Join(dir, filepath.FromSlash(f))
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
@@ -70,8 +70,11 @@ func TestTestdataLinks(t *testing.T) {
 	for _, l := range []struct{ link, target string }{
 		{"td/sheet", "../shared/sheet"},
 		{"td/c.txtar", "b.txtar"},
-		{"td/a/old", "../../shared/old"},
+		{"td/other", "../shared/other"},
+		{"td/checks/linked.txt", "found.txt"},
+		{"td/a/old", "../../shared/sheet"},
 		{"td/dangling", "../shared/missing"},
+		{"td/loop", "loop"},
 		{"linked", "td"},
 	} {
 		if err := os.Symlink(filepath.FromSlash(l.target), filepath.Join(dir, filepath.FromSlash(l.link))); err != nil {
@@ -79,13 +82,18 @@ func TestTestdataLinks(t *testing.T) {
 		}
 	}
 	var got []string
-	links, err := Testdata(td, nil, func(p string, d fs.DirEntry) {
+	links, err := Testdata(td, map[string]bool{filepath.Join(td, "other"): true}, func(p string, d fs.DirEntry) {
 		rel, _ := filepath.Rel(td, p)
 		got = append(got, filepath.ToSlash(rel))
 	})
-	want, wantLinks := []string{"a/old", "a/z.txtar", "b.txtar", "c.txtar", "dangling"}, []string{filepath.Join(td, "sheet")}
-	if err != nil || !slices.Equal(got, want) || !slices.Equal(links, wantLinks) {
-		t.Errorf("Testdata visited %q, with the links %q and the error %v; want %q, with the links %q", got, links, err, want, wantLinks)
+	var rels []string
+	for _, l := range links {
+		rel, _ := filepath.Rel(td, l)
+		rels = append(rels, filepath.ToSlash(rel))
+	}
+	want, wantLinks := []string{"a/z.txtar", "b.txtar", "checks/found.txt"}, []string{"a/old", "c.txtar", "checks/linked.txt", "dangling", "loop", "other", "sheet"}
+	if err != nil || !slices.Equal(got, want) || !slices.Equal(rels, wantLinks) {
+		t.Errorf("Testdata visited %q, with the links %q and the error %v; want %q, with the links %q", got, rels, err, want, wantLinks)
 	}
 
 	got = nil

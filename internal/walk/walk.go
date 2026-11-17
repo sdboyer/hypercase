@@ -20,16 +20,15 @@ import (
 // corpus root, as others holds it by its path, or holds a go.mod, the root
 // of a nested module. It returns the walk's error, which ends it.
 //
-// It follows no symbolic link, where a run reads a corpus's archives
-// through one. So it returns, in links, each link in place of td, or
-// directly in td and naming a directory, where a corpus's directory is,
-// and reads nothing through it.
+// No file under a corpus root's testdata/, td included, is a symbolic
+// link. Testdata follows none: it returns, in links, each one it reaches,
+// whatever it names, and calls file with none of them.
 func Testdata(td string, others map[string]bool, file func(p string, d fs.DirEntry)) (links []string, err error) {
 	err = filepath.WalkDir(td, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if d.Type()&fs.ModeSymlink != 0 && (p == td || filepath.Dir(p) == td && isDir(p)) {
+		if d.Type()&fs.ModeSymlink != 0 {
 			links = append(links, p)
 			return nil
 		}
@@ -49,12 +48,6 @@ func Testdata(td string, others map[string]bool, file func(p string, d fs.DirEnt
 func IsFile(p string) bool {
 	fi, err := os.Stat(p)
 	return err == nil && fi.Mode().IsRegular()
-}
-
-// isDir reports whether p names a directory, through a link.
-func isDir(p string) bool {
-	fi, err := os.Stat(p)
-	return err == nil && fi.IsDir()
 }
 
 // CheckPath reports why path is no archive of the corpus root, or nil
