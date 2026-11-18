@@ -449,6 +449,91 @@ func TestImportCSVMissing(t *testing.T) {
 	}
 }
 
+func TestFieldLines(t *testing.T) {
+	tests := []struct {
+		name, csv, cell string
+		want            string // first-last, or describe
+	}{
+		{"one line", "4,6,=A1+B1\n", "C1", "1-1"},
+		{"a later record", "1\n2,3\n", "B2", "2-2"},
+		{"crlf", "1,2\r\n3\r\n", "A2", "2-2"},
+		{"newline in quotes", "\"1\n2\",3\n4\n", "A1", "1-2"},
+		{"after a newline in quotes", "\"1\n2\",3\n4\n", "B1", "2-2"},
+		{"the record after a newline in quotes", "\"1\n2\",3\n4\n", "A2", "3-3"},
+		{"closing quote alone on its line", "\"a\n\",1\n", "A1", "1-2"},
+		{"empty field", ",2\n", "A1", "plain: csv/in.csv has no field for the cell A1"},
+		{"no such field", "1\n", "B1", "plain: csv/in.csv has no field for the cell B1"},
+		{"open quote", `4,"six` + "\n", "A1", "C101 line 1: quote never closes @ csv/in.csv:1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := fstest.MapFS{"csv/in.csv": {Data: []byte(tt.csv)}}
+			first, last, err := sheet.FieldLines(in, "csv/in.csv", tt.cell)
+			got := describe(err)
+			if err == nil {
+				got = fmt.Sprintf("%d-%d", first, last)
+			}
+			if got != tt.want {
+				t.Errorf("got %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestFieldLinesGrid lays every pair of records of two fields each, drawn
+// from fields that are empty, plain, quoted, and quoted around newlines,
+// with either record end, and checks each cell's lines against where its
+// field was laid: its first line is one past the newlines before it, and
+// its last is that plus the newlines it holds. A cell ImportCSV makes no
+// file for has none.
+func TestFieldLinesGrid(t *testing.T) {
+	fields := []string{"", `""`, "4", "=A1", `"a,b"`, "\"1\n2\"", "\"\n\n\"", `"say ""hi"""`}
+	for _, eol := range []string{"\n", "\r\n"} {
+		for n := range len(fields) * len(fields) * len(fields) * len(fields) {
+			grid := [2][2]string{}
+			for i, k := 0, n; i < 4; i, k = i+1, k/len(fields) {
+				grid[i/2][i%2] = fields[k%len(fields)]
+			}
+			var csv strings.Builder
+			want := map[string]string{}
+			for row, rec := range grid {
+				for col, f := range rec {
+					if col > 0 {
+						csv.WriteString(",")
+					}
+					first := 1 + strings.Count(csv.String(), "\n")
+					if f != "" && f != `""` {
+						want[fmt.Sprintf("%c%d", 'A'+col, row+1)] = fmt.Sprintf("%d-%d", first, first+strings.Count(f, "\n"))
+					}
+					csv.WriteString(f)
+				}
+				csv.WriteString(eol)
+			}
+			in := fstest.MapFS{"csv/in.csv": {Data: []byte(csv.String())}}
+			cells, err := sheet.ImportCSV(in, "csv/in.csv")
+			if err != nil {
+				t.Fatalf("%q: %v", csv.String(), err)
+			}
+			for _, cell := range []string{"A1", "B1", "A2", "B2"} {
+				got := "none"
+				if first, last, err := sheet.FieldLines(in, "csv/in.csv", cell); err == nil {
+					got = fmt.Sprintf("%d-%d", first, last)
+				}
+				w, ok := want[cell]
+				if !ok {
+					w = "none"
+				}
+				if got != w {
+					t.Errorf("%q, %s: got %s, want %s", csv.String(), cell, got, w)
+				}
+				if _, err := fs.Stat(cells, "sheet/"+cell); (err == nil) != ok {
+					t.Errorf("%q, %s: ImportCSV makes a file: %t, want %t", csv.String(), cell, err == nil, ok)
+				}
+			}
+		}
+	}
+}
+
 func TestMoveDown(t *testing.T) {
 	tests := []struct {
 		name  string

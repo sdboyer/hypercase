@@ -10,9 +10,9 @@ never pans out.
 
 hypercase is one framework, with everything on. It has no levels to opt into.
 A project that upgrades to a later commit carries what later steps add: an
-`outcome` file per cell (step 8), and `Inputs` or `AllInputs` on every output
-declaration (step 11). Earlier steps' examples keep running, and gain what
-later steps require.
+`outcome` file per cell (step 8), and `Inputs` on every output declaration,
+with an `inputs` file per cell that runs (step 11). Earlier steps' examples
+keep running, and gain what later steps require.
 
 Every step is shown in one toy domain, spreadsheet formulas, which step 1
 introduces. Steps 1 to 11 show the Go an author writes at that
@@ -1716,7 +1716,7 @@ package owns every column it registers.
 - Its output ends with a newline; one that doesn't fails the cell.
 - A panic in it fails the cell, and an update writes nothing for that cell.
 - The other hooks land with their first readers: `Codes` at step 8, and
-  `Positions` and `Range` at step 11.
+  `Positions` at step 11.
 
 **Parameters.**
 
@@ -3414,17 +3414,17 @@ lift.
   the lift's cell commits. That is the owner's verdict, under its Project.
   A package that only uses the lift doesn't judge the lift's cell with its
   own Project, which may differ from the owner's: it judges the cell under
-  a bare Project, whose `RenderError` and `Codes` fail no cell, and by its
-  own declaration of the lift. When it registers the owner's declaration,
-  it holds the cells past the lift back on what keeps the cell from being
-  written under any Project, such as a fault of the jenny or a product an
-  archive can't hold. The root-package check fails when the declarations
-  differ in what the registries record, below; it can't compare two
-  jennies. When the owner's Project alone keeps its update from writing
-  the lift's cell, as a `RenderError` that panics on the lift's error
-  does, the using package's update writes the cells past the lift, and its
-  normal runs, which read the lift's committed outcome, fail them until the
-  owner's update writes that cell.
+  a bare Project, whose `RenderError`, `Codes` and `Positions` (step 11)
+  fail no cell, and by its own declaration of the lift. When it registers
+  the owner's declaration, it holds the cells past the lift back on what
+  keeps the cell from being written under any Project, such as a fault of
+  the jenny or a product an archive can't hold. The root-package check
+  fails when the declarations differ in what the registries record, below;
+  it can't compare two jennies. When the owner's Project alone keeps its
+  update from writing the lift's cell, as a `RenderError` or a `Positions`
+  that panics on the lift's error does, the using package's update writes
+  the cells past the lift, and its normal runs, which read the lift's
+  committed outcome, fail them until the owner's update writes that cell.
 - The lift's own cell files sit in `out/<lift>/`, like any column's. A
   lift's name covers both directories.
 - A variant's product goes under `variant/<name>/via/<lift>/` or
@@ -3586,88 +3586,116 @@ hand, and, through a bytes lift, the CSV.
 
 ### What the author writes
 
-Every output declaration says which input lines its files come from. That
-map from an output back to its inputs is a **reverse map**. A **range** is a
-span of lines in one file of the cell's input view.
+Every output declaration says which input lines its files come from, in its
+`Inputs` field. That map from an output back to its inputs is a **reverse
+map**. A **range** is a span of lines in one file of the cell's input view.
+The steps before this one show their declarations' `Inputs` without
+comment.
 
-Proposed names: `decl.Output`'s `Inputs` field; `decl.InputsFunc`, a
-function that maps one output file; `decl.AllInputs`, the escape;
-`decl.FromPositions`, which an `error.txt` declaration states to take its
-ranges from `Positions`; `decl.Range`; and `decl.Project`'s `Positions`
-field.
+Adopting this step means editing every output declaration: each suite's,
+`stdout.txt`, `stderr.txt` and `error.txt` included, each lift's `Outputs`,
+and each bytes lift's `Product`. Each states one of these (proposed names):
 
+- a `decl.InputsFunc`, a function that maps one output file to its ranges;
+- `decl.AllInputs`, which says each file depends on the whole input view;
+- `decl.FromPositions`, on a declaration whose pattern is exactly
+  `error.txt`, which takes the error's ranges from the project's
+  `Positions`.
+
+`walkthrough/sheets/step11/sheetcorpus/inputs.go` holds the toy's maps, and
+the `Positions` its `Project` sets, `Positions: positions`:
+
+<!-- source: walkthrough/sheets/step11/sheetcorpus/inputs.go -->
 ```go
-// walkthrough/sheets/step11/sheetcorpus/project.go: Project gains
-	Positions: func(err error) []decl.Range {
-		var rs []decl.Range
-		for _, p := range sheet.Positions(err) {
-			rs = append(rs, decl.Range{Path: p.Path, Start: p.Line, End: p.Line})
-		}
-		return rs
-	},
+// walkthrough/sheets/step11/sheetcorpus/inputs.go
+package sheetcorpus
+
+import (
+	"fmt"
+	"io/fs"
+	"strings"
+
+	"github.com/sdboyer/hypercase/decl"
+	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
+)
+
+// Cells maps an output file to every cell of the sheet, whole: a cell's
+// value depends on the cells its formula refers to, and theirs on others.
+var Cells = decl.InputsFunc(func(in fs.FS, _ string) ([]decl.Range, error) {
+	cells, err := fs.Glob(in, "sheet/*")
+	if err != nil {
+		return nil, err
+	}
+	rs := make([]decl.Range, len(cells))
+	for i, c := range cells {
+		rs[i] = decl.Range{Path: c} // 0, 0: the whole file
+	}
+	return rs, nil
+})
+
+// Formulas maps an output file to the cells that hold a formula, whole:
+// the cells format prints.
+var Formulas = decl.InputsFunc(func(in fs.FS, _ string) ([]decl.Range, error) {
+	p, err := sheet.Parse(in)
+	if err != nil {
+		return nil, err
+	}
+	var rs []decl.Range
+	for _, name := range p.Formulas() {
+		rs = append(rs, decl.Range{Path: "sheet/" + name})
+	}
+	return rs, nil
+})
+
+// Field maps a product file of import, one cell of the sheet, to the lines
+// of the CSV export its field spans.
+var Field = decl.InputsFunc(func(in fs.FS, path string) ([]decl.Range, error) {
+	csvs, err := fs.Glob(in, "csv/*.csv")
+	if err != nil {
+		return nil, err
+	}
+	if len(csvs) != 1 {
+		return nil, fmt.Errorf("the input holds %q, and a CSV export is one file", csvs)
+	}
+	first, last, err := sheet.FieldLines(in, csvs[0], strings.TrimPrefix(path, "sheet/"))
+	if err != nil {
+		return nil, err
+	}
+	return []decl.Range{{Path: csvs[0], Start: first, End: last}}, nil
+})
+
+// positions finds the lines an error points at, sheet.Positions's: each
+// line it names, or the whole file for a position about the file as a
+// whole, whose Line is 0.
+func positions(err error) []decl.Range {
+	var rs []decl.Range
+	for _, p := range sheet.Positions(err) {
+		rs = append(rs, decl.Range{Path: p.Path, Start: p.Line, End: p.Line})
+	}
+	return rs
+}
 ```
 
-```go
-// walkthrough/sheets/step11/corpus_test.go: evaluate's declaration
-	Outputs: []decl.Output{
-		{
-			Pattern:     "values.txt",
-			Description: "Each cell's value, one per line, in cell order.",
-			Inputs: decl.InputsFunc(func(in fs.FS, path string) ([]decl.Range, error) {
-				cells, err := fs.Glob(in, "sheet/*")
-				if err != nil {
-					return nil, err
-				}
-				rs := make([]decl.Range, len(cells))
-				for i, c := range cells {
-					rs[i] = decl.Range{Path: c} // 0, 0: the whole file
-				}
-				return rs, nil
-			}),
-		},
-	},
-```
+`evaluate`'s `values.txt` states `Cells`, and `format`'s `formulas.txt`
+states `Formulas`. Every `error.txt` states `decl.FromPositions`, and
+`calc`'s `stdout.txt` and `stderr.txt` state `decl.AllInputs`.
 
-`format`'s `formulas.txt` maps to its formula cells only. `parse`'s,
-`resolve`'s and `calc`'s `error.txt` state `Inputs: decl.FromPositions`, and
-`calc`'s `stdout.txt` and `stderr.txt` state `Inputs: decl.AllInputs`.
-
-A bytes lift's product declarations are output declarations too, so each has
-`Inputs`. `import`'s map receives each product file's path as its pattern
-matches it, such as `sheet/B1`, and gives the CSV lines that cell's field
-came from (proposed):
-
-```go
-// walkthrough/sheets/step11/sheetcorpus/types.go: Import's declarations
-	Outputs: []decl.Output{
-		{
-			Pattern:     "error.txt",
-			Description: "The line the importer can't read, and why.",
-			Inputs:      decl.FromPositions,
-		},
-	},
-	Product: []decl.Output{
-		{
-			Pattern:     "sheet/*",
-			Description: "One file per cell, as a sheet's in/sheet/ holds them.",
-			Inputs: decl.InputsFunc(func(in fs.FS, path string) ([]decl.Range, error) {
-				csv, first, last, err := sheet.FieldLines(in, path) // the CSV's path, and the lines of the cell's field
-				if err != nil {
-					return nil, err
-				}
-				return []decl.Range{{Path: csv, Start: first, End: last}}, nil
-			}),
-		},
-	},
-```
+A bytes lift's product declarations are output declarations too. `import`'s
+`Product`, `sheet/*`, states `Field`, which receives each product file's
+path as the pattern matches it, such as `sheet/B1`, and gives the lines of
+the CSV that cell's field spans, through the toy's `sheet.FieldLines`. A
+field spans more than one line when it is quoted and holds a newline. Steps
+3 to 10 map at the grain the toy knows by then: step 10's `Export` maps each
+product file to the whole CSV.
 
 ### How the files change
 
-Every cell that ran gains an `inputs` file. The archives shown in steps 3 to
-10 are as their own step leaves them. Their examples carry `inputs` from this
-step on, and the next update writes them (proposed). `hypercase.json`
-records, for each output declaration, whether it maps its files with
-`Inputs`, takes its ranges from `Positions`, or states `AllInputs`.
+Every cell that ran has an `inputs` file, `out/<column>/inputs`, and the
+same under a variant's prefix, as the archives of steps 3 to 10 show. It
+holds, for each of the cell's output files, the archive sections and lines
+the file's declaration maps it to. The update writes it with the cell, and
+a normal run compares it byte for byte, as any golden. `hypercase.json`
+records what each output declaration states in `Inputs` (step 5).
 
 `testdata/sheet/twice.txtar`, with its `cycle` variant's `calc`, `evaluate`
 and `parse` cells, and its other variants, left out. A range into a path the
@@ -3735,86 +3763,163 @@ error.txt
 rejected S201
 ```
 
-Past a bytes lift, ranges point at the product. In
-`testdata/csv/prices.txtar`, `evaluate`'s `inputs` is:
+Past a bytes lift, ranges point at the product.
+`testdata/csv/wrapped.txtar` is a CSV whose second field the export wrapped
+onto a second line:
 
+<!-- source: walkthrough/sheets/step11/testdata/csv/wrapped.txtar -->
 ```
-values.txt
-  via/import/sheet/A1
-  via/import/sheet/B1
-  via/import/sheet/C1
-```
-
-and `import`'s own `out/import/inputs`, with no files of its own to list,
-maps each product file, named by its section, to the CSV line its field came
-from (proposed):
-
-```
+A price and a formula the export wrapped onto a second line, in a quoted field.
+-- in/csv/wrapped.csv --
+4,"=A1*
+2"
+-- properties --
+malformed
+-- via/import/sheet/A1 --
+4
+-- via/import/sheet/B1 --
+=A1*
+2
+-- out/calc/error.txt --
+B1: more than one line
+  sheet/B1:2: 2
+-- out/calc/inputs --
+error.txt
+  via/import/sheet/B1:2-2
+-- out/calc/outcome --
+rejected S101
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/import/inputs --
 via/import/sheet/A1
-  in/csv/prices.csv:1-1
+  in/csv/wrapped.csv:1-1
 via/import/sheet/B1
-  in/csv/prices.csv:1-1
-via/import/sheet/C1
-  in/csv/prices.csv:1-1
+  in/csv/wrapped.csv:1-2
+-- out/import/outcome --
+accepted
+-- out/parse/error.txt --
+B1: more than one line
+  sheet/B1:2: 2
+-- out/parse/inputs --
+error.txt
+  via/import/sheet/B1:2-2
+-- out/parse/outcome --
+rejected S101
+-- out/resolve/outcome --
+blocked parse
 ```
+
+`parse`'s and `calc`'s `error.txt` point at line 2 of the product's
+`sheet/B1`, `via/import/sheet/B1:2-2`. `import`'s own `out/import/inputs`,
+with no files of its own to list, maps each product file, named by its
+section, to the CSV lines its field spans: `B1`'s spans lines 1 and 2. The
+cells blocked at `parse` have no `inputs`.
 
 **The `inputs` format** (proposed).
 
-- For each output file of the cell, in path order: a line holding the
-  file's path, then one line per range, indented two spaces. A bytes lift's
-  product files follow its own files, each named by its section.
+- For each output file of the cell, in path order, bytewise: a line holding
+  the file's path, then one line per range, indented two spaces. A bytes
+  lift's product file is named by its section below the case's prefix,
+  `via/<lift>/<path>`.
 - A range is its archive section and its lines, `in/sheet/A1:1-1`.
   A whole file is its section alone, `in/sheet/A1`. `AllInputs` is
   `all inputs`.
-- Ranges are sorted by section, then by first line, then by last. A repeated
-  range appears once, and overlapping or adjacent ranges in one section are
-  merged.
-- An output file with no ranges is its path line alone. So is an `error.txt`
-  whose error has no position.
+- Ranges are sorted by section, then by first line, then by last. A
+  repeated range appears once, overlapping or adjacent line ranges in one
+  section are merged, and a whole section absorbs its line ranges.
+- An output file with no ranges is its path line alone. So is an
+  `error.txt` whose error has no position, and a panic's `error.txt`, which
+  has no error for `Positions` to read.
+- A path or a section that isn't plain is written as a Go string literal,
+  `"like this"`. A name is plain when it is printable ASCII, holds no colon,
+  double quote or backslash, neither starts nor ends with a space, doesn't
+  start with a hyphen, and isn't `all inputs`.
 - A cell that ran and wrote no output files has an empty `inputs`.
 - Every line ends with a newline.
 
 ### Rules
 
-- Each output declaration has `Inputs`. A map is a
+- Each output declaration states `Inputs`. A map is a
   `func(in fs.FS, path string) ([]Range, error)`, given as
-  `decl.InputsFunc`, which receives the cell's input view and works per
-  output file. It is required, with `AllInputs` as the explicit escape,
-  which the report shows as such.
-- `Range{Path, Start, End}` uses 1-based inclusive lines in the cell's input
-  view, and `0, 0` means the whole file. The project may supply
-  `Positions func(err error) []Range`, which finds an error's positions.
+  `decl.InputsFunc`. It works per output file, and receives the cell's input
+  view, the one `RenderError` receives; for a bytes lift's own
+  declarations, its `Product` included, that is the lift's input view. It
+  is called for each file of each run of the cell, so it is a function of
+  its arguments alone. `AllInputs` is the explicit escape, which the cell's
+  `inputs` and the registry show as such. There is no default.
+- Only a declaration whose pattern is exactly `error.txt` states
+  `FromPositions`, and never one in a `Product`. One whose pattern matches
+  `error.txt` states no `InputsFunc`, so an `error.txt` states
+  `FromPositions` or `AllInputs`. Registration refuses the others.
+- A declaration that states nothing fails the run, naming it and what it
+  can state, as a missing description does (step 3). So does
+  `FromPositions` in a project with no `Positions`: every package that
+  registers such a declaration, owned or used, supplies
+  `Positions func(err error) []Range`, which finds where an error points.
+  The cells still run and the update writes their outputs. A cell with a
+  file of such a declaration has no `inputs`, and every other cell has its
+  own.
+- `Range{Path, Start, End}` uses lines counted from 1, `End` included, in
+  the cell's input view, and `0, 0` means the whole file.
 - A cell has one input view: its case's inputs, with a variant's overlay and
   deletions applied; past a bytes lift, that lift's product, and past
-  several, the last one's. A range outside it is bad, and fails the cell
-  (proposed).
-  The framework maps each range through the overlay to archive sections.
-- Each `error.txt` declaration, a suite's or a lift's, states where its
-  ranges come from: `Positions`, through `decl.FromPositions`, or
-  `AllInputs`. One that states neither fails the run. There is no default.
-- An error or a panic in `Inputs` fails the cell, and the update writes
-  nothing for that cell.
-- Ranges are committed per cell as `out/<column>/inputs`, and the same under
-  a variant's prefix, compared byte for byte. A frozen cell without `inputs`
-  gains it on update, as with `outcome` at step 8; an update never changes
-  or removes an `inputs` the cell has.
-- So the report stays a pure function of repository files, and range changes
-  show in pull-request diffs. The accepted cost is line-shift churn in edited
-  sections.
+  several, the last one's. A range that names no lines of it is bad: a path
+  that isn't a clean slash path, that the view lacks, or that is a
+  directory; a negative line; one of `Start` and `End` 0 and not the other;
+  an `End` before its `Start`, or past the file's last line.
+- The framework maps each range to the section a normal run reads the file
+  from: `in/<path>`; a variant's own file, even one equal to the base's, at
+  `variant/<name>/in/<path>`; a transform's own file at
+  `transform/<name>/in/<path>`, and one it inherits at `in/<path>`; past a
+  bytes lift, `via/<lift>/<path>` below the case's prefix.
 - A range through a `via/` product stops at the product's lines (proposed):
   it names a `via/<lift>/…` section, and is not followed back through the
   lift's own `inputs`.
-- The report shows each changed output beside its input lines, ranks ranges
-  that changed alone fourth, and includes corpus-check findings (#18).
-- This is the last code step, because requiring `Inputs` is source-breaking
-  for every project.
+- A bad range, an error or a panic in an `InputsFunc`, and a panic in
+  `Positions` fail the cell. The failure names the file, what gave its
+  ranges and the range, and says what to fix, and the update writes nothing
+  for that cell. When the cell is a bytes lift's, every cell past the lift
+  fails and is not written either, as for anything else that keeps the
+  lift's cell from being written (step 10).
+- A cell with any file that can't be judged, such as an output no
+  declaration matches, has its `inputs` neither compared nor written.
+- A frozen cell without `inputs` gains it on update, as with `outcome` at
+  step 8, when its other files match today's run; an update never changes
+  or removes an `inputs` the cell has. So an edit that shifts lines a
+  frozen cell maps fails that cell until a person deletes its files.
+  Whole-file ranges never shift.
+- An `inputs` beside a skipped or blocked cell is an orphan, as any output
+  the run no longer produces is (step 3), until a person removes it.
+- `hypercase strip` removes `inputs` with its column, keeps it with a
+  frozen cell, and removes it under `-frozen`. Stripping a bytes lift's
+  column removes its `via/` sections, which other cells' committed `inputs`
+  still name, until the update rewrites both.
+- The registry records, for each output and product declaration,
+  `"inputs"`: `"func"`, `"positions"`, `"all"`, or `"none"` for one that
+  states nothing; and `"positions"`, whether the project supplies
+  `Positions`. The root-package check compares what each of a lift's
+  declarations states across the packages that own or use it, among its
+  outputs and `productFiles` (step 10).
+- So the report stays a pure function of repository files, and range
+  changes show in pull-request diffs. The accepted cost is line-shift churn
+  in edited sections.
+- The report lists `inputs` among a cell's files, and diffs it as any other
+  (step 9). Showing each changed output beside its input lines, and ranking
+  a change to ranges alone, is #18.
+- Requiring `Inputs` breaks every project's declarations, which is why it
+  comes last of the steps that change them.
 
 ### What can now be seen
 
-- Each changed output beside the input lines it came from. A changed
-  `values.txt` shows the sheet's cells beside it.
+- Which input lines each output came from, in the archive beside it, and in
+  a pull request's diff when they move. A changed `values.txt` has the cells
+  it depends on beside it.
 - Which overlay a variant's output depends on: `cycle`'s `resolve` error
   points at `variant/cycle/in/sheet/B1`, the line the variant changed.
+- Through a bytes lift, which CSV lines each cell came from: `wrapped`'s
+  `B1` spans lines 1 and 2 of the CSV.
 - Where a declaration gives no map, and says so: `calc`'s stdout reads
   `all inputs`.
 

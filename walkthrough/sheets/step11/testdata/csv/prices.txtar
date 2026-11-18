@@ -1,0 +1,49 @@
+Two prices and their total, exported as CSV.
+-- in/csv/prices.csv --
+4,6,=A1+B1
+-- via/import/sheet/A1 --
+4
+-- via/import/sheet/B1 --
+6
+-- via/import/sheet/C1 --
+=A1+B1
+-- out/calc/inputs --
+stdout.txt
+  all inputs
+-- out/calc/outcome --
+accepted
+-- out/calc/stdout.txt --
+4,6,10
+-- out/evaluate/inputs --
+values.txt
+  via/import/sheet/A1
+  via/import/sheet/B1
+  via/import/sheet/C1
+-- out/evaluate/outcome --
+accepted
+-- out/evaluate/values.txt --
+A1 4
+B1 6
+C1 10
+-- out/format/formulas.txt --
+C1 =A1 + B1
+-- out/format/inputs --
+formulas.txt
+  via/import/sheet/C1
+-- out/format/outcome --
+accepted
+-- out/import/inputs --
+via/import/sheet/A1
+  in/csv/prices.csv:1-1
+via/import/sheet/B1
+  in/csv/prices.csv:1-1
+via/import/sheet/C1
+  in/csv/prices.csv:1-1
+-- out/import/outcome --
+accepted
+-- out/parse/inputs --
+-- out/parse/outcome --
+accepted
+-- out/resolve/inputs --
+-- out/resolve/outcome --
+accepted
