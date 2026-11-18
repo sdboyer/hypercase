@@ -101,13 +101,23 @@ ul.outputs { padding-left: 18px; }
 <body>
 <header>
 <h1>hypercase report</h1>
-<p class="revs"><span class="rev">86b06d5e516eb6d58fdfe9a6e492ebed2424bc1f</span> <code>86b06d5e516e</code> to <span class="rev">HEAD</span> <code>fb8bd694bdee</code>, over the corpus root <code>step11</code></p>
+<p class="revs"><span class="rev">86b06d5e516eb6d58fdfe9a6e492ebed2424bc1f</span> <code>86b06d5e516e</code> to <span class="rev">HEAD</span> <code>e129bb2df7e5</code>, over the corpus root <code>step11</code></p>
 </header>
 <main>
 <section id="changes">
 <h2>Changes</h2>
-<h3 class="rank outcome-changed">outcome changed <span class="count">2</span></h3>
+<h3 class="rank findings-changed">findings changed <span class="count">1</span></h3>
 <ul class="changes">
+<li class="change findings-changed">
+<div class="line"><span class="pkg">step11</span> <span class="check">codes</span>: Every code the formula evaluator and the CSV importer define is the code of some rejected cell.</div>
+<pre class="findings"><span class="del">- C103</span><span class="add">&#43; C104</span></pre>
+</li>
+</ul>
+<h3 class="rank outcome-changed">outcome changed <span class="count">3</span></h3>
+<ul class="changes">
+<li class="change outcome-changed">
+<div class="line"><span class="case">csv/past-xfd</span> <span class="col">import</span> <span class="outcome s-rejected">rejected C103</span> <span class="arrow">to</span> <span class="outcome s-rejected">rejected C104</span> <span class="props"><span class="prop" title="Some field that is not empty lies past the sheet&#39;s last column, XFD, or its last row, 1048576.">out-of-range</span></span></div>
+</li>
 <li class="change outcome-changed">
 <div class="line"><span class="case">sheet/divide</span> <span class="col">calc</span> <span class="outcome s-accepted">accepted</span> <span class="arrow">to</span> <span class="outcome s-accepted">accepted warned</span></div>
 </li>
@@ -167,8 +177,65 @@ ul.outputs { padding-left: 18px; }
 <div class="line"><span class="case">sheet/blank</span> <span class="col">resolve</span> <span class="outcome s-blocked">blocked parse</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
 </li>
 </ul>
-<h3 class="rank bytes-changed">bytes changed <span class="count">4</span></h3>
+<h3 class="rank bytes-changed">bytes changed <span class="count">7</span></h3>
 <ul class="changes">
+<li class="change bytes-changed">
+<div class="line"><span class="case">csv/wrapped</span> <span class="col">calc</span> <span class="outcome s-rejected">rejected S101</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
+<ul class="files">
+<li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+2</span> <span class="del">-2</span></span></summary>
+<pre class="diff"><span class="del">- B1: more than one line</span><span class="del">-   sheet/B1:2: 2</span><span class="add">&#43; A1: more than one line</span><span class="add">&#43;   sheet/A1:2: 3</span></pre></details>
+<pre class="ranges"><span class="del">- via/import/sheet/B1:2-2</span><span class="add">&#43; via/import/sheet/A1:2-2</span></pre>
+<details class="inputs"><summary>input lines</summary>
+<div class="excerpt"><code>via/import/sheet/A1</code> at <span class="rev">HEAD</span>
+<pre class="lines"><span class="ctx">   2  3</span></pre>
+<details><summary><code>via/import/sheet/A1</code> changed <span class="stat"><span class="add">+2</span> <span class="del">-1</span></span></summary>
+<pre class="diff"><span class="del">- 4</span><span class="add">&#43; =1&#43;</span><span class="add">&#43; 3</span></pre></details></div>
+<div class="excerpt"><code>via/import/sheet/B1</code> at <span class="rev">86b06d5e516eb6d58fdfe9a6e492ebed2424bc1f</span>
+<pre class="lines"><span class="ctx">   2  2</span></pre></div>
+</details></li>
+</ul>
+</li>
+<li class="change bytes-changed">
+<div class="line"><span class="case">csv/wrapped</span> <span class="col">import</span> <span class="outcome s-accepted">accepted</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
+<ul class="files">
+<li class="changed"><details><summary><code>via/import/sheet/A1</code> changed <span class="stat"><span class="add">+2</span> <span class="del">-1</span></span></summary>
+<pre class="diff"><span class="del">- 4</span><span class="add">&#43; =1&#43;</span><span class="add">&#43; 3</span></pre></details>
+<pre class="ranges"><span class="del">- in/csv/wrapped.csv:1-1</span><span class="add">&#43; in/csv/wrapped.csv:1-2</span></pre>
+<details class="inputs"><summary>input lines</summary>
+<div class="excerpt"><code>in/csv/wrapped.csv</code> at <span class="rev">86b06d5e516eb6d58fdfe9a6e492ebed2424bc1f</span>
+<pre class="lines"><span class="ctx">   1  4,&#34;=A1*</span></pre></div>
+<div class="excerpt"><code>in/csv/wrapped.csv</code> at <span class="rev">HEAD</span>
+<pre class="lines"><span class="ctx">   1  &#34;=1&#43;</span><span class="ctx">   2  3&#34;,&#34;=A1*</span></pre>
+<details><summary><code>in/csv/wrapped.csv</code> changed <span class="stat"><span class="add">+2</span> <span class="del">-1</span></span></summary>
+<pre class="diff"><span class="del">- 4,&#34;=A1*</span><span class="add">&#43; &#34;=1&#43;</span><span class="add">&#43; 3&#34;,&#34;=A1*</span><span class="ctx">  2&#34;</span></pre></details></div>
+</details></li>
+<li class="ranges-changed"><code>via/import/sheet/B1</code> ranges changed
+<pre class="ranges"><span class="del">- in/csv/wrapped.csv:1-2</span><span class="add">&#43; in/csv/wrapped.csv:2-3</span></pre>
+<details class="inputs"><summary>input lines</summary>
+<div class="excerpt"><code>in/csv/wrapped.csv</code> at <span class="rev">86b06d5e516eb6d58fdfe9a6e492ebed2424bc1f</span>
+<pre class="lines"><span class="ctx">   1  4,&#34;=A1*</span><span class="ctx">   2  2&#34;</span></pre></div>
+<div class="excerpt"><code>in/csv/wrapped.csv</code> at <span class="rev">HEAD</span>
+<pre class="lines"><span class="ctx">   2  3&#34;,&#34;=A1*</span><span class="ctx">   3  2&#34;</span></pre>
+<p class="note">What changed in <code>in/csv/wrapped.csv</code> is shown under <code>via/import/sheet/A1</code>.</p></div>
+</details></li>
+</ul>
+</li>
+<li class="change bytes-changed">
+<div class="line"><span class="case">csv/wrapped</span> <span class="col">parse</span> <span class="outcome s-rejected">rejected S101</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
+<ul class="files">
+<li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+2</span> <span class="del">-2</span></span></summary>
+<pre class="diff"><span class="del">- B1: more than one line</span><span class="del">-   sheet/B1:2: 2</span><span class="add">&#43; A1: more than one line</span><span class="add">&#43;   sheet/A1:2: 3</span></pre></details>
+<pre class="ranges"><span class="del">- via/import/sheet/B1:2-2</span><span class="add">&#43; via/import/sheet/A1:2-2</span></pre>
+<details class="inputs"><summary>input lines</summary>
+<div class="excerpt"><code>via/import/sheet/A1</code> at <span class="rev">HEAD</span>
+<pre class="lines"><span class="ctx">   2  3</span></pre>
+<details><summary><code>via/import/sheet/A1</code> changed <span class="stat"><span class="add">+2</span> <span class="del">-1</span></span></summary>
+<pre class="diff"><span class="del">- 4</span><span class="add">&#43; =1&#43;</span><span class="add">&#43; 3</span></pre></details></div>
+<div class="excerpt"><code>via/import/sheet/B1</code> at <span class="rev">86b06d5e516eb6d58fdfe9a6e492ebed2424bc1f</span>
+<pre class="lines"><span class="ctx">   2  2</span></pre></div>
+</details></li>
+</ul>
+</li>
 <li class="change bytes-changed">
 <div class="line"><span class="case">sheet/notes</span> <span class="col">calc</span> <span class="outcome s-rejected">rejected S101</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
 <ul class="files">
@@ -214,6 +281,54 @@ ul.outputs { padding-left: 18px; }
 </ul>
 </li>
 </ul>
+<h3 class="rank ranges-changed">ranges changed <span class="count">3</span></h3>
+<ul class="changes">
+<li class="change ranges-changed">
+<div class="line"><span class="case">sheet/twice/variant/cycle</span> <span class="col">calc</span> <span class="outcome s-rejected">rejected S201</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span></div>
+<ul class="files">
+<li class="ranges-changed"><code>error.txt</code> ranges changed
+<pre class="ranges"><span class="del">- in/sheet/A1:1-1</span><span class="add">&#43; variant/cycle/in/sheet/A1:1-1</span></pre>
+<details class="inputs"><summary>input lines</summary>
+<div class="excerpt"><code>in/sheet/A1</code> at <span class="rev">86b06d5e516eb6d58fdfe9a6e492ebed2424bc1f</span>
+<pre class="lines"><span class="ctx">   1  =B1*2</span></pre></div>
+<div class="excerpt"><code>variant/cycle/in/sheet/A1</code> at <span class="rev">HEAD</span>
+<pre class="lines"><span class="ctx">   1  =B1*2</span></pre></div>
+<div class="excerpt"><code>variant/cycle/in/sheet/B1</code> at <span class="rev">86b06d5e516eb6d58fdfe9a6e492ebed2424bc1f</span> and <span class="rev">HEAD</span>
+<pre class="lines"><span class="ctx">     1  =A1</span></pre></div>
+</details></li>
+</ul>
+</li>
+<li class="change ranges-changed">
+<div class="line"><span class="case">sheet/twice/variant/cycle</span> <span class="col">format</span> <span class="outcome s-accepted">accepted</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span></div>
+<ul class="files">
+<li class="ranges-changed"><code>formulas.txt</code> ranges changed
+<pre class="ranges"><span class="del">- in/sheet/A1</span><span class="add">&#43; variant/cycle/in/sheet/A1</span></pre>
+<details class="inputs"><summary>input lines</summary>
+<div class="excerpt"><code>in/sheet/A1</code> at <span class="rev">86b06d5e516eb6d58fdfe9a6e492ebed2424bc1f</span>
+<pre class="lines"><span class="ctx">   1  =B1*2</span></pre></div>
+<div class="excerpt"><code>variant/cycle/in/sheet/A1</code> at <span class="rev">HEAD</span>
+<pre class="lines"><span class="ctx">   1  =B1*2</span></pre></div>
+<div class="excerpt"><code>variant/cycle/in/sheet/B1</code> at <span class="rev">86b06d5e516eb6d58fdfe9a6e492ebed2424bc1f</span> and <span class="rev">HEAD</span>
+<pre class="lines"><span class="ctx">     1  =A1</span></pre></div>
+</details></li>
+</ul>
+</li>
+<li class="change ranges-changed">
+<div class="line"><span class="case">sheet/twice/variant/cycle</span> <span class="col">resolve</span> <span class="outcome s-rejected">rejected S201</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span></div>
+<ul class="files">
+<li class="ranges-changed"><code>error.txt</code> ranges changed
+<pre class="ranges"><span class="del">- in/sheet/A1:1-1</span><span class="add">&#43; variant/cycle/in/sheet/A1:1-1</span></pre>
+<details class="inputs"><summary>input lines</summary>
+<div class="excerpt"><code>in/sheet/A1</code> at <span class="rev">86b06d5e516eb6d58fdfe9a6e492ebed2424bc1f</span>
+<pre class="lines"><span class="ctx">   1  =B1*2</span></pre></div>
+<div class="excerpt"><code>variant/cycle/in/sheet/A1</code> at <span class="rev">HEAD</span>
+<pre class="lines"><span class="ctx">   1  =B1*2</span></pre></div>
+<div class="excerpt"><code>variant/cycle/in/sheet/B1</code> at <span class="rev">86b06d5e516eb6d58fdfe9a6e492ebed2424bc1f</span> and <span class="rev">HEAD</span>
+<pre class="lines"><span class="ctx">     1  =A1</span></pre></div>
+</details></li>
+</ul>
+</li>
+</ul>
 </section>
 <section class="matrix" id="corpus-csv">
 <h2>csv</h2>
@@ -247,7 +362,7 @@ ul.outputs { padding-left: 18px; }
 <td class="cell s-blocked"><span class="outcome">blocked import</span></td>
 <td class="cell s-blocked"><span class="outcome">blocked import</span></td>
 <td class="cell s-blocked"><span class="outcome">blocked import</span></td>
-<td class="cell s-rejected"><span class="outcome">rejected C103</span></td>
+<td class="cell s-rejected outcome-changed"><span class="outcome">rejected C104</span> <span class="badge">outcome changed</span></td>
 <td class="cell s-blocked"><span class="outcome">blocked import</span></td>
 <td class="cell s-blocked"><span class="outcome">blocked import</span></td>
 </tr>
@@ -270,12 +385,12 @@ ul.outputs { padding-left: 18px; }
 <td class="cell s-blocked"><span class="outcome">blocked import</span></td>
 </tr>
 <tr>
-<th scope="row"><span class="case">csv/wrapped</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span><div class="desc">A price and a formula the export wrapped onto a second line, in a quoted field.</div></th>
-<td class="cell s-rejected"><span class="outcome">rejected S101</span></td>
+<th scope="row"><span class="case">csv/wrapped</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span><div class="desc">Two formulas the export wrapped onto a second line each, in quoted fields.</div></th>
+<td class="cell s-rejected bytes-changed"><span class="outcome">rejected S101</span> <span class="badge">bytes changed</span></td>
 <td class="cell s-blocked"><span class="outcome">blocked parse</span></td>
 <td class="cell s-blocked"><span class="outcome">blocked parse</span></td>
-<td class="cell s-accepted"><span class="outcome">accepted</span></td>
-<td class="cell s-rejected"><span class="outcome">rejected S101</span></td>
+<td class="cell s-accepted bytes-changed"><span class="outcome">accepted</span> <span class="badge">bytes changed</span></td>
+<td class="cell s-rejected bytes-changed"><span class="outcome">rejected S101</span> <span class="badge">bytes changed</span></td>
 <td class="cell s-blocked"><span class="outcome">blocked parse</span></td>
 </tr>
 </tbody>
@@ -469,11 +584,11 @@ ul.outputs { padding-left: 18px; }
 </tr>
 <tr>
 <th scope="row"><span class="case">sheet/twice/variant/cycle</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span><div class="desc">B1 refers back to A1, so the sheet has a cycle.</div></th>
-<td class="cell s-rejected"><span class="outcome">rejected S201</span></td>
+<td class="cell s-rejected ranges-changed"><span class="outcome">rejected S201</span> <span class="badge">ranges changed</span></td>
 <td class="cell s-blocked"><span class="outcome">blocked resolve</span></td>
+<td class="cell s-accepted ranges-changed"><span class="outcome">accepted</span> <span class="badge">ranges changed</span></td>
 <td class="cell s-accepted"><span class="outcome">accepted</span></td>
-<td class="cell s-accepted"><span class="outcome">accepted</span></td>
-<td class="cell s-rejected"><span class="outcome">rejected S201</span></td>
+<td class="cell s-rejected ranges-changed"><span class="outcome">rejected S201</span> <span class="badge">ranges changed</span></td>
 </tr>
 <tr>
 <th scope="row"><span class="case">sheet/twice/variant/missing</span> <span class="props"><span class="prop" title="Some formula refers to a cell the sheet doesn&#39;t have.">dangling</span></span><div class="desc">B1 is gone, so A1 refers to a cell that doesn&#39;t exist.</div></th>

@@ -70,8 +70,9 @@ type edit struct {
 	old, new string
 }
 
-// change is the branch's change: three edits, each of which moves cells of
-// one rank or two.
+// change is the branch's change: six edits. Each of the first three moves
+// cells of one rank or two, as at step 9. The last three move what step 11
+// adds to the report: input lines, ranges alone, and findings.
 var change = []edit{
 	// calc gains a classifier, which refines the outcome of each cell where
 	// calc warns: outcome changed.
@@ -82,6 +83,21 @@ var change = []edit{
 	// A file that is not a cell is worded otherwise, under the same
 	// outcome: bytes changed.
 	{path: "sheet/sheet.go", old: `"%s: not a cell name"`, new: `"%s: not the name of a cell"`},
+	// wrapped's A1 becomes a formula the export wraps onto a second line,
+	// as it wraps B1: import's A1 and the CSV lines it comes from change,
+	// and B1 moves down a line while its file doesn't. The sheet's first
+	// cell of more than one line is A1 now, so each error points there.
+	{path: "step11/testdata/csv/wrapped.txtar",
+		old: "A price and a formula the export wrapped onto a second line, in a quoted field.\n-- in/csv/wrapped.csv --\n4,\"=A1*\n2\"\n",
+		new: "Two formulas the export wrapped onto a second line each, in quoted fields.\n-- in/csv/wrapped.csv --\n\"=1+\n3\",\"=A1*\n2\"\n"},
+	// twice's variant cycle writes out A1 too, as the base has it: its
+	// cells' files don't change, and each range that named the base's A1
+	// names the variant's, so they change their ranges alone.
+	{path: "step11/testdata/sheet/twice.txtar", old: "-- variant/cycle/in/sheet/B1 --\n", new: "-- variant/cycle/in/sheet/A1 --\n=B1*2\n-- variant/cycle/in/sheet/B1 --\n"},
+	// The importer's code for a field past the last column or row is
+	// renumbered: past-xfd's import is rejected under the new code, and
+	// the findings of codes trade the old code for the new.
+	{path: "sheet/error.go", old: `codeTooLarge     = "C103"`, new: `codeTooLarge     = "C104"`},
 }
 
 // stale makes a cell of the copy differ from what the code writes for it, as
@@ -616,11 +632,13 @@ func TestCommit(t *testing.T) {
 
 // runUpdate runs the update of step11's packages in the scratch module,
 // then their normal run, which fails unless the update wrote everything.
-// One pass is enough: neither the toy as copied nor the change moves a code
-// that the corpus check codes counts, so its findings don't depend on which
-// package writes first. Both build with -trimpath, which keeps the scratch
-// module's directory, new in each run, out of the build cache's keys, so
-// that the cache serves them.
+// One pass is enough: the one code the change moves that the corpus check
+// codes counts is past-xfd's, in a cell of import, and import's cells are
+// this package's, as codes is, so its update writes the cell before its
+// check reads it, and the findings don't depend on which package writes
+// first. Both build with -trimpath, which keeps the scratch module's
+// directory, new in each run, out of the build cache's keys, so that the
+// cache serves them.
 func runUpdate(t *testing.T, repo, modfile string) {
 	t.Helper()
 	gotest := func(env []string) ([]byte, error) {
