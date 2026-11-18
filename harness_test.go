@@ -247,12 +247,9 @@ func (s *sandbox) shown(r rawResult) string {
 	return out
 }
 
-// execRaw runs the child, as exec does, and returns what it left, its
-// output as the child wrote it, for a caller that shows it only on a
-// failure.
-func (s *sandbox) execRaw(pkg, registration string, extra []string, args ...string) rawResult {
-	cmd := exec.Command(os.Args[0], append([]string{"-test.run=^TestCorpus$", "-test.v", "-test.count=1"}, args...)...)
-	cmd.Dir = filepath.Join(s.dir, pkg)
+// childEnv is this process's environment for a child, less what would
+// steer it: the self-tests' and the updates' variables, GOFLAGS and PWD.
+func childEnv() []string {
 	var env []string
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
@@ -260,6 +257,16 @@ func (s *sandbox) execRaw(pkg, registration string, extra []string, args ...stri
 			env = append(env, kv)
 		}
 	}
+	return env
+}
+
+// execRaw runs the child, as exec does, and returns what it left, its
+// output as the child wrote it, for a caller that shows it only on a
+// failure.
+func (s *sandbox) execRaw(pkg, registration string, extra []string, args ...string) rawResult {
+	cmd := exec.Command(os.Args[0], append([]string{"-test.run=^TestCorpus$", "-test.v", "-test.count=1"}, args...)...)
+	cmd.Dir = filepath.Join(s.dir, pkg)
+	env := childEnv()
 	env = append(env, fixtureEnv+"="+registration)
 	env = append(env, extra...)
 	cmd.Env = env

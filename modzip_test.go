@@ -65,13 +65,7 @@ func TestTranscriptRefused(t *testing.T) {
 		dir := t.TempDir()
 		cmd := exec.Command(os.Args[0], "-test.run=^TestTranscriptRefused$", "-test.count=1")
 		cmd.Dir = dir
-		for _, kv := range os.Environ() {
-			k, _, _ := strings.Cut(kv, "=")
-			if k != fixtureEnv && k != transcriptsVar && k != transcriptChildEnv && k != "PWD" {
-				cmd.Env = append(cmd.Env, kv)
-			}
-		}
-		cmd.Env = append(cmd.Env, transcriptChildEnv+"=1")
+		cmd.Env = append(childEnv(), transcriptChildEnv+"=1")
 		if update {
 			cmd.Env = append(cmd.Env, transcriptsVar+"=1")
 		}
