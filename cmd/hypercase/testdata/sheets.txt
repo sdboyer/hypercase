@@ -1,3 +1,6 @@
+findings changed
+  step09 codes
+    + S202
 outcome changed
   sheet/div calc: accepted -> rejected S202
     error.txt added

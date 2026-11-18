@@ -13,12 +13,17 @@ import (
 // cycle: A1 -> B1 -> A1. It adds what the walkthrough's sample leaves out:
 // a cell whose outcome changes alone, one whose outcome and files change
 // together, an archive removed, and a hand-written variant whose cells
-// panicked and were skipped, so the matrix shows every state. It holds no
-// Go source: the report reads registries and archives only.
+// panicked and were skipped, so the matrix shows every state; and the
+// toy's corpus check codes, whose findings gain the code the changed
+// division reaches. It holds no Go source: the report reads registries,
+// archives and findings files only.
 
 const sheetsLink = "https://example.com/sheets/issues/$1"
 
-func sheetsRegistries(link string) map[string]string {
+// sheetsRegistries returns the fixture's go.mod and registries, with
+// link as its issue link pattern's URL, and the findings of its corpus
+// check codes.
+func sheetsRegistries(link, codes string) map[string]string {
 	links := []registry.IssueLink{{Pattern: `sheets#(\d+)`, URL: link}}
 	props := []registry.Property{
 		{Name: "circular", Description: "Some cell's formula refers back to itself, directly or through other cells."},
@@ -54,7 +59,9 @@ func sheetsRegistries(link string) map[string]string {
 			IssueLinks: links, Properties: props, Types: []registry.Type{owner},
 			Lifts:  []registry.Lift{parse, resolve},
 			Suites: []registry.Suite{evaluate},
+			Checks: []registry.Check{{Name: "codes", Description: "Every code the formula evaluator defines is the code of some rejected cell."}},
 		}.Marshal()),
+		"step09/testdata/checks/codes.txt": codes,
 		"step09/format/testdata/hypercase.json": string(registry.Registry{
 			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", Codes: true, Positions: true, IssueLinks: links, Properties: props, Types: []registry.Type{sheet},
 			Lifts: []registry.Lift{used},
@@ -75,7 +82,7 @@ const sheetDir = "step09/testdata/sheet/"
 // and returns the repository and its two commits.
 func sheets(t testing.TB) (g *gittest.Repo, a, b string) {
 	g = gittest.New(t)
-	files := sheetsRegistries("https://old.example.com/$1")
+	files := sheetsRegistries("https://old.example.com/$1", "S101\nS201\n")
 	for name, data := range map[string]string{
 		"loop.txtar":     loopA,
 		"twice.txtar":    twiceA,
@@ -88,7 +95,7 @@ func sheets(t testing.TB) (g *gittest.Repo, a, b string) {
 	g.Write(files)
 	a = g.Commit("a")
 
-	files = sheetsRegistries(sheetsLink)
+	files = sheetsRegistries(sheetsLink, "S101\nS201\nS202\n")
 	for name, data := range map[string]string{
 		"loop.txtar":  loopB,
 		"twice.txtar": twiceB,

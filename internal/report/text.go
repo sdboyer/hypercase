@@ -6,11 +6,15 @@ import (
 	"strings"
 )
 
-// WriteText writes the problems and the ranked changes as plain text. The
-// problems, when there are any, come first, under the heading problems:
-// under it, a line per revision that has them, in the report's order, and
-// under that, one line per problem, its place, where it has one, then what
-// it is. Each rank that has changes has a heading, in rank order. Under it
+// WriteText writes the problems, the changed findings and the ranked
+// changes as plain text. The problems, when there are any, come first,
+// under the heading problems: under it, a line per revision that has them,
+// in the report's order, and under that, one line per problem, its place,
+// where it has one, then what it is. The changed findings, when there are
+// any, come next, under the heading findings changed: under it, a line per
+// check whose findings changed, its package's directory, then its name,
+// and under that, each finding only at A, marked -, then each only at B,
+// marked +. Each rank that has changes has a heading, in rank order. Under it
 // is one line per cell: its case, its column, and its outcome, or the
 // change in it, so the outcome file is never listed as a file, and nor is
 // the inputs file. Under each cell is one line per other file of the cell
@@ -31,6 +35,18 @@ func (r *Report) WriteText(w io.Writer) error {
 				line = p.Where + ": " + line
 			}
 			bw.WriteString("    " + line + "\n")
+		}
+	}
+	if len(r.Findings) > 0 {
+		bw.WriteString("findings changed\n")
+	}
+	for _, fc := range r.Findings {
+		bw.WriteString("  " + fc.Package + " " + fc.Check + "\n")
+		for _, f := range fc.Disappeared {
+			bw.WriteString("    - " + f + "\n")
+		}
+		for _, f := range fc.Appeared {
+			bw.WriteString("    + " + f + "\n")
 		}
 	}
 	for i, ch := range r.Changes {

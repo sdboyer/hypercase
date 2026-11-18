@@ -12,9 +12,10 @@ import (
 
 // WriteHTML writes the report as one static HTML page, which loads
 // nothing: its style sheet is inline, and it has no scripts. It holds the
-// problems the report found, the ranked changes with each changed file's
-// line diff, what changed in its reverse map and the input lines it comes
-// from, then the matrix of each corpus at B, each case with the properties
+// problems the report found, the corpus checks whose findings changed, the
+// ranked changes with each changed file's line diff, what changed in its
+// reverse map and the input lines it comes from, then the matrix of each
+// corpus at B, each case with the properties
 // it states and each known gap on the cell it marks, then the descriptions
 // of what the registries declare. Text that names an issue links to it.
 func (r *Report) WriteHTML(w io.Writer) error {
@@ -240,6 +241,17 @@ const pageTemplate = `<!doctype html>
 {{- with .Unranged}}
 <p class="note">The newest registry at <span class="rev">{{.At}}</span> is of format {{.Format}}, from before inputs files, so the report shows no ranges at <span class="rev">{{.At}}</span>, and ranks no cell on its inputs file.</p>
 {{- end}}
+{{- if .Findings}}
+<h3 class="rank findings-changed">findings changed <span class="count">{{len .Findings}}</span></h3>
+<ul class="changes">
+{{- range .Findings}}
+<li class="change findings-changed">
+<div class="line"><span class="pkg">{{.Package}}</span> <span class="check">{{.Check}}</span>{{with .Description}}: {{template "text" .}}{{end}}</div>
+<pre class="findings">{{range .Disappeared}}<span class="del">{{print "- " .}}</span>{{end}}{{range .Appeared}}<span class="add">{{print "+ " .}}</span>{{end}}</pre>
+</li>
+{{- end}}
+</ul>
+{{- end}}
 {{- if not .Changes}}
 <p class="none">No cell changed.</p>
 {{- end}}
@@ -409,7 +421,7 @@ h1 { font-size: 1.5rem; margin: 24px 0 4px; }
 h2 { font-size: 1.2rem; margin: 32px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
 h3 { font-size: 1rem; margin: 20px 0 6px; }
 h4 { font-size: 0.95rem; margin: 12px 0 4px; color: var(--muted); }
-code, pre, .case, .col, .outcome, .prop { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+code, pre, .case, .col, .pkg, .check, .outcome, .prop { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
 a { color: var(--link); }
 .revs { color: var(--muted); margin: 0; }
 .rev { font-weight: 600; }
@@ -423,7 +435,7 @@ ul.problems li { margin: 2px 0; overflow-wrap: anywhere; }
 ul.changes { list-style: none; padding: 0; margin: 0; }
 li.change { padding: 6px 0; border-bottom: 1px solid var(--line); }
 .line { overflow-wrap: anywhere; }
-.col { font-weight: 600; }
+.col, .check { font-weight: 600; }
 .outcome { padding: 1px 6px; border-radius: 4px; background: var(--head); }
 .s-accepted .outcome, .outcome.s-accepted { background: var(--accepted); }
 .s-rejected .outcome, .outcome.s-rejected { background: var(--rejected); }
@@ -436,10 +448,10 @@ ul.files { list-style: none; margin: 4px 0 0 20px; padding: 0; color: var(--mute
 summary { cursor: pointer; }
 .stat .add { color: var(--appeared); }
 .stat .del { color: var(--changed); }
-pre.diff, pre.ranges, pre.lines { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
-pre.diff span, pre.ranges span, pre.lines span { display: block; padding: 0 8px; white-space: pre; }
-pre.diff .add, pre.ranges .add, pre.lines .add { background: var(--add); }
-pre.diff .del, pre.ranges .del, pre.lines .del { background: var(--del); }
+pre.diff, pre.ranges, pre.lines, pre.findings { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
+pre.diff span, pre.ranges span, pre.lines span, pre.findings span { display: block; padding: 0 8px; white-space: pre; }
+pre.diff .add, pre.ranges .add, pre.lines .add, pre.findings .add { background: var(--add); }
+pre.diff .del, pre.ranges .del, pre.lines .del, pre.findings .del { background: var(--del); }
 pre.diff .skip, pre.diff .unaligned, pre.lines .skip { color: var(--muted); }
 details.inputs { margin: 2px 0 6px; }
 details.inputs > summary, .excerpt { color: var(--muted); }

@@ -1,12 +1,13 @@
 // Package report builds hypercase report: what changed in a corpus root
 // between two git revisions, read from the repository's object store.
 //
-// It reads registries and archives, never Go source, and works from the
-// cells' committed outcomes alone: a cell exists at a revision when its
-// outcome file does. It ranks the changes: changed outcomes first, then
-// cells that appeared, then cells that disappeared, then cells whose files
-// changed under the same outcome, then cells whose inputs file alone
-// changed, each with a line diff of its files, what changed in their
+// It reads registries, archives and corpus checks' findings files, never
+// Go source, and works from the cells' committed outcomes alone: a cell
+// exists at a revision when its outcome file does. It shows each corpus
+// check whose findings changed, and ranks the changes: changed outcomes
+// first, then cells that appeared, then cells that disappeared, then cells
+// whose files changed under the same outcome, then cells whose inputs file
+// alone changed, each with a line diff of its files, what changed in their
 // reverse maps, and the input lines they come from. It shows the matrix of
 // each corpus at the second revision, each case with the properties it
 // states and each known gap on the cell it marks, linked to its issue; the
@@ -62,6 +63,9 @@ type Report struct {
 	// Problems are what the report found that it can't show as it is: at
 	// B, then at A.
 	Problems []Problem
+	// Findings are the corpus checks whose findings changed, by package,
+	// then check.
+	Findings []FindingsChange
 	// Changes are the cells that changed, in rank order, and within a rank
 	// by case, then column.
 	Changes []Change
@@ -238,6 +242,7 @@ func Build(opts Options) (*Report, error) {
 	// its name.
 	props := maps.Clone(a.props)
 	maps.Copy(props, b.props)
+	r.Findings = findingsChanges(a, b, links)
 	r.Changes = changes(a, b, props, links)
 	switch {
 	// A has no registries where it predates the project's use of

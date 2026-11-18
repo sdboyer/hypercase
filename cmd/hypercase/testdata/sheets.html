@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>hypercase report: 3737835945400164698734a06cb0c30bc95d7344 to 592ff29f4e9abd640dfc27d36a4df407943a7be5</title>
+<title>hypercase report: eb7c597daa225f4db3af39c70012415841b6aebd to 12a26310d2d49f9fa9c8722832856518ab32eab7</title>
 <style>
 :root {
   color-scheme: light dark;
@@ -28,7 +28,7 @@ h1 { font-size: 1.5rem; margin: 24px 0 4px; }
 h2 { font-size: 1.2rem; margin: 32px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
 h3 { font-size: 1rem; margin: 20px 0 6px; }
 h4 { font-size: 0.95rem; margin: 12px 0 4px; color: var(--muted); }
-code, pre, .case, .col, .outcome, .prop { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+code, pre, .case, .col, .pkg, .check, .outcome, .prop { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
 a { color: var(--link); }
 .revs { color: var(--muted); margin: 0; }
 .rev { font-weight: 600; }
@@ -42,7 +42,7 @@ ul.problems li { margin: 2px 0; overflow-wrap: anywhere; }
 ul.changes { list-style: none; padding: 0; margin: 0; }
 li.change { padding: 6px 0; border-bottom: 1px solid var(--line); }
 .line { overflow-wrap: anywhere; }
-.col { font-weight: 600; }
+.col, .check { font-weight: 600; }
 .outcome { padding: 1px 6px; border-radius: 4px; background: var(--head); }
 .s-accepted .outcome, .outcome.s-accepted { background: var(--accepted); }
 .s-rejected .outcome, .outcome.s-rejected { background: var(--rejected); }
@@ -55,10 +55,10 @@ ul.files { list-style: none; margin: 4px 0 0 20px; padding: 0; color: var(--mute
 summary { cursor: pointer; }
 .stat .add { color: var(--appeared); }
 .stat .del { color: var(--changed); }
-pre.diff, pre.ranges, pre.lines { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
-pre.diff span, pre.ranges span, pre.lines span { display: block; padding: 0 8px; white-space: pre; }
-pre.diff .add, pre.ranges .add, pre.lines .add { background: var(--add); }
-pre.diff .del, pre.ranges .del, pre.lines .del { background: var(--del); }
+pre.diff, pre.ranges, pre.lines, pre.findings { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
+pre.diff span, pre.ranges span, pre.lines span, pre.findings span { display: block; padding: 0 8px; white-space: pre; }
+pre.diff .add, pre.ranges .add, pre.lines .add, pre.findings .add { background: var(--add); }
+pre.diff .del, pre.ranges .del, pre.lines .del, pre.findings .del { background: var(--del); }
 pre.diff .skip, pre.diff .unaligned, pre.lines .skip { color: var(--muted); }
 details.inputs { margin: 2px 0 6px; }
 details.inputs > summary, .excerpt { color: var(--muted); }
@@ -101,11 +101,18 @@ ul.outputs { padding-left: 18px; }
 <body>
 <header>
 <h1>hypercase report</h1>
-<p class="revs"><span class="rev">3737835945400164698734a06cb0c30bc95d7344</span> <code>373783594540</code> to <span class="rev">592ff29f4e9abd640dfc27d36a4df407943a7be5</span> <code>592ff29f4e9a</code>, over the corpus root <code>step09</code></p>
+<p class="revs"><span class="rev">eb7c597daa225f4db3af39c70012415841b6aebd</span> <code>eb7c597daa22</code> to <span class="rev">12a26310d2d49f9fa9c8722832856518ab32eab7</span> <code>12a26310d2d4</code>, over the corpus root <code>step09</code></p>
 </header>
 <main>
 <section id="changes">
 <h2>Changes</h2>
+<h3 class="rank findings-changed">findings changed <span class="count">1</span></h3>
+<ul class="changes">
+<li class="change findings-changed">
+<div class="line"><span class="pkg">step09</span> <span class="check">codes</span>: Every code the formula evaluator defines is the code of some rejected cell.</div>
+<pre class="findings"><span class="add">&#43; S202</span></pre>
+</li>
+</ul>
 <h3 class="rank outcome-changed">outcome changed <span class="count">2</span></h3>
 <ul class="changes">
 <li class="change outcome-changed">
@@ -114,12 +121,12 @@ ul.outputs { padding-left: 18px; }
 <li class="added"><details><summary><code>error.txt</code> added <span class="stat"><span class="add">+1</span> <span class="del">-0</span></span></summary>
 <pre class="diff"><span class="add">&#43; C1: division by zero</span></pre></details>
 <details class="inputs"><summary>input lines</summary>
-<p class="map">At <span class="rev">592ff29f4e9abd640dfc27d36a4df407943a7be5</span>: no ranges.</p>
+<p class="map">At <span class="rev">12a26310d2d49f9fa9c8722832856518ab32eab7</span>: no ranges.</p>
 </details></li>
 <li class="removed"><details><summary><code>stdout.txt</code> removed <span class="stat"><span class="add">+0</span> <span class="del">-1</span></span></summary>
 <pre class="diff"><span class="del">- 1,0,#DIV/0!</span></pre></details>
 <details class="inputs"><summary>input lines</summary>
-<p class="map">At <span class="rev">3737835945400164698734a06cb0c30bc95d7344</span>: no ranges.</p>
+<p class="map">At <span class="rev">eb7c597daa225f4db3af39c70012415841b6aebd</span>: no ranges.</p>
 </details></li>
 </ul>
 </li>
@@ -135,7 +142,7 @@ ul.outputs { padding-left: 18px; }
 <li class="added"><details><summary><code>stdout.txt</code> added <span class="stat"><span class="add">+1</span> <span class="del">-0</span></span></summary>
 <pre class="diff"><span class="add">&#43; 0.25,1,4</span></pre></details>
 <details class="inputs"><summary>input lines</summary>
-<p class="map">At <span class="rev">592ff29f4e9abd640dfc27d36a4df407943a7be5</span>: no ranges.</p>
+<p class="map">At <span class="rev">12a26310d2d49f9fa9c8722832856518ab32eab7</span>: no ranges.</p>
 </details></li>
 </ul>
 </li>
@@ -145,7 +152,7 @@ ul.outputs { padding-left: 18px; }
 <li class="added"><details><summary><code>values.txt</code> added <span class="stat"><span class="add">+3</span> <span class="del">-0</span></span></summary>
 <pre class="diff"><span class="add">&#43; A1 0.25</span><span class="add">&#43; B1 1</span><span class="add">&#43; C1 4</span></pre></details>
 <details class="inputs"><summary>input lines</summary>
-<p class="map">At <span class="rev">592ff29f4e9abd640dfc27d36a4df407943a7be5</span>: no ranges.</p>
+<p class="map">At <span class="rev">12a26310d2d49f9fa9c8722832856518ab32eab7</span>: no ranges.</p>
 </details></li>
 </ul>
 </li>
@@ -155,7 +162,7 @@ ul.outputs { padding-left: 18px; }
 <li class="added"><details><summary><code>formulas.txt</code> added <span class="stat"><span class="add">+1</span> <span class="del">-0</span></span></summary>
 <pre class="diff"><span class="add">&#43; A1 =B1 / C1</span></pre></details>
 <details class="inputs"><summary>input lines</summary>
-<p class="map">At <span class="rev">592ff29f4e9abd640dfc27d36a4df407943a7be5</span>: no ranges.</p>
+<p class="map">At <span class="rev">12a26310d2d49f9fa9c8722832856518ab32eab7</span>: no ranges.</p>
 </details></li>
 </ul>
 </li>
@@ -183,7 +190,7 @@ ul.outputs { padding-left: 18px; }
 <li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
 <pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details>
 <details class="inputs"><summary>input lines</summary>
-<p class="map">At <span class="rev">592ff29f4e9abd640dfc27d36a4df407943a7be5</span>: no ranges.</p>
+<p class="map">At <span class="rev">12a26310d2d49f9fa9c8722832856518ab32eab7</span>: no ranges.</p>
 </details></li>
 </ul>
 </li>
@@ -193,7 +200,7 @@ ul.outputs { padding-left: 18px; }
 <li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
 <pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details>
 <details class="inputs"><summary>input lines</summary>
-<p class="map">At <span class="rev">592ff29f4e9abd640dfc27d36a4df407943a7be5</span>: no ranges.</p>
+<p class="map">At <span class="rev">12a26310d2d49f9fa9c8722832856518ab32eab7</span>: no ranges.</p>
 </details></li>
 </ul>
 </li>
@@ -203,7 +210,7 @@ ul.outputs { padding-left: 18px; }
 <li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
 <pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1*2</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details>
 <details class="inputs"><summary>input lines</summary>
-<p class="map">At <span class="rev">592ff29f4e9abd640dfc27d36a4df407943a7be5</span>: no ranges.</p>
+<p class="map">At <span class="rev">12a26310d2d49f9fa9c8722832856518ab32eab7</span>: no ranges.</p>
 </details></li>
 </ul>
 </li>
@@ -213,7 +220,7 @@ ul.outputs { padding-left: 18px; }
 <li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
 <pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1*2</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details>
 <details class="inputs"><summary>input lines</summary>
-<p class="map">At <span class="rev">592ff29f4e9abd640dfc27d36a4df407943a7be5</span>: no ranges.</p>
+<p class="map">At <span class="rev">12a26310d2d49f9fa9c8722832856518ab32eab7</span>: no ranges.</p>
 </details></li>
 </ul>
 </li>
@@ -313,7 +320,7 @@ ul.outputs { padding-left: 18px; }
 <dl class="transforms">
 <dt>looped</dt><dd>Makes A1 refer to itself, so the sheet has a cycle.<p>Gives <span class="prop">circular</span>.</p></dd>
 </dl>
-<h4>Cases only at <span class="rev">3737835945400164698734a06cb0c30bc95d7344</span></h4>
+<h4>Cases only at <span class="rev">eb7c597daa225f4db3af39c70012415841b6aebd</span></h4>
 <dl class="cases">
 <dt><span class="case">sheet/blank</span></dt><dd>A1 is empty.</dd>
 </dl>

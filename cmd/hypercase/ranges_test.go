@@ -12,26 +12,30 @@ import (
 )
 
 // registryAt returns a registry's bytes at an older format than today's,
-// one from before registry.InputsFormat: what Marshal writes, less the
-// keys registry.InputsFormat and the formats after it added.
+// one from registry.InputsFormat or before it: what Marshal writes, less
+// the keys the formats after it added. registry.ChecksFormat added the
+// corpus checks, and registry.InputsFormat the project's Positions and
+// each output declaration's Inputs.
 func registryAt(r registry.Registry, format int) string {
-	if format >= registry.InputsFormat {
-		panic(fmt.Sprintf("registryAt writes formats before %d, not %d", registry.InputsFormat, format))
+	if format > registry.InputsFormat {
+		panic(fmt.Sprintf("registryAt writes formats up to %d, not %d", registry.InputsFormat, format))
 	}
 	var v map[string]any
 	if err := json.Unmarshal(r.Marshal(), &v); err != nil {
 		panic(err)
 	}
 	v["format"] = format
-	delete(v, "positions")
 	delete(v, "checks")
-	for _, list := range []string{"suites", "lifts"} {
-		cols, _ := v[list].([]any)
-		for _, c := range cols {
-			for _, key := range []string{"outputs", "productFiles"} {
-				outs, _ := c.(map[string]any)[key].([]any)
-				for _, o := range outs {
-					delete(o.(map[string]any), "inputs")
+	if format < registry.InputsFormat {
+		delete(v, "positions")
+		for _, list := range []string{"suites", "lifts"} {
+			cols, _ := v[list].([]any)
+			for _, c := range cols {
+				for _, key := range []string{"outputs", "productFiles"} {
+					outs, _ := c.(map[string]any)[key].([]any)
+					for _, o := range outs {
+						delete(o.(map[string]any), "inputs")
+					}
 				}
 			}
 		}

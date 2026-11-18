@@ -28,11 +28,10 @@ import (
 // rewrites both.
 //
 // The scratch repository's commits hold what the report reads, and nothing
-// else: go.mod, which places the module root, and the corpus root's
-// registries and archives. The Go source the update builds, and the corpus
-// checks' findings, which the report doesn't read, are in its working tree,
-// out of the commits, so the page's commits move only when what the report
-// reads does.
+// else: go.mod, which places the module root, the corpus root's registries
+// and archives, and its packages' corpus checks' findings. The Go source
+// the update builds is in its working tree, out of the commits, so the
+// page's commits move only when what the report reads does.
 //
 // The toy is copied from this module's working tree, which, in the module's
 // update, another package can be writing while this test copies it. Each
@@ -577,6 +576,7 @@ var read = []string{
 	"go.mod",
 	":(glob)step11/**/testdata/hypercase.json",
 	":(glob)step11/testdata/*/*.txtar",
+	":(glob)step11/**/testdata/checks/*",
 }
 
 // commit commits what the report reads, as it is in the working tree.
@@ -586,9 +586,9 @@ func commit(t *testing.T, repo, msg string) {
 	git(t, repo, "commit", "-q", "-m", msg)
 }
 
-// TestCommit: a commit holds go.mod, the registries and the archives, and
-// none of the rest of the toy: its Go source, its corpus check's findings,
-// which the report doesn't read, and the report's own goldens.
+// TestCommit: a commit holds go.mod, the registries, the archives and the
+// corpus check's findings, and none of the rest of the toy: its Go source
+// and the report's own goldens.
 func TestCommit(t *testing.T) {
 	repo := t.TempDir()
 	git(t, repo, gitInit...)
@@ -608,7 +608,7 @@ func TestCommit(t *testing.T) {
 	}
 	commit(t, repo, "main")
 	got := git(t, repo, "ls-tree", "-r", "--name-only", "HEAD")
-	const want = "go.mod\nstep11/cli/testdata/hypercase.json\nstep11/testdata/hypercase.json\nstep11/testdata/sheet/notes.txtar\n"
+	const want = "go.mod\nstep11/cli/testdata/hypercase.json\nstep11/testdata/checks/codes.txt\nstep11/testdata/hypercase.json\nstep11/testdata/sheet/notes.txtar\n"
 	if got != want {
 		t.Errorf("the commit holds:\n%s\nwant:\n%s", got, want)
 	}

@@ -56,6 +56,14 @@ type snapshot struct {
 	// with a via/<lift>/ section whose lift no registry declares as a
 	// bytes lift over the corpus.
 	leftOut map[cellKey]bool
+	// checks holds the description of each corpus check a registry lists,
+	// findings each check's findings, as its findings file holds them, and
+	// unread the checks whose findings the report can't read: a listed
+	// check with no findings file, or one whose file isn't as an update
+	// writes it.
+	checks   map[checkKey]string
+	findings map[checkKey][]string
+	unread   map[checkKey]bool
 }
 
 // An archiveKey names an archive: its corpus, and its name.
@@ -276,8 +284,9 @@ func unreadable(p string, rev Rev, err error) error {
 }
 
 // load reads the corpus root at a revision, from the registries that
-// record it: every archive in the corpora they declare. root is the corpus
-// root, as a slash path from the top of the repository.
+// record it: every archive in the corpora they declare, and each of their
+// packages' findings files. root is the corpus root, as a slash path from
+// the top of the repository.
 func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 	s := &snapshot{
 		rev:        rev,
@@ -294,6 +303,9 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 		cells:      map[cellKey]*cellAt{},
 		gaps:       map[cellKey]string{},
 		sections:   map[archiveKey]map[string][]byte{},
+		checks:     map[checkKey]string{},
+		findings:   map[checkKey][]string{},
+		unread:     map[checkKey]bool{},
 	}
 	for _, f := range regs {
 		s.format = max(s.format, f.reg.Format)
@@ -402,6 +414,9 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 		}
 	}
 	s.unclaimedColumns()
+	if err := s.readFindings(tree, regs); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 

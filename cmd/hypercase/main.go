@@ -9,14 +9,15 @@
 // repository's object store, never the working tree. A cell exists at a
 // revision when its outcome file does. The report writes one HTML page on
 // stdout, which runs no script and loads nothing: the problems it found
-// and doesn't pick between; the cells that changed, ranked, with changed
-// outcomes first, then cells that appeared, then cells that disappeared,
-// then files that changed under the same outcome, then inputs files that
-// alone changed, each file with its line diff, what changed in its reverse
-// map and the input lines it comes from; the matrix of each corpus at <b>;
-// and the descriptions of what the registries and archives declare, from
-// <b>, or from <a> for what <b> lacks. With -text it writes the problems
-// and the ranked changes as plain text instead.
+// and doesn't pick between; the corpus checks whose findings changed; the
+// cells that changed, ranked, with changed outcomes first, then cells that
+// appeared, then cells that disappeared, then files that changed under the
+// same outcome, then inputs files that alone changed, each file with its
+// line diff, what changed in its reverse map and the input lines it comes
+// from; the matrix of each corpus at <b>; and the descriptions of what the
+// registries and archives declare, from <b>, or from <a> for what <b>
+// lacks. With -text it writes the problems, the changed findings and the
+// ranked changes as plain text instead.
 //
 // It reads registries of every format from the oldest this hypercase
 // knows to its own, and refuses a newer one, naming the hypercase that
