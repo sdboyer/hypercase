@@ -641,6 +641,10 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "%s %s, which no registered corpus type reaches. Register the lift that produces it, or the corpus type.", "a type no corpus type reaches, before any case runs"},
 		{"Log", "No case runs until each type a column consumes is reached by one path.", "that no case runs until each type has one path"},
 	},
+	"runner.refuseLinks": {
+		{"Errorf", "reading %s: %v, so the update wrote nothing. Fix what failed, then run %s again.", "testdata/, which an update can't read for symbolic links, so it writes nothing"},
+		{"Errorf", "%s, so the update wrote nothing. Remove %s, or replace it with a copy of what it names, if it names anything, then run %s again.", "the symbolic links under testdata/, or testdata/ itself as one, as walk.LinkReason words them, which an update writes nothing through"},
+	},
 	"runner.requireRootCheck": {
 		{"Errorf", "no registry records a root-package check for %s, so nothing reports what no column there owns. Register hypercase.RootPackage() in one package over it, then run %s to record it in the package's registry.", "a corpus root no registry records the root-package check of"},
 		{"Errorf", "%s records the root-package check for %s, and %s holds no _test.go file, so no test runs the check, and nothing reports what no column there owns. Restore the package's tests, or register hypercase.RootPackage() in another package over it, then run %s to record it in that package's registry.", "a root-package check recorded in a directory with no tests"},
@@ -659,8 +663,7 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "the registries that own or use the lift %s differ in %s: %s Every package that owns or uses a lift registers one declaration of it: %s. Declare the lift once, in a package the others import, and register that declaration. %s", "a lift's differing registry entries, in the root-package check"},
 		{"Errorf", "%s is a temp file left by a write that was cut short. Delete it.", "a registry temp file a write left, in the root-package check"},
 		{"Errorf", "reading %s: %v", "testdata/, which can't be read, in the root-package check"},
-		{"Errorf", "%s is a symbolic link, and a corpus root's testdata/ is a directory that holds none. Remove it, or replace it with a copy of what it names, if it names anything.", "a symbolic link in place of testdata/, in the root-package check"},
-		{"Errorf", "testdata/ holds no symbolic links: %s is one. Remove it, or replace it with a copy of what it names, if it names anything.", "a symbolic link under testdata/, in the root-package check"},
+		{"Errorf", "%s. Remove %s, or replace it with a copy of what it names, if it names anything.", "the symbolic links under testdata/, or testdata/ itself as one, as walk.LinkReason words them, in the root-package check"},
 		{"Errorf", "%s holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/. Move the archives into one, or delete them.", "archives directly under testdata/, in the root-package check"},
 		{"Errorf", "%s holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus. Declare a decl.Type with that Dir, or move or delete the archives.", "a directory of archives no registry declares, in the root-package check"},
 	},
@@ -689,8 +692,6 @@ var messageSites = map[string][]messageSite{
 		{"Skipf", "%s: %s's probe says the case isn't for it: %s", "a cell whose probe says the case isn't for it, with no note, which it skips: it fails nothing"},
 	},
 	"runner.write": {
-		{"Errorf", "%s is a symbolic link, and a corpus root's testdata/ is a directory that holds none, so the update wrote nothing to %s. Remove it, or replace it with a copy of what it names, if it names anything, then run %s again.", "a symbolic link in place of testdata/, which an update writes no archive through"},
-		{"Errorf", "testdata/ holds no symbolic links: %s is one, so the update wrote nothing to %s. Remove it, or replace it with a copy of what it names, if it names anything, then run %s again.", "a symbolic link under testdata/ on an archive's path, which an update writes no archive through"},
 		{"Errorf", "%s changed while the update ran: its comment or hand-written sections differ from those its cells ran on, so the update wrote nothing to it. Run %s again.", "an archive that changed while the update ran, which it doesn't write"},
 		{"Errorf", "writing %s: %v", "an archive the update can't write"},
 	},

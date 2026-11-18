@@ -85,144 +85,53 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
     --- PASS: TestCorpus/checks
         --- PASS: TestCorpus/checks/products
 PASS
+$ rm testdata/.hypercase.lock  # the lock, which the update takes to write an archive
 $ edit testdata/export/prices.txtar  # parse's outcome, out of its place, where the update puts it back
 # testdata/export moves to shared/, and a symbolic link to ../shared/export.d takes its place
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
-    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
-    testdata/ holds no symbolic links: testdata/export is one, so the update wrote nothing to testdata/export/prices.txtar.
+    testdata/ holds no symbolic links: testdata/export is one, so the update wrote nothing.
         Remove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
-    what ran, in order:
-        import ran
-        parse ran on prices
-        resolve ran on prices
-        import ran
-        parse ran on prices
-        resolve ran on prices
-        import ran
-        parse ran on prices
-        resolve ran on prices
-        parse ran on plain
-        resolve ran on plain
-        parse ran on plain
-        resolve ran on plain
 --- FAIL: TestCorpus
-    --- FAIL: TestCorpus/export
-        --- FAIL: TestCorpus/export/prices
-            --- PASS: TestCorpus/export/prices/import
-            --- PASS: TestCorpus/export/prices/parse
-            --- PASS: TestCorpus/export/prices/resolve
-            --- PASS: TestCorpus/export/prices/variant/doubled
-                --- PASS: TestCorpus/export/prices/variant/doubled/import
-                --- PASS: TestCorpus/export/prices/variant/doubled/parse
-                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
-            --- PASS: TestCorpus/export/prices/transform/louder
-                --- PASS: TestCorpus/export/prices/transform/louder/import
-                --- PASS: TestCorpus/export/prices/transform/louder/parse
-                --- PASS: TestCorpus/export/prices/transform/louder/resolve
-    --- PASS: TestCorpus/script
-        --- PASS: TestCorpus/script/plain
-            --- PASS: TestCorpus/script/plain/parse
-            --- PASS: TestCorpus/script/plain/resolve
-            --- PASS: TestCorpus/script/plain/variant/more
-                --- PASS: TestCorpus/script/plain/variant/more/parse
-                --- PASS: TestCorpus/script/plain/variant/more/resolve
-    --- PASS: TestCorpus/checks
-        --- PASS: TestCorpus/checks/cells
 FAIL
 [exit 1]
 # testdata/export moves back, in place of the link
 $ edit testdata/export/prices.txtar  # parse's outcome, out of its place, where the update puts it back
 # testdata/export/prices.txtar moves to shared/, and a symbolic link to ../../shared/prices.txtar.d takes its place
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
-    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
-    testdata/ holds no symbolic links: testdata/export/prices.txtar is one, so the update wrote nothing to testdata/export/prices.txtar.
+    testdata/ holds no symbolic links: testdata/export/prices.txtar is one, so the update wrote nothing.
         Remove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
-    what ran, in order:
-        import ran
-        parse ran on prices
-        resolve ran on prices
-        import ran
-        parse ran on prices
-        resolve ran on prices
-        import ran
-        parse ran on prices
-        resolve ran on prices
-        parse ran on plain
-        resolve ran on plain
-        parse ran on plain
-        resolve ran on plain
 --- FAIL: TestCorpus
-    --- FAIL: TestCorpus/export
-        --- FAIL: TestCorpus/export/prices
-            --- PASS: TestCorpus/export/prices/import
-            --- PASS: TestCorpus/export/prices/parse
-            --- PASS: TestCorpus/export/prices/resolve
-            --- PASS: TestCorpus/export/prices/variant/doubled
-                --- PASS: TestCorpus/export/prices/variant/doubled/import
-                --- PASS: TestCorpus/export/prices/variant/doubled/parse
-                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
-            --- PASS: TestCorpus/export/prices/transform/louder
-                --- PASS: TestCorpus/export/prices/transform/louder/import
-                --- PASS: TestCorpus/export/prices/transform/louder/parse
-                --- PASS: TestCorpus/export/prices/transform/louder/resolve
-    --- PASS: TestCorpus/script
-        --- PASS: TestCorpus/script/plain
-            --- PASS: TestCorpus/script/plain/parse
-            --- PASS: TestCorpus/script/plain/resolve
-            --- PASS: TestCorpus/script/plain/variant/more
-                --- PASS: TestCorpus/script/plain/variant/more/parse
-                --- PASS: TestCorpus/script/plain/variant/more/resolve
-    --- PASS: TestCorpus/checks
-        --- PASS: TestCorpus/checks/cells
 FAIL
 [exit 1]
 # testdata/export/prices.txtar moves back, in place of the link
 $ edit testdata/export/prices.txtar  # parse's outcome, out of its place, where the update puts it back
 # testdata moves to shared/, and a symbolic link to shared/testdata.d takes its place
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
-    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
-    testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none, so the update wrote nothing to testdata/export/prices.txtar.
+    testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none, so the update wrote nothing.
         Remove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
-    what ran, in order:
-        import ran
-        parse ran on prices
-        resolve ran on prices
-        import ran
-        parse ran on prices
-        resolve ran on prices
-        import ran
-        parse ran on prices
-        resolve ran on prices
-        parse ran on plain
-        resolve ran on plain
-        parse ran on plain
-        resolve ran on plain
 --- FAIL: TestCorpus
-    --- FAIL: TestCorpus/export
-        --- FAIL: TestCorpus/export/prices
-            --- PASS: TestCorpus/export/prices/import
-            --- PASS: TestCorpus/export/prices/parse
-            --- PASS: TestCorpus/export/prices/resolve
-            --- PASS: TestCorpus/export/prices/variant/doubled
-                --- PASS: TestCorpus/export/prices/variant/doubled/import
-                --- PASS: TestCorpus/export/prices/variant/doubled/parse
-                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
-            --- PASS: TestCorpus/export/prices/transform/louder
-                --- PASS: TestCorpus/export/prices/transform/louder/import
-                --- PASS: TestCorpus/export/prices/transform/louder/parse
-                --- PASS: TestCorpus/export/prices/transform/louder/resolve
-    --- PASS: TestCorpus/script
-        --- PASS: TestCorpus/script/plain
-            --- PASS: TestCorpus/script/plain/parse
-            --- PASS: TestCorpus/script/plain/resolve
-            --- PASS: TestCorpus/script/plain/variant/more
-                --- PASS: TestCorpus/script/plain/variant/more/parse
-                --- PASS: TestCorpus/script/plain/variant/more/resolve
-    --- PASS: TestCorpus/checks
-        --- PASS: TestCorpus/checks/cells
 FAIL
 [exit 1]
 # testdata moves back, in place of the link
+$ edit testdata/export/prices.txtar  # the archive as the update leaves it, so it has nothing to write
+# testdata/export moves to shared/, and a symbolic link to ../shared/export.d takes its place
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    testdata/ holds no symbolic links: testdata/export is one, so the update wrote nothing.
+        Remove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+# testdata/export moves back, in place of the link
+$ edit testdata/export/prices.txtar  # parse's outcome, out of its place, where the update puts it back
+# testdata/export moves to shared/, and a symbolic link to ../shared/missing takes its place
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    testdata/ holds no symbolic links: testdata/export is one, so the update wrote nothing.
+        Remove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+# testdata/export moves back, in place of the link
+$ edit testdata/export/prices.txtar  # parse's outcome, out of its place, where the update puts it back
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
     what ran, in order:

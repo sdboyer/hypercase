@@ -678,35 +678,99 @@ func TestRootCheckLinks(t *testing.T) {
 	s.done()
 }
 
-// TestUpdateLinks: an update writes no archive through a symbolic link,
-// which would write it outside the corpus root, or in the link's place.
-// The root-package check, which refuses links, runs in normal runs alone,
-// so before the update writes an archive, it refuses a link in place of
-// testdata/, of the corpus's directory or of the archive, with the
-// check's reason, and writes nothing, outside the corpus root or in it.
-// With the link replaced, the update writes the archive.
+// TestUpdateLinks: an update writes nothing when the walk the
+// root-package check runs finds a symbolic link under the corpus root's
+// testdata/. Every write there would go through it, outside the corpus
+// root or in the link's place, and the check runs in normal runs alone. So
+// the update refuses at its start, whatever the link names and whether or
+// not it has an archive to write, with the check's reason, and leaves the
+// corpus root and the link's target as they were, with no lock file in
+// either. With the link replaced, the update writes the archive.
 func TestUpdateLinks(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "strip")
 	s.settle(stripModule...)
 	settled := s.read(prices)
-	for _, l := range []struct{ rel, why string }{
-		{"testdata/export", "testdata/ holds no symbolic links: testdata/export is one"},
-		{prices, "testdata/ holds no symbolic links: " + prices + " is one"},
-		{"testdata", "testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none"},
+	stale := archive.Parse(settled)
+	move("out/parse/outcome", "out/import/")(stale)
+	s.remove("testdata/.hypercase.lock", "the lock, which the update takes to write an archive")
+	const fix = ", so the update wrote nothing.\nRemove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again."
+	for _, l := range []struct {
+		rel, target string
+		write       bool // whether the update has an archive to write
+		why         string
+	}{
+		{"testdata/export", "", true, "testdata/ holds no symbolic links: testdata/export is one"},
+		{prices, "", true, "testdata/ holds no symbolic links: " + prices + " is one"},
+		{"testdata", "", true, "testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none"},
+		{"testdata/export", "", false, "testdata/ holds no symbolic links: testdata/export is one"},
+		{"testdata/export", "../shared/missing", true, "testdata/ holds no symbolic links: testdata/export is one"},
 	} {
-		s.edit(prices, "parse's outcome, out of its place, where the update puts it back", move("out/parse/outcome", "out/import/"))
+		if l.write {
+			s.write(prices, stale.Format(), "parse's outcome, out of its place, where the update puts it back")
+		} else {
+			s.write(prices, settled, "the archive as the update leaves it, so it has nothing to write")
+		}
 		before := s.snapshot()
-		s.link(l.rel, "")
-		s.fails(s.update("strip-a"), l.why+", so the update wrote nothing to "+prices+".\nRemove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.")
+		s.link(l.rel, l.target)
+		s.fails(s.update("strip-a"), l.why+fix)
 		if fi, err := os.Lstat(s.path(l.rel)); err != nil || fi.Mode()&fs.ModeSymlink == 0 {
 			t.Errorf("%s is no symbolic link after the update, which wrote in its place", l.rel)
 		}
 		s.unlink(l.rel)
 		s.unchanged(before)
 	}
+	s.write(prices, stale.Format(), "parse's outcome, out of its place, where the update puts it back")
 	s.passes(s.update("strip-a"))
 	s.same(prices, settled)
 	s.passes(s.normal("strip-a"))
+	s.done()
+}
+
+// TestUpdateUnreadTestdata: when the walk for symbolic links can't read a
+// directory under the corpus root's testdata/, the update can't tell
+// whether a link is there, and writes nothing, as for a link.
+func TestUpdateUnreadTestdata(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	s.settle(stripModule...)
+	s.edit(prices, "parse's outcome, out of its place, where the update puts it back", move("out/parse/outcome", "out/import/"))
+	before := s.snapshot()
+	locked := s.path("testdata/export/old")
+	if err := os.Mkdir(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o755) })
+	if _, err := os.ReadDir(locked); err == nil {
+		t.Skip("a directory with no permissions is still readable here")
+	}
+	s.note("testdata/export/old is a directory that can't be read")
+	s.fails(s.update("strip-a"), "reading testdata: open $SANDBOX/testdata/export/old: permission denied, so the update wrote nothing.\nFix what failed, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.")
+	if err := os.Remove(locked); err != nil {
+		t.Fatal(err)
+	}
+	s.unchanged(before)
+	s.done()
+}
+
+// TestUpdateLinkNestedModule: a corpus's directory that holds a go.mod is
+// the root of a nested module to the walk, which skips it for the
+// root-package check, hypercase strip and the update alike, so the update
+// and the check agree: neither refuses a symbolic link in it. A normal
+// run passes, and the update writes the archive in the link's place. The
+// directory's cells run all the same, which is today's behavior: the
+// check and strip should read such a directory, or a run should not.
+func TestUpdateLinkNestedModule(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	s.settle(stripModule...)
+	s.write("testdata/export/go.mod", []byte("module example.com/nested\n\ngo 1.27\n"), "a go.mod in a corpus's directory")
+	s.edit(prices, "parse's outcome, out of its place, where the update puts it back", move("out/parse/outcome", "out/import/"))
+	s.link(prices, "")
+	s.passes(s.normal("strip-a"))
+	s.passes(s.update("strip-a"))
+	if fi, err := os.Lstat(s.path(prices)); err != nil || fi.Mode()&fs.ModeSymlink != 0 {
+		t.Errorf("%s is still a symbolic link after the update, or is gone: %v", prices, err)
+	}
 	s.done()
 }

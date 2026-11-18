@@ -43,6 +43,9 @@ func Test(t *testing.T) {
 		return
 	}
 	r.checkDescriptions(t)
+	if r.update && r.refuseLinks(t) {
+		return
+	}
 	r.checkRegistry(t)
 	found, err := registry.Find(r.moduleRoot)
 	if err != nil {
@@ -61,6 +64,46 @@ func Test(t *testing.T) {
 	r.runCorpora(t)
 	r.appliesToNoCase(t)
 	r.runChecks(t, found)
+}
+
+// refuseLinks reports whether the update refuses to run, and fails it
+// when it does: when the walk the root-package check runs finds a symbolic
+// link under the corpus root's testdata/, testdata/ itself included, or
+// can't finish. Every write the update makes there, the lock's included,
+// would go through such a link, and the check runs in normal runs alone,
+// so it runs before the update writes anything. A link made while the
+// update runs is left to the next normal run's check.
+func (r *runner) refuseLinks(t *testing.T) bool {
+	t.Helper()
+	td := filepath.Join(r.corpusRoot, "testdata")
+	if _, err := os.Lstat(td); errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	// The corpus roots other registries record, which the walk skips, as
+	// the check's does. A registry that can't be read is the check's to
+	// report.
+	found, _ := registry.Find(r.moduleRoot)
+	others := map[string]bool{}
+	for _, f := range found {
+		data, err := os.ReadFile(f.Path)
+		if err != nil {
+			continue
+		}
+		if h, err := registry.Peek(data); err == nil && h.CorpusRoot != r.rootRel {
+			others[filepath.Join(r.moduleRoot, filepath.FromSlash(h.CorpusRoot))] = true
+		}
+	}
+	links, err := walk.Testdata(td, others, func(string, fs.DirEntry) {})
+	switch {
+	case err != nil:
+		t.Errorf("reading %s: %v, so the update wrote nothing.\nFix what failed, then run %s again.", r.rel(td), err, r.updateCmd())
+		return true
+	case len(links) > 0:
+		reason, it := walk.LinkReason(td, links, r.rel)
+		t.Errorf("%s, so the update wrote nothing.\n"+walk.LinkFix+", then run %s again.", reason, it, r.updateCmd())
+		return true
+	}
+	return false
 }
 
 // runner is one call of Test.
@@ -608,10 +651,7 @@ func (w *caseWrites) replaced(section string) bool {
 	return strings.HasPrefix(rest, archive.In+"/") || rest == archive.Delete
 }
 
-var (
-	errChanged = errors.New("the archive's hand-written sections changed")
-	errLinked  = errors.New("a symbolic link is on the archive's path")
-)
+var errChanged = errors.New("the archive's hand-written sections changed")
 
 // write writes the package's own sections of one archive: a
 // read-modify-write under the corpus root's lock. The bytes of every
@@ -635,20 +675,7 @@ func (r *runner) write(t *testing.T, pc plannedCase, w *caseWrites) {
 		return
 	}
 	rel := r.rel(pc.path)
-	td := filepath.Join(r.corpusRoot, "testdata")
-	var link string
 	err := archive.Modify(r.lockPath(), pc.path, func(current *archive.Archive) (*archive.Archive, error) {
-		// The rename would write through a symbolic link, outside the
-		// corpus root or in the link's place, and the root-package check,
-		// which refuses links, runs in normal runs alone.
-		l, err := walk.Link(td, pc.path)
-		if err != nil {
-			return nil, err
-		}
-		if l != "" {
-			link = l
-			return nil, errLinked
-		}
 		// The cells ran on the hand-written sections first read. Outputs
 		// written beside other inputs would make an update that passed and
 		// a normal run that fails.
@@ -661,10 +688,6 @@ func (r *runner) write(t *testing.T, pc plannedCase, w *caseWrites) {
 		return apply(current), nil
 	})
 	switch {
-	case errors.Is(err, errLinked) && link == td:
-		t.Errorf("%s is a symbolic link, and a corpus root's testdata/ is a directory that holds none, so the update wrote nothing to %s.\nRemove it, or replace it with a copy of what it names, if it names anything, then run %s again.", r.rel(link), rel, r.updateCmd())
-	case errors.Is(err, errLinked):
-		t.Errorf("testdata/ holds no symbolic links: %s is one, so the update wrote nothing to %s.\nRemove it, or replace it with a copy of what it names, if it names anything, then run %s again.", r.rel(link), rel, r.updateCmd())
 	case errors.Is(err, errChanged):
 		t.Errorf("%s changed while the update ran: its comment or hand-written sections differ from those its cells ran on, so the update wrote nothing to it.\nRun %s again.", rel, r.updateCmd())
 	case err != nil:

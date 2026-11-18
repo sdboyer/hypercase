@@ -1,7 +1,8 @@
-// Package walk walks a corpus root's testdata/ as the root-package check
-// and hypercase strip both read it, so the two find the same files, and
-// tells by its path which file is an archive of the corpus root, so the
-// two agree on which archives strip strips. It doesn't import testing.
+// Package walk walks a corpus root's testdata/ as the root-package check,
+// hypercase strip and an update read it, so the three find the same files
+// and refuse the same symbolic links, in the same words, and tells by its
+// path which file is an archive of the corpus root, so the check and strip
+// agree on which archives strip strips. It doesn't import testing.
 package walk
 
 import (
@@ -43,28 +44,27 @@ func Testdata(td string, others map[string]bool, file func(p string, d fs.DirEnt
 	return links, err
 }
 
-// Link returns the first of td and the files below it on the way to p, a
-// path under td, that is a symbolic link, or "" when none is: of them,
-// what [Testdata] returns in links. An update calls it before it writes
-// an archive, since the root-package check, which refuses links, runs in
-// normal runs alone.
-func Link(td, p string) (string, error) {
-	rel, err := filepath.Rel(td, p)
-	if err != nil {
-		return "", err
+// LinkFix is the fix for the symbolic links [LinkReason] words: a format
+// for the word it gives for them.
+const LinkFix = "Remove %s, or replace it with a copy of what it names, if it names anything"
+
+// LinkReason words why the symbolic links [Testdata] returned for td are
+// refused, naming each with name, and gives the word [LinkFix] takes for
+// them: "it" for one, "each" for more. The root-package check, hypercase
+// strip and an update word their refusals with it, so the three give one
+// reason and one fix.
+func LinkReason(td string, links []string, name func(string) string) (reason, it string) {
+	switch {
+	case len(links) == 1 && links[0] == td:
+		return name(td) + " is a symbolic link, and a corpus root's testdata/ is a directory that holds none", "it"
+	case len(links) == 1:
+		return "testdata/ holds no symbolic links: " + name(links[0]) + " is one", "it"
 	}
-	cur := td
-	for _, part := range append([]string{"."}, strings.Split(rel, string(filepath.Separator))...) {
-		cur = filepath.Join(cur, part)
-		fi, err := os.Lstat(cur)
-		if err != nil {
-			return "", err
-		}
-		if fi.Mode()&fs.ModeSymlink != 0 {
-			return cur, nil
-		}
+	names := make([]string, len(links))
+	for i, l := range links {
+		names[i] = name(l)
 	}
-	return "", nil
+	return "testdata/ holds no symbolic links: " + strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1] + " are links", "each"
 }
 
 // IsFile reports whether p names a regular file.

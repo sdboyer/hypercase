@@ -54,8 +54,7 @@ func TestTestdata(t *testing.T) {
 // one under testdata/, whatever it names and wherever it sits: a link to
 // a directory, to a file, to another corpus root, under testdata/checks/,
 // below a corpus's directory, one that names nothing, a loop, and one in
-// place of testdata/. It calls file with none of them. Link, on a path
-// through each, returns it, and on a path through none, nothing.
+// place of testdata/. It calls file with none of them.
 func TestTestdataLinks(t *testing.T) {
 	dir := t.TempDir()
 	for _, f := range []string{"shared/sheet/x.txtar", "shared/other/w.txtar", "td/a/z.txtar", "td/b.txtar", "td/checks/found.txt"} {
@@ -103,25 +102,24 @@ func TestTestdataLinks(t *testing.T) {
 	if err != nil || got != nil || !slices.Equal(links, []string{linked}) {
 		t.Errorf("Testdata of a link in place of testdata/ visited %q, with the links %q and the error %v; want none, with the link alone", got, links, err)
 	}
+}
 
-	for _, tt := range []struct{ td, p, want string }{
-		{"td", "td/a/z.txtar", ""},
-		{"td", "td/b.txtar", ""},
-		{"td", "td/sheet/x.txtar", "td/sheet"},
-		{"td", "td/c.txtar", "td/c.txtar"},
-		{"td", "td/checks/linked.txt", "td/checks/linked.txt"},
-		{"td", "td/a/old/x.txtar", "td/a/old"},
-		{"td", "td/dangling/x.txtar", "td/dangling"},
-		{"td", "td/loop/x.txtar", "td/loop"},
-		{"linked", "linked/a/z.txtar", "linked"},
+// TestLinkReason: a link in place of testdata/ is worded on its own, one
+// link under it as one, and more as a list, which the fix's word, "each",
+// matches.
+func TestLinkReason(t *testing.T) {
+	name := func(p string) string { return filepath.ToSlash(p) }
+	for _, tt := range []struct {
+		links      []string
+		reason, it string
+	}{
+		{[]string{"td"}, "td is a symbolic link, and a corpus root's testdata/ is a directory that holds none", "it"},
+		{[]string{"td/sheet"}, "testdata/ holds no symbolic links: td/sheet is one", "it"},
+		{[]string{"td/a", "td/b"}, "testdata/ holds no symbolic links: td/a and td/b are links", "each"},
+		{[]string{"td/a", "td/b", "td/c"}, "testdata/ holds no symbolic links: td/a, td/b and td/c are links", "each"},
 	} {
-		want := tt.want
-		if want != "" {
-			want = filepath.Join(dir, filepath.FromSlash(want))
-		}
-		got, err := Link(filepath.Join(dir, tt.td), filepath.Join(dir, filepath.FromSlash(tt.p)))
-		if err != nil || got != want {
-			t.Errorf("Link(%s, %s) = %q, %v; want %q", tt.td, tt.p, got, err, want)
+		if reason, it := LinkReason("td", tt.links, name); reason != tt.reason || it != tt.it {
+			t.Errorf("LinkReason(td, %q) = %q, %q; want %q, %q", tt.links, reason, it, tt.reason, tt.it)
 		}
 	}
 }
