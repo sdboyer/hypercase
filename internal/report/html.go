@@ -137,9 +137,13 @@ func excerptClass(l ExcerptLine) string {
 }
 
 // excerptText returns a line of an excerpt as the page shows it: its mark,
-// where it has one, its number, and its text.
+// where it has one, its number, and its text, or, for a line that stands
+// for others, how many lines of a range it leaves out, if any.
 func excerptText(l ExcerptLine) string {
-	if l.N == 0 {
+	switch {
+	case l.N == 0 && l.Cut > 0:
+		return fmt.Sprintf("  ... left out: %s past the first %d of a range", lines(l.Cut), MaxRangeLines)
+	case l.N == 0:
 		return "  ..."
 	}
 	mark := ""
@@ -151,6 +155,18 @@ func excerptText(l ExcerptLine) string {
 		text += fmt.Sprintf("\n%s%4s  \\ no final newline", mark, "")
 	}
 	return text
+}
+
+// cutNote says what MaxFileLines leaves out of a file's input lines.
+func cutNote(c *Cut) string {
+	s := fmt.Sprintf("The page shows the first %d lines the file's ranges hold, and leaves out %d more, of %d section", MaxFileLines, c.Lines, c.Sections)
+	if c.Sections != 1 {
+		s += "s"
+	}
+	if c.Diffs > 0 {
+		s += fmt.Sprintf(", and what changed in %d of them", c.Diffs)
+	}
+	return s + "."
 }
 
 var page = template.Must(template.New("page").Funcs(template.FuncMap{
@@ -168,6 +184,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
 	"rangeText":     func(l RangeLine) string { return string(l.Kind) + " " + l.Text },
 	"excerptClass":  excerptClass,
 	"excerptText":   excerptText,
+	"cutNote":       cutNote,
 }).Parse(pageTemplate))
 
 const pageTemplate = `<!doctype html>
@@ -237,7 +254,12 @@ const pageTemplate = `<!doctype html>
 {{- if .Diff}}
 <details><summary><code>{{.Section}}</code> changed <span class="stat">{{if .Unaligned}}partly unaligned{{else}}<span class="add">+{{.Added}}</span> <span class="del">-{{.Removed}}</span>{{end}}</span></summary>
 <pre class="diff">{{range .Diff}}<span class="{{diffClass .}}">{{diffText .}}</span>{{end}}</pre></details>
+{{- else if .DiffAt}}
+<p class="note">What changed in <code>{{.Section}}</code> is shown under <code>{{.DiffAt}}</code>.</p>
 {{- end}}</div>
+{{- end}}
+{{- with .Cut}}
+<p class="note">{{cutNote .}}</p>
 {{- end}}
 </details>
 {{- end}}</li>

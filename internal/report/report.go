@@ -338,6 +338,7 @@ func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 			ch.Rank, ch.Before, ch.After = BytesChanged, ca.line, cb.line
 		}
 		ch.Files = fileChanges([2]*snapshot{a, b}, k, !a.leftOut[k] && !b.leftOut[k])
+		onceDiffs(ch.Files)
 		if ch.Rank == BytesChanged && !slices.ContainsFunc(ch.Files, func(f FileChange) bool { return f.How != RangesOnly }) {
 			if !a.ranges || !b.ranges || inputsEqual(ca.inputs, cb.inputs) {
 				continue

@@ -12,6 +12,18 @@ import (
 	"github.com/sdboyer/hypercase/internal/revmap"
 )
 
+// The page's input lines grow with what each changed file maps, so they
+// are capped, each cap with a note of what it leaves out.
+const (
+	// MaxRangeLines caps the lines of one range the page shows: its first
+	// MaxRangeLines, then a line that says how many more it leaves out.
+	MaxRangeLines = 20
+	// MaxFileLines caps the input lines the page shows beside one changed
+	// file, over all its sections and both revisions: past them, a note
+	// says how many more lines its ranges hold, of how many sections.
+	MaxFileLines = 4 * MaxRangeLines
+)
+
 // Inputs are the input lines a changed file comes from, as its
 // revisions' reverse maps give them: B's map of a file at B, A's of a file
 // only at A, and both where both revisions map the file, differently.
@@ -20,8 +32,18 @@ type Inputs struct {
 	// page shows none of that revision's.
 	Maps [2]*Map
 	// Excerpts are the lines the shown maps' ranges point at, by section,
-	// and a section's at A before its at B where the two are apart.
+	// and a section's at A before its at B where the two are apart, up to
+	// MaxFileLines of them.
 	Excerpts []Excerpt
+	// Cut is what MaxFileLines leaves out, or nil.
+	Cut *Cut
+}
+
+// A Cut is what MaxFileLines leaves out of a file's input lines: how many
+// lines its ranges hold past them, of how many sections, and the diffs of
+// how many of those sections that changed.
+type Cut struct {
+	Lines, Sections, Diffs int
 }
 
 // A Map is what one revision's reverse map of a changed file states.
@@ -45,10 +67,14 @@ type Excerpt struct {
 	Lines []ExcerptLine
 	// Diff, Added, Removed and Unaligned are the section's line diff from A
 	// to B, as a changed file's are, where both revisions hold the section
-	// with other bytes. Only the section's last excerpt has it.
+	// with other bytes. Only the section's last excerpt has it, and only
+	// the first file of a change that shows the section.
 	Diff           []diff.Line
 	Added, Removed int
 	Unaligned      bool
+	// DiffAt is the path of the file of the change that shows the
+	// section's diff, where an earlier file does, or "".
+	DiffAt string
 	// Note says why the lines may not be the ones the cell read, or is "".
 	Note string
 }
@@ -56,8 +82,11 @@ type Excerpt struct {
 // An ExcerptLine is one line of an excerpt.
 type ExcerptLine struct {
 	// N is the line's number, counted from 1, or 0 for a line that stands
-	// for those left out between two others.
+	// for those left out between two others, or after the last.
 	N int
+	// Cut, in a line that stands for others, is how many of them a range
+	// holds past its first MaxRangeLines.
+	Cut int
 	// Text is the line as a diff shows it, and NoNewline records that the
 	// line is its section's last, and has no final newline.
 	Text      string
@@ -142,16 +171,93 @@ func inputsOf(snaps [2]*snapshot, cells [2]*cellAt, k cellKey, fc FileChange, at
 	if len(in.Excerpts) == 0 && !slices.ContainsFunc(in.Maps[:], func(m *Map) bool { return m != nil && !m.Ranges }) {
 		return nil
 	}
+	in.capLines()
 	return in
 }
 
+// capLines cuts the excerpts after their first MaxFileLines lines, and
+// records what that leaves out.
+func (in *Inputs) capLines() {
+	shown := 0
+	for i := range in.Excerpts {
+		e := &in.Excerpts[i]
+		for j, l := range e.Lines {
+			if l.N == 0 {
+				continue
+			}
+			if shown < MaxFileLines {
+				shown++
+				continue
+			}
+			c := &Cut{}
+			sections := map[string]bool{}
+			leave := func(e Excerpt, lines []ExcerptLine) {
+				for _, l := range lines {
+					if l.N > 0 {
+						c.Lines++
+					}
+					c.Lines += l.Cut
+				}
+				sections[e.Section] = true
+			}
+			leave(*e, e.Lines[j:])
+			e.Lines = e.Lines[:j]
+			if n := len(e.Lines); n > 0 && e.Lines[n-1].N == 0 {
+				c.Lines += e.Lines[n-1].Cut
+				e.Lines = e.Lines[:n-1]
+			}
+			kept := i + 1
+			if len(e.Lines) == 0 { // the excerpt's first line is past the cap
+				kept = i
+				if e.Diff != nil {
+					c.Diffs++
+				}
+			}
+			for _, d := range in.Excerpts[i+1:] {
+				leave(d, d.Lines)
+				if d.Diff != nil {
+					c.Diffs++
+				}
+			}
+			in.Excerpts = in.Excerpts[:kept]
+			c.Sections = len(sections)
+			in.Cut = c
+			return
+		}
+	}
+}
+
+// onceDiffs leaves each section's diff on the first file of a change
+// whose input lines show it, and points the others' excerpts there.
+func onceDiffs(files []FileChange) {
+	at := map[string]string{} // section → the path of the file that shows its diff
+	for _, f := range files {
+		if f.Inputs == nil {
+			continue
+		}
+		for i := range f.Inputs.Excerpts {
+			e := &f.Inputs.Excerpts[i]
+			if e.Diff == nil {
+				continue
+			}
+			if p, ok := at[e.Section]; ok {
+				e.Diff, e.Added, e.Removed, e.Unaligned, e.DiffAt = nil, 0, 0, false, p
+				continue
+			}
+			at[e.Section] = f.Path
+		}
+	}
+}
+
 // excerptLines returns the lines of a section that ranges hold, A's and
-// B's, numbered, with a line that stands for those left out between two
-// lines apart, and each marked by whose ranges hold it when marks says to.
-// A range past the section's last line holds none.
+// B's, numbered, each range's first MaxRangeLines of them, with a line
+// that stands for those left out between two lines apart, or after the
+// last, and each marked by whose ranges hold it when marks says to. A
+// range past the section's last line holds none.
 func excerptLines(data []byte, ranges [2][]revmap.Range, marks bool) []ExcerptLine {
 	lines := sectionLines(data)
 	var held [2][]bool
+	shown := make([]bool, len(lines)+1)
 	for i := range 2 {
 		held[i] = make([]bool, len(lines)+1)
 		for _, r := range ranges[i] {
@@ -164,25 +270,32 @@ func excerptLines(data []byte, ranges [2][]revmap.Range, marks bool) []ExcerptLi
 			}
 			for n := first; n <= last; n++ {
 				held[i][n] = true
+				shown[n] = shown[n] || n < first+MaxRangeLines
 			}
 		}
 	}
 	var out []ExcerptLine
-	prev := 0
+	prev, cut := 0, 0
 	for n := 1; n <= len(lines); n++ {
 		a, b := held[0][n], held[1][n]
-		if !a && !b {
+		if !shown[n] {
+			if a || b {
+				cut++
+			}
 			continue
 		}
 		if prev > 0 && n > prev+1 {
-			out = append(out, ExcerptLine{})
+			out = append(out, ExcerptLine{Cut: cut})
 		}
-		prev = n
+		prev, cut = n, 0
 		l := ExcerptLine{N: n, Text: diff.Display(lines[n-1]), NoNewline: !strings.HasSuffix(lines[n-1], "\n")}
 		if marks {
 			l.Mark = map[[2]bool]string{{true, false}: "-", {false, true}: "+", {true, true}: " "}[[2]bool{a, b}]
 		}
 		out = append(out, l)
+	}
+	if cut > 0 {
+		out = append(out, ExcerptLine{Cut: cut})
 	}
 	return out
 }
