@@ -60,9 +60,11 @@ func TestRootCheckLifts(t *testing.T) {
 // parse it owns, so the cells of resolve that ./b's cells past it are
 // built through are cells no package writes, and the root-package check
 // fails. The paths check finds resolve's cell of the case built through
-// parse, where ./b's evaluate cell is built through parse2. The message
-// gives two fixes, and following either, step by step, makes every run
-// pass.
+// parse, where ./b's evaluate cell is built through parse2. The failure
+// states the two ways the conflict ends, and applying either makes every
+// run pass: ./b reaches resolve by .'s path, using parse in place of
+// parse2, or . by ./b's, using parse2 in place of parse, and the cells of
+// the copy given up, which no package writes then, are deleted.
 func TestRootCheckUsedPath(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
@@ -84,8 +86,8 @@ func TestRootCheckUsedPath(t *testing.T) {
 				t.Errorf("the paths check finds no cell built otherwise than the cell past it")
 			}
 			r := s.normal("ladder-a-paths")
-			s.fails(r, "the lift resolve is used by ./b on the path testdata/script/ → parse2 → resolve, and ., which owns it, runs it on the path testdata/script/ → parse → resolve, so no package writes the cells of resolve that ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does. Either in ./b, give parse to hypercase.Use in place of parse2, and delete parse2's cells, under out/parse2/ in the archives, which no package writes then, or in ., give parse2 to hypercase.Use in place of parse, and delete parse's cells, under out/parse/ in the archives, which no package writes then. If they reach it alike already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
-			if n := strings.Count(string(r.out), " used by "); n != 1 {
+			s.fails(r, "the lift resolve is used by ./b on the path testdata/script/ → parse2 → resolve, and ., which owns it, runs it on the path testdata/script/ → parse → resolve, so no package writes the cells of resolve that ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either ./b reaches resolve from testdata/script/ by .'s path, or . by ./b's. If they reach it alike already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
+			if n := strings.Count(string(r.out), " is used by "); n != 1 {
 				t.Errorf("the root-package check fails %d times on lifts used otherwise than their owner reaches them, and should fail once", n)
 			}
 			s.passes(s.run("b", "ladder-b-producer", false))

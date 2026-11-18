@@ -31,7 +31,7 @@ script parse: through no lift
 script resolve: through parse
 $ go test  # ladder-a-paths
     the lift resolve is used by ./b on the path testdata/script/ → parse2 → resolve, and ., which owns it, runs it on the path testdata/script/ → parse → resolve, so no package writes the cells of resolve that ./b's cells past it are built through.
-        A package that uses a lift reaches it from each corpus by the path the lift's owner does. Either in ./b, give parse to hypercase.Use in place of parse2, and delete parse2's cells, under out/parse2/ in the archives, which no package writes then, or in ., give parse2 to hypercase.Use in place of parse, and delete parse's cells, under out/parse/ in the archives, which no package writes then. If they reach it alike already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either ./b reaches resolve from testdata/script/ by .'s path, or . by ./b's. If they reach it alike already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
     what ran, in order:
         parse ran on x
         resolve ran on x

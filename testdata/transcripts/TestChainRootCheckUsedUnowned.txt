@@ -21,8 +21,10 @@ PASS
 $ go test  # used-fewer-a
     the lift import is used by ./b, and no package owns it, so its error is recorded nowhere.
         Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
-    the lifts parse and resolve are used by ./b on the path testdata/export/ → import → parse and past it, and ., which owns them, doesn't run them over testdata/export/, so no package writes their cells of that corpus's cases, which ./b's cells past them are built through.
-        A package that uses a lift reaches it from each corpus by the path the lift's owner does. In ., register the corpus type of testdata/export/, and give import to hypercase.Own, so . runs them over testdata/export/ too. If . registers them already, or ./b doesn't reach them from testdata/export/, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+    the lift parse is used by ./b on the path testdata/export/ → import → parse, and ., which owns it, doesn't run it over testdata/export/, so no package writes its cells of that corpus's cases, which ./b's cells past it are built through.
+        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs parse over testdata/export/ by that path, or ./b doesn't reach parse from testdata/export/. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+    the lift resolve is used by ./b on the path testdata/export/ → import → parse → resolve, and ., which owns it, doesn't run it over testdata/export/, so no package writes its cells of that corpus's cases, which ./b's cells past it are built through.
+        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs resolve over testdata/export/ by that path, or ./b doesn't reach resolve from testdata/export/. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/script
     --- PASS: TestCorpus/checks

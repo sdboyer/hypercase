@@ -84,6 +84,12 @@ func TestParse(t *testing.T) {
 		{func(r *Registry) { r.Lifts[2].Paths = nil }, "the lift resolve runs over testdata/sheet/, and has paths from none,"},
 		{func(r *Registry) { r.Suites[1].Paths[0].Lifts[2] = "nosuch" }, "the suite evaluate's path from testdata/csv/ names nosuch, and the registry lists no lift of that name, where every lift on a column's path is one its package registers"},
 		{func(r *Registry) { r.Lifts[2].Paths[0].Lifts = []string{"resolve"} }, "the lift resolve's path from testdata/sheet/ names the lift itself, where a column's path names the lifts before it"},
+		{func(r *Registry) {
+			r.Lifts[2].Corpora = []string{"sheet", "sheet"}
+			r.Lifts[2].Paths = append(r.Lifts[2].Paths, r.Lifts[2].Paths[0])
+		}, "the lift resolve runs over testdata/sheet/ twice, where a registry lists each corpus a column runs over once"},
+		{func(r *Registry) { r.Suites[0].Paths[0].Lifts = []string{"parse"} }, "the suite calc consumes the raw input view, and its path from testdata/sheet/ names parse, where a suite over the raw input view passes through no lift"},
+		{func(r *Registry) { r.Suites[1].Paths[1].Lifts = []string{"resolve", "parse", "parse"} }, "the suite evaluate's path from testdata/sheet/ names parse twice, where a column's path names each lift before it once"},
 	} {
 		r, err := Parse(now.Marshal())
 		if err != nil {

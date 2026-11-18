@@ -5,11 +5,11 @@ import (
 	"io"
 	"io/fs"
 	"maps"
+	"path"
 	"reflect"
 	"regexp"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/sdboyer/hypercase"
@@ -93,19 +93,24 @@ func (v *Top4N) topologyView() fs.FS { return v.view }
 // corpus type it starts from: 1, after Top0, or k+1, after the product of
 // the bytes lift at k, and 0 for 1. Where shadow is set, b registers, in
 // place of the stage at that position, which a owns, a copy of it it
-// owns, named for it with an x: l2x for l2. Where adopt is set too, a
-// uses the copy in place of the stage, which no package registers then.
+// owns, named for it with an x: l2x for l2. Where third is set, a third
+// package, ./c, starts at that position, as starts gives it, and owns
+// listc, a copy of list, using every lift from its start, a's stage at
+// the shadow's position among them.
 type topology struct {
 	kinds, owners string
 	transform     bool
 	starts        [2]int
 	shadow        int
-	adopt         bool
+	third         int
 }
 
-// start is the position of the first lift the package pkg, a or b,
+// start is the position of the first lift the package pkg, a, b or c,
 // registers.
 func (tp topology) start(pkg byte) int {
+	if pkg == 'c' {
+		return tp.third
+	}
 	return max(tp.starts[pkg-'a'], 1)
 }
 
@@ -165,19 +170,27 @@ func (tp topology) name() string {
 	if tp.shadow > 0 {
 		name += fmt.Sprintf("-x%d", tp.shadow)
 	}
-	if tp.adopt {
-		name += "-y"
+	if tp.third > 0 {
+		name += fmt.Sprintf("-c%d", tp.third)
 	}
 	return name
 }
 
-// registration names the registration of the package pkg, a or b, which
-// topologyRegistration reads.
+// registration names the registration of the package pkg, a, b or c,
+// which topologyRegistration reads.
 func (tp topology) registration(pkg byte) string { return tp.name() + "-" + string(pkg) }
 
 // topologyRegistration is the registration a name gives, as a topology's
-// registration names it.
+// or a branching's registration names it.
 func topologyRegistration(name string) (func(), bool) {
+	if rest, ok := strings.CutPrefix(name, "branching-"); ok {
+		parts := strings.Split(rest, "-")
+		if len(parts) != 3 || len(parts[0]) != 6 || len(parts[1]) != 2 || len(parts[2]) != 1 {
+			panic("selftest: no branching registration named " + name)
+		}
+		br := branching{owners: parts[0], late: [2]bool{parts[1][0] == 'l', parts[1][1] == 'l'}}
+		return func() { br.register(parts[2][0]) }, true
+	}
 	rest, ok := strings.CutPrefix(name, "topology-")
 	if !ok {
 		return nil, false
@@ -195,8 +208,8 @@ func topologyRegistration(name string) (func(), bool) {
 			tp.starts = [2]int{int(p[1] - '0'), int(p[2] - '0')}
 		case len(p) == 2 && p[0] == 'x':
 			tp.shadow = int(p[1] - '0')
-		case p == "y":
-			tp.adopt = true
+		case len(p) == 2 && p[0] == 'c':
+			tp.third = int(p[1] - '0')
 		default:
 			panic("selftest: no topology registration named " + name)
 		}
@@ -205,17 +218,16 @@ func topologyRegistration(name string) (func(), bool) {
 	return func() { tp.register(pkg) }, true
 }
 
-// register registers the package pkg, a or b, of the topology: the
+// register registers the package pkg, a, b or c, of the topology: the
 // properties of its chain, the corpus type it starts from and each bytes
 // lift's product past it, the columns it owns, and the lifts it uses,
 // those on its columns' paths from its start that it doesn't own, but
-// for b the stage its shadow replaces, whose copy it owns, and for a,
-// where it adopts the copy, the copy in place of the stage.
+// for b the stage its shadow replaces, whose copy it owns. c owns listc.
 func (tp topology) register(pkg byte) {
 	start := tp.start(pkg)
 	items := []any{project}
 	if start == 1 {
-		top0 := decl.Type[Top0]{Dir: "top0", Description: "Trees of instructions, under in/<lift>/, that a chain of lifts follows, and the data, under in/data/ or below a bytes lift's tree."}
+		top0 := topologyTop0
 		if tp.transform {
 			top0.Transforms = []decl.Transform[Top0]{topologyTransform}
 		}
@@ -232,12 +244,12 @@ func (tp topology) register(pkg byte) {
 			items = append(items, topologyType(k))
 		}
 	}
-	last := strings.LastIndexByte(tp.owners, pkg)
+	last := tp.last(pkg) - 1
 	var owned, used []any
 	for i := range tp.owners {
 		switch col := tp.column(i); {
-		case pkg == 'a' && tp.adopt && i+1 == tp.shadow:
-			used = append(used, renamed(col, fmt.Sprintf("l%dx", i+1)))
+		case pkg == 'c' && i == len(tp.kinds):
+			owned = append(owned, renamed(col, "listc"))
 		case tp.owners[i] == pkg:
 			owned = append(owned, col)
 		case pkg == 'b' && i+1 == tp.shadow:
@@ -256,7 +268,11 @@ func (tp topology) register(pkg byte) {
 	hypercase.Register(items...)
 }
 
-// renamed is a copy of a lift declared as a decl.Lift, under another name.
+// topologyTop0 is the corpus type Top0, of testdata/top0/.
+var topologyTop0 = decl.Type[Top0]{Dir: "top0", Description: "Trees of instructions, under in/<lift>/, that a chain of lifts follows, and the data, under in/data/ or below a bytes lift's tree."}
+
+// renamed is a copy of a lift declared as a decl.Lift, or of a suite, under
+// another name.
 func renamed(lift any, name string) any {
 	v := reflect.New(reflect.TypeOf(lift)).Elem()
 	v.Set(reflect.ValueOf(lift))
@@ -377,12 +393,18 @@ func topologyTree(kinds string, from, j int) string {
 }
 
 func topologyBytes[In topologyValue, Out ~struct{ fs.FS }](kinds string, k int) decl.Lift[In, Out] {
-	name := fmt.Sprintf("l%d", k)
 	var product []decl.Output
 	for j := k + 1; j <= len(kinds); j++ {
 		product = append(product, decl.Output{Pattern: topologyTree(kinds, k, j) + "*", Description: fmt.Sprintf("What l%d does, as its tree says.", j)})
 	}
 	product = append(product, decl.Output{Pattern: topologyTree(kinds, k, len(kinds)+1) + "*", Description: "The data list lists."})
+	return topologyBytesOf[In, Out](k, product)
+}
+
+// topologyBytesOf is the bytes lift at position k, whose product holds
+// the files product declares.
+func topologyBytesOf[In topologyValue, Out ~struct{ fs.FS }](k int, product []decl.Output) decl.Lift[In, Out] {
+	name := fmt.Sprintf("l%d", k)
 	return decl.Lift[In, Out]{
 		Name:        name,
 		Description: fmt.Sprintf("Makes its input view's %s/out/ tree its product, as its %s/ tree says.", name, name),
@@ -848,8 +870,8 @@ func usedPathTopologies() []topology {
 	return out
 }
 
-// usesOwned reports whether each package starts at or before the first
-// column it owns, and each lift a package uses has an owner that starts
+// usesOwned reports whether a and b each start at or before the first
+// column they own, and each lift a package uses has an owner that starts
 // at or before it.
 func (tp topology) usesOwned() bool {
 	for _, p := range []byte("ab") {
@@ -857,15 +879,118 @@ func (tp topology) usesOwned() bool {
 			return false
 		}
 	}
-	for _, p := range []byte("ab") {
-		last := strings.LastIndexByte(tp.owners, p) + 1
-		for k := tp.start(p); k < last; k++ {
+	for _, p := range tp.pkgs() {
+		for k := tp.start(p); k < tp.last(p); k++ {
 			if o := tp.owners[k-1]; o != p && tp.start(o) > k {
 				return false
 			}
 		}
 	}
 	return true
+}
+
+// last is the position of the last column the package pkg owns: for c,
+// listc's, past the chain.
+func (tp topology) last(pkg byte) int {
+	if pkg == 'c' {
+		return len(tp.kinds) + 1
+	}
+	return strings.LastIndexByte(tp.owners, pkg) + 1
+}
+
+// thirdPackageCandidates are the topologies of topologies, of chains of
+// up to maxUsedChain lifts, and of usedPathTopologies, with ./c added,
+// from each start from which the lifts it uses have owners that start at
+// or before them.
+func thirdPackageCandidates() []topology {
+	var bases []topology
+	for _, tp := range topologies() {
+		if len(tp.kinds) <= maxUsedChain {
+			bases = append(bases, tp)
+		}
+	}
+	var out []topology
+	for _, tp := range append(bases, usedPathTopologies()...) {
+		starts := []int{1}
+		for k := 1; k <= len(tp.kinds); k++ {
+			if tp.kinds[k-1] == 'B' {
+				starts = append(starts, k+1)
+			}
+		}
+		for _, c := range starts {
+			tp.third = c
+			if tp.usesOwned() {
+				out = append(out, tp)
+			}
+		}
+	}
+	return out
+}
+
+// thirdPackageTopologies are thirdPackageCandidates, one for each
+// signature c's lifts give, as usedSignature words it, which is all the
+// root-package check reads to judge c's uses: it compares each use with
+// the lift's owner's entry alone. So two topologies that give c one
+// signature give c the same failures, as TestThirdPackageSignatures
+// checks of refusals, and what a and b do, the topologies without c vary.
+func thirdPackageTopologies() []topology {
+	var out []topology
+	seen := map[string]bool{}
+	for _, tp := range thirdPackageCandidates() {
+		if sig := tp.usedSignature('c'); !seen[sig] {
+			seen[sig] = true
+			out = append(out, tp)
+		}
+	}
+	return out
+}
+
+// TestThirdPackageSignatures: of thirdPackageCandidates, those that give
+// c one signature, as usedSignature words it, give c the same refusals,
+// so thirdPackageTopologies, which keeps one of them, drops none of c's
+// verdicts.
+func TestThirdPackageSignatures(t *testing.T) {
+	t.Parallel()
+	byUser := func(tp topology, user string) []usedRefusal {
+		return slices.DeleteFunc(tp.refusals(), func(r usedRefusal) bool { return r.user != user })
+	}
+	first := map[string]topology{}
+	for _, tp := range thirdPackageCandidates() {
+		sig := tp.usedSignature('c')
+		kept, ok := first[sig]
+		if !ok {
+			first[sig] = tp
+			continue
+		}
+		if got, want := byUser(tp, "./c"), byUser(kept, "./c"); !slices.Equal(got, want) {
+			t.Errorf("%s and %s give c the signature\n%s\nand refusals gives c\n%s\nand\n%s", tp.name(), kept.name(), sig, refusalLines(got), refusalLines(want))
+		}
+	}
+	t.Logf("%d candidates give %d signatures", len(thirdPackageCandidates()), len(first))
+}
+
+// usedSignature is what the root-package check reads of the lifts the
+// package pkg uses: each one's name and owner, and its paths in pkg's
+// registry and in its owner's, each as route shows it.
+func (tp topology) usedSignature(pkg byte) string {
+	var b strings.Builder
+	for k := tp.start(pkg); k < tp.last(pkg); k++ {
+		o := tp.owner(pkg, k)
+		if o == pkg {
+			continue
+		}
+		lift := fmt.Sprintf("l%d", k)
+		fmt.Fprintf(&b, "%s, owned by %s:", lift, pkgDir(o))
+		for _, c := range tp.corpora(pkg, k) {
+			fmt.Fprintf(&b, " %s;", usedRoute(fmt.Sprintf("top%d", c), tp.lifts(pkg, k, c), lift))
+		}
+		b.WriteString(" owned:")
+		for _, c := range tp.corpora(o, k) {
+			fmt.Fprintf(&b, " %s;", usedRoute(fmt.Sprintf("top%d", c), tp.lifts(o, k, c), lift))
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
 }
 
 // corpora are the positions of the corpus types from which the package
@@ -897,116 +1022,229 @@ func (tp topology) lifts(pkg byte, j, c int) []string {
 }
 
 // owner is the package that owns the lift at position k that the package
-// pkg registers: b for its shadow, and for a's where a adopts it.
+// pkg registers: b for its shadow.
 func (tp topology) owner(pkg byte, k int) byte {
-	if k == tp.shadow && (pkg == 'b' || tp.adopt) {
+	if k == tp.shadow && pkg == 'b' {
 		return 'b'
 	}
 	return tp.owners[k-1]
 }
 
-// refusals is what the root-package check refuses in the topology, from
-// its description alone: for each package that uses a lift, and each
-// corpus it reaches the lift from, that the lift's owner doesn't reach it
-// from that corpus, as where the user starts earlier, or reaches it by
-// another path, as through b's shadow. It gives the package and the
-// corpus, once for each pair: past where the paths part, every lift the
-// user uses parts alike.
-func (tp topology) refusals() map[string]bool {
-	out := map[string]bool{}
-	for _, u := range []byte("ab") {
-		last := strings.LastIndexByte(tp.owners, u) + 1
-		for k := tp.start(u); k < last; k++ {
+// A usedRefusal is one failure of the root-package check over a lift a
+// package uses: the user's directory, the owner's, the corpus, the lift,
+// the user's path from the corpus to the lift, and the owner's, or none
+// where the owner doesn't run the lift over the corpus, each path as
+// route shows it.
+type usedRefusal struct{ user, owner, corpus, lift, mine, theirs string }
+
+// usedRoute shows the path from the corpus to the lift through lifts,
+// nearest the lift first, as route shows it.
+func usedRoute(corpus string, lifts []string, lift string) string {
+	s := "testdata/" + corpus + "/"
+	for i := len(lifts) - 1; i >= 0; i-- {
+		s += " → " + lifts[i]
+	}
+	return s + " → " + lift
+}
+
+// pkgDir is the directory of the package pkg, a, b or c, as the
+// root-package check names it.
+func pkgDir(pkg byte) string {
+	if pkg == 'a' {
+		return "."
+	}
+	return "./" + string(pkg)
+}
+
+// refusals are the root-package check's failures over the topology, from
+// its description alone: one for each package that uses a lift, and each
+// corpus it reaches the lift from that the lift's owner doesn't reach it
+// from alike, as where the user starts earlier, or reaches it by another
+// path, as through b's shadow.
+func (tp topology) refusals() []usedRefusal {
+	var out []usedRefusal
+	for _, u := range tp.pkgs() {
+		for k := tp.start(u); k < tp.last(u); k++ {
 			o := tp.owner(u, k)
 			if o == u {
 				continue
 			}
-			theirs := tp.corpora(o, k)
+			lift := fmt.Sprintf("l%d", k)
 			for _, c := range tp.corpora(u, k) {
-				if !slices.Contains(theirs, c) || !slices.Equal(tp.lifts(u, k, c), tp.lifts(o, k, c)) {
-					out[fmt.Sprintf("%c top%d", u, c)] = true
+				corpus := fmt.Sprintf("top%d", c)
+				r := usedRefusal{pkgDir(u), pkgDir(o), corpus, lift, usedRoute(corpus, tp.lifts(u, k, c), lift), ""}
+				switch {
+				case !slices.Contains(tp.corpora(o, k), c):
+				case !slices.Equal(tp.lifts(u, k, c), tp.lifts(o, k, c)):
+					r.theirs = usedRoute(corpus, tp.lifts(o, k, c), lift)
+				default:
+					continue
 				}
+				out = append(out, r)
 			}
 		}
 	}
 	return out
 }
 
-// TestTopologyPaths: over every topology, transformGrid's and
-// usedPathTopologies', the registry of each package records each column's
-// paths as the chain gives them: one from the corpus type the package
-// starts from, and one from the product of each bytes lift past it before
-// the column, each naming the lifts between, nearest the column first,
-// with b's shadow for the stage it replaces. And after the first update,
-// the root-package check refuses the topology exactly where refusals,
-// worked out from the topology alone, says it does, once for each refusal
-// it gives. Every other run of a topology it accepts passes. In one it
-// refuses, the user's run can fail too, where it reads the committed
-// outcome of a bytes lift's cell that no package writes. Following the
-// advice of a refusal's failures, every step each names, ends them, and
-// every run passes, as followAdvice checks.
+// usedFailure is the first line of a failure of the root-package check
+// over a lift a package uses: the lift, the user, the user's path and its
+// corpus, the owner, and the corpus the owner doesn't run the lift over,
+// or the owner's path.
+var usedFailure = regexp.MustCompile(`the lift (\S+) is used by (\S+) on the path (testdata/(\w+)/(?: → \S+)*), and (\S+), which owns it, (?:doesn't run it over testdata/(\w+)/|runs it on the path (testdata/\w+/(?: → \S+)*)), so `)
+
+// usedFailures reads the root-package check's failures over lifts
+// packages use in out, each as a usedRefusal, sorted, and fails where one
+// names its lift or its corpus twice otherwise, or where a failure it
+// can't read speaks of a used lift.
+func usedFailures(t *testing.T, out string) []usedRefusal {
+	t.Helper()
+	var got []usedRefusal
+	ms := usedFailure.FindAllStringSubmatch(out, -1)
+	for _, m := range ms {
+		r := usedRefusal{m[2], m[5], m[4], m[1], m[3], m[7]}
+		if m[6] != "" && m[6] != r.corpus {
+			t.Errorf("a failure names the corpora testdata/%s/ and testdata/%s/: %q", r.corpus, m[6], m[0])
+		}
+		for _, p := range []string{r.mine, r.theirs} {
+			if p != "" && (!strings.HasPrefix(p, "testdata/"+r.corpus+"/") || !strings.HasSuffix(p, " → "+r.lift)) {
+				t.Errorf("a failure over %s from testdata/%s/ gives the path %s: %q", r.lift, r.corpus, p, m[0])
+			}
+		}
+		got = append(got, r)
+	}
+	if n := strings.Count(out, " is used by "); n != len(ms) {
+		t.Errorf("of the %d failures over used lifts, %d can be read:\n%s", n, len(ms), out)
+	}
+	sortRefusals(got)
+	return got
+}
+
+func sortRefusals(rs []usedRefusal) {
+	slices.SortFunc(rs, func(a, b usedRefusal) int { return strings.Compare(fmt.Sprint(a), fmt.Sprint(b)) })
+}
+
+// A pathTopology is what TestTopologyPaths runs: a topology, or a
+// branching.
+type pathTopology interface {
+	name() string
+	sandbox(t *testing.T) (*sandbox, closingGrid)
+	refusals() []usedRefusal
+	checkPaths(t *testing.T, s *sandbox)
+}
+
+// TestTopologyPaths: over every topology, transformGrid's,
+// usedPathTopologies', thirdPackageTopologies' and the branchings', the
+// registry of each package records each column's paths as the topology
+// gives them: one from the corpus type the package starts from, and one
+// from the product of each bytes lift past it before the column, each
+// naming the lifts between, nearest the column first, with b's shadow for
+// the stage it replaces. And after the first update, the root-package
+// check fails exactly where refusals, worked out from the topology alone,
+// says: the failures name the users, owners, corpora, lifts and paths it
+// gives, each once. Every other run of a topology it accepts passes. In
+// one it refuses, the user's run can fail too, where it reads the
+// committed outcome of a bytes lift's cell that no package writes.
 func TestTopologyPaths(t *testing.T) {
 	t.Parallel()
-	tps := append(topologies(), topology{kinds: "NB", owners: "aaa", transform: true})
-	tps = append(tps, usedPathTopologies()...)
-	var mu sync.Mutex
-	var refused, accepted, followed int
-	t.Cleanup(func() {
-		t.Logf("of %d topologies, the root-package check refuses %d, and accepts %d; the advice of the refusals is followed %d ways", refused+accepted, refused, accepted, followed)
-	})
+	var tps []pathTopology
+	family := map[string]string{} // each topology's family, by its name
+	add := func(name string, tp pathTopology) {
+		tps = append(tps, tp)
+		family[tp.name()] = name
+	}
+	for _, tp := range append(topologies(), topology{kinds: "NB", owners: "aaa", transform: true}) {
+		add("topologies and transformGrid", tp)
+	}
+	for _, tp := range usedPathTopologies() {
+		add("usedPathTopologies", tp)
+	}
+	for _, tp := range thirdPackageTopologies() {
+		add(fmt.Sprintf("thirdPackageTopologies, of %d candidates", len(thirdPackageCandidates())), tp)
+	}
+	for _, br := range branchings() {
+		add("branchings", br)
+	}
+	counts := map[string][2]int{} // family → topologies, refused
+	for _, tp := range tps {
+		c := counts[family[tp.name()]]
+		c[0]++
+		if len(tp.refusals()) > 0 {
+			c[1]++
+		}
+		counts[family[tp.name()]] = c
+	}
+	for _, f := range slices.Sorted(maps.Keys(counts)) {
+		t.Logf("%s: %d topologies, of which the root-package check refuses %d", f, counts[f][0], counts[f][1])
+	}
 	for _, tp := range tps {
 		t.Run(tp.name(), func(t *testing.T) {
 			t.Parallel()
 			s, g := tp.sandbox(t)
-			wantRefused := tp.refusals()
-			mu.Lock()
-			if len(wantRefused) > 0 {
-				refused++
-			} else {
-				accepted++
-			}
-			mu.Unlock()
-			var rootOut string
+			want := tp.refusals()
+			sortRefusals(want)
 			for i, r := range g.runAll(s, false, "") {
 				switch {
-				case i == 0 && len(wantRefused) > 0:
-					rootOut = string(r.out)
+				case i == 0 && len(want) > 0:
 					if r.ok() {
-						t.Errorf("the root-package check accepts the topology, and should refuse %v:\n%s", slices.Sorted(maps.Keys(wantRefused)), s.shown(r))
-					} else if got := strings.Count(rootOut, " used by "); got != len(wantRefused) {
-						t.Errorf("the root-package check refuses %d uses, and should refuse %d, %v:\n%s", got, len(wantRefused), slices.Sorted(maps.Keys(wantRefused)), s.shown(r))
+						t.Errorf("the root-package check accepts the topology, and should refuse\n%s", refusalLines(want))
+					} else if got := usedFailures(t, string(r.out)); !slices.Equal(got, want) {
+						t.Errorf("the root-package check refuses\n%s\nand should refuse\n%s\n%s", refusalLines(got), refusalLines(want), s.shown(r))
 					}
-				case !r.ok() && len(wantRefused) == 0:
+				case !r.ok() && len(want) == 0:
 					t.Errorf("the run of %q failed:\n%s", g.pkgs[i].pkg, s.shown(r))
 				}
 			}
 			tp.checkPaths(t, s)
-			if len(wantRefused) == 0 {
-				return
-			}
-			one, two := topologyAdvice(rootOut)
-			if len(one)+len(two) != len(wantRefused) {
-				t.Fatalf("of the root-package check's %d failures, %d give advice that can be followed:\n%s", len(wantRefused), len(one)+len(two), rootOut)
-			}
-			// Each failure that gives two ways gives up b's shadow one way,
-			// and has a adopt it the other: the first in every failure is
-			// followed, and then, from a fresh copy of the sandbox, the
-			// second.
-			ways := []bool{false}
-			if len(two) > 0 {
-				ways = append(ways, true)
-			}
-			for _, adopt := range ways {
-				if adopt {
-					s, _ = tp.sandbox(t)
-				}
-				followAdvice(t, s, tp, one, two, adopt)
-				mu.Lock()
-				followed++
-				mu.Unlock()
-			}
 		})
 	}
+}
+
+// TestTopologyUsedPathLeft: in the topology BN, ./b owns the bytes lift
+// l1, and . the stage l2 and list, starting from Top1B, the product of
+// l1; ./c, which owns listc, starts from Top0, and so reaches l2 from
+// testdata/top0/ through l1, where . doesn't run l2. The root-package
+// check fails once, and applying the second way the failure states ends
+// it: ./c no longer reaches l2 from testdata/top0/, starting from Top1B,
+// and its cells of top0's base, which no package writes then, are
+// deleted. Every run passes then. TestChainRootCheckUsedPath applies the
+// first way, and TestRootCheckUsedPath both ways a failure over a path
+// other than the owner's states.
+func TestTopologyUsedPathLeft(t *testing.T) {
+	t.Parallel()
+	tp := topology{kinds: "BN", owners: "baa", starts: [2]int{2, 1}, third: 1}
+	want := []usedRefusal{{"./c", ".", "top0", "l2", "testdata/top0/ → l1 → l2", ""}}
+	if got := tp.refusals(); !slices.Equal(got, want) {
+		t.Fatalf("refusals gives\n%s\nwhere the test expects\n%s", refusalLines(got), refusalLines(want))
+	}
+	s, _ := tp.sandbox(t)
+	r := s.normal(tp.registration('a'))
+	s.fails(r, "the lift l2 is used by ./c on the path testdata/top0/ → l1 → l2, and ., which owns it, doesn't run it over testdata/top0/, so no package writes its cells of that corpus's cases, which ./c's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs l2 over testdata/top0/ by that path, or ./c doesn't reach l2 from testdata/top0/. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
+	if n := strings.Count(r.out, " is used by "); n != 1 {
+		t.Errorf("the root-package check fails %d times on used lifts, and should fail once", n)
+	}
+
+	left := tp
+	left.third = 2
+	s.edit("testdata/top0/base.txtar", "delete ./c's cells of top0's base, which no package writes now", drop("out/listc/"))
+	s.passes(s.run("c", left.registration('c'), true))
+	s.passes(s.normal(left.registration('a')))
+	s.passes(s.run("b", left.registration('b'), false))
+	s.passes(s.run("c", left.registration('c'), false))
+	if got := left.refusals(); len(got) > 0 {
+		t.Errorf("refusals gives\n%s\nwhere ./c starts from Top1B", refusalLines(got))
+	}
+	left.checkPaths(t, s)
+	s.done()
+}
+
+// refusalLines shows refusals, one to a line.
+func refusalLines(rs []usedRefusal) string {
+	var lines []string
+	for _, r := range rs {
+		lines = append(lines, fmt.Sprintf("  %+v", r))
+	}
+	return strings.Join(lines, "\n")
 }
 
 // sandbox is a sandbox holding the topology's packages and a base
@@ -1015,29 +1253,45 @@ func TestTopologyPaths(t *testing.T) {
 func (tp topology) sandbox(t *testing.T) (*sandbox, closingGrid) {
 	t.Helper()
 	s := newSandbox(t, "")
-	g := closingGrid{pkgs: []childRun{{pkg: "", registration: tp.registration('a')}}}
-	if strings.Contains(tp.owners, "b") {
-		s.write("b/corpus_test.go", []byte(packageTestFile), "./b is a package with tests")
-		g.pkgs = append(g.pkgs, childRun{pkg: "b", registration: tp.registration('b')})
+	var g closingGrid
+	for _, p := range tp.pkgs() {
+		dir := ""
+		if p != 'a' {
+			dir = string(p)
+			s.write(dir+"/corpus_test.go", []byte(packageTestFile), pkgDir(p)+" is a package with tests")
+		}
+		g.pkgs = append(g.pkgs, childRun{pkg: dir, registration: tp.registration(p)})
 	}
 	for _, c := range tp.startCorpora() {
 		tree := topologyTree(tp.kinds, c, len(tp.kinds)+1)
 		s.write(fmt.Sprintf("testdata/top%d/base.txtar", c), fmt.Appendf(nil, "A chain of lifts, each following its tree.\n-- in/%sA1 --\n1\n-- in/%sB1 --\n2\n", tree, tree), "the topology's base, where a package starts")
 	}
+	updateAll(t, s, g)
+	return s, g
+}
+
+// updateAll runs the update of each package of g in s, and fails the test
+// where one fails.
+func updateAll(t *testing.T, s *sandbox, g closingGrid) {
+	t.Helper()
 	for i, r := range g.runAll(s, true, "") {
 		if !r.ok() {
 			t.Fatalf("the update of %q failed:\n%s", g.pkgs[i].pkg, s.shown(r))
 		}
 	}
-	return s, g
 }
 
-// pkgs are the topology's packages, a and, where it owns a column, b.
+// pkgs are the topology's packages: a, b where it owns a column, and c
+// where third is set.
 func (tp topology) pkgs() []byte {
+	pkgs := []byte("a")
 	if strings.Contains(tp.owners, "b") {
-		return []byte("ab")
+		pkgs = append(pkgs, 'b')
 	}
-	return []byte("a")
+	if tp.third > 0 {
+		pkgs = append(pkgs, 'c')
+	}
+	return pkgs
 }
 
 // startCorpora are the positions of the corpus types the packages start
@@ -1052,35 +1306,43 @@ func (tp topology) startCorpora() []int {
 	return out
 }
 
+// registryColumns are the columns, suites and lifts, owned or used, that
+// the registry of the package in the directory dir in s records, by name,
+// with their paths.
+func registryColumns(t *testing.T, s *sandbox, dir string) map[string][]registry.Path {
+	t.Helper()
+	g, err := registry.Parse(s.read(path.Join(dir, "testdata/hypercase.json")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string][]registry.Path{}
+	for _, l := range g.Lifts {
+		got[l.Name] = l.Paths
+	}
+	for _, c := range g.Suites {
+		got[c.Name] = c.Paths
+	}
+	return got
+}
+
 // checkPaths checks that the registry of each package of the topology, in
 // s, records each column's paths as the chain gives them.
 func (tp topology) checkPaths(t *testing.T, s *sandbox) {
 	t.Helper()
 	n := len(tp.kinds)
 	for _, p := range tp.pkgs() {
-		reg := "testdata/hypercase.json"
-		if p == 'b' {
-			reg = "b/testdata/hypercase.json"
-		}
-		g, err := registry.Parse(s.read(reg))
-		if err != nil {
-			t.Fatal(err)
-		}
-		got := map[string][]registry.Path{}
-		for _, l := range g.Lifts {
-			got[l.Name] = l.Paths
-		}
-		for _, c := range g.Suites {
-			got[c.Name] = c.Paths
-		}
+		got := registryColumns(t, s, pkgDir(p))
 		if len(got) == 0 {
-			t.Errorf("%s records no column", reg)
+			t.Errorf("%s's registry records no column", pkgDir(p))
 		}
 		for j := 1; j <= n+1; j++ {
 			col := fmt.Sprintf("l%d", j)
-			if j == n+1 {
+			switch {
+			case j == n+1 && p == 'c':
+				col = "listc"
+			case j == n+1:
 				col = "list"
-			} else if j == tp.shadow && tp.owner(p, j) == 'b' {
+			case j == tp.shadow && tp.owner(p, j) == 'b':
 				col += "x"
 			}
 			var want []registry.Path
@@ -1088,219 +1350,239 @@ func (tp topology) checkPaths(t *testing.T, s *sandbox) {
 				want = append(want, registry.Path{Corpus: fmt.Sprintf("top%d", c), Lifts: tp.lifts(p, j, c)})
 			}
 			if ps, ok := got[col]; ok && !reflect.DeepEqual(ps, want) {
-				t.Errorf("%s records %s's paths as %+v, and the chain gives %+v", reg, col, ps, want)
+				t.Errorf("%s's registry records %s's paths as %+v, and the chain gives %+v", pkgDir(p), col, ps, want)
 			}
 		}
 	}
 }
 
-// topologyAdvice reads the advice of the root-package check's failures
-// over lifts used otherwise than their owners reach them in out: of each
-// that gives one way, the way, and of each that gives two, both. Each way
-// is a package's part, "in <pkg>, <step>, and <step>…", or more than
-// one.
-func topologyAdvice(out string) (one []string, two [][2]string) {
-	for _, m := range regexp.MustCompile(`In (\./b|\.), (.+?), so (?:\./b|\.) runs (?:it|them) over testdata/top\d/ too\.`).FindAllStringSubmatch(out, -1) {
-		one = append(one, "in "+m[1]+", "+m[2])
-	}
-	for _, m := range regexp.MustCompile(`Either (.+?), or (.+?)\. If they reach`).FindAllStringSubmatch(out, -1) {
-		two = append(two, [2]string{m[1], m[2]})
-	}
-	return one, two
+// A branching is a topology of two branches from Top0, where topologies
+// gives chains alone: the bytes lifts l1 and l2 take Top0 and make Top1B
+// and Top2B, the stages l3 and l4 take those, and the suites list3 and
+// list4 list what l3 and l4 make. owners gives the owner, a or b, of the
+// columns of branchCols, in their order, and late, for a and then b, that
+// the package starts from Top1B and Top2B, and not from Top0. A package
+// registers the columns it owns, the lifts before them on their branch,
+// from its start, that it doesn't own, with hypercase.Use, and the corpus
+// type of each branch it registers a column of.
+type branching struct {
+	owners string
+	late   [2]bool
 }
 
-// adviceSteps are the steps advice names for a package: the corpus types
-// of dirs to register, the lifts of use to give to hypercase.Use, the
-// lifts of add to give it in place of those of drop, and the sections
-// under deletes to delete from the archives.
-type adviceSteps struct{ dirs, use, add, drop, deletes []string }
+// branchCols are a branching's columns: l1 and l2, then l3 and l4, then
+// list3 and list4. The column at index i is on branch i%2+1, at depth
+// i/2.
+var branchCols = []string{"l1", "l2", "l3", "l4", "list3", "list4"}
 
-// parseAdvice adds the steps each package's part of advice names to
-// steps, each once: two failures can name one step.
-func parseAdvice(t *testing.T, advice string, steps map[byte]*adviceSteps) {
-	t.Helper()
-	names := func(list string) []string { return regexp.MustCompile(`, | and `).Split(list, -1) }
-	add := func(to *[]string, items ...string) {
-		for _, x := range items {
-			if !slices.Contains(*to, x) {
-				*to = append(*to, x)
-			}
+// branchings are every branching in which a and b each own a column, and
+// a package that starts late owns neither bytes lift: one starts from
+// Top0. A package uses a lift from a corpus its owner doesn't run it over
+// where it starts early and the owner late, and two such uses on two
+// branches are two failures; every package reaches a column from a corpus
+// by one path, so none uses a lift by another.
+func branchings() []branching {
+	var out []branching
+	for mask := range 1 << len(branchCols) {
+		var ob strings.Builder
+		for i := range branchCols {
+			ob.WriteByte("ab"[mask>>i&1])
 		}
-	}
-	parts := regexp.MustCompile(`(?:^|, and )in (\./b|\.), `).FindAllStringSubmatchIndex(advice, -1)
-	if len(parts) == 0 || parts[0][0] != 0 {
-		t.Errorf("the advice %q names no package to start with", advice)
-		return
-	}
-	for i, part := range parts {
-		end := len(advice)
-		if i+1 < len(parts) {
-			end = parts[i+1][0]
+		owners := ob.String()
+		if !strings.Contains(owners, "a") || !strings.Contains(owners, "b") {
+			continue
 		}
-		pkg := byte('a')
-		if advice[part[2]:part[3]] == "./b" {
-			pkg = 'b'
-		}
-		if steps[pkg] == nil {
-			steps[pkg] = &adviceSteps{}
-		}
-		st := steps[pkg]
-		for _, step := range strings.Split(advice[part[1]:end], ", and ") {
-			if m := regexp.MustCompile(`^register the corpus types? of (.+)$`).FindStringSubmatch(step); m != nil {
-				for _, d := range regexp.MustCompile(`testdata/(top\d)/`).FindAllStringSubmatch(m[1], -1) {
-					add(&st.dirs, d[1])
-				}
-			} else if m := regexp.MustCompile(`^give (.+) to hypercase\.Use in place of (.+)$`).FindStringSubmatch(step); m != nil {
-				add(&st.add, names(m[1])...)
-				add(&st.drop, names(m[2])...)
-			} else if m := regexp.MustCompile(`^give (.+) to hypercase\.Use$`).FindStringSubmatch(step); m != nil {
-				add(&st.use, names(m[1])...)
-			} else if m := regexp.MustCompile(`^delete .+, under (.+) in the archives, which no package writes then$`).FindStringSubmatch(step); m != nil {
-				add(&st.deletes, names(m[1])...)
-			} else {
-				t.Errorf("the advice %q names a step no topology takes: %q", advice, step)
-			}
-		}
-	}
-}
-
-// followAdvice follows, in s, the advice of the root-package check's
-// failures over the topology tp: the ways of one, and of each pair of two
-// the one that gives up b's shadow, or where adopt is set, the one that
-// has a adopt it. Every step the advice names is a change of tp: a
-// package that registers the corpus types of dirs starts from the
-// earliest of them, and b that gives the stage to hypercase.Use in place
-// of its copy gives up its shadow, and a that gives the copy in place of
-// the stage adopts it. The registries the update writes then differ from
-// those before by the steps' corpus types and lifts, and none else, every
-// run passes, and refusals, from the changed topology alone, gives none.
-func followAdvice(t *testing.T, s *sandbox, tp topology, one []string, two [][2]string, adopt bool) {
-	t.Helper()
-	steps := map[byte]*adviceSteps{}
-	advice := slices.Clone(one)
-	x := fmt.Sprintf("l%d", tp.shadow)
-	for _, ways := range two {
-		giveUp := strings.Contains(ways[0], "in place of "+x+"x")
-		if giveUp == strings.Contains(ways[1], "in place of "+x+"x") {
-			t.Fatalf("of the ways %q and %q, not one gives up b's shadow, %sx", ways[0], ways[1], x)
-		}
-		i := 1
-		if giveUp != adopt {
-			i = 0
-		}
-		advice = append(advice, ways[i])
-	}
-	for _, a := range advice {
-		parseAdvice(t, a, steps)
-	}
-	next := tp
-	next.starts = [2]int{tp.start('a'), tp.start('b')}
-	for pkg, st := range steps {
-		if len(st.dirs) > 0 {
-			start := len(tp.kinds) + 1
-			for _, d := range st.dirs {
-				start = min(start, int(d[3]-'0')+1)
-			}
-			if start > 1 && tp.kinds[start-2] != 'B' {
-				t.Fatalf("the advice %q has %c register %v, of which none is a corpus type to start from", advice, pkg, st.dirs)
-			}
-			next.starts[pkg-'a'] = start
-		}
-		switch {
-		case len(st.add)+len(st.drop) == 0:
-		case pkg == 'b' && slices.Equal(st.add, []string{x}) && slices.Equal(st.drop, []string{x + "x"}):
-			next.shadow = 0
-		case pkg == 'a' && slices.Equal(st.add, []string{x + "x"}) && slices.Equal(st.drop, []string{x}):
-			next.adopt = true
-		default:
-			t.Fatalf("the advice %q has %c give %v to hypercase.Use in place of %v, which no topology does", advice, pkg, st.add, st.drop)
-		}
-	}
-	before := topologyLifts(t, s, tp.pkgs())
-	for _, c := range tp.startCorpora() {
-		for _, st := range steps {
-			for _, d := range st.deletes {
-				s.edit(fmt.Sprintf("testdata/top%d/base.txtar", c), "delete the cells the advice names", drop(d))
-			}
-		}
-	}
-	g := closingGrid{pkgs: []childRun{{pkg: "", registration: next.registration('a')}}}
-	if len(tp.pkgs()) > 1 {
-		g.pkgs = append(g.pkgs, childRun{pkg: "b", registration: next.registration('b')})
-	}
-	for _, update := range []bool{true, false} {
-		for i, r := range g.runAll(s, update, "") {
-			if !r.ok() {
-				t.Errorf("after following the advice %q, the run of %q (update %v) failed:\n%s", advice, g.pkgs[i].pkg, update, s.shown(r))
-			}
-		}
-	}
-	after := topologyLifts(t, s, tp.pkgs())
-	for _, p := range tp.pkgs() {
-		st := steps[p]
-		if st == nil {
-			st = &adviceSteps{}
-		}
-		var wantAdded, wantRemoved, added, removed []string
-		for _, d := range st.dirs {
-			wantAdded = append(wantAdded, "type "+d)
-		}
-		for _, l := range append(slices.Clone(st.use), st.add...) {
-			wantAdded = append(wantAdded, "use "+l)
-		}
-		for k := range before[p] {
-			if slices.Contains(st.drop, strings.Fields(k)[1]) {
-				wantRemoved = append(wantRemoved, k)
-			}
-			if !after[p][k] {
-				removed = append(removed, k)
-			}
-		}
-		for k := range after[p] {
-			if !before[p][k] {
-				added = append(added, k)
-			}
-		}
-		slices.Sort(wantAdded)
-		slices.Sort(wantRemoved)
-		slices.Sort(added)
-		slices.Sort(removed)
-		if !slices.Equal(added, wantAdded) || !slices.Equal(removed, wantRemoved) {
-			t.Errorf("following the advice %q, %c's registry gains %v and loses %v, where the advice names %v and %v", advice, p, added, removed, wantAdded, wantRemoved)
-		}
-	}
-	if r := next.refusals(); len(r) > 0 {
-		t.Errorf("following the advice %q gives %s, which refusals refuses: %v", advice, next.name(), slices.Sorted(maps.Keys(r)))
-	}
-	next.checkPaths(t, s)
-}
-
-// topologyLifts are, for each package of pkgs, the corpus types its
-// registry in s lists, as "type <dir>", and its lifts, as "own <name>"
-// and "use <name>".
-func topologyLifts(t *testing.T, s *sandbox, pkgs []byte) map[byte]map[string]bool {
-	t.Helper()
-	out := map[byte]map[string]bool{}
-	for _, p := range pkgs {
-		reg := "testdata/hypercase.json"
-		if p == 'b' {
-			reg = "b/testdata/hypercase.json"
-		}
-		g, err := registry.Parse(s.read(reg))
-		if err != nil {
-			t.Fatal(err)
-		}
-		out[p] = map[string]bool{}
-		for _, ct := range g.Types {
-			out[p]["type "+ct.Dir] = true
-		}
-		for _, l := range g.Lifts {
-			if l.Owned {
-				out[p]["own "+l.Name] = true
-			} else {
-				out[p]["use "+l.Name] = true
+		for _, late := range [][2]bool{{false, false}, {false, true}, {true, false}} {
+			br := branching{owners, late}
+			if (!late[0] || !strings.ContainsRune(owners[:2], 'a')) && (!late[1] || !strings.ContainsRune(owners[:2], 'b')) {
+				out = append(out, br)
 			}
 		}
 	}
 	return out
+}
+
+func (br branching) name() string {
+	late := []byte("ee")
+	for i, l := range br.late {
+		if l {
+			late[i] = 'l'
+		}
+	}
+	return "branching-" + br.owners + "-" + string(late)
+}
+
+// registration names the registration of the package pkg, a or b, which
+// topologyRegistration reads.
+func (br branching) registration(pkg byte) string { return br.name() + "-" + string(pkg) }
+
+// columns are the indices in branchCols of the columns the package pkg
+// owns, and of the lifts it uses.
+func (br branching) columns(pkg byte) (owned, used []int) {
+	for i := range branchCols {
+		if br.owners[i] == pkg {
+			owned = append(owned, i)
+		}
+	}
+	for i := range 4 {
+		if br.owners[i] == pkg || (br.late[pkg-'a'] && i < 2) {
+			continue
+		}
+		if slices.ContainsFunc(owned, func(j int) bool { return j%2 == i%2 && j > i }) {
+			used = append(used, i)
+		}
+	}
+	return owned, used
+}
+
+// paths are the paths by which the package pkg reaches the column at
+// index i in branchCols, as a registry records them: from Top0, where the
+// package starts there, through the lifts before the column on its
+// branch, and from the product of the branch's bytes lift, past it,
+// through the stage, for a suite.
+func (br branching) paths(pkg byte, i int) []registry.Path {
+	branch, depth := i%2+1, i/2
+	stage, bytes := fmt.Sprintf("l%d", branch+2), fmt.Sprintf("l%d", branch)
+	var out []registry.Path
+	if !br.late[pkg-'a'] {
+		lifts := []string{}
+		switch depth {
+		case 1:
+			lifts = []string{bytes}
+		case 2:
+			lifts = []string{stage, bytes}
+		}
+		out = append(out, registry.Path{Corpus: "top0", Lifts: lifts})
+	}
+	if depth > 0 {
+		lifts := []string{}
+		if depth == 2 {
+			lifts = []string{stage}
+		}
+		out = append(out, registry.Path{Corpus: fmt.Sprintf("top%d", branch), Lifts: lifts})
+	}
+	return out
+}
+
+// column is the branching's column at index i in branchCols.
+func (br branching) column(i int) any {
+	product := func(k int) []decl.Output {
+		return []decl.Output{
+			{Pattern: fmt.Sprintf("l%d/*", k), Description: fmt.Sprintf("What l%d does, as its tree says.", k)},
+			{Pattern: "data/*", Description: "The data a list lists."},
+		}
+	}
+	switch i {
+	case 0:
+		return topologyBytesOf[Top0, Top1B](1, product(3))
+	case 1:
+		return topologyBytesOf[Top0, Top2B](2, product(4))
+	case 2:
+		return topologyStage[Top1B](3, func(v fs.FS) *Top3N { return &Top3N{v} })
+	case 3:
+		return topologyStage[Top2B](4, func(v fs.FS) *Top4N { return &Top4N{v} })
+	case 4:
+		return renamed(topologySuite[*Top3N](), "list3")
+	}
+	return renamed(topologySuite[*Top4N](), "list4")
+}
+
+// register registers the package pkg, a or b, of the branching.
+func (br branching) register(pkg byte) {
+	owned, used := br.columns(pkg)
+	items := []any{project}
+	if !br.late[pkg-'a'] {
+		items = append(items, topologyTop0)
+	}
+	for b := range 2 {
+		if slices.ContainsFunc(append(slices.Clone(owned), used...), func(i int) bool { return i%2 == b }) {
+			items = append(items, topologyType(b+1))
+		}
+	}
+	if pkg == 'a' {
+		items = append(items, rootPkg)
+	}
+	for k := 1; k <= 4; k++ {
+		items = append(items, topologyProperty(k))
+	}
+	var ownedCols, usedCols []any
+	for _, i := range owned {
+		ownedCols = append(ownedCols, br.column(i))
+	}
+	for _, i := range used {
+		usedCols = append(usedCols, br.column(i))
+	}
+	items = append(items, own(ownedCols...))
+	if len(usedCols) > 0 {
+		items = append(items, hypercase.Use(usedCols...))
+	}
+	hypercase.Register(items...)
+}
+
+// sandbox is a sandbox holding the branching's packages, a base archive
+// at Top0, whose data sits below each bytes lift's out/ tree, and one at
+// the product of each branch a late package registers, after the first
+// update, and the grid of its packages.
+func (br branching) sandbox(t *testing.T) (*sandbox, closingGrid) {
+	t.Helper()
+	s := newSandbox(t, "")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "./b is a package with tests")
+	g := closingGrid{pkgs: []childRun{{pkg: "", registration: br.registration('a')}, {pkg: "b", registration: br.registration('b')}}}
+	s.write("testdata/top0/base.txtar", []byte("Two branches of lifts, each following its tree.\n-- in/l1/out/data/A1 --\n1\n-- in/l2/out/data/B1 --\n2\n"), "the branching's base at Top0")
+	for b := 1; b <= 2; b++ {
+		for _, p := range []byte("ab") {
+			owned, used := br.columns(p)
+			if br.late[p-'a'] && slices.ContainsFunc(append(owned, used...), func(i int) bool { return i%2+1 == b }) {
+				s.write(fmt.Sprintf("testdata/top%d/base.txtar", b), fmt.Appendf(nil, "A branch's data.\n-- in/data/A%d --\n%d\n", b, b), "the branching's base where a package starts late")
+				break
+			}
+		}
+	}
+	updateAll(t, s, g)
+	return s, g
+}
+
+// refusals are the root-package check's failures over the branching,
+// from its description alone: one for each package that uses a lift, and
+// each corpus it reaches the lift from that the lift's owner doesn't
+// reach it from alike.
+func (br branching) refusals() []usedRefusal {
+	var out []usedRefusal
+	for _, u := range []byte("ab") {
+		_, used := br.columns(u)
+		for _, i := range used {
+			o, lift := br.owners[i], branchCols[i]
+			theirs := br.paths(o, i)
+			for _, p := range br.paths(u, i) {
+				r := usedRefusal{pkgDir(u), pkgDir(o), p.Corpus, lift, usedRoute(p.Corpus, p.Lifts, lift), ""}
+				switch j := slices.IndexFunc(theirs, func(q registry.Path) bool { return q.Corpus == p.Corpus }); {
+				case j < 0:
+				case !slices.Equal(p.Lifts, theirs[j].Lifts):
+					r.theirs = usedRoute(p.Corpus, theirs[j].Lifts, lift)
+				default:
+					continue
+				}
+				out = append(out, r)
+			}
+		}
+	}
+	return out
+}
+
+// checkPaths checks that the registry of each package of the branching,
+// in s, records the columns it owns and the lifts it uses, and each one's
+// paths as paths gives them.
+func (br branching) checkPaths(t *testing.T, s *sandbox) {
+	t.Helper()
+	for _, p := range []byte("ab") {
+		got := registryColumns(t, s, pkgDir(p))
+		owned, used := br.columns(p)
+		want := map[string][]registry.Path{}
+		for _, i := range append(owned, used...) {
+			want[branchCols[i]] = br.paths(p, i)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("%s's registry records the columns and paths\n%+v\nand the branching gives\n%+v", pkgDir(p), got, want)
+		}
+	}
 }

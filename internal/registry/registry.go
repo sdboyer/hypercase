@@ -300,9 +300,10 @@ func (e *FormatError) Error() string {
 // Parse parses a registry. One of another format version is a
 // [*FormatError]. So that every reader of today's registries reads the
 // paths the update writes, Parse refuses one whose paths the update
-// couldn't have written: a column's paths are one from each of its
-// corpora, in their order, and name only lifts the registry lists, never
-// the column itself.
+// couldn't have written: a column runs over each of its corpora once,
+// and its paths are one from each, in their order, and name only lifts
+// the registry lists, each once, never the column itself, and none for a
+// suite over the raw input view.
 func Parse(data []byte) (*Registry, error) {
 	var head struct {
 		Format int `json:"format"`
@@ -333,7 +334,12 @@ func (r *Registry) checkPaths() error {
 	for _, l := range r.Lifts {
 		lifts[l.Name] = true
 	}
-	check := func(kind, name string, corpora []string, paths []Path) error {
+	check := func(kind, name string, raw bool, corpora []string, paths []Path) error {
+		for i, c := range corpora {
+			if slices.Contains(corpora[:i], c) {
+				return fmt.Errorf("the %s %s runs over testdata/%s/ twice, where a registry lists each corpus a column runs over once", kind, name, c)
+			}
+		}
 		from := []string{}
 		for _, p := range paths {
 			from = append(from, p.Corpus)
@@ -342,24 +348,29 @@ func (r *Registry) checkPaths() error {
 			return fmt.Errorf("the %s %s runs over %s, and has paths from %s, where a registry gives each column one path from each corpus it runs over, in the same order", kind, name, dirList(corpora), dirList(from))
 		}
 		for _, p := range paths {
-			for _, l := range p.Lifts {
+			if raw && len(p.Lifts) > 0 {
+				return fmt.Errorf("the %s %s consumes the raw input view, and its path from testdata/%s/ names %s, where a suite over the raw input view passes through no lift", kind, name, p.Corpus, strings.Join(p.Lifts, ", "))
+			}
+			for i, l := range p.Lifts {
 				switch {
 				case l == name:
 					return fmt.Errorf("the %s %s's path from testdata/%s/ names the %s itself, where a column's path names the lifts before it", kind, name, p.Corpus, kind)
 				case !lifts[l]:
 					return fmt.Errorf("the %s %s's path from testdata/%s/ names %s, and the registry lists no lift of that name, where every lift on a column's path is one its package registers", kind, name, p.Corpus, l)
+				case slices.Contains(p.Lifts[:i], l):
+					return fmt.Errorf("the %s %s's path from testdata/%s/ names %s twice, where a column's path names each lift before it once", kind, name, p.Corpus, l)
 				}
 			}
 		}
 		return nil
 	}
 	for _, s := range r.Suites {
-		if err := check("suite", s.Name, s.Corpora, s.Paths); err != nil {
+		if err := check("suite", s.Name, s.Consumes == RawInput, s.Corpora, s.Paths); err != nil {
 			return err
 		}
 	}
 	for _, l := range r.Lifts {
-		if err := check("lift", l.Name, l.Corpora, l.Paths); err != nil {
+		if err := check("lift", l.Name, false, l.Corpora, l.Paths); err != nil {
 			return err
 		}
 	}

@@ -1,0 +1,50 @@
+$ edit b/corpus_test.go  # ./b is a package with tests
+$ edit c/corpus_test.go  # ./c is a package with tests
+$ edit testdata/top1/base.txtar  # the topology's base, where a package starts
+$ edit testdata/top0/base.txtar  # the topology's base, where a package starts
+$ go test  # topology-BN-baa-s21-c1-a
+    the lift l2 is used by ./c on the path testdata/top0/ → l1 → l2, and ., which owns it, doesn't run it over testdata/top0/, so no package writes its cells of that corpus's cases, which ./c's cells past it are built through.
+        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs l2 over testdata/top0/ by that path, or ./c doesn't reach l2 from testdata/top0/. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+    what ran, in order:
+        l2 ran on base
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/top1
+        --- PASS: TestCorpus/top1/base
+            --- PASS: TestCorpus/top1/base/l2
+            --- PASS: TestCorpus/top1/base/list
+FAIL
+[exit 1]
+$ edit testdata/top0/base.txtar  # delete ./c's cells of top0's base, which no package writes now
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./c  # topology-BN-baa-s21-c2-c
+    what ran, in order:
+        l2 ran on base
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/top1
+        --- PASS: TestCorpus/top1/base
+            --- PASS: TestCorpus/top1/base/listc
+PASS
+$ go test  # topology-BN-baa-s21-c2-a
+    what ran, in order:
+        l2 ran on base
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/top1
+        --- PASS: TestCorpus/top1/base
+            --- PASS: TestCorpus/top1/base/l2
+            --- PASS: TestCorpus/top1/base/list
+PASS
+$ go test ./b  # topology-BN-baa-s21-c2-b
+    what ran, in order:
+        l1 ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/top0
+        --- PASS: TestCorpus/top0/base
+            --- PASS: TestCorpus/top0/base/l1
+PASS
+$ go test ./c  # topology-BN-baa-s21-c2-c
+    what ran, in order:
+        l2 ran on base
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/top1
+        --- PASS: TestCorpus/top1/base
+            --- PASS: TestCorpus/top1/base/listc
+PASS

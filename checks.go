@@ -141,7 +141,7 @@ func (r *runner) runChecks(t *testing.T, found []registry.Found) {
 				var reg *unreadableRegistry
 				switch {
 				case errors.As(err, &reg):
-					t.Errorf("the corpus check %s can't read its cells: %s can't be read: %v.\nRun %s to write it. No check runs, and an update writes no findings.", c.Name, reg.path, reg.err, r.updateCmd())
+					t.Errorf("the corpus check %s can't read its cells: %s can't be read: %v. No check runs, and an update writes no findings.\nRun %s to write it. If %s holds no _test.go file, no update writes it, so delete it.", c.Name, reg.path, reg.err, r.updateCmd(), reg.dir)
 					return
 				case err != nil:
 					t.Errorf("the corpus check %s can't read its cells: %v\nFix what the message names. No check runs, and an update writes no findings.", c.Name, err)
@@ -263,7 +263,7 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 		}
 		g, err := registry.Parse(data)
 		if err != nil {
-			return nil, &unreadableRegistry{r.rel(f.Path), err}
+			return nil, &unreadableRegistry{r.rel(f.Path), r.rel(f.Pkg), err}
 		}
 		pkg := r.pkgName(f.Pkg)
 		// Parse refuses paths that aren't one from each corpus, so each
@@ -387,10 +387,10 @@ func gapTexts(transform string, gaps []archive.Gap) map[string]string {
 }
 
 // An unreadableRegistry is a registry readCells can't read, by its path
-// relative to the module root, and why.
+// and its package's directory, relative to the module root, and why.
 type unreadableRegistry struct {
-	path string
-	err  error
+	path, dir string
+	err       error
 }
 
 func (e *unreadableRegistry) Error() string { return e.path + ": " + e.err.Error() }
