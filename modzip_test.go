@@ -31,17 +31,19 @@ import (
 // two paths that differ only in case, or files past the size limits.
 // moduleZipProblems lists HEAD's tree with git ls-tree, which no attribute
 // changes, and checks its files with modzip.CheckFiles. An untracked file
-// is no part of the check, as it is none of a download. The test skips
-// where there is no commit to check: where the module root is not the top
-// of a git checkout, as in a module cache, whose module a download zipped
-// by the rule, and where the checkout has no commit.
+// is no part of the check, as it is none of a download. The test skips,
+// saying why, where it can't read a commit to check: where git can't be
+// run; where the module root is in no git checkout, or is below the top of
+// one, as in a module cache, whose module a download zipped by the rule;
+// and where HEAD names no commit.
 //
 // go test replays a passing result while the files the test read under
 // the module root are unchanged, so headFiles reads the files that name
-// HEAD's commit. In a linked worktree those are outside its root, in the
-// main checkout's .git, so there go test can replay a pass after a new
-// commit: -count=1 gives the verdict. CI's fresh checkout always runs the
-// check.
+// HEAD's commit. Where a checkout's git directory is outside its top, as
+// a linked worktree's or a clone's made with --separate-git-dir, those
+// files are outside the module root, so there go test can replay a pass
+// after a new commit: -count=1 gives the verdict. CI's fresh checkout
+// always runs the check.
 func TestModuleZip(t *testing.T) {
 	t.Parallel()
 	problems, skip := moduleZipProblems(t, ".", os.Environ())
@@ -62,9 +64,10 @@ func TestModuleZip(t *testing.T) {
 // an untracked file, a nested module's and a submodule, as a download
 // does. It gives a transcript's advice only for a transcript, and quotes
 // each path. It finds the top of a checkout by a path in another case, on
-// a volume that folds case. It skips where the directory is not the top of
-// a git checkout, and where the checkout has no commit. And in a plain
-// clone, a new commit changes a file headRefs names.
+// a volume that folds case, and skips that case on a volume that doesn't.
+// It skips where the directory is in no git checkout, where it is below
+// the top of one, and where HEAD names no commit. And in a plain clone, a
+// new commit changes a file headRefs names, with either ref store.
 func TestModuleZipCases(t *testing.T) {
 	t.Parallel()
 	const goMod = "module example.com/sheets\n"
@@ -182,13 +185,13 @@ func TestModuleZipCases(t *testing.T) {
 	t.Run("a checkout with no commit", func(t *testing.T) {
 		t.Parallel()
 		r := gittest.New(t)
-		if _, skip := moduleZipProblems(t, r.Dir, gittest.Env()); skip != "The checkout has no commit, so there is nothing to download." {
+		if _, skip := moduleZipProblems(t, r.Dir, gittest.Env()); skip != "HEAD names no commit, so there is nothing to download." {
 			t.Errorf("the skip is %q", skip)
 		}
 	})
-	// A volume that folds case finds a path in any case, which keeps the
-	// case it is given, and git gives the checkout's top in the case the
-	// volume holds.
+	// A volume that folds case finds a path in any case. git rev-parse
+	// --show-prefix is empty at the checkout's top, whatever case the path
+	// that reaches it is in.
 	t.Run("the top of a checkout, by a path in another case", func(t *testing.T) {
 		t.Parallel()
 		r := gittest.New(t)
@@ -209,7 +212,8 @@ func TestModuleZipCases(t *testing.T) {
 	// go test replays a pass while the files the test read under the
 	// module root are unchanged. In a plain clone, whose .git is under its
 	// top, those include what headRefs names, so a new commit must rewrite
-	// one of them, whichever ref store the clone keeps.
+	// one of them, whichever ref store the clone keeps. Each is named to git
+	// init, as either can be its default.
 	for _, format := range []string{"files", "reftable"} {
 		t.Run("a new commit rewrites a file of a plain clone that names HEAD, in "+format, func(t *testing.T) {
 			t.Parallel()
@@ -220,12 +224,9 @@ func TestModuleZipCases(t *testing.T) {
 					t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, stderr)
 				}
 			}
-			initArgs := []string{"init", "-q", "-b", "main", "--object-format=sha1"}
-			if format != "files" {
-				initArgs = append(initArgs, "--ref-format="+format)
-			}
+			initArgs := []string{"init", "-q", "-b", "main", "--object-format=sha1", "--ref-format=" + format}
 			if _, stderr, err := gitIn(dir, gittest.Env(), initArgs...); err != nil {
-				if format != "files" && strings.Contains(stderr, "unknown option") {
+				if strings.Contains(stderr, "unknown option") {
 					t.Skipf("this git has no --ref-format: %s", stderr)
 				}
 				t.Fatalf("git %s: %v\n%s", strings.Join(initArgs, " "), err, stderr)
@@ -325,7 +326,7 @@ func headFiles(t *testing.T, dir string, env []string) ([]modzip.File, string) {
 	if _, stderr, err := gitIn(dir, env, "rev-parse", "--verify", "-q", "HEAD"); err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) && exit.ExitCode() == 1 {
-			return nil, "The checkout has no commit, so there is nothing to download."
+			return nil, "HEAD names no commit, so there is nothing to download."
 		}
 		t.Fatalf("git rev-parse --verify -q HEAD: %v\n%s", err, stderr)
 	}
@@ -367,9 +368,10 @@ func headFiles(t *testing.T, dir string, env []string) ([]modzip.File, string) {
 		default:
 			t.Fatalf("git ls-tree gave %q, of a mode no file has", entry)
 		}
-		// The size is the blob's. A download's git archive converts line
-		// endings where the attributes say to, so its size for such a file
-		// can differ by its line endings, which only the size limits read.
+		// The size is the blob's. A download's git archive applies git's
+		// conversions, line endings, ident and the filter drivers of the
+		// user's config, so its size for a file they convert can differ from
+		// the blob's. Only the size limits read sizes.
 		size, err := strconv.ParseInt(f[3], 10, 64)
 		if err != nil {
 			t.Fatalf("git ls-tree gave %q: %v", entry, err)
