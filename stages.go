@@ -238,13 +238,13 @@ func pathString(ct *corpusType, path []*lift) string {
 // for the case, and runs nothing before them; an update reads the product
 // the lift makes.
 type caseState struct {
-	r     *runner
-	c     *aCase
-	plan  *plan
-	root  any
-	view  fs.FS // the case's input view
-	runs  map[*lift]*liftRun
-	reads map[*lift]*liftRead
+	r      *runner
+	c      *aCase
+	plan   *plan
+	root   any
+	origin *origin // the case's input view, and where the archive commits its files
+	runs   map[*lift]*liftRun
+	reads  map[*lift]*liftRead
 	// update says how the state stages the types past a bytes lift: by
 	// running the lift, as an update does, or by reading what the archive
 	// commits for it, as a normal run does.
@@ -252,9 +252,9 @@ type caseState struct {
 	// made is, in a normal run of a transform's variant whose committed
 	// inputs give another input view than the one the transform makes,
 	// what it makes: the input view the update stages the case on. It is
-	// nil when the update stages the case on view, or on a view that holds
-	// the same files.
-	made fs.FS
+	// nil when the update stages the case on its origin, or on a view that
+	// holds the same files.
+	made *origin
 	// asUpdate is, in a normal run, the case staged as the package's
 	// update stages it, made when a cell first asks what the update does
 	// with it. Its normal is the normal run's state, whose runs it shares
@@ -274,7 +274,7 @@ type liftRun struct {
 	value    any
 	out      *called
 	product  map[string][]byte // a bytes lift's product, by path in its view; nil when it made none
-	view     fs.FS
+	origin   *origin
 	problems notes
 	verdict  *liftVerdict // a bytes lift's cell's, once judged
 	bare     *liftVerdict // a bytes lift's cell's under a bare Project, once judged
@@ -283,9 +283,9 @@ type liftRun struct {
 // A liftRead is what a normal run reads of a bytes lift on a case: the
 // committed product, which the cells past it read, or what blocks them.
 type liftRead struct {
-	value any
-	view  fs.FS
-	block *blockage
+	value  any
+	origin *origin
+	block  *blockage
 }
 
 // A blockage is what keeps a cell from running: a lift on its path that
@@ -311,18 +311,19 @@ type blockage struct {
 }
 
 // stage returns the value of a type the plan reaches, and the input view
-// it comes from: the case's, or, past a bytes lift, the last one's
-// product. It returns what blocks the type instead, when something does.
-func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
+// it comes from, with where the archive commits its files: the case's, or,
+// past a bytes lift, the last one's product. It returns what blocks the
+// type instead, when something does.
+func (s *caseState) stage(typ reflect.Type) (any, *origin, *blockage) {
 	if typ == s.plan.root.goType {
-		return s.root, s.view, nil
+		return s.root, s.origin, nil
 	}
 	l := s.plan.producer[typ]
 	if l.bytes && !s.update {
 		rd := s.read(l)
-		return rd.value, rd.view, rd.block
+		return rd.value, rd.origin, rd.block
 	}
-	in, view, b := s.stage(l.in)
+	in, from, b := s.stage(l.in)
 	if b != nil {
 		return nil, nil, b
 	}
@@ -330,16 +331,16 @@ func (s *caseState) stage(typ reflect.Type) (any, fs.FS, *blockage) {
 	// Past a bytes lift, which runs here only in an update, or in a normal
 	// run's staging of the case as its update stages it, a cell is written
 	// only with the lift's cell: a normal run reads what that writes.
-	if l.bytes && s.heldBack(l, lr, in, view) {
+	if l.bytes && s.heldBack(l, lr, in, from.view) {
 		return nil, nil, &blockage{lift: l, failed: l.name, broken: true}
 	}
 	switch {
 	case lr.out.panicked || lr.out.err != nil || lr.out.noProduct:
 		return nil, nil, &blockage{lift: l, failed: l.name}
 	case !l.bytes:
-		return lr.value, view, nil
+		return lr.value, from, nil
 	}
-	return lr.value, lr.view, nil
+	return lr.value, lr.origin, nil
 }
 
 // heldBack reports whether, in an update, the cells past the bytes lift l
@@ -417,14 +418,14 @@ func (s *caseState) updateFate(col *column) updateFate {
 			c:      s.c,
 			plan:   s.plan,
 			root:   s.root,
-			view:   s.view,
+			origin: s.origin,
 			runs:   map[*lift]*liftRun{},
 			reads:  map[*lift]*liftRead{},
 			update: true,
 			normal: s,
 		}
 		if s.made != nil {
-			s.asUpdate.root, s.asUpdate.view, s.asUpdate.normal = s.plan.root.new(s.made), s.made, nil
+			s.asUpdate.root, s.asUpdate.origin, s.asUpdate.normal = s.plan.root.new(s.made.view), s.made, nil
 		}
 	}
 	in, _, b := s.asUpdate.stage(col.consumes)
@@ -538,8 +539,8 @@ func (s *caseState) read(l *lift) *liftRead {
 	case err != nil:
 		rd.block = b
 	case o.State == archive.Accepted:
-		rd.view = archive.NewFS(s.c.product(l))
-		rd.value = s.r.products[l].new(rd.view)
+		rd.origin = viaOrigin(l, s.c.prefix, s.c.product(l))
+		rd.value = s.r.products[l].new(rd.origin.view)
 	case o.State == archive.Blocked:
 		b.failed = o.Detail
 		rd.block = b
@@ -591,8 +592,8 @@ func (s *caseState) runLift(l *lift, in any) *liftRun {
 	}
 	lr.product, lr.problems = productOf(l, s.c.prefix, made)
 	if len(lr.problems) == 0 {
-		lr.view = archive.NewFS(lr.product)
-		lr.value = s.r.products[l].new(lr.view)
+		lr.origin = viaOrigin(l, s.c.prefix, lr.product)
+		lr.value = s.r.products[l].new(lr.origin.view)
 	}
 	return lr
 }

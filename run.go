@@ -493,13 +493,13 @@ func (r *runner) newCase(p *plan, pc plannedCase, prefix string, about []byte, g
 }
 
 // setView gives the case its input view, and the values its cells read.
-func (c *aCase) setView(r *runner, p *plan, view fs.FS) {
+func (c *aCase) setView(r *runner, p *plan, from *origin) {
 	c.state = &caseState{
 		r:      r,
 		c:      c,
 		plan:   p,
-		root:   p.root.new(view),
-		view:   view,
+		root:   p.root.new(from.view),
+		origin: from,
 		runs:   map[*lift]*liftRun{},
 		reads:  map[*lift]*liftRead{},
 		update: r.update,
@@ -556,7 +556,7 @@ func (r *runner) runCase(t *testing.T, p *plan, pc plannedCase) {
 	base := r.newCase(p, pc, "", pc.a.Comment, archive.Gaps, pc.a.Properties(), gaps)
 	// The view copies the base's files, so it is made here, where the
 	// base's cells read it, and held no longer than they run.
-	base.setView(r, p, pc.base.View())
+	base.setView(r, p, baseOrigin(pc.base.View()))
 	w := &caseWrites{set: map[string][]byte{}}
 	r.runCells(t, base, p.cols, w)
 	for _, v := range pc.variants {
@@ -710,10 +710,10 @@ type cellResult struct {
 	writable bool              // whether an update writes the cell's files
 	files    map[string][]byte // the cell's outputs, by path under out/<column>/
 	// onValue records that the cell ran on a value: its run, or its
-	// lift's, past its probe, if it has one. view is the input view the
+	// lift's, past its probe, if it has one. origin is the input view the
 	// value comes from, or nil where a lift on the cell's path blocks it.
 	onValue bool
-	view    fs.FS
+	origin  *origin
 	// via records that an update that writes the cell replaces its bytes
 	// lift's product, under via/<column>/, with product: the files of the
 	// product, by path in it, or none, for a lift with no product.
@@ -771,8 +771,8 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	cf := c.committed(col)
 	goldens := cf.goldens
 
-	in, view, by := c.state.stage(col.consumes)
-	res.view = view
+	in, from, by := c.state.stage(col.consumes)
+	res.origin = from
 	if by != nil {
 		st.applied++
 		res.fate = updateFate{block: by}
@@ -857,11 +857,11 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	if bytesLift {
 		// In an update, the cells past the lift may have asked for the
 		// verdict first, to learn whether the update writes this cell.
-		v := c.state.liftVerdict(col.lift, lr, in, view)
+		v := c.state.liftVerdict(col.lift, lr, in, from.view)
 		ns = append(ns, v.notes...)
 		files, unjudged, writable = maps.Clone(v.files), maps.Clone(v.unjudged), v.writable
 	} else {
-		files, unjudged, writable = r.verdict(&ns, c, col, in, view, out)
+		files, unjudged, writable = r.verdict(&ns, c, col, in, from.view, out)
 	}
 	// A bytes lift's cell includes its product. A fault of its jenny
 	// leaves the product uncompared: the fault comes first.
