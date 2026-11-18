@@ -1333,21 +1333,26 @@ func TestStripLinks(t *testing.T) {
 // reads anything through it, whatever the link names: a directory,
 // nothing, itself or a file. That holds at the module root and in a
 // subdirectory, with -root and without, and the line that says to run
-// strip again names -root where it was given. A link in place of the
-// corpus root's testdata/, which a registry read first names, fails it
-// the same way, before it reads another registry.
+// strip again names -root where it was given. Away from the module root
+// with no -root, strip run again finds the corpus root only by a registry
+// in testdata/, so the line also says to name the root with -root if
+// there is none. A link in place of the corpus root's testdata/, which a
+// registry read first names, fails it the same way, before it reads
+// another registry.
 func TestStripTestdataLink(t *testing.T) {
 	t.Parallel()
+	const more = " If the current directory then holds no registry, testdata/hypercase.json, name the corpus root with -root, relative to the current directory or by an absolute path."
 	for _, at := range []struct {
 		link, dir string
 		args      []string
 		again     string
 	}{
-		{"testdata", "", nil, "hypercase strip"},
-		{"testdata", "", []string{"-root", "."}, "hypercase strip -root ."},
-		{"step09/testdata", "step09", nil, "hypercase strip"},
-		{"step09/testdata", "", []string{"-root", "step09"}, "hypercase strip -root step09"},
-		{"testdata", "a/b/c", nil, "hypercase strip -root ../../.."},
+		{"testdata", "", nil, "hypercase strip again."},
+		{"testdata", "", []string{"-root", "."}, "hypercase strip -root . again."},
+		{"step09/testdata", "step09", nil, "hypercase strip again." + more},
+		{"step09/testdata", "", []string{"-root", "step09"}, "hypercase strip -root step09 again."},
+		{"a/b/c/testdata", "a/b/c", nil, "hypercase strip again." + more},
+		{"testdata", "a/b/c", nil, "hypercase strip -root ../../.. again."},
 	} {
 		for _, names := range []string{"a directory", "nothing", "itself", "a file"} {
 			t.Run(fmt.Sprintf("%s naming %s, from %s, by %s", at.link, names, filepath.ToSlash(filepath.Join(".", at.dir)), strings.Join(append([]string{"hypercase strip"}, at.args...), " ")), func(t *testing.T) {
@@ -1362,11 +1367,66 @@ func TestStripTestdataLink(t *testing.T) {
 					target = filepath.ToSlash(rel)
 				}
 				linkIn(t, top, at.link, target)
-				stripFails(t, filepath.Join(top, filepath.FromSlash(at.dir)), "", 1, at.args, "hypercase strip: testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none. Nothing was removed.\nRemove it, or replace it with a copy of what it names, if it names anything, then run "+at.again+" again.\n")
+				stripFails(t, filepath.Join(top, filepath.FromSlash(at.dir)), "", 1, at.args, "hypercase strip: testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none. Nothing was removed.\nRemove it, or replace it with a copy of what it names, if it names anything, then run "+at.again+"\n")
 				unlinkIn(t, top, at.link)
 				sameTree(t, top, files)
 			})
 		}
+	}
+}
+
+// TestStripRootPastLink: with -root, the testdata/ strip reads first is
+// -root's, so a symbolic link in place of the current directory's, which
+// isn't the corpus root, fails nothing before strip reads the registries.
+// Strip reads it as it reads any package's testdata/, for a registry,
+// through the link (#57): from the module root, by -root step09, with the
+// module root's testdata/ a link to a directory or to nothing, strip
+// strips step09 and leaves the link and its target as they were. With one
+// to itself or a file, finding the registries fails, and strip exits 1
+// having removed nothing. With one to a directory whose registry records
+// step09, strip removes that registry and its package's findings file
+// through the link, in its target.
+func TestStripRootPastLink(t *testing.T) {
+	t.Parallel()
+	const failed = "hypercase strip: finding the module's registries failed: "
+	stripped := fmt.Sprintf("testdata/sheet/twice.txtar: removed %d sections\n", sectionCount(twiceFull)-sectionCount(twiceHand))
+	for _, tt := range []struct {
+		names, target string
+		registry      string // the module root's registry, if not the fixture's
+		out           string // what strip prints, or, when it fails, how its stderr starts
+		want          map[string]string
+	}{
+		{names: "a directory", out: stripped + nextLine},
+		{names: "nothing", target: "missing", out: stripped + nextLine},
+		{names: "itself", target: "testdata", out: failed},
+		{names: "a file", target: "go.mod", out: failed},
+		{
+			names:    "a directory whose registry records step09",
+			registry: stripRegistry("step09", sheetsVar),
+			out:      stripped + nextLine,
+			want:     map[string]string{"testdata/hypercase.json": "", "testdata/checks/located.txt": ""},
+		},
+	} {
+		t.Run(tt.names, func(t *testing.T) {
+			files := stripModule()
+			if tt.registry != "" {
+				files = with(files, map[string]string{"testdata/hypercase.json": tt.registry})
+			}
+			top := writeTree(t, files)
+			linkIn(t, top, "testdata", tt.target)
+			want := files
+			if strings.HasPrefix(tt.out, failed) {
+				stripFails(t, top, "", 1, []string{"-root", "step09"}, tt.out, ". Nothing was removed.\nFix what failed, then run hypercase strip -root step09 again.\n")
+			} else {
+				stripOK(t, top, "", tt.out, "-root", "step09")
+				want = with(files, map[string]string{"step09/testdata/sheet/twice.txtar": twiceHand, "step09/testdata/hypercase.json": ""})
+			}
+			if fi, err := os.Lstat(filepath.Join(top, "testdata")); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+				t.Errorf("testdata is no symbolic link after strip: %v", err)
+			}
+			unlinkIn(t, top, "testdata")
+			sameTree(t, top, with(want, tt.want))
+		})
 	}
 }
 

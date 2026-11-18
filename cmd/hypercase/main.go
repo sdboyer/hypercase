@@ -78,11 +78,15 @@
 // or by an absolute path. Without -root, the corpus root is the one the
 // registry of the package in the current directory records, or, at the
 // module root with no registry there, the module root. Anywhere else with
-// no registry, strip asks for -root, and so it does for a registry's
-// corpus root that lies inside a module nested in the package's. Before it
-// reads anything, strip fails when the testdata/ it reads first, -root's
-// or else the current directory's, is a symbolic link, and its line that
-// says to run it again gives the command as it was run.
+// no registry, strip asks for -root, and so it does for a registry's corpus
+// root that lies inside a module nested in the package's. Before it reads
+// anything, strip fails when the testdata/ it reads first is a symbolic
+// link: -root's, or else the current directory's. Its line that says to run
+// strip again then gives -root where it was given, naming the same
+// directory, and, away from the module root with no -root, says to name the
+// root with -root if the current directory then holds no registry. Strip
+// reads any other package's testdata/, for a registry and findings, through
+// a link in its place, the current directory's under -root included.
 package main
 
 import (

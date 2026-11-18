@@ -117,9 +117,12 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	if err != nil {
 		return fail("finding the current directory failed: %v.\nRun strip from a directory that exists.", err)
 	}
-	// The testdata/ strip reads first, -root's or the current directory's,
-	// where it finds the registry that records the corpus root: a symbolic
-	// link there fails strip before it reads anything through it.
+	// The testdata/ strip reads first, -root's or else the current
+	// directory's, where it finds the registry that records the corpus
+	// root: a symbolic link there fails strip before it reads anything
+	// through it. With -root, the current directory's is a package's
+	// testdata/ like any other, which strip reads for its registry, through
+	// a link too.
 	first := dir
 	if given != "" {
 		first = given
@@ -127,9 +130,19 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 			first = filepath.Join(dir, first)
 		}
 	}
-	if fi, err := os.Lstat(filepath.Join(first, "testdata")); err == nil && fi.Mode()&fs.ModeSymlink != 0 {
-		reason, it := walk.LinkReason(filepath.Join(first, "testdata"), []string{filepath.Join(first, "testdata")}, func(p string) string { return root.Rel(first, p) })
-		return fail("%s. Nothing was removed.\n"+walk.LinkFix+", then run %s again.", reason, it, rerun(dir, first, given != "", sel))
+	link := filepath.Join(first, "testdata")
+	if fi, err := os.Lstat(link); err == nil && fi.Mode()&fs.ModeSymlink != 0 {
+		reason, it := walk.LinkReason(link, []string{link}, func(p string) string { return root.Rel(first, p) })
+		// Run again with no -root away from the module root, strip finds
+		// the corpus root only by a registry in testdata/, which the fix
+		// may leave out.
+		more := ""
+		if given == "" {
+			if mod, err := root.Module(dir); err != nil || mod != dir {
+				more = " If the current directory then holds no registry, testdata/" + registry.Name + ", name the corpus root with -root, relative to the current directory or by an absolute path."
+			}
+		}
+		return fail("%s. Nothing was removed.\n"+walk.LinkFix+", then run %s again.%s", reason, it, rerun(dir, first, given != "", sel), more)
 	}
 	corpusRoot, err := findCorpusRoot(dir, given)
 	if err != nil {
