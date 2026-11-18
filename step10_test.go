@@ -1161,9 +1161,11 @@ func TestChainCheckPaths(t *testing.T) {
 // doesn't give one path from each corpus its column runs over, in the
 // order of its corpora, can't be read, and so can't one whose path names
 // a lift the registry doesn't list, or the column itself, whether the
-// column is the package's or a lift it uses: every check fails, and so
-// does the root-package check. Each hand edit is written as the JSON it
-// makes, not by Marshal, which would sort the paths.
+// column is the package's or a lift it uses, and so can't one that
+// records an output's inputs as no declaration registration takes would:
+// every check fails, and so does the root-package check. Each hand edit is
+// written as the JSON it makes, not by Marshal, which would sort the
+// paths.
 func TestChainSharedCheckPaths(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "chain-shared")
@@ -1229,6 +1231,10 @@ func TestChainSharedCheckPaths(t *testing.T) {
 	refused(evaluateRuns + "testdata/export/, testdata/script/ and testdata/script/" + rule)
 	edit("name a lift b's registry doesn't list on evaluate's path from export, by hand", evaluate(func(c *registry.Suite) { c.Paths[0].Lifts = []string{"resolve", "nosuch"} }))
 	refused("the suite evaluate's path from testdata/export/ names nosuch, and the registry lists no lift of that name, where every lift on a column's path is one its package registers")
+	edit("record evaluate's values.txt with inputs no declaration states in b's registry, by hand", evaluate(func(c *registry.Suite) {
+		c.Outputs[slices.IndexFunc(c.Outputs, func(o registry.Output) bool { return o.Pattern == "values.txt" })].Inputs = "lines"
+	}))
+	refused(`the suite evaluate declares the output values.txt with inputs "lines", where a registry records "func", "positions", "all" or "none"`)
 
 	// The lifts b uses are held to the same rules as its columns.
 	edit("drop the paths from export of the lifts b uses, parse and resolve, from b's registry, by hand", func(g *registry.Registry) {

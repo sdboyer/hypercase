@@ -345,16 +345,40 @@ func Parse(data []byte) (*Registry, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := r.checkNames(); err != nil {
-		return nil, err
-	}
-	if err := r.checkPaths(); err != nil {
-		return nil, err
-	}
-	if err := r.checkInputs(); err != nil {
+	if err := r.check(); err != nil {
 		return nil, err
 	}
 	return r, nil
+}
+
+// parseChecks are Parse's checks of what a registry holds, each with the
+// oldest format whose registries it holds of: from that format on, the
+// update couldn't have written a registry the check refuses. Registration
+// has refused a second column, or lift, of one name since format 3, and
+// planned a column over each corpus once. Format 7 added the paths, and
+// format 8 the statements of Inputs.
+var parseChecks = []struct {
+	format int
+	check  func(*Registry) error
+}{
+	{3, (*Registry).checkNames},
+	{3, (*Registry).checkCorpora},
+	{7, (*Registry).checkPaths},
+	{8, (*Registry).checkInputs},
+}
+
+// check reports the first of parseChecks that holds of the registry's
+// format and refuses it.
+func (r *Registry) check() error {
+	for _, c := range parseChecks {
+		if r.Format < c.format {
+			continue
+		}
+		if err := c.check(r); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // errorFile is the output file that holds a column's error.
@@ -430,6 +454,30 @@ func (r *Registry) checkNames() error {
 	return nil
 }
 
+// checkCorpora reports the first column, suite or lift, owned or used,
+// that the registry lists as running over one corpus twice.
+func (r *Registry) checkCorpora() error {
+	check := func(kind, name string, corpora []string) error {
+		for i, c := range corpora {
+			if slices.Contains(corpora[:i], c) {
+				return fmt.Errorf("the %s %s runs over testdata/%s/ twice, where a registry lists each corpus a column runs over once", kind, name, c)
+			}
+		}
+		return nil
+	}
+	for _, s := range r.Suites {
+		if err := check("suite", s.Name, s.Corpora); err != nil {
+			return err
+		}
+	}
+	for _, l := range r.Lifts {
+		if err := check("lift", l.Name, l.Corpora); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // checkPaths reports the first column, suite or lift, owned or used,
 // whose paths the update couldn't have written.
 func (r *Registry) checkPaths() error {
@@ -438,11 +486,6 @@ func (r *Registry) checkPaths() error {
 		lifts[l.Name] = true
 	}
 	check := func(kind, name string, raw bool, corpora []string, paths []Path) error {
-		for i, c := range corpora {
-			if slices.Contains(corpora[:i], c) {
-				return fmt.Errorf("the %s %s runs over testdata/%s/ twice, where a registry lists each corpus a column runs over once", kind, name, c)
-			}
-		}
 		from := []string{}
 		for _, p := range paths {
 			from = append(from, p.Corpus)
@@ -614,7 +657,10 @@ func holdsInputs(outs []outputPresence) bool {
 // [Format], as a tool reads the registries that other revisions committed.
 // One of an older format is given in today's form, with its own Format,
 // and is refused as no registry if it holds a key a later format added.
-// A format older than Oldest or newer than Format is a [*FormatError].
+// It refuses what Parse would refuse of a registry of its format: each of
+// Parse's checks that holds of the format applies, and Parse's checks of
+// what a later format added don't. A format older than Oldest or newer
+// than Format is a [*FormatError].
 func ParseAny(data []byte) (*Registry, error) {
 	var head struct {
 		Format int `json:"format"`
@@ -637,7 +683,14 @@ func ParseAny(data []byte) (*Registry, error) {
 			return nil, fmt.Errorf("it is not a registry: it holds format %d, and %s, which format %d added", head.Format, a.key, a.format)
 		}
 	}
-	return decode(data)
+	r, err := decode(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.check(); err != nil {
+		return nil, err
+	}
+	return r, nil
 }
 
 // RawInput is the type a suite over the raw input view consumes, as

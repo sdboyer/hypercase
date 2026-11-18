@@ -176,11 +176,12 @@ func productRegistry() registry.Registry {
 		Types: []registry.Type{csv, sheet},
 		Lifts: []registry.Lift{{
 			Name: "import", Description: "Imports the CSV as a sheet.", Input: csv.GoType, Product: sheet.GoType,
-			Owned: true, Bytes: true, Corpora: []string{"csv"},
-			Outputs:      []registry.Output{{Pattern: "error.txt", Description: "Why the importer rejects the CSV."}},
-			ProductFiles: []registry.Output{{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them."}},
+			Owned: true, Bytes: true, Corpora: []string{"csv"}, Paths: []registry.Path{{Corpus: "csv"}},
+			Outputs:      []registry.Output{{Pattern: "error.txt", Description: "Why the importer rejects the CSV.", Inputs: registry.InputsAll}},
+			ProductFiles: []registry.Output{{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them.", Inputs: registry.InputsFunc}},
 		}},
-		Suites: []registry.Suite{{Name: "calc", Description: "Runs calc.", Consumes: sheet.GoType, Corpora: []string{"csv", "sheet"}}},
+		Suites: []registry.Suite{{Name: "calc", Description: "Runs calc.", Consumes: sheet.GoType, Corpora: []string{"csv", "sheet"},
+			Paths: []registry.Path{{Corpus: "csv", Lifts: []string{"import"}}, {Corpus: "sheet"}}}},
 	}
 }
 

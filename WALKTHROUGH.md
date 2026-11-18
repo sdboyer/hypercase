@@ -2733,8 +2733,9 @@ S202
   included, one path from each corpus it runs over, each corpus once and
   in their order, or whose path names the column itself, a lift the
   registry doesn't list or one lift twice, or names a lift for a suite
-  over the raw input view. The root-package check fails on such a
-  registry too. Where the package has a `_test.go` file, both say to run
+  over the raw input view. So does one that records an output's or a
+  product file's `"inputs"` as no declaration registration takes would
+  (step 11). The root-package check fails on such a registry too. Where the package has a `_test.go` file, both say to run
   the update, which writes its registry; where it has none, both say to
   delete the registry, which no update writes.
 - A check reads the cells as they are committed when it runs. The module's
@@ -2895,7 +2896,10 @@ the same outcome.
   naming the revision, the registry and its format: for a newer format,
   saying to run the report from that revision's hypercase, and for one
   older than 3, that no hypercase's report reads it. A registry of an older
-  format that holds what a later format added is refused too.
+  format that holds what a later format added is refused too, and so is
+  one its format's update couldn't have written, as a check refuses one of
+  today's (step 8): by its names and corpora at every format, its paths
+  from format 7, and its `"inputs"` from format 8.
 - A cell exists at a revision when its `outcome` file does, from registry
   format 5 on. A changed cell takes the first of these ranks that applies:
   outcome changed, at both revisions; appeared, at `<b>` only; disappeared,

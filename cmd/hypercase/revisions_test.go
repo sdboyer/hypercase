@@ -106,7 +106,8 @@ func TestNestedModule(t *testing.T) {
 // older one saying no hypercase's report reads it. It reads both
 // revisions' registries before anything else, so an archive it can't read
 // never hides the refusal. A registry of another corpus root is left
-// unread, whatever its format.
+// unread, whatever its format. A registry that is none, or that its
+// format's update couldn't have written, is refused by name.
 func TestFormats(t *testing.T) {
 	t.Parallel()
 	arch := map[string]string{"x": "A case about sheets#4.\n-- out/calc/outcome --\naccepted\n"}
@@ -156,10 +157,16 @@ func TestFormats(t *testing.T) {
 			}
 		}
 	}
-	// A registry that is no registry fails by name.
+	// A registry that is no registry fails by name, and so does one its
+	// format's update couldn't have written.
 	g = gittest.New(t)
 	c = revisions(t, g, module(nil), withRegistry(module(arch), "not json\n"))
 	fails(t, g, "", 1, []string{"report", c[0], c[1]}, "testdata/hypercase.json at "+c[1]+" can't be read: it is not a registry")
+	stale := moduleRegistry()
+	stale.Suites[0].Paths = nil
+	g = gittest.New(t)
+	c = revisions(t, g, module(nil), withRegistry(module(arch), string(stale.Marshal())))
+	fails(t, g, "", 1, []string{"report", c[0], c[1]}, "testdata/hypercase.json at "+c[1]+" can't be read: the suite calc runs over testdata/sheet/, and has paths from none,")
 }
 
 // history reads the files of one of hypercase's own commits that
