@@ -1,0 +1,524 @@
+# the update, run until a pass changes nothing; that pass:
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/evaluate
+                --- PASS: TestCorpus/script/plain/variant/more/list
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/products
+PASS
+$ edit testdata/export/prices.txtar  # import's jenny now fails on the export, with an error decl.Reject doesn't mark
+# the update, run until a pass changes nothing; that pass:
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        import: Imports the export as a script, as its import/ tree says.
+        import's jenny failed on the case, with an error that is no rejection:
+          import: the generator's error
+        If import rejects the case, return the error as decl.Reject(err). If not, fix import's jenny. An update writes nothing for this cell.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        parse: Parses the script, as its parse/ tree says.
+        The cell of the lift import, on parse's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on parse's path, nor for this cell.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        The cell of the lift import, on resolve's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on resolve's path, nor for this cell.
+    export/prices/variant/doubled: The prices are doubled.
+        import: Imports the export as a script, as its import/ tree says.
+        import's jenny failed on the case, with an error that is no rejection:
+          import: the generator's error
+        If import rejects the case, return the error as decl.Reject(err). If not, fix import's jenny. An update writes nothing for this cell.
+    export/prices/variant/doubled: The prices are doubled.
+        parse: Parses the script, as its parse/ tree says.
+        The cell of the lift import, on parse's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on parse's path, nor for this cell.
+    export/prices/variant/doubled: The prices are doubled.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        The cell of the lift import, on resolve's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on resolve's path, nor for this cell.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        import: Imports the export as a script, as its import/ tree says.
+        import's jenny failed on the case, with an error that is no rejection:
+          import: the generator's error
+        If import rejects the case, return the error as decl.Reject(err). If not, fix import's jenny. An update writes nothing for this cell.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        parse: Parses the script, as its parse/ tree says.
+        The cell of the lift import, on parse's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on parse's path, nor for this cell.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        The cell of the lift import, on resolve's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on resolve's path, nor for this cell.
+    what ran, in order:
+        import ran
+        import ran
+        import ran
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- FAIL: TestCorpus/export/prices/import
+            --- FAIL: TestCorpus/export/prices/parse
+            --- FAIL: TestCorpus/export/prices/resolve
+            --- FAIL: TestCorpus/export/prices/variant/doubled
+                --- FAIL: TestCorpus/export/prices/variant/doubled/import
+                --- FAIL: TestCorpus/export/prices/variant/doubled/parse
+                --- FAIL: TestCorpus/export/prices/variant/doubled/resolve
+            --- FAIL: TestCorpus/export/prices/transform/louder
+                --- FAIL: TestCorpus/export/prices/transform/louder/import
+                --- FAIL: TestCorpus/export/prices/transform/louder/parse
+                --- FAIL: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        The cell of the lift import, on evaluate's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on evaluate's path, nor for this cell.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        list: Lists the files of the script's input view, with their bytes.
+        The cell of the lift import, on list's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on list's path, nor for this cell.
+    export/prices/variant/doubled: The prices are doubled.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        The cell of the lift import, on evaluate's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on evaluate's path, nor for this cell.
+    export/prices/variant/doubled: The prices are doubled.
+        list: Lists the files of the script's input view, with their bytes.
+        The cell of the lift import, on list's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on list's path, nor for this cell.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        The cell of the lift import, on evaluate's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on evaluate's path, nor for this cell.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        list: Lists the files of the script's input view, with their bytes.
+        The cell of the lift import, on list's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on list's path, nor for this cell.
+    what ran, in order:
+        import ran
+        import ran
+        import ran
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- FAIL: TestCorpus/export/prices/evaluate
+            --- FAIL: TestCorpus/export/prices/list
+            --- FAIL: TestCorpus/export/prices/variant/doubled
+                --- FAIL: TestCorpus/export/prices/variant/doubled/evaluate
+                --- FAIL: TestCorpus/export/prices/variant/doubled/list
+            --- FAIL: TestCorpus/export/prices/transform/louder
+                --- FAIL: TestCorpus/export/prices/transform/louder/evaluate
+                --- FAIL: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/evaluate
+                --- PASS: TestCorpus/script/plain/variant/more/list
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/products
+FAIL
+[exit 1]
+$ hypercase strip -column import
+testdata/export/prices.txtar: removed 12 sections
+Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
+# the update, run until a pass changes nothing; that pass:
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        import: Imports the export as a script, as its import/ tree says.
+        import's jenny failed on the case, with an error that is no rejection:
+          import: the generator's error
+        If import rejects the case, return the error as decl.Reject(err). If not, fix import's jenny. An update writes nothing for this cell.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        parse: Parses the script, as its parse/ tree says.
+        The cell of the lift import, on parse's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on parse's path, nor for this cell.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        The cell of the lift import, on resolve's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on resolve's path, nor for this cell.
+    export/prices/variant/doubled: The prices are doubled.
+        import: Imports the export as a script, as its import/ tree says.
+        import's jenny failed on the case, with an error that is no rejection:
+          import: the generator's error
+        If import rejects the case, return the error as decl.Reject(err). If not, fix import's jenny. An update writes nothing for this cell.
+    export/prices/variant/doubled: The prices are doubled.
+        parse: Parses the script, as its parse/ tree says.
+        The cell of the lift import, on parse's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on parse's path, nor for this cell.
+    export/prices/variant/doubled: The prices are doubled.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        The cell of the lift import, on resolve's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on resolve's path, nor for this cell.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        import: Imports the export as a script, as its import/ tree says.
+        import's jenny failed on the case, with an error that is no rejection:
+          import: the generator's error
+        If import rejects the case, return the error as decl.Reject(err). If not, fix import's jenny. An update writes nothing for this cell.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        parse: Parses the script, as its parse/ tree says.
+        The cell of the lift import, on parse's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on parse's path, nor for this cell.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        The cell of the lift import, on resolve's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on resolve's path, nor for this cell.
+    what ran, in order:
+        import ran
+        import ran
+        import ran
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- FAIL: TestCorpus/export/prices/import
+            --- FAIL: TestCorpus/export/prices/parse
+            --- FAIL: TestCorpus/export/prices/resolve
+            --- FAIL: TestCorpus/export/prices/variant/doubled
+                --- FAIL: TestCorpus/export/prices/variant/doubled/import
+                --- FAIL: TestCorpus/export/prices/variant/doubled/parse
+                --- FAIL: TestCorpus/export/prices/variant/doubled/resolve
+            --- FAIL: TestCorpus/export/prices/transform/louder
+                --- FAIL: TestCorpus/export/prices/transform/louder/import
+                --- FAIL: TestCorpus/export/prices/transform/louder/parse
+                --- FAIL: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        The cell of the lift import, on evaluate's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on evaluate's path, nor for this cell.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        list: Lists the files of the script's input view, with their bytes.
+        The cell of the lift import, on list's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on list's path, nor for this cell.
+    export/prices/variant/doubled: The prices are doubled.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        The cell of the lift import, on evaluate's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on evaluate's path, nor for this cell.
+    export/prices/variant/doubled: The prices are doubled.
+        list: Lists the files of the script's input view, with their bytes.
+        The cell of the lift import, on list's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on list's path, nor for this cell.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        The cell of the lift import, on evaluate's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on evaluate's path, nor for this cell.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        list: Lists the files of the script's input view, with their bytes.
+        The cell of the lift import, on list's path, has a problem, which that cell reports, in the package that owns it. A normal run reads the product and the outcome the archive commits for import, so this cell runs nothing.
+        Fix what import's cell reports. An update writes nothing for the cell of the lift import, on list's path, nor for this cell.
+    what ran, in order:
+        import ran
+        import ran
+        import ran
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- FAIL: TestCorpus/export/prices/evaluate
+            --- FAIL: TestCorpus/export/prices/list
+            --- FAIL: TestCorpus/export/prices/variant/doubled
+                --- FAIL: TestCorpus/export/prices/variant/doubled/evaluate
+                --- FAIL: TestCorpus/export/prices/variant/doubled/list
+            --- FAIL: TestCorpus/export/prices/transform/louder
+                --- FAIL: TestCorpus/export/prices/transform/louder/evaluate
+                --- FAIL: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/evaluate
+                --- PASS: TestCorpus/script/plain/variant/more/list
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/products
+FAIL
+[exit 1]
+$ go test  # strip-a
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        import: Imports the export as a script, as its import/ tree says.
+        import's jenny failed on the case, with an error that is no rejection:
+          import: the generator's error
+        If import rejects the case, return the error as decl.Reject(err). If not, fix import's jenny. An update writes nothing for this cell.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for parse: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on parse's path. Fix what import's cell reports.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        out/resolve/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for resolve: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on resolve's path. Fix what import's cell reports.
+    export/prices/variant/doubled: The prices are doubled.
+        import: Imports the export as a script, as its import/ tree says.
+        import's jenny failed on the case, with an error that is no rejection:
+          import: the generator's error
+        If import rejects the case, return the error as decl.Reject(err). If not, fix import's jenny. An update writes nothing for this cell.
+    export/prices/variant/doubled: The prices are doubled.
+        parse: Parses the script, as its parse/ tree says.
+        variant/doubled/out/parse/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for parse: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on parse's path. Fix what import's cell reports.
+    export/prices/variant/doubled: The prices are doubled.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        variant/doubled/out/resolve/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for resolve: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on resolve's path. Fix what import's cell reports.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        import: Imports the export as a script, as its import/ tree says.
+        import's jenny failed on the case, with an error that is no rejection:
+          import: the generator's error
+        If import rejects the case, return the error as decl.Reject(err). If not, fix import's jenny. An update writes nothing for this cell.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        parse: Parses the script, as its parse/ tree says.
+        transform/louder/out/parse/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for parse: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on parse's path. Fix what import's cell reports.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        transform/louder/out/resolve/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for resolve: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on resolve's path. Fix what import's cell reports.
+    what ran, in order:
+        import ran
+        import ran
+        import ran
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- FAIL: TestCorpus/export/prices/import
+            --- FAIL: TestCorpus/export/prices/parse
+            --- FAIL: TestCorpus/export/prices/resolve
+            --- FAIL: TestCorpus/export/prices/variant/doubled
+                --- FAIL: TestCorpus/export/prices/variant/doubled/import
+                --- FAIL: TestCorpus/export/prices/variant/doubled/parse
+                --- FAIL: TestCorpus/export/prices/variant/doubled/resolve
+            --- FAIL: TestCorpus/export/prices/transform/louder
+                --- FAIL: TestCorpus/export/prices/transform/louder/import
+                --- FAIL: TestCorpus/export/prices/transform/louder/parse
+                --- FAIL: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+FAIL
+[exit 1]
+$ go test ./b  # strip-b
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
+        out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
+    export/prices: One export of prices: import makes a script whose quote/ tree list shows.
+        list: Lists the files of the script's input view, with their bytes.
+        out/list/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
+        out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
+    export/prices/variant/doubled: The prices are doubled.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        variant/doubled/out/evaluate/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
+        variant/doubled/out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, variant/doubled/out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
+    export/prices/variant/doubled: The prices are doubled.
+        list: Lists the files of the script's input view, with their bytes.
+        variant/doubled/out/list/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
+        variant/doubled/out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, variant/doubled/out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        transform/louder/out/evaluate/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
+        transform/louder/out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, transform/louder/out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        list: Lists the files of the script's input view, with their bytes.
+        transform/louder/out/list/outcome differs (-golden +got):
+        - accepted
+        + blocked import
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
+        transform/louder/out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, transform/louder/out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
+    what ran, in order:
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- FAIL: TestCorpus/export/prices/evaluate
+            --- FAIL: TestCorpus/export/prices/list
+            --- FAIL: TestCorpus/export/prices/variant/doubled
+                --- FAIL: TestCorpus/export/prices/variant/doubled/evaluate
+                --- FAIL: TestCorpus/export/prices/variant/doubled/list
+            --- FAIL: TestCorpus/export/prices/transform/louder
+                --- FAIL: TestCorpus/export/prices/transform/louder/evaluate
+                --- FAIL: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/evaluate
+                --- PASS: TestCorpus/script/plain/variant/more/list
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/products
+FAIL
+[exit 1]

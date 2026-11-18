@@ -12,7 +12,9 @@ import (
 	"testing"
 
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/internal/cells"
 	"github.com/sdboyer/hypercase/internal/registry"
+	"github.com/sdboyer/hypercase/internal/walk"
 )
 
 // rootCheck is the root-package check: it reads every registry over the
@@ -309,52 +311,73 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 	}
 	r.usedPaths(t, testedRegs, liftEntries, liftPkgs)
 
-	// The archives, and the directories that hold them.
+	// The archives, and the directories that hold them, as hypercase
+	// strip walks them. A corpus root with no testdata/ holds none.
 	td := filepath.Join(r.corpusRoot, "testdata")
 	archives := map[string][]string{} // corpus → archive file names
 	undeclared := map[string]bool{}   // directories, relative to td
-	err := filepath.WalkDir(td, func(p string, d fs.DirEntry, err error) error {
+	if _, err := os.Lstat(td); !errors.Is(err, fs.ErrNotExist) {
+		links, err := walk.Testdata(td, otherRoots, func(p string, d fs.DirEntry) {
+			dir := filepath.ToSlash(mustRel(td, filepath.Dir(p)))
+			isCorpus := declared[dir]
+			switch {
+			case archive.IsTemp(d.Name()) && isCorpus:
+				t.Errorf("%s is a temp file left by a write that was cut short.\nDelete it.", r.rel(p))
+			case strings.HasSuffix(d.Name(), ".txtar") && isCorpus:
+				archives[dir] = append(archives[dir], d.Name())
+			case strings.HasSuffix(d.Name(), ".txtar"):
+				undeclared[dir] = true
+			}
+		})
 		if err != nil {
-			if p == td && errors.Is(err, fs.ErrNotExist) {
-				return filepath.SkipDir
-			}
-			return err
+			t.Errorf("reading %s: %v", r.rel(td), err)
 		}
-		if d.IsDir() {
-			if p != td && (otherRoots[p] || isFile(filepath.Join(p, "go.mod"))) {
-				return filepath.SkipDir
-			}
-			return nil
+		if len(links) > 0 {
+			reason, it := walk.LinkReason(td, links, r.rel)
+			t.Errorf("%s.\n"+walk.LinkFix+".", reason, it)
 		}
-		dir := filepath.ToSlash(mustRel(td, filepath.Dir(p)))
-		isCorpus := declared[dir]
-		switch {
-		case archive.IsTemp(d.Name()) && isCorpus:
-			t.Errorf("%s is a temp file left by a write that was cut short.\nDelete it.", r.rel(p))
-		case strings.HasSuffix(d.Name(), ".txtar") && isCorpus:
-			archives[dir] = append(archives[dir], d.Name())
-		case strings.HasSuffix(d.Name(), ".txtar"):
-			undeclared[dir] = true
-		}
-		return nil
-	})
-	if err != nil {
-		t.Errorf("reading %s: %v", r.rel(td), err)
 	}
 	for _, dir := range slices.Sorted(maps.Keys(undeclared)) {
 		rel := r.rel(filepath.Join(td, filepath.FromSlash(dir))) + "/"
 		if dir == "." {
-			t.Errorf("%s holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.\nMove the archives into one.", rel)
+			t.Errorf("%s holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.\nMove the archives into one, or delete them.", rel)
 			continue
 		}
 		t.Errorf("%s holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.\nDeclare a decl.Type with that Dir, or move or delete the archives.", rel)
 	}
 
 	props := func(name string) bool { _, ok := propEntries[name]; return ok }
+	// What the registries say of the bytes lifts over each corpus, read as
+	// strip reads them, to say which gaps lines keep it from removing a
+	// section. And the lifts whose entries in them, owned or used, in a
+	// package with tests or not, differ on whether the lift is a bytes
+	// lift. The check fails on the registries that make them differ, by
+	// the lift's entries, which it compares across the packages with
+	// tests, or by a registry's own failure, in a package with none. Their
+	// fix may change what strip reads, so the check's advice on which
+	// gaps lines keep strip from a lift's via/ waits on them agreeing.
+	var parsed []*registry.Registry
+	for _, g := range regs {
+		parsed = append(parsed, g.reg)
+	}
+	bytesLifts := registry.BytesLifts(parsed)
+	says := map[string]map[bool]bool{} // lift → what its entries say of whether it is a bytes lift
+	for _, g := range parsed {
+		for _, l := range g.Lifts {
+			if says[l.Name] == nil {
+				says[l.Name] = map[bool]bool{}
+			}
+			says[l.Name][l.Bytes] = true
+		}
+	}
+	disputed := map[string]bool{}
+	for name, s := range says {
+		disputed[name] = len(s) > 1
+	}
 	for _, corpus := range slices.Sorted(maps.Keys(archives)) {
 		cols := claimed[corpus]
 		for _, file := range archives[corpus] {
-			r.checkArchive(t, filepath.Join(td, corpus, file), corpus, cols, products[corpus], transforms[corpus], props)
+			r.checkArchive(t, filepath.Join(td, corpus, file), corpus, cols, products[corpus], bytesLifts[corpus], disputed, transforms[corpus], props)
 		}
 	}
 }
@@ -825,13 +848,20 @@ func typeEntry(ct registry.Type) string {
 }
 
 // checkArchive reports the problems of one archive as a whole. cols are
-// the columns over its corpus, products the bytes lifts among them, and
-// transforms its corpus type's.
-func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, transforms map[string]bool, props func(string) bool) {
+// the columns over its corpus, products the bytes lifts among them that a
+// registry owns, in a package with tests or not, bytesLifts what the
+// registries say of the columns over it as strip reads them (see
+// [registry.BytesLifts]), disputed the lifts whose entries in the
+// registries differ on whether they are bytes lifts, and transforms its
+// corpus type's.
+func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, bytesLifts, disputed, transforms map[string]bool, props func(string) bool) {
 	t.Helper()
 	rel := r.rel(p)
-	if name := strings.TrimSuffix(filepath.Base(p), ".txtar"); !validName(name) {
-		t.Errorf("%s: the archive's name, %q, breaks the naming rule: %s.\nRename the archive.", rel, name, nameRule)
+	// An archive hypercase strip refuses by its path runs no cell, and
+	// strip strips none of its sections, so the check reports that alone.
+	if e := walk.ArchivePath(filepath.ToSlash(mustRel(r.corpusRoot, p))); e != nil {
+		t.Errorf("%s is no archive a run reads: %s.\n%s.", rel, e.Reason, e.Fix)
+		return
 	}
 	data, err := os.ReadFile(p)
 	if err != nil {
@@ -878,26 +908,55 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, tr
 
 	// Sections no registry claims: a column's outputs and a bytes lift's
 	// product, in any case, and a transform's variant, whole, when no
-	// corpus type lists the transform.
-	type claim struct{ what, why string }
+	// corpus type lists the transform. A claim's why says why no registry
+	// claims them, and its strip is the flag that limits hypercase strip
+	// to them, or "" where strip would refuse the flag; whose names them.
+	// A claim of a bytes lift's product names the lift.
+	type claim struct{ what, why, strip, whose, lift string }
 	unclaimed := map[claim][]string{}
+	// columnClaim builds a claim of the sections of the column col, of
+	// which fact says why no registry claims them, and register what to
+	// do if one should. A name that breaks the naming rule, by
+	// archive.ValidName, no column or lift can have, and hypercase strip
+	// refuses it as -column, so such a claim has no register and no strip.
+	columnClaim := func(what, fact, register, col, whose, lift string) claim {
+		if !archive.ValidName(col) {
+			return claim{what, fact + ", and none can, since the name breaks the naming rule: " + nameRule, "", whose, lift}
+		}
+		return claim{what, fact + ".\n" + register, "-column " + col, whose, lift}
+	}
+	// The gaps lines that keep strip from removing a claim's sections, as
+	// strip reads the archive's cells, knowing what the registries say of
+	// the columns over the corpus.
+	kept := map[claim][]string{}
+	marks := cells.Marks(a)
+	keep := func(c claim, section string) {
+		if l, ok := stripKeeps(marks, section, bytesLifts); ok && !slices.Contains(kept[c], l) {
+			kept[c] = append(kept[c], l)
+		}
+	}
 	for _, s := range a.Sections {
 		kind, name, rest := archive.SplitCase(s.Name)
 		if kind == archive.Transform && !transforms[name] {
-			c := claim{archive.Transform + "/" + name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s.\nIf a transform should make the variant, list it in its corpus type's Transforms", corpus, name)}
+			// archive.Check refuses a transform's name that breaks the
+			// naming rule, so strip takes this one as -transform.
+			c := claim{archive.Transform + "/" + name, fmt.Sprintf("no corpus type of testdata/%s/ lists a transform named %s.\nIf a transform should make the variant, list it in its corpus type's Transforms", corpus, name), "-transform " + name, "the sections under transform/" + name + "/", ""}
 			unclaimed[c] = append(unclaimed[c], s.Name)
+			keep(c, s.Name)
 			continue
 		}
 		if out, ok := strings.CutPrefix(rest, archive.Out+"/"); ok {
 			if col, _, _ := strings.Cut(out, "/"); !cols[col] {
-				c := claim{col, fmt.Sprintf("no column named %s runs over the corpus %s.\nIf a column should write them, register the column", col, corpus)}
+				c := columnClaim(col, fmt.Sprintf("no column named %s runs over the corpus %s", col, corpus), "If a column should write them, register the column", col, col+"'s sections", "")
 				unclaimed[c] = append(unclaimed[c], s.Name)
+				keep(c, s.Name)
 			}
 		}
 		if via, ok := strings.CutPrefix(rest, archive.Via+"/"); ok {
 			if l, _, _ := strings.Cut(via, "/"); !products[l] {
-				c := claim{archive.Via + "/" + l, fmt.Sprintf("no bytes lift named %s runs over the corpus %s.\nIf a bytes lift should write them, register it", l, corpus)}
+				c := columnClaim(archive.Via+"/"+l, fmt.Sprintf("no bytes lift named %s runs over the corpus %s", l, corpus), "If a bytes lift should write them, register it", l, l+"'s sections", l)
 				unclaimed[c] = append(unclaimed[c], s.Name)
+				keep(c, s.Name)
 			}
 		}
 	}
@@ -907,8 +966,46 @@ func (r *runner) checkArchive(t *testing.T, p, corpus string, cols, products, tr
 	}
 	slices.SortFunc(claims, func(a, b claim) int { return strings.Compare(a.what, b.what) })
 	for _, c := range claims {
-		t.Errorf("%s: no registry claims %s: %s. If not, delete them by hand; %s leaves them in place.", rel, andList(unclaimed[c]), c.why, r.updateCmd())
+		if c.strip == "" {
+			t.Errorf("%s: no registry claims %s: %s.\n%s leaves them in place. Delete them by hand, or run %s at the module root: with no flags, it removes every section an update writes, from every archive under %s but a frozen cell's, and the registries and findings files of the root, and lists what it leaves. Then run %s until it changes nothing, and read what it reports.", rel, andList(unclaimed[c]), c.why, r.updateCmd(), r.stripCmd(""), r.rootName(), r.updateCmd())
+			continue
+		}
+		// Whether a gaps line keeps strip from removing a lift's product
+		// turns on whether the lift is a bytes lift, so while the
+		// registries differ on that, the advice waits on them.
+		if ls := kept[c]; len(ls) > 0 && disputed[c.lift] {
+			keeps := fmt.Sprintf("%s, which marks a cell of theirs, keeps", ls[0])
+			if len(ls) > 1 {
+				keeps = fmt.Sprintf("%s, which mark cells of theirs, keep", andList(ls))
+			}
+			t.Errorf("%s: no registry claims %s: %s. If not, first settle whether %s is a bytes lift, on which the registries differ, as the check's failures on them say, then run the check again: until they agree, it can't tell whether %s strip from removing them.", rel, andList(unclaimed[c]), c.why, c.lift, keeps)
+			continue
+		}
+		first := ""
+		if ls := kept[c]; len(ls) == 1 {
+			first = fmt.Sprintf("remove %s, which marks a cell of theirs, so that strip removes them; then ", ls[0])
+		} else if len(ls) > 1 {
+			first = fmt.Sprintf("remove %s, which mark cells of theirs, so that strip removes them; then ", andList(ls))
+		}
+		t.Errorf("%s: no registry claims %s: %s. If not, %srun %s at the module root. It removes %s from every archive under %s, but a frozen cell's, and lists what it leaves. Then run %s until it changes nothing, and read what it reports.", rel, andList(unclaimed[c]), c.why, first, r.stripCmd(c.strip), c.whose, r.rootName(), r.updateCmd())
 	}
+}
+
+// stripKeeps returns the gaps line that keeps hypercase strip, run without
+// -frozen, from removing an archive's section, as strip reads the
+// archive's cells, and whether one does: the line that marks the cell the
+// section is part of. marks are the cells the archive's gaps lines mark,
+// and bytesLifts says which columns over its corpus are bytes lifts.
+func stripKeeps(marks map[cells.Cell]cells.Mark, section string, bytesLifts map[string]bool) (string, bool) {
+	c, ok := cells.Of(section)
+	if !ok || !cells.Part(section, bytesLifts) {
+		return "", false
+	}
+	m, ok := marks[c]
+	if !ok {
+		return "", false
+	}
+	return fmt.Sprintf("%s line %d", m.Gaps, m.Line), true
 }
 
 // pkgName names a package by its directory, as go test does: ., ./format.
@@ -934,11 +1031,6 @@ func hasTestFile(dir string) bool {
 		}
 	}
 	return false
-}
-
-func isFile(p string) bool {
-	fi, err := os.Stat(p)
-	return err == nil && fi.Mode().IsRegular()
 }
 
 func mustRel(base, target string) string {

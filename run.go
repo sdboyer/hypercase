@@ -18,6 +18,8 @@ import (
 	"github.com/sdboyer/hypercase/internal/diff"
 	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/hypercase/internal/root"
+	"github.com/sdboyer/hypercase/internal/shell"
+	"github.com/sdboyer/hypercase/internal/walk"
 )
 
 // Test runs every case through every column the package registered, as
@@ -41,6 +43,9 @@ func Test(t *testing.T) {
 		return
 	}
 	r.checkDescriptions(t)
+	if r.update && r.refuseLinks(t) {
+		return
+	}
 	r.checkRegistry(t)
 	found, err := registry.Find(r.moduleRoot)
 	if err != nil {
@@ -59,6 +64,40 @@ func Test(t *testing.T) {
 	r.runCorpora(t)
 	r.appliesToNoCase(t)
 	r.runChecks(t, found)
+}
+
+// refuseLinks reports whether the update refuses to run, and fails it
+// when it does: when a walk of the corpus root's testdata/, as the
+// root-package check walks it but into other corpus roots too, finds a
+// symbolic link there, testdata/ itself included, or can't finish. Every
+// write the update makes there, the lock's included, would go through such
+// a link, and the check runs in normal runs alone, so the update walks
+// before it writes anything. A link made while the update runs is left to
+// the next normal run's check.
+//
+// The check leaves another corpus root to that root's check. A registry
+// that records one, in a package no test runs as well, would hide its
+// directory from a walk that skipped it, while the update writes there.
+// So the update refuses every link under this root's testdata/ but in a
+// nested module, some that no check reports among them: one in another
+// corpus root's directory, outside that root's own testdata/.
+func (r *runner) refuseLinks(t *testing.T) bool {
+	t.Helper()
+	td := filepath.Join(r.corpusRoot, "testdata")
+	if _, err := os.Lstat(td); errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	links, err := walk.Testdata(td, nil, func(string, fs.DirEntry) {})
+	switch {
+	case err != nil:
+		t.Errorf("reading %s: %v, so the update wrote nothing.\nFix what failed, then run %s again.", r.rel(td), err, r.updateCmd())
+		return true
+	case len(links) > 0:
+		reason, it := walk.LinkReason(td, links, r.rel)
+		t.Errorf("%s, so the update wrote nothing.\n"+walk.LinkFix+", then run %s again.", reason, it, r.updateCmd())
+		return true
+	}
+	return false
 }
 
 // runner is one call of Test.
@@ -210,6 +249,21 @@ func checkRegistered(t *testing.T, what, verb, list string, ps []decl.Property) 
 // updateCmd is the command that runs an update.
 func (r *runner) updateCmd() string {
 	return r.updateVar + "=1 go test ./..."
+}
+
+// stripCmd is the hypercase strip command, run at the module root, that
+// removes the sections the flag given selects under the corpus root, or,
+// with no flag, every section an update writes there. It names the root
+// with -root, the module-root corpus too: without it, strip takes the
+// root the module root's registry records, which a stale one may record
+// otherwise. It quotes the root's path for a shell where the path needs
+// it.
+func (r *runner) stripCmd(flag string) string {
+	cmd := "hypercase strip -root " + shell.Quote(r.rootRel)
+	if flag != "" {
+		cmd += " " + flag
+	}
+	return cmd
 }
 
 // rel returns a path relative to the module root, with slashes, so a

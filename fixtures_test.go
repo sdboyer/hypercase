@@ -348,6 +348,8 @@ var registrations = map[string]func(){
 	"pkg-b-later":    func() { hypercase.Register(project, laterType, own(steered[Later]("shout", "shout"))) },
 	"corp-a":         func() { hypercase.Register(project, hypercase.Root("corp"), rootPkg, scriptType, own(echo)) },
 	"corp-b":         func() { hypercase.Register(project, hypercase.Root("corp"), rootPkg, scriptType, own(shout)) },
+	"corp-root-only": func() { hypercase.Register(project, hypercase.Root("corp"), rootPkg) },
+	"spaced-a":       func() { hypercase.Register(project, hypercase.Root("my corp"), rootPkg, scriptType, own(echo)) },
 
 	// Issue links, given out of order.
 	"echo-links": func() {
@@ -442,6 +444,8 @@ var fixturePackages = map[string][]fixturePkg{
 	"chain-past":   {{".", "chain-past"}},
 	"chain-twice":  {{".", "chain-twice"}},
 	"chain-shared": {{".", "chain-a"}, {"b", "chain-b"}},
+
+	"strip": {{".", "strip-a"}, {"b", "strip-b"}},
 }
 
 type fixturePkg struct{ dir, registration string }

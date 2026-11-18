@@ -98,9 +98,9 @@ $ go test  # chain-a-paths
     the transform louder, of testdata/export/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
         Give it to hypercase.Own in one package that registers its corpus type.
     testdata/export/prices.txtar: no registry claims out/evaluate/outcome, out/evaluate/values.txt, transform/louder/out/evaluate/outcome and transform/louder/out/evaluate/values.txt: no column named evaluate runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column evaluate at the module root. It removes evaluate's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/export/prices.txtar: no registry claims out/list/files.txt, out/list/outcome, transform/louder/out/list/files.txt and transform/louder/out/list/outcome: no column named list runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column list at the module root. It removes list's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: the suite evaluate runs over testdata/export/ and testdata/script/, and has paths from testdata/script/, where a registry gives each column one path from each corpus it runs over, in the same order.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it. No check runs, and an update writes no findings.
     what ran, in order:
@@ -158,9 +158,9 @@ $ go test  # chain-a-paths
     the transform louder, of testdata/export/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
         Give it to hypercase.Own in one package that registers its corpus type.
     testdata/export/prices.txtar: no registry claims out/evaluate/outcome, out/evaluate/values.txt, transform/louder/out/evaluate/outcome and transform/louder/out/evaluate/values.txt: no column named evaluate runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column evaluate at the module root. It removes evaluate's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/export/prices.txtar: no registry claims out/list/files.txt, out/list/outcome, transform/louder/out/list/files.txt and transform/louder/out/list/outcome: no column named list runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column list at the module root. It removes list's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: the suite evaluate runs over testdata/export/ and testdata/script/, and has paths from testdata/script/ and testdata/script/, where a registry gives each column one path from each corpus it runs over, in the same order.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it. No check runs, and an update writes no findings.
     what ran, in order:
@@ -192,9 +192,9 @@ $ go test  # chain-a-paths
     the transform louder, of testdata/export/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
         Give it to hypercase.Own in one package that registers its corpus type.
     testdata/export/prices.txtar: no registry claims out/evaluate/outcome, out/evaluate/values.txt, transform/louder/out/evaluate/outcome and transform/louder/out/evaluate/values.txt: no column named evaluate runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column evaluate at the module root. It removes evaluate's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/export/prices.txtar: no registry claims out/list/files.txt, out/list/outcome, transform/louder/out/list/files.txt and transform/louder/out/list/outcome: no column named list runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column list at the module root. It removes list's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: the suite evaluate runs over testdata/export/ and testdata/script/, and has paths from none, where a registry gives each column one path from each corpus it runs over, in the same order.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it. No check runs, and an update writes no findings.
     what ran, in order:
@@ -226,9 +226,9 @@ $ go test  # chain-a-paths
     the transform louder, of testdata/export/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
         Give it to hypercase.Own in one package that registers its corpus type.
     testdata/export/prices.txtar: no registry claims out/evaluate/outcome, out/evaluate/values.txt, transform/louder/out/evaluate/outcome and transform/louder/out/evaluate/values.txt: no column named evaluate runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column evaluate at the module root. It removes evaluate's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/export/prices.txtar: no registry claims out/list/files.txt, out/list/outcome, transform/louder/out/list/files.txt and transform/louder/out/list/outcome: no column named list runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column list at the module root. It removes list's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: the suite evaluate runs over testdata/export/ and testdata/script/, and has paths from testdata/script/ and testdata/export/, where a registry gives each column one path from each corpus it runs over, in the same order.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it. No check runs, and an update writes no findings.
     what ran, in order:
@@ -260,9 +260,9 @@ $ go test  # chain-a-paths
     the transform louder, of testdata/export/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
         Give it to hypercase.Own in one package that registers its corpus type.
     testdata/export/prices.txtar: no registry claims out/evaluate/outcome, out/evaluate/values.txt, transform/louder/out/evaluate/outcome and transform/louder/out/evaluate/values.txt: no column named evaluate runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column evaluate at the module root. It removes evaluate's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/export/prices.txtar: no registry claims out/list/files.txt, out/list/outcome, transform/louder/out/list/files.txt and transform/louder/out/list/outcome: no column named list runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column list at the module root. It removes list's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: the suite evaluate runs over testdata/export/ and testdata/script/, and has paths from testdata/export/, testdata/script/ and testdata/script/, where a registry gives each column one path from each corpus it runs over, in the same order.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it. No check runs, and an update writes no findings.
     what ran, in order:
@@ -294,9 +294,9 @@ $ go test  # chain-a-paths
     the transform louder, of testdata/export/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
         Give it to hypercase.Own in one package that registers its corpus type.
     testdata/export/prices.txtar: no registry claims out/evaluate/outcome, out/evaluate/values.txt, transform/louder/out/evaluate/outcome and transform/louder/out/evaluate/values.txt: no column named evaluate runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column evaluate at the module root. It removes evaluate's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/export/prices.txtar: no registry claims out/list/files.txt, out/list/outcome, transform/louder/out/list/files.txt and transform/louder/out/list/outcome: no column named list runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column list at the module root. It removes list's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: the suite evaluate's path from testdata/export/ names nosuch, and the registry lists no lift of that name, where every lift on a column's path is one its package registers.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it. No check runs, and an update writes no findings.
     what ran, in order:
@@ -328,9 +328,9 @@ $ go test  # chain-a-paths
     the transform louder, of testdata/export/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
         Give it to hypercase.Own in one package that registers its corpus type.
     testdata/export/prices.txtar: no registry claims out/evaluate/outcome, out/evaluate/values.txt, transform/louder/out/evaluate/outcome and transform/louder/out/evaluate/values.txt: no column named evaluate runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column evaluate at the module root. It removes evaluate's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/export/prices.txtar: no registry claims out/list/files.txt, out/list/outcome, transform/louder/out/list/files.txt and transform/louder/out/list/outcome: no column named list runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column list at the module root. It removes list's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: the lift parse runs over testdata/export/ and testdata/script/, and has paths from testdata/script/, where a registry gives each column one path from each corpus it runs over, in the same order.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it. No check runs, and an update writes no findings.
     what ran, in order:
@@ -362,9 +362,9 @@ $ go test  # chain-a-paths
     the transform louder, of testdata/export/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
         Give it to hypercase.Own in one package that registers its corpus type.
     testdata/export/prices.txtar: no registry claims out/evaluate/outcome, out/evaluate/values.txt, transform/louder/out/evaluate/outcome and transform/louder/out/evaluate/values.txt: no column named evaluate runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column evaluate at the module root. It removes evaluate's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/export/prices.txtar: no registry claims out/list/files.txt, out/list/outcome, transform/louder/out/list/files.txt and transform/louder/out/list/outcome: no column named list runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column list at the module root. It removes list's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: the lift resolve's path from testdata/script/ names the lift itself, where a column's path names the lifts before it.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it. No check runs, and an update writes no findings.
     what ran, in order:

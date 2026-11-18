@@ -1,0 +1,8 @@
+$ edit corp/README  # a corpus root, corp, with no testdata/
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # corp-root-only
+    The root-package check for the corpus root corp runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+PASS
+$ go test  # corp-root-only
+--- PASS: TestCorpus
+PASS

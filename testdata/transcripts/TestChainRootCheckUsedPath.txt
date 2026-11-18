@@ -136,9 +136,9 @@ $ go test  # used-fewer-a-fixed
     the lifts parse and resolve are used by ./b on the path testdata/export/ → import → parse and past it, and ., which owns them, doesn't run them over testdata/export/, so no package writes their cells of that corpus's cases, which ./b's cells past them are built through.
         A package that uses a lift reaches it from each corpus by the path the lift's owner does, and the registry of . records the corpus type of testdata/export/ and the lifts on ./b's path from it, so a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
     testdata/export/prices.txtar: no registry claims out/parse/outcome: no column named parse runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column parse at the module root. It removes parse's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/export/prices.txtar: no registry claims out/resolve/outcome: no column named resolve runs over the corpus export.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column resolve at the module root. It removes resolve's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/checks/paths.txt, the corpus check paths's findings, differs (-golden +got):
         + export evaluate: parse has no cell of export/prices
         + export evaluate: resolve has no cell of export/prices

@@ -1,0 +1,190 @@
+{
+  "format": 7,
+  "updateVar": "FIXTURE_UPDATE_GOLDEN",
+  "corpusRoot": ".",
+  "rootPackage": true,
+  "codes": false,
+  "issueLinks": [],
+  "properties": [
+    {
+      "name": "circular",
+      "description": "Some cell's formula refers back to itself, directly or through other cells."
+    },
+    {
+      "name": "dangling",
+      "description": "Some formula refers to a cell the sheet doesn't have."
+    },
+    {
+      "name": "malformed",
+      "description": "Some cell holds neither a number nor a formula."
+    },
+    {
+      "name": "unterminated",
+      "description": "The export holds a quoted field it never closes."
+    }
+  ],
+  "types": [
+    {
+      "dir": "export",
+      "description": "Exports, whose import/ tree says what the importer makes of them.",
+      "goType": "github.com/sdboyer/hypercase_test.Export",
+      "transforms": [
+        {
+          "name": "louder",
+          "description": "Uppercases every file under import/out/evaluate/out/.",
+          "gives": [],
+          "keeps": [
+            "unterminated"
+          ],
+          "probe": true,
+          "owned": false
+        }
+      ]
+    },
+    {
+      "dir": "script",
+      "description": "Trees of instructions, under in/<tree>/, that the fixtures' columns follow.",
+      "goType": "github.com/sdboyer/hypercase_test.Script",
+      "transforms": []
+    }
+  ],
+  "lifts": [
+    {
+      "name": "import",
+      "description": "Imports the export as a script, as its import/ tree says.",
+      "input": "github.com/sdboyer/hypercase_test.Export",
+      "product": "github.com/sdboyer/hypercase_test.Script",
+      "owned": true,
+      "bytes": true,
+      "corpora": [
+        "export"
+      ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": []
+        }
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why the importer rejects the export."
+        }
+      ],
+      "productFiles": [
+        {
+          "pattern": "evaluate/*",
+          "description": "What evaluate does, as a script's evaluate/ tree says."
+        },
+        {
+          "pattern": "evaluate/out/*",
+          "description": "An output evaluate returns."
+        },
+        {
+          "pattern": "inputs/*",
+          "description": "A tree named as a cell's inputs file is."
+        },
+        {
+          "pattern": "names/*",
+          "description": "Files named as a cell's own files are."
+        },
+        {
+          "pattern": "parse/*",
+          "description": "What parse does, as a script's parse/ tree says."
+        },
+        {
+          "pattern": "quote/*",
+          "description": "What a renderer of errors quotes."
+        },
+        {
+          "pattern": "resolve/*",
+          "description": "What resolve does, as a script's resolve/ tree says."
+        }
+      ],
+      "rejects": [
+        "unterminated"
+      ]
+    },
+    {
+      "name": "parse",
+      "description": "Parses the script, as its parse/ tree says.",
+      "input": "github.com/sdboyer/hypercase_test.Script",
+      "product": "*github.com/sdboyer/hypercase_test.Parsed",
+      "owned": true,
+      "bytes": false,
+      "corpora": [
+        "export",
+        "script"
+      ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": [
+            "import"
+          ]
+        },
+        {
+          "corpus": "script",
+          "lifts": []
+        }
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why the lift rejects the case."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "What the lift writes to stderr."
+        }
+      ],
+      "productFiles": [],
+      "rejects": [
+        "malformed"
+      ]
+    },
+    {
+      "name": "resolve",
+      "description": "Resolves the parsed script, as its resolve/ tree says.",
+      "input": "*github.com/sdboyer/hypercase_test.Parsed",
+      "product": "*github.com/sdboyer/hypercase_test.Graph",
+      "owned": true,
+      "bytes": false,
+      "corpora": [
+        "export",
+        "script"
+      ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": [
+            "parse",
+            "import"
+          ]
+        },
+        {
+          "corpus": "script",
+          "lifts": [
+            "parse"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "pattern": "error.txt",
+          "description": "Why the lift rejects the case."
+        },
+        {
+          "pattern": "stderr.txt",
+          "description": "What the lift writes to stderr."
+        }
+      ],
+      "productFiles": [],
+      "rejects": [
+        "circular",
+        "dangling"
+      ]
+    }
+  ],
+  "suites": []
+}

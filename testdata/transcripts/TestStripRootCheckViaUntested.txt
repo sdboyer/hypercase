@@ -1,0 +1,426 @@
+# the update, run until a pass changes nothing; that pass:
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/evaluate
+                --- PASS: TestCorpus/script/plain/variant/more/list
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/products
+PASS
+$ edit c/testdata/hypercase.json  # a copy of b's registry, recording parse as a bytes lift
+$ edit testdata/export/prices.txtar  # a product parse doesn't make, in parse's cell, which a gaps line marks
+$ edit testdata/export/prices.txtar  # a product parse doesn't make, in the variant's parse cell, which its gaps line marks
+$ go test  # strip-a
+    c/testdata/hypercase.json is a registry, and c holds no _test.go file, so no test compares it, and it still claims sections.
+        Delete it, or restore the package's tests.
+    testdata/export/prices.txtar: no registry claims via/parse/quote/A1 and variant/doubled/via/parse/quote/A1: no bytes lift named parse runs over the corpus export.
+        If a bytes lift should write them, register it. If not, first settle whether parse is a bytes lift, on which the registries differ, as the check's failures on them say, then run the check again: until they agree, it can't tell whether gaps line 1 and variant/doubled/gaps line 1, which mark cells of theirs, keep strip from removing them.
+    testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
+          export/prices evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+        + export/prices evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [outcome values.txt]
+          export/prices import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+          export/prices list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        + export/prices list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt outcome]
+          export/prices parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+          export/prices resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          export/prices/transform/louder evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+        + export/prices/transform/louder evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [outcome values.txt]
+          export/prices/transform/louder import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+          export/prices/transform/louder list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        + export/prices/transform/louder list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt outcome]
+          export/prices/transform/louder parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+          export/prices/transform/louder resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          export/prices/variant/doubled evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+        + export/prices/variant/doubled evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [outcome values.txt]
+          export/prices/variant/doubled import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+          export/prices/variant/doubled list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        + export/prices/variant/doubled list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt outcome]
+          export/prices/variant/doubled parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+          export/prices/variant/doubled resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          script/plain evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+        + script/plain evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [outcome values.txt]
+          script/plain list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        + script/plain list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt outcome]
+          script/plain parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+          script/plain resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          script/plain/variant/more evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+        + script/plain/variant/more evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [outcome values.txt]
+          script/plain/variant/more list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        + script/plain/variant/more list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt outcome]
+          script/plain/variant/more parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+          script/plain/variant/more resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/cells
+FAIL
+[exit 1]
+$ hypercase strip -column parse
+testdata/export/prices.txtar: removed 1 section
+testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells
+testdata/export/prices.txtar: left the cell variant/doubled/parse, frozen by its known gap, variant/doubled/gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells
+testdata/script/plain.txtar: removed 2 sections
+Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
+$ rm c/testdata/hypercase.json  # delete c's registry, as its failure says
+$ go test  # strip-a
+    testdata/export/prices.txtar: no registry claims via/parse/quote/A1 and variant/doubled/via/parse/quote/A1: no bytes lift named parse runs over the corpus export.
+        If a bytes lift should write them, register it. If not, run hypercase strip -root . -column parse at the module root. It removes parse's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
+    export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        parse: Parses the script, as its parse/ tree says.
+        transform/louder/out/parse/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/plain: A script, not an export, which evaluate and list run on directly.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    script/plain/variant/more: The script evaluates to a second value too.
+        parse: Parses the script, as its parse/ tree says.
+        variant/more/out/parse/outcome has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+    testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
+          export/prices/transform/louder evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+          export/prices/transform/louder import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+          export/prices/transform/louder list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        - export/prices/transform/louder parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+        + export/prices/transform/louder parse: no outcome; the lift parse of ., rejecting [malformed]; states []; files []
+          export/prices/transform/louder resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          export/prices/variant/doubled evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+          export/prices/variant/doubled import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+          ...
+          export/prices/variant/doubled resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          script/plain evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+          script/plain list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        - script/plain parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+        + script/plain parse: no outcome; the lift parse of ., rejecting [malformed]; states []; files []
+          script/plain resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          script/plain/variant/more evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+          script/plain/variant/more list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        - script/plain/variant/more parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+        + script/plain/variant/more parse: no outcome; the lift parse of ., rejecting [malformed]; states []; files []
+          script/plain/variant/more resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/export
+        --- FAIL: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- FAIL: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- FAIL: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/plain
+            --- FAIL: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- FAIL: TestCorpus/script/plain/variant/more
+                --- FAIL: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/cells
+FAIL
+[exit 1]
+$ hypercase strip -root . -column parse
+testdata/export/prices.txtar: removed 2 sections
+testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells
+testdata/export/prices.txtar: left the cell variant/doubled/parse, frozen by its known gap, variant/doubled/gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells
+Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
+# the update, run until a pass changes nothing; that pass:
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/evaluate
+                --- PASS: TestCorpus/script/plain/variant/more/list
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/products
+PASS
+$ go test  # strip-a
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS
+$ go test ./b  # strip-b
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/evaluate
+                --- PASS: TestCorpus/script/plain/variant/more/list
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/products
+PASS

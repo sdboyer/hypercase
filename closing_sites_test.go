@@ -578,7 +578,7 @@ var messageSites = map[string][]messageSite{
 		{"Skipf", "%s: %s is blocked: the lift %s failed on the case, and %s, %s, records its error.", "a cell that a lift whose committed error matches blocks, which it skips: it fails nothing"},
 	},
 	"runner.checkArchive": {
-		{"Errorf", "%s: the archive's name, %q, breaks the naming rule: %s. Rename the archive.", "an archive's name, in the root-package check"},
+		{"Errorf", "%s is no archive a run reads: %s. %s.", "an archive hypercase strip refuses by its path, such as by its name, in the root-package check"},
 		{"Errorf", "reading %s: %v", "an archive that can't be read, in the root-package check"},
 		{"Errorf", "%s has problems of form, so none of its cells run, and no update writes it: %s Fix the archive by hand.", "an archive's problems of form, in the root-package check"},
 		{"Errorf", "%s: %s Write the case's description, in prose, as the archive's comment, the text before its first section.", "an archive with no description, in the root-package check"},
@@ -587,7 +587,9 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "%s: %s states %s, and no registry under %s lists a property of that name. Declare the property, or correct the line.", "a properties line naming no registered property, in the root-package check"},
 		{"Errorf", "%s: %s, line %d, names transform/%s, and no corpus type of testdata/%s/ lists a transform of that name. List the transform, or remove the line.", "a gaps line naming no transform, in the root-package check"},
 		{"Errorf", "%s: %s, line %d, names %s, and no registry has a column of that name over the corpus %s. Register the column, or remove the line.", "a gaps line naming no column, in the root-package check"},
-		{"Errorf", "%s: no registry claims %s: %s. If not, delete them by hand; %s leaves them in place.", "sections no registry claims, in the root-package check"},
+		{"Errorf", "%s: no registry claims %s: %s. %s leaves them in place. Delete them by hand, or run %s at the module root: with no flags, it removes every section an update writes, from every archive under %s but a frozen cell's, and the registries and findings files of the root, and lists what it leaves. Then run %s until it changes nothing, and read what it reports.", "sections no registry claims, of a column whose name hypercase strip refuses, in the root-package check"},
+		{"Errorf", "%s: no registry claims %s: %s. If not, first settle whether %s is a bytes lift, on which the registries differ, as the check's failures on them say, then run the check again: until they agree, it can't tell whether %s strip from removing them.", "sections no registry claims, of a lift the registries differ on, in the root-package check"},
+		{"Errorf", "%s: no registry claims %s: %s. If not, %srun %s at the module root. It removes %s from every archive under %s, but a frozen cell's, and lists what it leaves. Then run %s until it changes nothing, and read what it reports.", "sections no registry claims, in the root-package check"},
 	},
 	"runner.checkColumnDescriptions": {
 		{"Errorf", "the %s %s has no description. Add one: it says what the %s does, in prose.", "a column with no description"},
@@ -639,6 +641,10 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "%s %s, which no registered corpus type reaches. Register the lift that produces it, or the corpus type.", "a type no corpus type reaches, before any case runs"},
 		{"Log", "No case runs until each type a column consumes is reached by one path.", "that no case runs until each type has one path"},
 	},
+	"runner.refuseLinks": {
+		{"Errorf", "reading %s: %v, so the update wrote nothing. Fix what failed, then run %s again.", "testdata/, which an update can't read for symbolic links, so it writes nothing"},
+		{"Errorf", "%s, so the update wrote nothing. Remove %s, or replace it with a copy of what it names, if it names anything, then run %s again.", "the symbolic links under testdata/, or testdata/ itself as one, as walk.LinkReason words them, which an update writes nothing through"},
+	},
 	"runner.requireRootCheck": {
 		{"Errorf", "no registry records a root-package check for %s, so nothing reports what no column there owns. Register hypercase.RootPackage() in one package over it, then run %s to record it in the package's registry.", "a corpus root no registry records the root-package check of"},
 		{"Errorf", "%s records the root-package check for %s, and %s holds no _test.go file, so no test runs the check, and nothing reports what no column there owns. Restore the package's tests, or register hypercase.RootPackage() in another package over it, then run %s to record it in that package's registry.", "a root-package check recorded in a directory with no tests"},
@@ -657,7 +663,8 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "the registries that own or use the lift %s differ in %s: %s Every package that owns or uses a lift registers one declaration of it: %s. Declare the lift once, in a package the others import, and register that declaration. %s", "a lift's differing registry entries, in the root-package check"},
 		{"Errorf", "%s is a temp file left by a write that was cut short. Delete it.", "a registry temp file a write left, in the root-package check"},
 		{"Errorf", "reading %s: %v", "testdata/, which can't be read, in the root-package check"},
-		{"Errorf", "%s holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/. Move the archives into one.", "archives directly under testdata/, in the root-package check"},
+		{"Errorf", "%s. Remove %s, or replace it with a copy of what it names, if it names anything.", "the symbolic links under testdata/, or testdata/ itself as one, as walk.LinkReason words them, in the root-package check"},
+		{"Errorf", "%s holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/. Move the archives into one, or delete them.", "archives directly under testdata/, in the root-package check"},
 		{"Errorf", "%s holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus. Declare a decl.Type with that Dir, or move or delete the archives.", "a directory of archives no registry declares, in the root-package check"},
 	},
 	"runner.runCell": {

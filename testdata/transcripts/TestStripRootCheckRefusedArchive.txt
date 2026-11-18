@@ -1,0 +1,419 @@
+# the update, run until a pass changes nothing; that pass:
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/evaluate
+                --- PASS: TestCorpus/script/plain/variant/more/list
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/products
+PASS
+$ edit testdata/export/Bad.txtar  # a copy of prices, under a name that breaks the naming rule
+$ edit testdata/export/Bad.txtar  # a removed column's outcome
+$ go test  # strip-a
+    testdata/export/Bad.txtar is no archive a run reads: the archive's name, "Bad", breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter, so none of its cells run, and no update writes it.
+        Rename the archive.
+    testdata/export/Bad.txtar: the archive's name breaks the naming rule, so none of its cells run. The root-package check reports it.
+    the corpus check cells can't read its cells: testdata/export/Bad.txtar: the archive's name breaks the naming rule
+        Fix what the message names. No check runs, and an update writes no findings.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/cells
+FAIL
+[exit 1]
+$ hypercase strip -root . -column nobody
+hypercase strip: -column nobody matches no section that strip removes under the module-root corpus. Only archives that it leaves as they are hold out/nobody/… or via/nobody/…, at any level, or can't be read:
+testdata/export/Bad.txtar: the archive's name, "Bad", breaks the naming rule: lowercase ASCII letters and digits, in words joined by single hyphens, starting with a letter, so none of its cells run, and no update writes it. Rename the archive.
+Fix them, then run hypercase strip -column nobody again.
+[exit 1]
+$ edit testdata/export/copy.txtar  # the archive renamed, as the message says
+$ rm testdata/export/Bad.txtar  # 
+$ go test  # strip-a
+    testdata/export/copy.txtar: no registry claims out/nobody/outcome: no column named nobody runs over the corpus export.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column nobody at the module root. It removes nobody's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
+    testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
+        + export/copy evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+        + export/copy import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+        + export/copy list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        + export/copy parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+        + export/copy resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+        + export/copy/transform/louder evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+        + export/copy/transform/louder import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+        + export/copy/transform/louder list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        + export/copy/transform/louder parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+        + export/copy/transform/louder resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+        + export/copy/variant/doubled evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+        + export/copy/variant/doubled import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+        + export/copy/variant/doubled list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        + export/copy/variant/doubled parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+        + export/copy/variant/doubled resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          export/prices evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
+          export/prices import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+          export/prices list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    what ran, in order:
+        import ran
+        parse ran on copy
+        resolve ran on copy
+        import ran
+        parse ran on copy
+        resolve ran on copy
+        import ran
+        parse ran on copy
+        resolve ran on copy
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/copy
+            --- PASS: TestCorpus/export/copy/import
+            --- PASS: TestCorpus/export/copy/parse
+            --- PASS: TestCorpus/export/copy/resolve
+            --- PASS: TestCorpus/export/copy/variant/doubled
+                --- PASS: TestCorpus/export/copy/variant/doubled/import
+                --- PASS: TestCorpus/export/copy/variant/doubled/parse
+                --- PASS: TestCorpus/export/copy/variant/doubled/resolve
+            --- PASS: TestCorpus/export/copy/transform/louder
+                --- PASS: TestCorpus/export/copy/transform/louder/import
+                --- PASS: TestCorpus/export/copy/transform/louder/parse
+                --- PASS: TestCorpus/export/copy/transform/louder/resolve
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/cells
+FAIL
+[exit 1]
+$ hypercase strip -root . -column nobody
+testdata/export/copy.txtar: removed 1 section
+Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
+# the update, run until a pass changes nothing; that pass:
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on copy
+        resolve ran on copy
+        import ran
+        parse ran on copy
+        resolve ran on copy
+        import ran
+        parse ran on copy
+        resolve ran on copy
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/copy
+            --- PASS: TestCorpus/export/copy/import
+            --- PASS: TestCorpus/export/copy/parse
+            --- PASS: TestCorpus/export/copy/resolve
+            --- PASS: TestCorpus/export/copy/variant/doubled
+                --- PASS: TestCorpus/export/copy/variant/doubled/import
+                --- PASS: TestCorpus/export/copy/variant/doubled/parse
+                --- PASS: TestCorpus/export/copy/variant/doubled/resolve
+            --- PASS: TestCorpus/export/copy/transform/louder
+                --- PASS: TestCorpus/export/copy/transform/louder/import
+                --- PASS: TestCorpus/export/copy/transform/louder/parse
+                --- PASS: TestCorpus/export/copy/transform/louder/resolve
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
+    what ran, in order:
+        import ran
+        parse ran on copy
+        resolve ran on copy
+        evaluate's probe ran
+        evaluate ran on copy
+        import ran
+        parse ran on copy
+        resolve ran on copy
+        evaluate's probe ran
+        evaluate ran on copy
+        import ran
+        parse ran on copy
+        resolve ran on copy
+        evaluate's probe ran
+        evaluate ran on copy
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/copy
+            --- PASS: TestCorpus/export/copy/evaluate
+            --- PASS: TestCorpus/export/copy/list
+            --- PASS: TestCorpus/export/copy/variant/doubled
+                --- PASS: TestCorpus/export/copy/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/copy/variant/doubled/list
+            --- PASS: TestCorpus/export/copy/transform/louder
+                --- PASS: TestCorpus/export/copy/transform/louder/evaluate
+                --- PASS: TestCorpus/export/copy/transform/louder/list
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/evaluate
+                --- PASS: TestCorpus/script/plain/variant/more/list
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/products
+PASS
+$ go test  # strip-a
+    what ran, in order:
+        import ran
+        parse ran on copy
+        resolve ran on copy
+        import ran
+        parse ran on copy
+        resolve ran on copy
+        import ran
+        parse ran on copy
+        resolve ran on copy
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/copy
+            --- PASS: TestCorpus/export/copy/import
+            --- PASS: TestCorpus/export/copy/parse
+            --- PASS: TestCorpus/export/copy/resolve
+            --- PASS: TestCorpus/export/copy/variant/doubled
+                --- PASS: TestCorpus/export/copy/variant/doubled/import
+                --- PASS: TestCorpus/export/copy/variant/doubled/parse
+                --- PASS: TestCorpus/export/copy/variant/doubled/resolve
+            --- PASS: TestCorpus/export/copy/transform/louder
+                --- PASS: TestCorpus/export/copy/transform/louder/import
+                --- PASS: TestCorpus/export/copy/transform/louder/parse
+                --- PASS: TestCorpus/export/copy/transform/louder/resolve
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS

@@ -218,7 +218,7 @@ func TestOrphans(t *testing.T) {
 	}
 	// A section under a column nothing registers is the root-package
 	// check's to report, in a normal run.
-	unclaimed := "testdata/script/gone.txtar: no registry claims out/other/values.txt: no column named other runs over the corpus script.\nIf a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place."
+	unclaimed := "testdata/script/gone.txtar: no registry claims out/other/values.txt: no column named other runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root . -column other at the module root."
 	s.fails(s.normal("echo"), append(want, unclaimed)...)
 	s.fails(s.update("echo"), want...)
 	s.same("testdata/script/gone.txtar", gone)
@@ -392,7 +392,7 @@ func TestLeftoverTempFile(t *testing.T) {
 func TestArchiveNameRule(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "bad-archive-name")
-	s.fails(s.normal("echo"), `testdata/script/Twice.txtar: the archive's name, "Twice", breaks the naming rule`)
+	s.fails(s.normal("echo"), `testdata/script/Twice.txtar is no archive a run reads: the archive's name, "Twice", breaks the naming rule`)
 	s.done()
 }
 

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/sdboyer/hypercase/internal/hooks"
 )
 
 const wellFormed = `Pancakes for two.
@@ -130,7 +132,7 @@ func TestFailedWriteLeavesTheFile(t *testing.T) {
 	a := Parse([]byte(wellFormed))
 	a.Sections[1].Data = []byte("serves: 8\n")
 	var sawTemp string
-	afterTemp = func(tmp string) error {
+	hooks.AfterTemp = func(tmp string) error {
 		sawTemp = tmp
 		if !IsTemp(tmp) || strings.HasSuffix(tmp, ".txtar") {
 			t.Errorf("the temp file %s isn't named as a temp file", tmp)
@@ -138,7 +140,7 @@ func TestFailedWriteLeavesTheFile(t *testing.T) {
 		return errors.New("disk full")
 	}
 	err := Write(name, a)
-	afterTemp = nil
+	hooks.AfterTemp = nil
 	if err == nil || sawTemp == "" {
 		t.Fatalf("Write = %v, and the hook saw %q", err, sawTemp)
 	}

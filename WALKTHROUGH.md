@@ -454,15 +454,58 @@ Its `.gitignore` names the corpus root's lock, which an update takes
 - What an update writes to a cell depends only on the inputs and the code,
   never on committed outputs. Committed outputs decide whether a run fails,
   and, from step 4, that a frozen cell is left alone.
-- `hypercase strip` (#16) isn't built yet. As designed, it removes
-  update-written sections, which it recognizes by name, under the corpus
-  root's lock (step 5). A person runs it, never an update. With no flags it
-  strips every archive under the corpus root, and the registry and findings
-  files (steps 5 and 8). `-column <name>` and `-transform <name>` limit it.
-  It leaves frozen cells (step 4) in place and lists them, and `-frozen`
-  strips those too.
+- `hypercase strip`, from `cmd/hypercase` (step 9), removes update-written
+  sections, which it tells from hand-written ones by name alone. Every
+  hand-written section keeps its bytes, and the sections left keep their
+  order. A person runs it, never an update. It strips each archive under
+  the corpus root's lock (step 5), and writes it by temp file and rename.
+- With no flags it strips every archive under the corpus root, and removes
+  the registries that record the root and the findings files in their
+  packages' `testdata/checks/` (steps 5 and 8). It keeps a package's
+  registry while any findings file of the package is left, so that strip
+  run again finds it, and every registry while it leaves any `*.txtar`
+  file as it was, for a problem of form, a failed write or a place that is
+  no archive's, so that strip run again reads them as this run did.
+  `-column <name>` limits it to a column's sections, at every level, and
+  `-transform <name>` to those under a transform's variant (step 7).
+  Either leaves the registries and findings files.
+- `-root <dir>` names the corpus root, relative to the current directory
+  or by an absolute path. Without it, strip takes the root that the
+  registry of the package in the current directory records, or, at the
+  module root with no registry there, the module-root corpus. Anywhere
+  else it asks for `-root`, unlike the report (step 9), and so it does for
+  a recorded root inside a module nested in the package's. Before it reads
+  anything, it fails when the `testdata/` it reads first is a symbolic
+  link: `-root`'s, or else the current directory's. Its line that says to
+  run strip again then gives `-root` where it was given, naming the same
+  directory, and, inside a module, away from its root, with no `-root`,
+  says to name the root with `-root` if the current directory then holds
+  no registry. Otherwise, a line that says to run strip again gives the
+  command, with `-root` unless strip ran at the module root on the
+  module-root corpus and the registry there, if there is one, records that
+  corpus: a strip may remove the registry that named the root, and one
+  that names another root would find that one. A path a shell would read
+  as other than itself is quoted.
+- It leaves frozen cells (step 4) in place and lists them, and `-frozen`
+  strips those too. A frozen cell's line gives the command that strips
+  it: `-column` with its column, and `-transform` for a cell of a
+  transform's variant. No flag limits strip to one archive or to a
+  hand-written variant, so the command strips the column's other frozen
+  cells too. It leaves as it was, and lists with the reason, an
+  archive with a problem of form, and one that isn't
+  `testdata/<corpus>/<archive>.txtar` with both names under the naming
+  rule and `<corpus>` other than `checks`, and then exits non-zero. It
+  goes by location alone, so it strips an archive in a directory that no
+  corpus type declares. It doesn't reach into a nested module or another
+  corpus root under `testdata/`, and a symbolic link where it reaches,
+  `testdata/` itself included, fails it before it removes anything. It
+  reads any other package's `testdata/` through a link in its place, the
+  current directory's under `-root` included, and removes a registry
+  there that records the root, and the package's findings file, through
+  the link (#57). Its last line is the update to run next.
 - Stripping and then updating, repeated until an update changes nothing,
-  will reach a known state.
+  reaches what updating the hand-written sections alone reaches, frozen
+  cells excepted: a known state.
 
 **What an archive can't hold** (proposed).
 
@@ -1125,6 +1168,16 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 - At the re-read, a package compares the hand-written sections its cells ran
   on with those it re-read. On a difference it writes nothing to that
   archive and fails, saying to run the update again.
+- The root-package check (below) runs in normal runs alone, so an update
+  walks the corpus root's `testdata/` for symbolic links itself, before it
+  takes the lock or writes anything. Its walk skips a nested module, as
+  the check's does, but not another corpus root, which a registry in a
+  package no test runs may record. On any link it reaches, `testdata/`
+  itself included, the update writes nothing and fails, naming the link in
+  the check's words. That includes some that no check reports: one in
+  another corpus root's directory, outside that root's own `testdata/`. It
+  fails too when the walk can't read a directory. A link made while the
+  update runs is left to the next normal run's check.
 - A temp file left by a killed write, beside an archive, a registry or a
   findings file, fails the run, naming it.
 - An update is the whole module's. A per-package update is not supported.
@@ -1142,7 +1195,21 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
     declare differently, or which a stale registry records, as one edited
     by hand: the update, which rewrites the registries, ends the second;
   - a section no registry claims, such as `out/<suite>/…` after that suite
-    was removed;
+    was removed, whose failure names `hypercase strip -root <dir> -column
+    <suite>`, to run at the module root, then the update. `-root` names
+    the corpus root, `.` for the module-root corpus: without it, strip
+    takes the root the module root's registry records, which a stale one
+    may record otherwise. The failure says the strip reaches the column's
+    sections in every archive under the root, and, since strip leaves a
+    cell a `gaps` line marks, it says to remove first a line that marks
+    one of theirs. Where the column's name breaks the naming rule, as in
+    `out/Old/…`, no column can have it, and strip refuses it as
+    `-column`, so the failure says to delete the sections by hand, or to
+    run `hypercase strip -root <dir>` with no flags, which removes every
+    section an update writes, then the update;
+  - an archive whose name breaks the naming rule, as `Bad.txtar`: none of
+    its cells run, and `hypercase strip` refuses it, so the check reports
+    that alone, as strip words it, and names no strip for its sections;
   - a problem of an archive as a whole: a missing description, a top-level
     name outside the closed set, hand-written sections that don't sit
     together, a `properties`
@@ -1150,7 +1217,11 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
     no registry has;
   - a registry file whose directory holds no `_test.go` file;
   - a directory under `testdata/` that holds archives and that no registry
-    declares.
+    declares;
+  - a symbolic link under the corpus root's `testdata/`, `testdata/`
+    itself included, whatever it names, but in a nested module or another
+    corpus root, which the check doesn't reach: a run reads through one,
+    where the check, `hypercase strip` and the report (step 9) don't.
 - A declared directory that doesn't exist yet is fine.
 - A package whose directory holds no `_test.go` file owns and uses
   nothing, whatever its registry records. Any file whose name ends in
@@ -1994,8 +2065,9 @@ whether each has a probe, and whether the package owns it.
   its update removes them. What remains under `transform/<name>/out/` is
   each column's orphan.
 - A transform nobody registers any more leaves sections nothing claims. The
-  root-package check reports them, and says to delete them by hand:
-  `hypercase strip` (#16), which is to remove them, isn't built yet.
+  root-package check reports them, and names `hypercase strip -root <dir>
+  -transform <name>`, then the update, as it does for a removed suite
+  (step 5).
 - The root-package check fails on a transform that a package with tests
   lists in a corpus type and no package owns (step 5's rule for packages
   with no tests), and on one that two own.
@@ -2667,8 +2739,12 @@ the same outcome.
 
 **Flags.**
 
-- `-root <dir>` names the corpus root, relative to the current directory.
-  Without it, the report finds the root as a test does.
+- `-root <dir>` names the corpus root, relative to the current directory
+  and inside the repository; the report refuses an absolute path. Without
+  it, the report takes the root that the registry of the package in the
+  current directory records, at `<b>`, or at `<a>` where `<b>` has no
+  module there, or, with no registry there, the module-root corpus, from
+  any directory of the module.
 - `-text` writes the problems and the ranked changes as plain text instead
   of the page.
 
@@ -3180,7 +3256,16 @@ lift.
   one doesn't, or the other way round, or both accept and the products
   differ, the cells past it fail normal runs, which read the committed
   outcome and product, until a person resolves the frozen cell. Deleting
-  the cell's files includes deleting its product.
+  the cell's files includes deleting its product. `hypercase strip` leaves
+  both in place, and `-frozen` strips both. It reads from the registries
+  which columns are bytes lifts: a `via/<column>/…` of a column they say is
+  none is part of no cell, so strip removes it even when a `gaps` line
+  marks the column's cell. A column they don't name keeps its `via/` with
+  its frozen cell, and so does one that any of them says is a bytes lift,
+  where they disagree. The root-package check fails on each registry that
+  makes them disagree: on the lift, where registries of packages with
+  tests record it differently, and on a registry in a package with no
+  `_test.go` file, by that registry's own failure.
 - The properties a case states hold for every column the case reaches,
   through the lift too. A CSV with a quote that never closes states
   `unterminated`, which `import` rejects, and a CSV whose imported sheet has
@@ -3197,7 +3282,15 @@ lift.
 - Past a bytes lift, a cell's input view, which `RenderError` receives, is
   that lift's product.
 - The root-package check claims `via/<lift>/…` in a corpus for each bytes
-  lift a package owns over it; any other `via/` section is unclaimed.
+  lift a package owns over it; any other `via/` section is unclaimed, and
+  its failure names `hypercase strip -root <dir> -column <lift>`, then the
+  update, as it does for a removed suite (step 5). Where the lift's name
+  breaks the naming rule, as in `via/Old/…`, the failure says to delete
+  the sections by hand, or to strip with no flags, as for a column of
+  such a name. When a `gaps` line marks a cell of those sections and the
+  registries disagree on whether the lift is a bytes lift, whether strip
+  leaves them turns on that, so the failure names no strip: it says to
+  settle the registries first, then run the check again.
 - The root-package check fails when the registries of packages with tests
   that own or use a lift record it differently, any lift: its
   description, input, product, `bytes`, outputs, `productFiles` or

@@ -122,7 +122,7 @@ func (r *registrations) addCheck(c Check) {
 
 // findingsDir is the directory of the package's findings.
 func (r *runner) findingsDir() string {
-	return filepath.Join(r.pkgDir, "testdata", checksDir)
+	return filepath.Join(r.pkgDir, "testdata", archive.ChecksDir)
 }
 
 // runChecks runs the package's corpus checks, each the subtest
@@ -135,7 +135,7 @@ func (r *runner) runChecks(t *testing.T, found []registry.Found) {
 		return
 	}
 	cells, err := r.readCells(found)
-	t.Run(checksDir, func(t *testing.T) {
+	t.Run(archive.ChecksDir, func(t *testing.T) {
 		for _, c := range r.checks {
 			t.Run(c.Name, func(t *testing.T) {
 				var reg *unreadableRegistry

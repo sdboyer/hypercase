@@ -1,0 +1,279 @@
+# the update, run until a pass changes nothing; that pass:
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/evaluate
+                --- PASS: TestCorpus/script/plain/variant/more/list
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/products
+PASS
+$ rm testdata/.hypercase.lock  # the lock, which the update takes to write an archive
+$ edit testdata/export/prices.txtar  # parse's outcome, out of its place, where the root package's update puts it back
+# testdata/export moves to shared/, and a symbolic link to ../shared/export.d takes its place
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    testdata/ holds no symbolic links: testdata/export is one, so the update wrote nothing.
+        Remove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+# testdata/export moves back, in place of the link
+# testdata/export/prices.txtar moves to shared/, and a symbolic link to ../../shared/prices.txtar.d takes its place
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    testdata/ holds no symbolic links: testdata/export/prices.txtar is one, so the update wrote nothing.
+        Remove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+# testdata/export/prices.txtar moves back, in place of the link
+# testdata moves to shared/, and a symbolic link to shared/testdata.d takes its place
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none, so the update wrote nothing.
+        Remove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+# testdata moves back, in place of the link
+$ edit testdata/export/prices.txtar  # the archive as the updates leave it
+# testdata/export moves to shared/, and a symbolic link to ../shared/export.d takes its place
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    testdata/ holds no symbolic links: testdata/export is one, so the update wrote nothing.
+        Remove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+# testdata/export moves back, in place of the link
+$ edit testdata/export/prices.txtar  # parse's outcome, out of its place, where the root package's update puts it back
+# testdata/export moves to shared/, and a symbolic link to ../shared/missing takes its place
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    testdata/ holds no symbolic links: testdata/export is one, so the update wrote nothing.
+        Remove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+# testdata/export moves back, in place of the link
+$ edit testdata/export/prices.txtar  # the archive as the updates leave it
+$ edit testdata/hypercase.json  # the root package's registry, with a blank line its update removes
+# testdata moves to shared/, and a symbolic link to shared/testdata.d takes its place
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none, so the update wrote nothing.
+        Remove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+# testdata moves back, in place of the link
+$ edit testdata/export/prices.txtar  # evaluate's values, wrong, which ./b's update writes again
+$ edit testdata/hypercase.json  # the root package's registry as its update leaves it
+# testdata/export moves to shared/, and a symbolic link to ../shared/export.d takes its place
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
+    testdata/ holds no symbolic links: testdata/export is one, so the update wrote nothing.
+        Remove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+# testdata/export moves back, in place of the link
+$ edit testdata/export/prices.txtar  # parse's outcome, out of its place, where the root package's update puts it back
+$ edit testdata/hypercase.json  # the root package's registry, with a blank line its update removes
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS
+$ edit testdata/export/prices.txtar  # evaluate's values, wrong, which ./b's update writes again
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+        parse ran on plain
+        resolve ran on plain
+        evaluate's probe ran
+        evaluate ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/list
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/evaluate
+                --- PASS: TestCorpus/export/prices/variant/doubled/list
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/evaluate
+                --- PASS: TestCorpus/export/prices/transform/louder/list
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/evaluate
+            --- PASS: TestCorpus/script/plain/list
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/evaluate
+                --- PASS: TestCorpus/script/plain/variant/more/list
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/products
+PASS
+$ go test  # strip-a
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        parse ran on plain
+        resolve ran on plain
+        parse ran on plain
+        resolve ran on plain
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/variant/doubled
+                --- PASS: TestCorpus/export/prices/variant/doubled/import
+                --- PASS: TestCorpus/export/prices/variant/doubled/parse
+                --- PASS: TestCorpus/export/prices/variant/doubled/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/plain
+            --- PASS: TestCorpus/script/plain/parse
+            --- PASS: TestCorpus/script/plain/resolve
+            --- PASS: TestCorpus/script/plain/variant/more
+                --- PASS: TestCorpus/script/plain/variant/more/parse
+                --- PASS: TestCorpus/script/plain/variant/more/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/cells
+PASS

@@ -376,17 +376,17 @@ func shape(v any, prefix string, holds func(string) bool, null string) any {
 
 // TestPeek: a registry's corpus root is read whatever its format, an older
 // or a newer one's included, so a reader can leave another root's registry
-// unread.
+// unread. Its update variable is read too, and is "" when it holds none.
 func TestPeek(t *testing.T) {
 	newer := fmt.Sprintf(`{"format": %d, "corpusRoot": "step09", "rootPackage": true, "a field of a later hypercase": {}}`, Format+1)
-	for _, tt := range []struct{ data, root string }{
-		{olderData, "step05"},
-		{string(Registry{CorpusRoot: "."}.Marshal()), "."},
-		{newer, "step09"},
+	for _, tt := range []struct{ data, root, updateVar string }{
+		{olderData, "step05", "X"},
+		{string(Registry{CorpusRoot: ".", UpdateVar: "Y"}.Marshal()), ".", "Y"},
+		{newer, "step09", ""},
 	} {
 		h, err := Peek([]byte(tt.data))
-		if err != nil || h.CorpusRoot != tt.root {
-			t.Errorf("Peek(%.40s…) = %+v, %v; want the corpus root %s", tt.data, h, err, tt.root)
+		if err != nil || h.CorpusRoot != tt.root || h.UpdateVar != tt.updateVar {
+			t.Errorf("Peek(%.40s…) = %+v, %v; want the corpus root %s and the update variable %q", tt.data, h, err, tt.root, tt.updateVar)
 		}
 	}
 	if h, _ := Peek([]byte(newer)); h.Format != Format+1 || !h.RootPackage {
