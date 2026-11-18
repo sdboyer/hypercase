@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -1569,6 +1570,121 @@ func TestStripUnreadFindings(t *testing.T) {
 // left are gone: a removed suite's sections, in an archive of each root,
 // and a findings file no check writes. The toy's frozen cells keep their
 // committed files.
+func TestStripToys(t *testing.T) {
+	t.Parallel()
+	dir, goCmd := toyCopy(t)
+	want := tree(t, dir)
+	roots := recordedRoots(t, dir, want)
+
+	stale := map[string]string{"step06/testdata/checks/gone.txt": "sheet/twice gone\n"}
+	for _, r := range roots {
+		p := r + "/testdata/sheet/twice.txtar"
+		stale[p] = want[p] + "-- out/gone/outcome --\naccepted\n"
+	}
+	for p, data := range stale {
+		full := filepath.Join(dir, filepath.FromSlash(p))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stripToy(t, dir, roots)
+	stripped := tree(t, dir)
+	for p := range want {
+		if strings.HasSuffix(p, "/"+registry.Name) {
+			if _, ok := stripped[p]; ok {
+				t.Errorf("strip left the registry %s", p)
+			}
+		}
+	}
+	if got, w := stripped["step04/testdata/sheet/negative.txtar"], want["step04/testdata/sheet/negative.txtar"]; got != w {
+		t.Errorf("strip changed step04's negative.txtar, whose only update-written cell is frozen (-want +got):\n%s", diff.Lines([]byte(w), []byte(got)))
+	}
+
+	for pass := 1; ; pass++ {
+		before := tree(t, dir)
+		goCmd([]string{sheetsVar + "=1"}, "test", "-count=1", "./...")
+		if maps.Equal(tree(t, dir), before) {
+			break
+		}
+		if pass == 5 {
+			t.Fatalf("the update still changes files after %d passes", pass)
+		}
+	}
+	sameTree(t, dir, want)
+}
+
+// TestStripToysReportFirst: on a copy of the walkthrough's toy module, with
+// each of its corpus roots stripped, the report tests, run in the update
+// before the packages that write prices' calc sections back, write every
+// report as it was. A report test copies its corpus root as it finds it,
+// and in the update of the whole module, the other packages over the root
+// write their sections back while it runs (#74). The report tests run
+// twice, each time with the committed reports removed: first alone, with
+// every corpus stripped, then after the update of their own packages
+// alone, as go test ./... can order them, where prices.txtar holds its own
+// package's sections and none of calc's, which each root's cli package
+// writes.
+func TestStripToysReportFirst(t *testing.T) {
+	t.Parallel()
+	dir, goCmd := toyCopy(t)
+	want := tree(t, dir)
+	stripToy(t, dir, recordedRoots(t, dir, want))
+	var reports, pkgs []string
+	for _, p := range slices.Sorted(maps.Keys(want)) {
+		if strings.HasSuffix(p, "/testdata/report.txt") || strings.HasSuffix(p, "/testdata/report.html") {
+			reports = append(reports, p)
+			if pkg, _, _ := strings.Cut(p, "/testdata/"); !slices.Contains(pkgs, "./"+pkg) {
+				pkgs = append(pkgs, "./"+pkg)
+			}
+		}
+	}
+	if len(reports) == 0 {
+		t.Fatal("the toy commits no report")
+	}
+	update := []string{sheetsVar + "=1"}
+	reportsFirst := func(state string) {
+		t.Helper()
+		for _, p := range reports {
+			if err := os.Remove(filepath.Join(dir, filepath.FromSlash(p))); err != nil {
+				t.Fatal(err)
+			}
+		}
+		goCmd(update, append([]string{"test", "-count=1", "-run=^TestReport$"}, pkgs...)...)
+		got := tree(t, dir)
+		for _, p := range reports {
+			g, ok := got[p]
+			switch {
+			case !ok:
+				t.Errorf("%s, the report tests didn't write %s", state, p)
+			case g != want[p]:
+				t.Errorf("%s, %s differs (-want +got):\n%s", state, p, diff.Lines([]byte(want[p]), []byte(g)))
+			}
+		}
+	}
+
+	reportsFirst("With every corpus stripped")
+	goCmd(update, append([]string{"test", "-count=1", "-run=^TestCorpus$"}, pkgs...)...)
+	files := tree(t, dir)
+	for _, pkg := range pkgs {
+		p := path.Join(pkg, "testdata", "sheet", "prices.txtar")
+		a := archive.Parse([]byte(files[p]))
+		_, own := a.Section("out/evaluate/outcome")
+		_, calc := a.Section("out/calc/outcome")
+		if !own || calc {
+			t.Fatalf("after the update of %s alone, %s holds out/evaluate/outcome: %t, and out/calc/outcome: %t, where the report tests are to find the first and not the second", strings.Join(pkgs, " "), p, own, calc)
+		}
+	}
+	reportsFirst("After the update of the report tests' own packages alone")
+}
+
+// toyCopy copies the walkthrough's toy module, and returns the toy's
+// directory in the copy and a function that runs go there, which fails the
+// test unless go exits 0. Each go command runs off any workspace, with
+// GOFLAGS dropped from its environment, though a GOFLAGS set in the go env
+// file still applies, and with neither update variable unless extra sets one.
 //
 // The toy's go.mod replaces hypercase by ../.., hypercase's own module,
 // where step 9's report test also builds the hypercase command. So the
@@ -1576,8 +1692,8 @@ func TestStripUnreadFindings(t *testing.T) {
 // leaves out .git, and, outside the toy, the testdata/ directories: no
 // build reads them, and the module's own tests can be writing them while
 // this one copies.
-func TestStripToys(t *testing.T) {
-	t.Parallel()
+func toyCopy(t *testing.T) (dir string, goCmd func(extra []string, args ...string)) {
+	t.Helper()
 	hc, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
@@ -1608,7 +1724,7 @@ func TestStripToys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(top, toy)
+	dir = filepath.Join(top, toy)
 	var env []string
 	for _, kv := range os.Environ() {
 		if k, _, _ := strings.Cut(kv, "="); k != "GOFLAGS" && k != "GOWORK" && k != sheetsVar && k != goldenVar && k != "PWD" {
@@ -1616,7 +1732,7 @@ func TestStripToys(t *testing.T) {
 		}
 	}
 	env = append(env, "GOWORK=off")
-	goCmd := func(extra []string, args ...string) {
+	goCmd = func(extra []string, args ...string) {
 		t.Helper()
 		cmd := exec.Command("go", args...)
 		cmd.Dir, cmd.Env = dir, append(slices.Clone(env), extra...)
@@ -1624,69 +1740,44 @@ func TestStripToys(t *testing.T) {
 			t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, out)
 		}
 	}
-	want := tree(t, dir)
+	return dir, goCmd
+}
 
-	// The toy's corpus roots, as its registries record them.
+// recordedRoots returns the corpus roots that the toy's registries record,
+// sorted, reading each from files, the toy's files at dir by slash path. It
+// fails the test unless there is more than one.
+func recordedRoots(t *testing.T, dir string, files map[string]string) []string {
+	t.Helper()
 	found, err := registry.Find(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var toyRoots []string
+	var roots []string
 	for _, f := range found {
-		h, err := registry.Peek([]byte(want[root.Rel(dir, f.Path)]))
+		h, err := registry.Peek([]byte(files[root.Rel(dir, f.Path)]))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !slices.Contains(toyRoots, h.CorpusRoot) {
-			toyRoots = append(toyRoots, h.CorpusRoot)
+		if !slices.Contains(roots, h.CorpusRoot) {
+			roots = append(roots, h.CorpusRoot)
 		}
 	}
-	slices.Sort(toyRoots)
-	if len(toyRoots) < 2 {
-		t.Fatalf("the toy's registries record the corpus roots %q, and it has more", toyRoots)
+	slices.Sort(roots)
+	if len(roots) < 2 {
+		t.Fatalf("the toy's registries record the corpus roots %q, and it has more", roots)
 	}
+	return roots
+}
 
-	stale := map[string]string{"step06/testdata/checks/gone.txt": "sheet/twice gone\n"}
-	for _, r := range toyRoots {
-		p := r + "/testdata/sheet/twice.txtar"
-		stale[p] = want[p] + "-- out/gone/outcome --\naccepted\n"
-	}
-	for p, data := range stale {
-		full := filepath.Join(dir, filepath.FromSlash(p))
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(full, []byte(data), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for _, r := range toyRoots {
+// stripToy runs hypercase strip -root on each of roots, in the toy at dir,
+// and fails the test unless each exits 0 and says to run the toy's update
+// next.
+func stripToy(t *testing.T, dir string, roots []string) {
+	t.Helper()
+	for _, r := range roots {
 		res := stripIn(t, dir, "", "-root", r)
 		if res.code != 0 || res.stderr != "" || !strings.HasSuffix(res.stdout, "Next, run "+sheetsVar+"=1 go test ./... at the module root, and again until it changes nothing.\n") {
 			t.Fatalf("strip -root %s exited %d, printing:\n%s%s", r, res.code, res.stdout, res.stderr)
 		}
 	}
-	stripped := tree(t, dir)
-	for p := range want {
-		if strings.HasSuffix(p, "/"+registry.Name) {
-			if _, ok := stripped[p]; ok {
-				t.Errorf("strip left the registry %s", p)
-			}
-		}
-	}
-	if got, w := stripped["step04/testdata/sheet/negative.txtar"], want["step04/testdata/sheet/negative.txtar"]; got != w {
-		t.Errorf("strip changed step04's negative.txtar, whose only update-written cell is frozen (-want +got):\n%s", diff.Lines([]byte(w), []byte(got)))
-	}
-
-	for pass := 1; ; pass++ {
-		before := tree(t, dir)
-		goCmd([]string{sheetsVar + "=1"}, "test", "-count=1", "./...")
-		if maps.Equal(tree(t, dir), before) {
-			break
-		}
-		if pass == 5 {
-			t.Fatalf("the update still changes files after %d passes", pass)
-		}
-	}
-	sameTree(t, dir, want)
 }
