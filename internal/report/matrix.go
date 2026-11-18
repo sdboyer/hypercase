@@ -117,4 +117,8 @@ func matrices(b *snapshot, changes []Change, props map[string]string, links *lin
 }
 
 // class names a rank for the page's style sheet.
-func (r Rank) class() string { return strings.ReplaceAll(r.String(), " ", "-") }
+func (r Rank) class() string { return class(r.String()) }
+
+// class names a rank, or how a file changed, for the page's style sheet:
+// its words joined by hyphens.
+func class(s string) string { return strings.ReplaceAll(s, " ", "-") }

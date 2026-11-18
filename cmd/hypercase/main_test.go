@@ -8,9 +8,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/internal/diff"
 	"github.com/sdboyer/hypercase/internal/gittest"
 	"github.com/sdboyer/hypercase/internal/registry"
+	"github.com/sdboyer/hypercase/internal/revmap"
 )
 
 // revisions commits each set of files in turn, as the whole working tree,
@@ -35,16 +37,81 @@ func revisions(t *testing.T, g *gittest.Repo, revs ...map[string]string) []strin
 }
 
 // module returns a module whose corpus root is its root, with one
-// registry, over the corpus sheet, and the archives given by name.
+// registry, over the corpus sheet, and the archives given by name, each
+// with the inputs files of mapped.
 func module(archives map[string]string) map[string]string {
 	files := map[string]string{
 		"go.mod":                  "module example.com/m\n\ngo 1.27\n",
 		"testdata/hypercase.json": string(moduleRegistry().Marshal()),
 	}
 	for name, data := range archives {
-		files["testdata/sheet/"+name+".txtar"] = data
+		files["testdata/sheet/"+name+".txtar"] = mapped(data)
 	}
 	return files
+}
+
+// mapped returns an archive with an inputs file for each cell that ran and
+// has none, as the update writes one for a cell whose output declarations
+// give no ranges: each of the cell's files, its product's named
+// via/<lift>/<path>, by its path line alone. So a fixture written before
+// inputs files, at a registry format that has them, holds what an update
+// would commit, and the report finds no cell that ran without one. Each
+// inputs file is added after the archive's last section, and an archive
+// that doesn't end with a newline is returned as it is.
+func mapped(data string) string {
+	if !strings.HasSuffix(data, "\n") {
+		return data
+	}
+	type cell struct {
+		ran, has bool
+		files    []revmap.File
+	}
+	cells := map[string]*cell{} // by the cell's directory, <prefix>out/<column>/
+	var order []string
+	cellOf := func(dir string) *cell {
+		if cells[dir] == nil {
+			cells[dir] = &cell{}
+			order = append(order, dir)
+		}
+		return cells[dir]
+	}
+	for _, s := range archive.Parse([]byte(data)).Sections {
+		kind, name, rest := archive.SplitCase(s.Name)
+		prefix := ""
+		switch {
+		case kind != "" && name == "":
+			continue // a section no case holds
+		case kind != "":
+			prefix = kind + "/" + name + "/"
+		}
+		top, below, _ := strings.Cut(rest, "/")
+		col, file, _ := strings.Cut(below, "/")
+		if col == "" || file == "" {
+			continue
+		}
+		switch top {
+		case archive.Out:
+			c := cellOf(prefix + archive.Out + "/" + col + "/")
+			switch file {
+			case archive.OutcomeFile:
+				o, err := archive.ParseOutcome(s.Data)
+				c.ran = err == nil && o.State != archive.Skipped && o.State != archive.Blocked
+			case revmap.Name:
+				c.has = true
+			default:
+				c.files = append(c.files, revmap.File{Path: file})
+			}
+		case archive.Via:
+			c := cellOf(prefix + archive.Out + "/" + col + "/")
+			c.files = append(c.files, revmap.File{Path: rest})
+		}
+	}
+	for _, dir := range order {
+		if c := cells[dir]; c.ran && !c.has {
+			data += "-- " + dir + revmap.Name + " --\n" + string(revmap.Format(c.files))
+		}
+	}
+	return data
 }
 
 func moduleRegistry() registry.Registry {

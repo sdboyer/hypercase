@@ -1,15 +1,18 @@
 // Package report builds hypercase report: what changed in a corpus root
 // between two git revisions, read from the repository's object store.
 //
-// It reads registries and archives, never Go source, and works from the
-// cells' committed outcomes alone: a cell exists at a revision when its
-// outcome file does. It ranks the changes: changed outcomes first, then
-// cells that appeared, then cells that disappeared, then cells whose files
-// changed under the same outcome, each with a line diff of its files. It
-// shows the matrix of each corpus at the second revision, each case with
-// the properties it states and each known gap on the cell it marks, linked
-// to its issue; the descriptions of what the registries and archives
-// declare; and the problems it found, where it doesn't pick.
+// It reads registries, archives and corpus checks' findings files, never
+// Go source, and works from the cells' committed outcomes alone: a cell
+// exists at a revision when its outcome file does. It shows each corpus
+// check whose findings changed, and ranks the changes: changed outcomes
+// first, then cells that appeared, then cells that disappeared, then cells
+// whose files changed under the same outcome, then cells whose inputs file
+// alone changed, each with a line diff of its files, what changed in their
+// reverse maps, and the input lines they come from. It shows the matrix of
+// each corpus at the second revision, each case with the properties it
+// states and each known gap on the cell it marks, linked to its issue; the
+// descriptions of what the registries and archives declare; and the
+// problems it found, where it doesn't pick.
 package report
 
 import (
@@ -27,6 +30,7 @@ import (
 	"github.com/sdboyer/hypercase/internal/diff"
 	"github.com/sdboyer/hypercase/internal/gitfs"
 	"github.com/sdboyer/hypercase/internal/registry"
+	"github.com/sdboyer/hypercase/internal/revmap"
 )
 
 // Options are what a report is asked for.
@@ -59,15 +63,30 @@ type Report struct {
 	// Problems are what the report found that it can't show as it is: at
 	// B, then at A.
 	Problems []Problem
+	// Findings are the corpus checks whose findings changed, by package,
+	// then check.
+	Findings []FindingsChange
 	// Changes are the cells that changed, in rank order, and within a rank
 	// by case, then column.
 	Changes []Change
+	// Unranged is the revision whose cells commit no inputs files, since
+	// its registries predate registry.InputsFormat, when the other's
+	// don't, or nil. The report shows no ranges there, and ranks no cell on
+	// its inputs file.
+	Unranged *Unranged
 	// Matrices are the corpora at B, by name.
 	Matrices []Matrix
 	// Corpora describe each corpus at B or at A, by name, and Properties
 	// each property, by name.
 	Corpora    []Corpus
 	Properties []Described
+}
+
+// An Unranged revision is one whose registries predate inputs files: its
+// name, and its newest registry's format.
+type Unranged struct {
+	At     string
+	Format int
 }
 
 // A Problem is what the report found at one revision that it can't show
@@ -88,10 +107,11 @@ const (
 	Appeared                   // the cell is only at B
 	Disappeared                // the cell is only at A
 	BytesChanged               // another of its files differs, under the same outcome
+	RangesChanged              // its inputs file alone differs, under the same outcome
 )
 
 func (r Rank) String() string {
-	return [...]string{"outcome changed", "appeared", "disappeared", "bytes changed"}[r]
+	return [...]string{"outcome changed", "appeared", "disappeared", "bytes changed", "ranges changed"}[r]
 }
 
 // A Change is one cell's change.
@@ -104,7 +124,8 @@ type Change struct {
 	// where the cell isn't.
 	Before, After string
 	// Files are the cell's other files that were added, changed or removed,
-	// by path, then, for a bytes lift's cell, its product's, by path.
+	// or whose reverse maps alone changed, by path, then, for a bytes
+	// lift's cell, its product's, by path. Its inputs file is none of them.
 	Files []FileChange
 	// Properties are what the case states, at B, or at A for a cell that
 	// disappeared.
@@ -116,17 +137,37 @@ type Change struct {
 
 // A FileChange is one file of a cell that changed, by its path under the
 // column's directory, or, for a file of a bytes lift's product, by its
-// path from the case's via/, as via/<lift>/<path>, with a line diff from A
-// to B.
+// path from the case's via/, as via/<lift>/<path>: its bytes, with a line
+// diff from A to B, or its reverse map alone.
 type FileChange struct {
 	Path string
-	How  string // added, changed or removed
+	How  string // added, changed or removed, or RangesOnly
 	// Diff is the line diff, and Added and Removed count its lines only at
 	// B and only at A. Unaligned records that the diff left out a stretch
 	// it can't align, so Added and Removed don't count the file's change.
 	Diff           []diff.Line
 	Added, Removed int
 	Unaligned      bool
+	// Ranges are what changed in the file's reverse map, where both
+	// revisions map it: the lines of the map at A that B's lacks, then
+	// those of B's that A's lacks.
+	Ranges []RangeLine
+	// Inputs are the input lines the file comes from, or nil where the
+	// page shows none: where no revision it shows maps the file, or each
+	// range it maps names lines the archive doesn't hold.
+	Inputs *Inputs
+}
+
+// RangesOnly is how a file changed whose bytes are the same at both
+// revisions, and whose reverse map isn't.
+const RangesOnly = "ranges changed"
+
+// A RangeLine is a line of a file's reverse map that one revision's map
+// holds and the other's lacks: Kind is '-' for A's and '+' for B's, and
+// Text is the line as the inputs file writes it, less its indent.
+type RangeLine struct {
+	Kind byte
+	Text string
 }
 
 // A Property is a property a case states, with its description at B, or
@@ -201,7 +242,16 @@ func Build(opts Options) (*Report, error) {
 	// its name.
 	props := maps.Clone(a.props)
 	maps.Copy(props, b.props)
+	r.Findings = findingsChanges(a, b, links)
 	r.Changes = changes(a, b, props, links)
+	switch {
+	// A has no registries where it predates the project's use of
+	// hypercase, and then no cells, and so no ranges to lack.
+	case !a.ranges && b.ranges && len(regs[0]) > 0:
+		r.Unranged = &Unranged{At: a.rev.Name, Format: a.format}
+	case a.ranges && !b.ranges:
+		r.Unranged = &Unranged{At: b.rev.Name, Format: b.format}
+	}
 	r.Matrices = matrices(b, r.Changes, props, links)
 	r.Corpora, r.Properties = describe(a, b, links)
 	return r, nil
@@ -262,8 +312,10 @@ func findModule(tree fs.FS, dir string) (string, bool) {
 // changes compares every cell of the two snapshots, and ranks those that
 // changed. A cell whose state is unknown at either revision has no outcome
 // to compare, so it ranks on its files alone when it is at both, and one
-// whose product either revision leaves out has no product to compare.
-// props holds each property's description.
+// whose product either revision leaves out has no product to compare. A
+// cell whose files are the same ranks on its inputs file, byte for byte,
+// where both revisions commit inputs files, less the maps of a product
+// either revision leaves out. props holds each property's description.
 func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 	keys := map[cellKey]bool{}
 	for k := range a.cells {
@@ -290,9 +342,18 @@ func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 		default:
 			ch.Rank, ch.Before, ch.After = BytesChanged, ca.line, cb.line
 		}
-		ch.Files = fileChanges(ca, cb, k.column, !a.leftOut[k] && !b.leftOut[k])
-		if ch.Rank == BytesChanged && len(ch.Files) == 0 {
-			continue
+		leftOut := a.leftOut[k] || b.leftOut[k]
+		ch.Files = fileChanges([2]*snapshot{a, b}, k, !leftOut)
+		onceDiffs(ch.Files)
+		if ch.Rank == BytesChanged && !slices.ContainsFunc(ch.Files, func(f FileChange) bool { return f.How != RangesOnly }) {
+			var product string
+			if leftOut {
+				product = archive.Via + "/" + k.column + "/"
+			}
+			if !a.ranges || !b.ranges || inputsEqual(ca.inputs, cb.inputs, product) {
+				continue
+			}
+			ch.Rank = RangesChanged
 		}
 		ch.Properties = at.properties(k.c, props, links)
 		if text, ok := at.gaps[k]; ok {
@@ -304,27 +365,43 @@ func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 	return out
 }
 
-// fileChanges returns a cell's files, other than its outcome, that differ
-// between two revisions, by path, then its product's, by path, each with
-// its diff, when products says to compare them. Either cell may be nil.
-func fileChanges(a, b *cellAt, column string, products bool) []FileChange {
-	var fa, fb, pa, pb map[string][]byte
-	if a != nil {
-		fa, pa = a.files, a.product
+// inputsEqual reports whether two revisions' inputs files of a cell are
+// the same: both absent, or both present with the same bytes, less the
+// maps of the files under product, where product isn't "".
+func inputsEqual(a, b *inputsAt, product string) bool {
+	if a == nil || b == nil {
+		return a == b
 	}
-	if b != nil {
-		fb, pb = b.files, b.product
+	return bytes.Equal(a.less(product), b.less(product))
+}
+
+// fileChanges returns a cell's files, other than its outcome and its inputs
+// file, that differ between two revisions, or whose reverse maps alone
+// do, by path, then its product's, by path, each with its diff and its
+// input lines, when products says to compare them. snaps are the
+// revisions, either of which may lack the cell.
+func fileChanges(snaps [2]*snapshot, k cellKey, products bool) []FileChange {
+	cells := [2]*cellAt{snaps[0].cells[k], snaps[1].cells[k]}
+	var files, product [2]map[string][]byte
+	for i, c := range cells {
+		if c != nil {
+			files[i], product[i] = c.files, c.product
+		}
 	}
 	if !products {
-		pa, pb = nil, nil
+		product = [2]map[string][]byte{}
 	}
-	return append(changedFiles(fa, fb, ""), changedFiles(pa, pb, archive.Via+"/"+column+"/")...)
+	return append(changedFiles(snaps, cells, k, files, ""), changedFiles(snaps, cells, k, product, archive.Via+"/"+k.column+"/")...)
 }
 
 // changedFiles returns the files that differ between two revisions' sets
-// of a cell's files, by path, each with its diff, and each path after the
-// prefix.
-func changedFiles(fa, fb map[string][]byte, prefix string) []FileChange {
+// of a cell's files, or whose reverse maps alone do, by path, each with
+// its diff, what changed in its map and its input lines, and each path
+// after the prefix, which is also the path its map is under. Either cell
+// may be nil.
+func changedFiles(snaps [2]*snapshot, cells [2]*cellAt, k cellKey, set [2]map[string][]byte, prefix string) []FileChange {
+	ca, cb := cells[0], cells[1]
+	fa, fb := set[0], set[1]
 	paths := map[string]bool{}
 	for p := range fa {
 		paths[p] = true
@@ -337,6 +414,9 @@ func changedFiles(fa, fb map[string][]byte, prefix string) []FileChange {
 		da, inA := fa[p]
 		db, inB := fb[p]
 		fc := FileChange{Path: prefix + p}
+		if inA && inB {
+			fc.Ranges = rangeChanges(ca.mapOf(fc.Path), cb.mapOf(fc.Path))
+		}
 		switch {
 		case !inA:
 			fc.How = "added"
@@ -344,21 +424,35 @@ func changedFiles(fa, fb map[string][]byte, prefix string) []FileChange {
 			fc.How = "removed"
 		case !bytes.Equal(da, db):
 			fc.How = "changed"
+		case len(fc.Ranges) > 0:
+			fc.How = RangesOnly
 		default:
 			continue
 		}
-		fc.Diff, _ = diff.Diff(da, db)
-		for _, l := range fc.Diff {
-			switch l.Kind {
-			case '+':
-				fc.Added++
-			case '-':
-				fc.Removed++
-			case diff.Unaligned:
-				fc.Unaligned = true
-			}
+		if fc.How != RangesOnly {
+			fc.Diff, fc.Added, fc.Removed, fc.Unaligned = lineDiff(da, db)
 		}
+		fc.Inputs = inputsOf(snaps, cells, k, fc, [2]bool{inA, inB})
 		out = append(out, fc)
+	}
+	return out
+}
+
+// rangeChanges returns the lines of a file's reverse map at A that B's
+// lacks, then those of B's that A's lacks, each in its map's order, or nil
+// unless both maps are given. The maps are canonical, so neither holds a
+// line twice, and they are equal exactly when no line is returned.
+func rangeChanges(a, b *revmap.File) []RangeLine {
+	if a == nil || b == nil {
+		return nil
+	}
+	var out []RangeLine
+	la, lb := a.Lines(), b.Lines()
+	for _, l := range only(la, lb) {
+		out = append(out, RangeLine{Kind: '-', Text: l})
+	}
+	for _, l := range only(lb, la) {
+		out = append(out, RangeLine{Kind: '+', Text: l})
 	}
 	return out
 }

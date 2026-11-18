@@ -1,9 +1,8 @@
 // Package revmap reads and writes a cell's inputs file, out/<column>/inputs:
 // its reverse maps, which give, for each of the cell's output files, the
 // archive sections and lines it comes from, or that it depends on all of
-// the cell's inputs. The framework writes it with Format, and tests read it
-// back with Parse; the report shows the file as it shows any other. It
-// doesn't import testing.
+// the cell's inputs. The framework writes it with Format, and tests and
+// the report read it back with Parse. It doesn't import testing.
 //
 // The file holds, for each output file, in path order, bytewise, a line
 // holding the file's path, then one line per range, indented two spaces:
@@ -27,6 +26,10 @@ import (
 	"strconv"
 	"strings"
 )
+
+// Name is the inputs file's name in its cell's column's directory, as in
+// out/<column>/inputs.
+const Name = "inputs"
 
 // A File is the reverse map of one output file.
 type File struct {
@@ -52,6 +55,33 @@ type Range struct {
 
 // whole reports whether the range is its whole section.
 func (r Range) whole() bool { return r.Start == 0 && r.End == 0 }
+
+// String returns the range as the inputs file writes it, less its indent:
+// its section alone for the whole section, as in/sheet/A1, or the section
+// and its lines, as in/sheet/A1:1-3, with a section that isn't plain
+// quoted.
+func (r Range) String() string {
+	if r.whole() {
+		return name(r.Section)
+	}
+	return fmt.Sprintf("%s:%d-%d", name(r.Section), r.Start, r.End)
+}
+
+// Lines returns the file's range lines as the inputs file writes them,
+// less their indent, in their order: the one line "all inputs" for a file
+// that depends on all inputs, and each range's String otherwise. Format
+// writes them, so two canonical maps of one file are equal exactly when
+// their lines are.
+func (f File) Lines() []string {
+	if f.All {
+		return []string{allLine}
+	}
+	lines := make([]string, len(f.Ranges))
+	for i, r := range f.Ranges {
+		lines[i] = r.String()
+	}
+	return lines
+}
 
 // allLine is the range line of a file that depends on all inputs.
 const allLine = "all inputs"
@@ -138,16 +168,8 @@ func Format(files []File) []byte {
 	for _, f := range Canonical(files) {
 		b.WriteString(name(f.Path))
 		b.WriteByte('\n')
-		if f.All {
-			b.WriteString("  " + allLine + "\n")
-			continue
-		}
-		for _, r := range f.Ranges {
-			b.WriteString("  " + name(r.Section))
-			if !r.whole() {
-				fmt.Fprintf(&b, ":%d-%d", r.Start, r.End)
-			}
-			b.WriteByte('\n')
+		for _, l := range f.Lines() {
+			b.WriteString("  " + l + "\n")
 		}
 	}
 	return b.Bytes()

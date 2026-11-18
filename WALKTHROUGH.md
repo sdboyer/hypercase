@@ -2826,8 +2826,9 @@ for the person to read, and a project needn't commit it.
 does on a branch. In a scratch repository, it runs the update on the toy at
 step 9 and commits it on `main`, makes a change on a branch, runs the update
 again, commits again, and runs the report in `step09/`. Its commits hold
-what the report reads: `go.mod`, the registries and the archives. The
-change makes three edits:
+what the report reads: `go.mod`, the registries and the archives, and the
+corpus check's findings, which step 11 adds to the report. The change makes
+three edits:
 
 - `calc` gains a classifier, `warned`, which adds `warned` to the outcome
   of each cell where calc writes a warning.
@@ -2892,7 +2893,8 @@ the same outcome.
   base computes it and passes it. Flags come before the revisions: every
   argument after `--`, or after the first revision, is a revision, even one
   that starts with `-`, and none is ever read as a flag of git's.
-- It reads registries and archives, never Go source. At each revision it
+- It reads registries and archives, and from step 11 corpus checks'
+  findings, never Go source. At each revision it
   merges the registries that record the corpus root, so one module can hold
   several. Only `<a>` may lack them, as a revision from before the project
   used hypercase does; every cell at `<b>` then appeared. A corpus root that
@@ -2945,7 +2947,8 @@ the same outcome.
   section an archive holds twice, each fail the report.
 - hypercase's own CI runs the report over the toy on each pull request, from
   its merge base to its head, once per corpus root, and keeps the pages.
-- Step 11 adds input lines and corpus-check findings.
+- Step 11 adds a fifth rank, ranges changed, the input lines beside each
+  changed file, and corpus checks' findings.
 
 **Flags.**
 
@@ -3004,8 +3007,9 @@ revision that has them, `<b>` first, and under it one line per problem, its
 place, where it has one, then what it is. Then one heading per rank that has
 changes, in rank order. Under it, one line per cell: its case, its column,
 and its outcome, or the change in it. So `outcome` is never listed as a
-file. Under each cell, one line per other file of the cell that was added,
-changed or removed. For the example's change,
+file, and nor is `inputs` (step 11). Under each cell, one line per other
+file of the cell that was added, changed or removed. For the example's
+change,
 `walkthrough/sheets/step09/testdata/report.txt`:
 
 <!-- source: walkthrough/sheets/step09/testdata/report.txt -->
@@ -3016,22 +3020,18 @@ outcome changed
 appeared
   sheet/empty calc: rejected S101
     error.txt added
-    inputs added
   sheet/empty evaluate: blocked parse
   sheet/empty format: blocked parse
   sheet/empty parse: rejected S101
     error.txt added
-    inputs added
   sheet/empty resolve: blocked parse
 disappeared
   sheet/blank calc: rejected S101
     error.txt removed
-    inputs removed
   sheet/blank evaluate: blocked parse
   sheet/blank format: blocked parse
   sheet/blank parse: rejected S101
     error.txt removed
-    inputs removed
   sheet/blank resolve: blocked parse
 bytes changed
   sheet/notes calc: rejected S101
@@ -3851,6 +3851,94 @@ cells blocked at `parse` have no `inputs`.
 - A cell that ran and wrote no output files has an empty `inputs`.
 - Every line ends with a newline.
 
+**The report.** `walkthrough/sheets/step11/report_test.go` runs step 9's
+example over step 11's toy. Its commits hold the corpus check's findings,
+and its change makes three more edits:
+
+- `wrapped`'s `A1` becomes a formula the export wraps onto a second line, as
+  it wraps `B1`.
+- `twice`'s variant `cycle` writes out `A1` too, as the base has it.
+- The importer's code for a field past the last column or row is
+  renumbered, from `C103` to `C104`.
+
+The plain text, `walkthrough/sheets/step11/testdata/report.txt`:
+
+<!-- source: walkthrough/sheets/step11/testdata/report.txt -->
+```
+findings changed
+  step11 codes
+    - C103
+    + C104
+outcome changed
+  csv/past-xfd import: rejected C103 -> rejected C104
+  sheet/divide calc: accepted -> accepted warned
+  sheet/divide/transform/renamed calc: accepted -> accepted warned
+appeared
+  sheet/empty calc: rejected S101
+    error.txt added
+  sheet/empty evaluate: blocked parse
+  sheet/empty format: blocked parse
+  sheet/empty parse: rejected S101
+    error.txt added
+  sheet/empty resolve: blocked parse
+disappeared
+  sheet/blank calc: rejected S101
+    error.txt removed
+  sheet/blank evaluate: blocked parse
+  sheet/blank format: blocked parse
+  sheet/blank parse: rejected S101
+    error.txt removed
+  sheet/blank resolve: blocked parse
+bytes changed
+  csv/wrapped calc: rejected S101
+    error.txt changed
+      - via/import/sheet/B1:2-2
+      + via/import/sheet/A1:2-2
+  csv/wrapped import: accepted
+    via/import/sheet/A1 changed
+      - in/csv/wrapped.csv:1-1
+      + in/csv/wrapped.csv:1-2
+    via/import/sheet/B1 ranges changed
+      - in/csv/wrapped.csv:1-2
+      + in/csv/wrapped.csv:2-3
+  csv/wrapped parse: rejected S101
+    error.txt changed
+      - via/import/sheet/B1:2-2
+      + via/import/sheet/A1:2-2
+  sheet/notes calc: rejected S101
+    error.txt changed
+  sheet/notes parse: rejected S101
+    error.txt changed
+  sheet/notes-directory calc: rejected S101
+    error.txt changed
+  sheet/notes-directory parse: rejected S101
+    error.txt changed
+ranges changed
+  sheet/twice/variant/cycle calc: rejected S201
+    error.txt ranges changed
+      - in/sheet/A1:1-1
+      + variant/cycle/in/sheet/A1:1-1
+  sheet/twice/variant/cycle format: accepted
+    formulas.txt ranges changed
+      - in/sheet/A1
+      + variant/cycle/in/sheet/A1
+  sheet/twice/variant/cycle resolve: rejected S201
+    error.txt ranges changed
+      - in/sheet/A1:1-1
+      + variant/cycle/in/sheet/A1:1-1
+```
+
+The findings of `codes` trade `C103` for `C104`, under their own heading
+before the ranks. `wrapped`'s `import` changed its product's `A1`, whose
+map spans two lines of the CSV now, and `B1`'s file is as it was, its map a
+line down. Its `calc` and `parse` errors point at `A1`'s second line now.
+`cycle`'s ranges that named the base's `A1` name the variant's, and nothing
+else of its cells changed, so they rank ranges changed. On the page,
+`walkthrough/sheets/step11/testdata/report.html`, each changed file has its
+input lines beside it, folded: for `wrapped`'s `calc` `error.txt`, line 2
+of `via/import/sheet/B1` at `<a>`, and line 2 of `via/import/sheet/A1` at
+`<b>`, with what changed in `A1`.
+
 ### Rules
 
 - Each output declaration states `Inputs`. A map is a
@@ -3930,9 +4018,51 @@ cells blocked at `parse` have no `inputs`.
 - So the report stays a pure function of repository files, and range
   changes show in pull-request diffs. The accepted cost is line-shift churn
   in edited sections.
-- The report lists `inputs` among a cell's files, and diffs it as any other
-  (step 9). Showing each changed output beside its input lines, and ranking
-  a change to ranges alone, is #18.
+- The report reads a cell's `inputs` as its maps, not as one of its files:
+  it never lists `inputs` among the cell's files, and a change to it alone
+  ranks no cell bytes changed. A cell whose files are the same at both
+  revisions, and whose `inputs` differs byte for byte, less its maps of a
+  product the report leaves out (step 10), ranks ranges changed, a fifth
+  rank, after bytes changed.
+- In the plain text, under a file whose map changed, each range only
+  `<a>`'s map holds, marked `-`, then each only `<b>`'s holds, marked `+`.
+  A file whose map alone changed is listed as `ranges changed`.
+- On the page, each changed file has its input lines: the lines of the
+  ranges its map gives at each revision, from the archive at that revision,
+  marked by which revision's ranges hold them, and the line diff of a
+  section whose lines changed, once per change. A file that depends on all
+  inputs, or comes from no ranges, says so. The page shows at most 20 lines
+  of a range and 80 beside a file, and says what it leaves out.
+- A range into a section its revision's archive lacks, or past the
+  section's last line, is a problem there, and the page shows none of its
+  lines. What may not be what the cell read carries a note: the lines of a
+  product past a frozen bytes lift's cell; the own inputs of a transform's
+  variant that no registry owns; and the map of a cell with a file whose
+  declaration states nothing, or `FromPositions` in a project with no
+  `Positions`, whose `inputs` no update writes.
+- At a revision of format 8 or later, a cell that ran with no `inputs` is a
+  problem, and so is an `inputs` that can't be read, that maps a file the
+  cell lacks or doesn't map one it has, or that sits beside a cell that
+  didn't run. At a revision whose registries predate format 8, an `inputs`
+  is a problem, left out, and the report shows no ranges there and ranks no
+  cell on them, which the page says.
+- The descriptions give each output and product declaration's statement,
+  and for `FromPositions`, whether the project supplies `Positions`.
+- The report reads each package's findings, under its `testdata/checks/`,
+  at both revisions: from registry format 9, each check its registry lists,
+  with the check's description, and before it, each file whose name is a
+  check's, as `hypercase strip` finds them. Under the heading
+  `findings changed`, after the problems and before the ranks, it lists
+  each check whose findings differ, by its package's directory and its
+  name: each finding only at `<a>`, marked `-`, then each only at `<b>`,
+  marked `+`, each quoted where it holds an ASCII control character other
+  than a tab, such as a carriage return. The page adds the check's
+  description, from `<b>`, or from `<a>` where `<b>` lists none. A listed
+  check with no findings file, or with something other than a regular file
+  in its place, a
+  findings file not as an update writes it, and, from format 9, any other
+  file under `testdata/checks/` are problems at their revision, and the
+  check shows no change there.
 - Requiring `Inputs` breaks every project's declarations, which is why it
   comes last of the steps that change them.
 
@@ -3947,6 +4077,9 @@ cells blocked at `parse` have no `inputs`.
   `B1` spans lines 1 and 2 of the CSV.
 - Where a declaration gives no map, and says so: `calc`'s stdout reads
   `all inputs`.
+- In the report, each changed file beside the input lines it came from at
+  both revisions, and a change to ranges alone ranked on its own.
+- Which corpus checks' findings a change moved, above every cell it moved.
 
 ## 12. Hypotheses
 

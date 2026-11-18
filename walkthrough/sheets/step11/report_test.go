@@ -28,11 +28,10 @@ import (
 // rewrites both.
 //
 // The scratch repository's commits hold what the report reads, and nothing
-// else: go.mod, which places the module root, and the corpus root's
-// registries and archives. The Go source the update builds, and the corpus
-// checks' findings, which the report doesn't read, are in its working tree,
-// out of the commits, so the page's commits move only when what the report
-// reads does.
+// else: go.mod, which places the module root, the corpus root's registries
+// and archives, and its packages' corpus checks' findings. The Go source
+// the update builds is in its working tree, out of the commits, so the
+// page's commits move only when what the report reads does.
 //
 // The toy is copied from this module's working tree, which, in the module's
 // update, another package can be writing while this test copies it. Each
@@ -72,8 +71,9 @@ type edit struct {
 	old, new string
 }
 
-// change is the branch's change: three edits, each of which moves cells of
-// one rank or two.
+// change is the branch's change: six edits. Each of the first three moves
+// cells of one rank or two, as at step 9. The last three move what step 11
+// adds to the report: input lines, ranges alone, and findings.
 var change = []edit{
 	// calc gains a classifier, which refines the outcome of each cell where
 	// calc warns: outcome changed.
@@ -84,6 +84,21 @@ var change = []edit{
 	// A file that is not a cell is worded otherwise, under the same
 	// outcome: bytes changed.
 	{path: "sheet/sheet.go", old: `"%s: not a cell name"`, new: `"%s: not the name of a cell"`},
+	// wrapped's A1 becomes a formula the export wraps onto a second line,
+	// as it wraps B1: import's A1 and the CSV lines it comes from change,
+	// and B1 moves down a line while its file doesn't. The sheet's first
+	// cell of more than one line is A1 now, so each error points there.
+	{path: "step11/testdata/csv/wrapped.txtar",
+		old: "A price and a formula the export wrapped onto a second line, in a quoted field.\n-- in/csv/wrapped.csv --\n4,\"=A1*\n2\"\n",
+		new: "Two formulas the export wrapped onto a second line each, in quoted fields.\n-- in/csv/wrapped.csv --\n\"=1+\n3\",\"=A1*\n2\"\n"},
+	// twice's variant cycle writes out A1 too, as the base has it: its
+	// cells' files don't change, and each range that named the base's A1
+	// names the variant's, so they change their ranges alone.
+	{path: "step11/testdata/sheet/twice.txtar", old: "-- variant/cycle/in/sheet/B1 --\n", new: "-- variant/cycle/in/sheet/A1 --\n=B1*2\n-- variant/cycle/in/sheet/B1 --\n"},
+	// The importer's code for a field past the last column or row is
+	// renumbered: past-xfd's import is rejected under the new code, and
+	// the findings of codes trade the old code for the new.
+	{path: "sheet/error.go", old: `codeTooLarge     = "C103"`, new: `codeTooLarge     = "C104"`},
 }
 
 // stale makes a cell of the copy differ from what the code writes for it, as
@@ -582,6 +597,7 @@ var read = []string{
 	"go.mod",
 	":(glob)step11/**/testdata/hypercase.json",
 	":(glob)step11/testdata/*/*.txtar",
+	":(glob)step11/**/testdata/checks/*",
 }
 
 // commit commits what the report reads, as it is in the working tree.
@@ -591,9 +607,9 @@ func commit(t *testing.T, repo, msg string) {
 	git(t, repo, "commit", "-q", "-m", msg)
 }
 
-// TestCommit: a commit holds go.mod, the registries and the archives, and
-// none of the rest of the toy: its Go source, its corpus check's findings,
-// which the report doesn't read, and the report's own goldens.
+// TestCommit: a commit holds go.mod, the registries, the archives and the
+// corpus check's findings, and none of the rest of the toy: its Go source
+// and the report's own goldens.
 func TestCommit(t *testing.T) {
 	repo := t.TempDir()
 	git(t, repo, gitInit...)
@@ -613,7 +629,7 @@ func TestCommit(t *testing.T) {
 	}
 	commit(t, repo, "main")
 	got := git(t, repo, "ls-tree", "-r", "--name-only", "HEAD")
-	const want = "go.mod\nstep11/cli/testdata/hypercase.json\nstep11/testdata/hypercase.json\nstep11/testdata/sheet/notes.txtar\n"
+	const want = "go.mod\nstep11/cli/testdata/hypercase.json\nstep11/testdata/checks/codes.txt\nstep11/testdata/hypercase.json\nstep11/testdata/sheet/notes.txtar\n"
 	if got != want {
 		t.Errorf("the commit holds:\n%s\nwant:\n%s", got, want)
 	}
@@ -621,11 +637,10 @@ func TestCommit(t *testing.T) {
 
 // runUpdate runs the update of step11's packages in the scratch module,
 // then their normal run, which fails unless the update wrote everything.
-// One pass is enough: neither the toy as copied nor the change moves a code
-// that the corpus check codes counts, so its findings don't depend on which
-// package writes first. Both build with -trimpath, which keeps the scratch
-// module's directory, new in each run, out of the build cache's keys, so
-// that the cache serves them.
+// One pass is enough for the toy as copied and for the change, as the
+// normal run after it shows. Both build with -trimpath, which keeps the
+// scratch module's directory, new in each run, out of the build cache's
+// keys, so that the cache serves them.
 func runUpdate(t *testing.T, repo, modfile string) {
 	t.Helper()
 	gotest := func(env []string) ([]byte, error) {

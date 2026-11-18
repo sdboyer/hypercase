@@ -1,27 +1,43 @@
+findings changed
+  step11 codes
+    - C103
+    + C104
 outcome changed
+  csv/past-xfd import: rejected C103 -> rejected C104
   sheet/divide calc: accepted -> accepted warned
   sheet/divide/transform/renamed calc: accepted -> accepted warned
 appeared
   sheet/empty calc: rejected S101
     error.txt added
-    inputs added
   sheet/empty evaluate: blocked parse
   sheet/empty format: blocked parse
   sheet/empty parse: rejected S101
     error.txt added
-    inputs added
   sheet/empty resolve: blocked parse
 disappeared
   sheet/blank calc: rejected S101
     error.txt removed
-    inputs removed
   sheet/blank evaluate: blocked parse
   sheet/blank format: blocked parse
   sheet/blank parse: rejected S101
     error.txt removed
-    inputs removed
   sheet/blank resolve: blocked parse
 bytes changed
+  csv/wrapped calc: rejected S101
+    error.txt changed
+      - via/import/sheet/B1:2-2
+      + via/import/sheet/A1:2-2
+  csv/wrapped import: accepted
+    via/import/sheet/A1 changed
+      - in/csv/wrapped.csv:1-1
+      + in/csv/wrapped.csv:1-2
+    via/import/sheet/B1 ranges changed
+      - in/csv/wrapped.csv:1-2
+      + in/csv/wrapped.csv:2-3
+  csv/wrapped parse: rejected S101
+    error.txt changed
+      - via/import/sheet/B1:2-2
+      + via/import/sheet/A1:2-2
   sheet/notes calc: rejected S101
     error.txt changed
   sheet/notes parse: rejected S101
@@ -30,3 +46,16 @@ bytes changed
     error.txt changed
   sheet/notes-directory parse: rejected S101
     error.txt changed
+ranges changed
+  sheet/twice/variant/cycle calc: rejected S201
+    error.txt ranges changed
+      - in/sheet/A1:1-1
+      + variant/cycle/in/sheet/A1:1-1
+  sheet/twice/variant/cycle format: accepted
+    formulas.txt ranges changed
+      - in/sheet/A1
+      + variant/cycle/in/sheet/A1
+  sheet/twice/variant/cycle resolve: rejected S201
+    error.txt ranges changed
+      - in/sheet/A1:1-1
+      + variant/cycle/in/sheet/A1:1-1

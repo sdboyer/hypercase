@@ -218,7 +218,7 @@ func diff(a, b []byte, collapse bool) (lines []Line, work int) {
 			}
 			continue
 		}
-		lines = append(lines, Line{Kind: op.kind, Text: display(line), NoNewline: noNewline, unaligned: op.unaligned})
+		lines = append(lines, Line{Kind: op.kind, Text: Display(line), NoNewline: noNewline, unaligned: op.unaligned})
 	}
 	return lines, w.spent
 }
@@ -260,7 +260,10 @@ func boolInt(b bool) int {
 	return 0
 }
 
-func display(line string) string {
+// Display returns a line as a diff shows it: without its newline, and
+// quoted when it holds a carriage return or another control character, so
+// that the line reads the same wherever it is shown.
+func Display(line string) string {
 	s := strings.TrimSuffix(line, "\n")
 	for _, r := range s {
 		if r < ' ' && r != '\t' || r == 0x7f {

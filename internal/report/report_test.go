@@ -34,8 +34,8 @@ func TestChangeClosedGap(t *testing.T) {
 		}
 		return s
 	}
-	a := at("a", "A1 is a negative number.\n-- in/sheet/A1 --\n-3\n-- gaps --\nparse A negative number is valid. Waits on sheets#3.\n-- out/parse/error.txt --\nA1: unexpected \"-\"\n-- out/parse/outcome --\nrejected S101\n")
-	b := at("b", "A1 is a negative number.\n-- in/sheet/A1 --\n-3\n-- out/parse/outcome --\naccepted\n")
+	a := at("a", "A1 is a negative number.\n-- in/sheet/A1 --\n-3\n-- gaps --\nparse A negative number is valid. Waits on sheets#3.\n-- out/parse/error.txt --\nA1: unexpected \"-\"\n-- out/parse/inputs --\nerror.txt\n-- out/parse/outcome --\nrejected S101\n")
+	b := at("b", "A1 is a negative number.\n-- in/sheet/A1 --\n-3\n-- out/parse/inputs --\n-- out/parse/outcome --\naccepted\n")
 	marked := cellKey{c: caseKey{corpus: "sheet", archive: "negative"}, column: "parse"}
 	if _, ok := a.gaps[marked]; len(a.gaps) != 1 || !ok {
 		t.Fatalf("at a, the gaps lines mark %v, not negative's parse cell alone", a.gaps)
@@ -51,7 +51,10 @@ func TestChangeClosedGap(t *testing.T) {
 		Column: "parse",
 		Before: "rejected S101",
 		After:  "accepted",
-		Files:  []FileChange{{Path: "error.txt", How: "removed", Diff: []diff.Line{{Kind: '-', Text: `A1: unexpected "-"`}}, Removed: 1}},
+		Files: []FileChange{{
+			Path: "error.txt", How: "removed", Diff: []diff.Line{{Kind: '-', Text: `A1: unexpected "-"`}}, Removed: 1,
+			Inputs: &Inputs{Maps: [2]*Map{{At: "a"}}},
+		}},
 	}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("the changes are\n\t%+v\nwhere today they are\n\t%+v\nthe change of outcome of negative's parse cell, with no gap (#51). If #51 is fixed, make this test show A's line, marked as closed.", got, want)

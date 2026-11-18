@@ -88,10 +88,10 @@ func TestTwoCorpora(t *testing.T) {
 	reg.Suites = append(reg.Suites, registry.Suite{Name: "export", Description: "Exports a CSV.", Consumes: registry.RawInput, Corpora: []string{"csv"}, Paths: []registry.Path{{Corpus: "csv"}}})
 	a := module(map[string]string{"x": "A sheet.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"})
 	a["testdata/hypercase.json"] = string(reg.Marshal())
-	a["testdata/csv/x.txtar"] = "A CSV.\n-- in/csv/x.csv --\n1\n-- out/export/outcome --\naccepted\n"
+	a["testdata/csv/x.txtar"] = mapped("A CSV.\n-- in/csv/x.csv --\n1\n-- out/export/outcome --\naccepted\n")
 	b := module(map[string]string{"x": "A sheet.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\nrejected\n"})
 	b["testdata/hypercase.json"] = a["testdata/hypercase.json"]
-	b["testdata/csv/x.txtar"] = "A CSV.\n-- in/csv/x.csv --\n1\n-- out/export/outcome --\nrejected\n"
+	b["testdata/csv/x.txtar"] = mapped("A CSV.\n-- in/csv/x.csv --\n1\n-- out/export/outcome --\nrejected\n")
 	g := gittest.New(t)
 	c := revisions(t, g, a, b)
 	want := "outcome changed\n  csv/x export: accepted -> rejected\n  sheet/x calc: accepted -> rejected\n"
@@ -117,7 +117,7 @@ func TestTwoRoots(t *testing.T) {
 		reg.Suites = []registry.Suite{{Name: "calc", Description: desc, Consumes: registry.RawInput, Corpora: []string{"sheet"}, Paths: []registry.Path{{Corpus: "sheet"}}}}
 		return map[string]string{
 			dir + "/testdata/hypercase.json":   string(reg.Marshal()),
-			dir + "/testdata/sheet/" + archive: "A case.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n",
+			dir + "/testdata/sheet/" + archive: mapped("A case.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"),
 		}
 	}
 	files := map[string]string{"go.mod": "module example.com/m\n\ngo 1.27\n"}
@@ -148,7 +148,8 @@ func TestTwoRoots(t *testing.T) {
 }
 
 // TestCorpusMissing: a revision before the corpus root's registries, at a,
-// makes every cell at b appear. At b, the root is wrong, and the report
+// makes every cell at b appear, and the page says nothing of a's ranges,
+// as a has no cells to lack them. At b, the root is wrong, and the report
 // fails, saying so.
 func TestCorpusMissing(t *testing.T) {
 	t.Parallel()
@@ -160,6 +161,7 @@ func TestCorpusMissing(t *testing.T) {
 	if got := ok(t, g, "", "report", "-text", c[0], c[1]); got != want {
 		t.Errorf("from a revision with no corpus, the report is:\n%s\nwant:\n%s", got, want)
 	}
+	lacks(t, "the page", ok(t, g, "", "report", c[0], c[1]), `<p class="note">The newest registry`)
 	fails(t, g, "", 1, []string{"report", c[1], c[0]},
 		"hypercase report: no registry records the corpus root . at "+c[0]+", though some do at "+c[1]+", and the report shows the corpus at its second revision.\n")
 	g = gittest.New(t)
@@ -256,7 +258,7 @@ func TestPageDiffs(t *testing.T) {
 	page := ok(t, g, "step09", "report", a, b)
 	holds(t, "loop calc's change", change(t, page, "sheet/loop", "calc"),
 		`<li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>`+"\n"+
-			`<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details></li>`)
+			`<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details>`+"\n")
 	holds(t, "div calc's change", change(t, page, "sheet/div", "calc"),
 		`<code>error.txt</code> added <span class="stat"><span class="add">+1</span> <span class="del">-0</span></span></summary>`+"\n"+
 			`<pre class="diff"><span class="add">&#43; C1: division by zero</span></pre>`,
@@ -348,9 +350,9 @@ func TestPageEscapes(t *testing.T) {
 }
 
 // TestPageDescriptions: the page describes each corpus type, column,
-// output declaration, classifier, transform and property, from b, or from
-// a for what b lacks, which it marks; and each archive and hand-written
-// variant only at a, from a.
+// output declaration, with its statement, classifier, transform and
+// property, from b, or from a for what b lacks, which it marks; and each
+// archive and hand-written variant only at a, from a.
 func TestPageDescriptions(t *testing.T) {
 	t.Parallel()
 	reg := func(version string) registry.Registry {
@@ -368,7 +370,7 @@ func TestPageDescriptions(t *testing.T) {
 	// b drops calc's stdout.txt and evaluate's classifier; a's describe
 	// them. calc's classifier is at both, and b's describes it.
 	ra.Suites[0].Outputs = append(ra.Suites[0].Outputs, registry.Output{Pattern: "stderr.txt", Description: "What calc warns, at a.", Inputs: registry.InputsAll})
-	rb.Suites[0].Outputs = []registry.Output{{Pattern: "stderr.txt", Description: "What calc warns, at b.", Inputs: registry.InputsAll}}
+	rb.Suites[0].Outputs = []registry.Output{{Pattern: "stderr.txt", Description: "What calc warns, at b.", Inputs: registry.InputsFunc}}
 	ra.Suites[0].Classifier = &registry.Classifier{Name: "slow", Description: "Adds slow, at a."}
 	rb.Suites[0].Classifier = &registry.Classifier{Name: "slow", Description: "Adds slow, at b."}
 	rb.Suites[1].Classifier = nil
@@ -396,10 +398,11 @@ func TestPageDescriptions(t *testing.T) {
 	d := section(t, page, `<section class="corpus" id="describe-sheet">`, "</section>")
 	holds(t, "the sheet corpus's descriptions", d,
 		"<h3>sheet</h3>\n<p>A sheet, at b.</p>",
-		"<dt>calc</dt><dd>Runs calc, at b.<ul class=\"outputs\"><li><code>stderr.txt</code>: What calc warns, at b.</li><li><code>stdout.txt</code>"+only+": What calc prints, at a.</li></ul>"+
+		"<dt>calc</dt><dd>Runs calc, at b.<ul class=\"outputs\"><li><code>stderr.txt</code>: What calc warns, at b. <span class=\"statement\">Its ranges come from a function.</span></li>"+
+			"<li><code>stdout.txt</code>"+only+": What calc prints, at a. <span class=\"statement\">It depends on all inputs.</span></li></ul>"+
 			"<p class=\"classifier\">Its classifier, <code>slow</code>: Adds slow, at b.</p></dd>",
 		"<dt>evaluate</dt><dd>Evaluates.<p class=\"classifier\">Its classifier, <code>div-zero</code>"+only+": Adds div-zero, at a.</p></dd>",
-		"<dt>old"+only+"</dt><dd>A column only a has.<ul class=\"outputs\"><li><code>old.txt</code>: What old wrote.</li></ul></dd>",
+		"<dt>old"+only+"</dt><dd>A column only a has.<ul class=\"outputs\"><li><code>old.txt</code>: What old wrote. <span class=\"statement\">It depends on all inputs.</span></li></ul></dd>",
 		"<dt>doubled"+only+"</dt><dd>A transform only a has.<p>Keeps <span class=\"prop\">dangling</span>.</p></dd>",
 		"<dt>looped</dt><dd>Loops, at b.<p>Gives <span class=\"prop\">circular</span>.</p></dd>",
 		`<dt><span class="case">sheet/gone</span></dt><dd>A case only a has.</dd>`,
@@ -454,21 +457,21 @@ func TestPageProducts(t *testing.T) {
 	a := productModule(map[string]string{"x": strings.ReplaceAll(x, "V", "4")})
 	a["testdata/hypercase.json"] = string(ra.Marshal())
 	b := productModule(map[string]string{"x": strings.ReplaceAll(x, "V", "5")})
-	b["testdata/sheet/y.txtar"] = "A sheet.\n-- in/sheet/A1 --\n1\n-- via/import/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"
+	b["testdata/sheet/y.txtar"] = mapped("A sheet.\n-- in/sheet/A1 --\n1\n-- via/import/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n")
 	g := gittest.New(t)
 	c := revisions(t, g, a, b)
 	page := ok(t, g, "", "report", c[0], c[1])
 
 	holds(t, "x import's change", change(t, page, "csv/x", "import"),
 		`<li class="changed"><details><summary><code>via/import/sheet/A1</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>`+"\n"+
-			`<pre class="diff"><span class="del">- 4</span><span class="add">&#43; 5</span></pre></details></li>`)
+			`<pre class="diff"><span class="del">- 4</span><span class="add">&#43; 5</span></pre></details>`+"\n")
 	lacks(t, "the changes", section(t, page, `<section id="changes">`, "</section>"), `<span class="case">csv/x</span> <span class="col">calc</span>`)
 
 	only := ` <span class="badge">only at ` + c[0] + `</span>`
 	holds(t, "the csv corpus's descriptions", section(t, page, `<section class="corpus" id="describe-csv">`, "</section>"),
-		`<dt>import</dt><dd>Imports the CSV as a sheet.<ul class="outputs"><li><code>error.txt</code>: Why the importer rejects the CSV.</li>`+
-			`<li><code>via/import/notes/*</code>`+only+`: A note, only at a.</li>`+
-			`<li><code>via/import/sheet/*</code>: One file per cell, as a sheet&#39;s in/sheet/ holds them.</li></ul></dd>`)
+		`<dt>import</dt><dd>Imports the CSV as a sheet.<ul class="outputs"><li><code>error.txt</code>: Why the importer rejects the CSV. <span class="statement">It depends on all inputs.</span></li>`+
+			`<li><code>via/import/notes/*</code>`+only+`: A note, only at a. <span class="statement">Its ranges come from a function.</span></li>`+
+			`<li><code>via/import/sheet/*</code>: One file per cell, as a sheet&#39;s in/sheet/ holds them. <span class="statement">Its ranges come from a function.</span></li></ul></dd>`)
 
 	holds(t, "the problems", section(t, page, `<section id="problems">`, "</section>"),
 		"<code>testdata/csv/x.txtar, via/calc/sheet/A1</code>: the section is a product of calc, and no registry declares a bytes lift of that name over testdata/csv/, so the report leaves it out, and doesn&#39;t compare its cell&#39;s product.</li>",

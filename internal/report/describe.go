@@ -31,8 +31,20 @@ type Corpus struct {
 // classifier.
 type ColumnDescribed struct {
 	Described
-	Outputs    []Described // Name is the pattern; by pattern
+	Outputs    []OutputDescribed // by pattern
 	Classifier *Described
+}
+
+// An OutputDescribed is an output declaration, named by its pattern, with
+// what its Inputs states at the revision it is described from: one of
+// registry.InputsFunc, InputsPositions, InputsAll and InputsNone, or ""
+// at a revision whose registries predate registry.InputsFormat. Positions
+// records that the registry that claims its column there records that the
+// project supplies Positions.
+type OutputDescribed struct {
+	Described
+	Inputs    string
+	Positions bool
 }
 
 // A TransformDescribed is a transform, with the properties it gives and
@@ -70,8 +82,11 @@ func describe(a, b *snapshot, links *linker) ([]Corpus, []Described) {
 				col, onlyA = colA, true
 			}
 			cd := ColumnDescribed{Described: Described{Name: name, Description: links.text(col.description), OnlyAtA: onlyA}}
+			output := func(o registry.Output, col *column, onlyA bool) OutputDescribed {
+				return OutputDescribed{Described: Described{Name: o.Pattern, Description: links.text(o.Description), OnlyAtA: onlyA}, Inputs: o.Inputs, Positions: col.positions}
+			}
 			for _, o := range col.outputs {
-				cd.Outputs = append(cd.Outputs, Described{Name: o.Pattern, Description: links.text(o.Description), OnlyAtA: onlyA})
+				cd.Outputs = append(cd.Outputs, output(o, col, onlyA))
 			}
 			if cl := col.classifier; cl != nil {
 				cd.Classifier = &Described{Name: cl.Name, Description: links.text(cl.Description), OnlyAtA: onlyA}
@@ -83,14 +98,14 @@ func describe(a, b *snapshot, links *linker) ([]Corpus, []Described) {
 			if atA && atB && !colA.conflict && !colB.conflict {
 				for _, o := range colA.outputs {
 					if !slices.ContainsFunc(colB.outputs, func(p registry.Output) bool { return p.Pattern == o.Pattern }) {
-						cd.Outputs = append(cd.Outputs, Described{Name: o.Pattern, Description: links.text(o.Description), OnlyAtA: true})
+						cd.Outputs = append(cd.Outputs, output(o, colA, true))
 					}
 				}
 				if cl := colA.classifier; cl != nil && colB.classifier == nil {
 					cd.Classifier = &Described{Name: cl.Name, Description: links.text(cl.Description), OnlyAtA: true}
 				}
 			}
-			slices.SortFunc(cd.Outputs, func(x, y Described) int { return cmp.Compare(x.Name, y.Name) })
+			slices.SortFunc(cd.Outputs, func(x, y OutputDescribed) int { return cmp.Compare(x.Name, y.Name) })
 			c.Columns = append(c.Columns, cd)
 		}
 

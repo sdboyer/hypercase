@@ -10,8 +10,9 @@ import (
 
 // TestRanks: changed outcomes come first, then cells that appeared, then
 // those that disappeared, then cells whose other files changed under the
-// same outcome. A cell exists where its outcome file does, a cell is
-// listed once, at its first rank, and only the cells' files are changes.
+// same outcome, then cells whose inputs file alone changed. A cell exists
+// where its outcome file does, a cell is listed once, at its first rank,
+// and only the cells' files and inputs files are changes.
 func TestRanks(t *testing.T) {
 	t.Parallel()
 	const head = "A case.\n-- in/sheet/A1 --\n1\n"
@@ -110,17 +111,20 @@ func TestRanks(t *testing.T) {
 			name: "by rank, then case, then column",
 			a: map[string]string{
 				"a": head + "-- out/calc/outcome --\naccepted\n-- out/calc/stdout.txt --\n1\n",
+				"b": head + "-- out/calc/inputs --\nstdout.txt\n  in/sheet/A1\n-- out/calc/outcome --\naccepted\n-- out/calc/stdout.txt --\n1\n",
 				"m": head + "-- out/calc/outcome --\naccepted\n-- out/evaluate/outcome --\naccepted\n",
 			},
 			b: map[string]string{
 				"a": head + "-- out/calc/outcome --\naccepted\n-- out/calc/stdout.txt --\n2\n",
+				"b": head + "-- out/calc/inputs --\nstdout.txt\n  in/sheet/A1:1-1\n-- out/calc/outcome --\naccepted\n-- out/calc/stdout.txt --\n1\n",
 				"m": head + "-- out/evaluate/outcome --\nrejected\n",
 				"z": head + "-- out/evaluate/outcome --\naccepted\n-- out/calc/outcome --\naccepted\n",
 			},
 			want: "outcome changed\n  sheet/m evaluate: accepted -> rejected\n" +
 				"appeared\n  sheet/z calc: accepted\n  sheet/z evaluate: accepted\n" +
 				"disappeared\n  sheet/m calc: accepted\n" +
-				"bytes changed\n  sheet/a calc: accepted\n    stdout.txt changed\n",
+				"bytes changed\n  sheet/a calc: accepted\n    stdout.txt changed\n" +
+				"ranges changed\n  sheet/b calc: accepted\n    stdout.txt ranges changed\n      - in/sheet/A1\n      + in/sheet/A1:1-1\n",
 		},
 		{
 			name: "an archive's cases sit together",
@@ -154,14 +158,14 @@ func TestRanks(t *testing.T) {
 
 // productModule returns a module whose corpus root is its root, with the
 // registry productRegistry, and the archives of the corpus csv given by
-// name.
+// name, each with the inputs files of mapped.
 func productModule(archives map[string]string) map[string]string {
 	files := map[string]string{
 		"go.mod":                  "module example.com/m\n\ngo 1.27\n",
 		"testdata/hypercase.json": string(productRegistry().Marshal()),
 	}
 	for name, data := range archives {
-		files["testdata/csv/"+name+".txtar"] = data
+		files["testdata/csv/"+name+".txtar"] = mapped(data)
 	}
 	return files
 }
@@ -273,6 +277,20 @@ func TestProducts(t *testing.T) {
 			a:    head,
 			b:    accepted("4"),
 			want: "appeared\n  csv/x import: accepted\n    via/import/sheet/A1 added\n",
+		},
+		{
+			// A product's file is mapped as via/<lift>/<path>.
+			name: "a product file's ranges alone",
+			a:    accepted("4") + "-- out/import/inputs --\nvia/import/sheet/A1\n  in/csv/x.csv\n",
+			b:    accepted("4") + "-- out/import/inputs --\nvia/import/sheet/A1\n  in/csv/x.csv:1-1\n",
+			want: "ranges changed\n  csv/x import: accepted\n    via/import/sheet/A1 ranges changed\n      - in/csv/x.csv\n      + in/csv/x.csv:1-1\n",
+		},
+		{
+			name: "a product file the map doesn't name",
+			a:    accepted("4") + "-- out/import/inputs --\nvia/import/sheet/A1\n",
+			b:    accepted("4") + "-- out/import/inputs --\n",
+			want: "ranges changed\n  csv/x import: accepted\n",
+			text: [2]string{"", "testdata/csv/x.txtar, out/import/inputs: the inputs file doesn't map via/import/sheet/A1, a file of the cell, so the report shows no ranges for it."},
 		},
 		{
 			// A cell exists where its outcome file does, its product's
