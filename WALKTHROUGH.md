@@ -2576,9 +2576,10 @@ run now gives `rejected S101`. So they fail, and no update writes them. A
 person deletes those four `outcome` files, and the next update adds them, as
 step 4's upgrade does for a frozen cell whose other files match its run.
 
-`hypercase.json` records each suite's classifier, and whether the project
-supplies `Codes`: step 5's shows them unset, and the registry of step 8's
-root package sets both.
+`hypercase.json` records each suite's classifier, whether the project
+supplies `Codes`, and the package's corpus checks: step 5's shows them unset
+and lists no check, and the registry of step 8's root package sets both and
+lists `codes`.
 
 ### Rules
 
@@ -2737,7 +2738,8 @@ S202
   registry doesn't list or one lift twice, or names a lift for a suite
   over the raw input view. So does one that records an output's or a
   product file's `"inputs"` as no declaration registration takes would
-  (step 11). The root-package check fails on such a registry too. Where the package has a `_test.go` file, both say to run
+  (step 11), or lists a corpus check twice. The root-package check fails
+  on such a registry too. Where the package has a `_test.go` file, both say to run
   the update, which writes its registry; where it has none, both say to
   delete the registry, which no update writes.
 - A check reads the cells as they are committed when it runs. The module's

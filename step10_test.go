@@ -1162,8 +1162,9 @@ func TestChainCheckPaths(t *testing.T) {
 // order of its corpora, can't be read, and so can't one whose path names
 // a lift the registry doesn't list, or the column itself, whether the
 // column is the package's or a lift it uses, and so can't one that
-// records an output's inputs as no declaration registration takes would:
-// every check fails, and so does the root-package check. Each hand edit is
+// records an output's inputs as no declaration registration takes would,
+// or lists a corpus check twice: every check fails, and so does the
+// root-package check. Each hand edit is
 // written as the JSON it makes, not by Marshal, which would sort the
 // paths.
 func TestChainSharedCheckPaths(t *testing.T) {
@@ -1235,6 +1236,11 @@ func TestChainSharedCheckPaths(t *testing.T) {
 		c.Outputs[slices.IndexFunc(c.Outputs, func(o registry.Output) bool { return o.Pattern == "values.txt" })].Inputs = "lines"
 	}))
 	refused(`the suite evaluate declares the output values.txt with inputs "lines", where a registry records "func", "positions", "all" or "none"`)
+	edit("list the corpus check codes twice in b's registry, by hand", func(g *registry.Registry) {
+		codes := registry.Check{Name: "codes", Description: "Lists the codes."}
+		g.Checks = append(g.Checks, codes, codes)
+	})
+	refused("the registry lists the corpus check codes twice, where each corpus check a package registers has a name of its own")
 
 	// The lifts b uses are held to the same rules as its columns.
 	edit("drop the paths from export of the lifts b uses, parse and resolve, from b's registry, by hand", func(g *registry.Registry) {

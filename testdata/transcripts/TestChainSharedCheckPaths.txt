@@ -355,6 +355,40 @@ $ go test  # chain-a-paths
         --- FAIL: TestCorpus/checks/paths
 FAIL
 [exit 1]
+$ edit b/testdata/hypercase.json  # list the corpus check codes twice in b's registry, by hand
+$ go test  # chain-a-paths
+    b/testdata/hypercase.json can't be read: the registry lists the corpus check codes twice, where each corpus check a package registers has a name of its own.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.
+    the transform louder, of testdata/export/, is owned by no package, so nothing writes its variants' inputs, or judges them against what it makes.
+        Give it to hypercase.Own in one package that registers its corpus type.
+    testdata/export/prices.txtar: no registry claims out/evaluate/inputs, out/evaluate/outcome, out/evaluate/values.txt, transform/louder/out/evaluate/inputs, transform/louder/out/evaluate/outcome and transform/louder/out/evaluate/values.txt: no column named evaluate runs over the corpus export.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column evaluate at the module root. It removes evaluate's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
+    testdata/export/prices.txtar: no registry claims out/list/files.txt, out/list/inputs, out/list/outcome, transform/louder/out/list/files.txt, transform/louder/out/list/inputs and transform/louder/out/list/outcome: no column named list runs over the corpus export.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column list at the module root. It removes list's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
+    the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: the registry lists the corpus check codes twice, where each corpus check a package registers has a name of its own. No check runs, and an update writes no findings.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/paths
+FAIL
+[exit 1]
 $ edit b/testdata/hypercase.json  # drop the paths from export of the lifts b uses, parse and resolve, from b's registry, by hand
 $ go test  # chain-a-paths
     b/testdata/hypercase.json can't be read: the lift parse runs over testdata/export/ and testdata/script/, and has paths from testdata/script/, where a registry gives each column one path from each corpus it runs over, in the same order.
