@@ -1161,12 +1161,12 @@ func TestChainCheckPaths(t *testing.T) {
 // doesn't give one path from each corpus its column runs over, in the
 // order of its corpora, can't be read, and so can't one whose path names
 // a lift the registry doesn't list, or the column itself, whether the
-// column is the package's or a lift it uses, and so can't one that
-// records an output's inputs as no declaration registration takes would,
-// or lists a corpus check twice, or gives no list of them: every check
-// fails, and so does the root-package check. Each hand edit is
-// written as the JSON it makes, not by Marshal, which would sort the
-// paths.
+// column is the package's or a lift it uses, and so can't one whose
+// inputs, for an output, name no statement of Inputs, or one
+// registration refuses there, or one that lists a corpus check twice, or
+// gives no list of them: every check fails, and so does the root-package
+// check. Each hand edit is written as the JSON it makes, not by Marshal,
+// which would sort the paths.
 func TestChainSharedCheckPaths(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "chain-shared")

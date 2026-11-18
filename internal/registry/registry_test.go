@@ -294,6 +294,8 @@ func TestParseAny(t *testing.T) {
 		{strings.Replace(v7, `"description": "What it prints."}`, `"description": "What it prints.", "inputs": "all"}`, 1), "it is not a registry: it holds format 7, and suites[].outputs[].inputs, which format 8 added"},
 		{strings.Replace(v8, `"rootPackage": true,`, `"rootPackage": true, "checks": [],`, 1), "it is not a registry: it holds format 8, and checks, which format 9 added"},
 		{strings.Replace(v8, `"rootPackage": true,`, `"rootPackage": true, "checks": null,`, 1), "it is not a registry: it holds format 8, and checks, which format 9 added"},
+		// v8, at format 9, holds no "checks" key.
+		{strings.Replace(v8, `"format": 8`, `"format": 9`, 1), "the registry gives no list of corpus checks, where a registry lists each corpus check its package registers, and an empty list for none"},
 		{strings.Replace(v4, `"rejects": ["circular"]}`, `"rejects": ["circular"], "later": 1}`, 1), `it is not a registry: json: unknown field "later"`},
 		// Registration has refused a second column of one name, and
 		// listed each corpus a column runs over once, since format 3.

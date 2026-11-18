@@ -55,9 +55,9 @@ type Registry struct {
 	Lifts      []Lift      `json:"lifts"`
 	Suites     []Suite     `json:"suites"`
 	// Checks are the corpus checks the package registers, sorted by name.
-	// It is nil in a registry of a format before ChecksFormat, which
-	// records none, and only there: from ChecksFormat on, a package that
-	// registers none lists none.
+	// In a registry Parse or ParseAny returns, it is nil exactly when the
+	// format is before ChecksFormat, which records none: from ChecksFormat
+	// on, a package that registers none lists none.
 	Checks []Check `json:"checks"`
 }
 
@@ -495,8 +495,6 @@ func (r *Registry) checkCorpora() error {
 	return nil
 }
 
-// checkCheckNames reports the first corpus check the registry lists
-// twice: registration refuses a second check of one name in a package.
 // checkChecksListed reports a registry that gives no list of corpus checks,
 // which the update writes, empty where the package registers none.
 func (r *Registry) checkChecksListed() error {
@@ -506,6 +504,8 @@ func (r *Registry) checkChecksListed() error {
 	return nil
 }
 
+// checkCheckNames reports the first corpus check the registry lists
+// twice: registration refuses a second check of one name in a package.
 func (r *Registry) checkCheckNames() error {
 	for i, c := range r.Checks {
 		if slices.ContainsFunc(r.Checks[:i], func(o Check) bool { return o.Name == c.Name }) {
