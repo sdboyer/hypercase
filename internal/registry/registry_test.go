@@ -179,7 +179,8 @@ var byHand = []struct {
 // format: each of byHand's edits breaks one of Parse's checks, each check
 // is broken by one of them, and an edited registry, given at each format,
 // is refused with the check's error from the format the check holds from,
-// and read before it.
+// and read before it. A check holds from the first format that can show
+// what breaks it: a format before it can't show one of its edits.
 func TestParseAny(t *testing.T) {
 	// A format 3 registry, as hypercase's main branch wrote it: corpus
 	// types with no transforms, no codes, and suites with no classifier.
@@ -328,8 +329,15 @@ func TestParseAny(t *testing.T) {
 	}
 	// Each of byHand's edits breaks one of Parse's checks, and each check
 	// is broken by one of them, so that every check is tried at every
-	// format.
+	// format. A check holds from the format that added what it checks, so
+	// the format before it reads one of its edits as the unedited registry:
+	// that holds each check's format in parseChecks to the formats' keys.
+	unedited, err := Parse(base.Marshal())
+	if err != nil {
+		t.Fatal(err)
+	}
 	broken := make([]bool, len(parseChecks))
+	hidden := make([]bool, len(parseChecks))
 	for _, e := range byHand {
 		r, err := Parse(base.Marshal())
 		if err != nil {
@@ -348,6 +356,9 @@ func TestParseAny(t *testing.T) {
 		}
 		c := parseChecks[by[0]]
 		broken[by[0]] = true
+		if c.format > Oldest && bytes.Equal(at(r, c.format-1), at(unedited, c.format-1)) {
+			hidden[by[0]] = true
+		}
 		want := c.check(r).Error()
 		for f := Oldest; f <= Format; f++ {
 			switch _, err := ParseAny(at(r, f)); {
@@ -359,8 +370,11 @@ func TestParseAny(t *testing.T) {
 		}
 	}
 	for i, c := range parseChecks {
-		if !broken[i] {
+		switch {
+		case !broken[i]:
 			t.Errorf("none of byHand's edits breaks %s, which holds from format %d: give byHand an edit that breaks it alone.", checkName(c.check), c.format)
+		case c.format > Oldest && !hidden[i]:
+			t.Errorf("each of byHand's edits that breaks %s shows at format %d, before the format %d it holds from, where a check holds from the first format that can show what breaks it", checkName(c.check), c.format-1, c.format)
 		}
 	}
 }
