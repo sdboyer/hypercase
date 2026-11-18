@@ -23,7 +23,7 @@ import (
 
 // Format is the version of what a registry holds. It changes on any change
 // to that.
-const Format = 6
+const Format = 7
 
 // Name is a registry's file name, in its package's testdata/ directory.
 const Name = "hypercase.json"
@@ -130,6 +130,9 @@ type Lift struct {
 	// Corpora are the directories of the corpus types that reach the
 	// lift's input, under the corpus root's testdata/.
 	Corpora []string `json:"corpora"`
+	// Paths are the paths of lifts the lift's input passes through, one
+	// from each of Corpora.
+	Paths   []Path   `json:"paths"`
 	Outputs []Output `json:"outputs"`
 	// ProductFiles declares a bytes lift's product's files, by their paths
 	// under via/<Name>/. Any other lift's is empty.
@@ -148,12 +151,29 @@ type Suite struct {
 	// Corpora are the directories of the corpus types that reach the type
 	// the suite consumes, under the corpus root's testdata/.
 	Corpora []string `json:"corpora"`
+	// Paths are the paths of lifts the suite's input passes through, one
+	// from each of Corpora.
+	Paths   []Path   `json:"paths"`
 	Outputs []Output `json:"outputs"`
 	// Rejects names the properties the suite rejects.
 	Rejects []string `json:"rejects"`
 	// Classifier is the suite's classifier, which refines its cells'
 	// outcomes, or nil.
 	Classifier *Classifier `json:"classifier"`
+}
+
+// A Path is the path of lifts a column's input passes through from one
+// corpus type, the one path the package plans from it, or from a suite's
+// Corpus.
+type Path struct {
+	// Corpus is the corpus type's directory, or the suite's Corpus, under
+	// the corpus root's testdata/.
+	Corpus string `json:"corpus"`
+	// Lifts names the path's lifts, the nearest to the column first: from
+	// a sheet to a *sheet.Graph, resolve, then parse. It is empty for a
+	// column that consumes the corpus type, and for a suite over its
+	// Corpus's raw input views.
+	Lifts []string `json:"lifts"`
 }
 
 // A Classifier is a suite's classifier.
@@ -225,6 +245,7 @@ func (r Registry) Marshal() []byte {
 	lifts := sorted(r.Lifts, func(l Lift) string { return l.Name })
 	for i, l := range lifts {
 		l.Corpora = sorted(l.Corpora, func(n string) string { return n })
+		l.Paths = sortedPaths(l.Paths)
 		l.Outputs = sorted(l.Outputs, func(o Output) string { return o.Pattern })
 		l.ProductFiles = sorted(l.ProductFiles, func(o Output) string { return o.Pattern })
 		l.Rejects = sorted(l.Rejects, func(n string) string { return n })
@@ -234,6 +255,7 @@ func (r Registry) Marshal() []byte {
 	suites := sorted(r.Suites, func(s Suite) string { return s.Name })
 	for i, s := range suites {
 		s.Corpora = sorted(s.Corpora, func(n string) string { return n })
+		s.Paths = sortedPaths(s.Paths)
 		s.Outputs = sorted(s.Outputs, func(o Output) string { return o.Pattern })
 		s.Rejects = sorted(s.Rejects, func(n string) string { return n })
 		suites[i] = s
@@ -257,6 +279,16 @@ func sorted[T any](s []T, key func(T) string) []T {
 	return out
 }
 
+// sortedPaths returns a copy of ps sorted by corpus, never nil, with each
+// path's lifts in their order, never nil either.
+func sortedPaths(ps []Path) []Path {
+	out := sorted(ps, func(p Path) string { return p.Corpus })
+	for i, p := range out {
+		out[i].Lifts = append(make([]string, 0, len(p.Lifts)), p.Lifts...)
+	}
+	return out
+}
+
 // A FormatError is a registry of a format version this package doesn't
 // read.
 type FormatError struct{ Format int }
@@ -266,7 +298,13 @@ func (e *FormatError) Error() string {
 }
 
 // Parse parses a registry. One of another format version is a
-// [*FormatError].
+// [*FormatError]. So that every reader of today's registries reads the
+// columns and paths the update writes, Parse refuses one the update
+// couldn't have written: it lists each suite and lift under a name of its
+// own, a column runs over each of its corpora once, and its paths are one
+// from each, in their order, and name only lifts the registry lists, each
+// once, never the column itself, and none for a suite over the raw input
+// view.
 func Parse(data []byte) (*Registry, error) {
 	var head struct {
 		Format int `json:"format"`
@@ -280,7 +318,112 @@ func Parse(data []byte) (*Registry, error) {
 	case head.Format != Format:
 		return nil, &FormatError{Format: head.Format}
 	}
-	return decode(data)
+	r, err := decode(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.checkNames(); err != nil {
+		return nil, err
+	}
+	if err := r.checkPaths(); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+// checkNames reports the first name the registry lists twice among its
+// suites and lifts, owned or used: registration refuses a second column,
+// or lift, of one name.
+func (r *Registry) checkNames() error {
+	kinds := map[string]string{} // name → "suite" or "lift"
+	check := func(kind, name string) error {
+		switch was, ok := kinds[name]; {
+		case !ok:
+			kinds[name] = kind
+			return nil
+		case was == kind:
+			return fmt.Errorf("the registry lists the %s %s twice, where each suite and lift a package registers, owned or used, has a name of its own", kind, name)
+		default:
+			return fmt.Errorf("the registry lists a suite and a lift named %s, where each suite and lift a package registers, owned or used, has a name of its own", name)
+		}
+	}
+	for _, s := range r.Suites {
+		if err := check("suite", s.Name); err != nil {
+			return err
+		}
+	}
+	for _, l := range r.Lifts {
+		if err := check("lift", l.Name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkPaths reports the first column, suite or lift, owned or used,
+// whose paths the update couldn't have written.
+func (r *Registry) checkPaths() error {
+	lifts := map[string]bool{}
+	for _, l := range r.Lifts {
+		lifts[l.Name] = true
+	}
+	check := func(kind, name string, raw bool, corpora []string, paths []Path) error {
+		for i, c := range corpora {
+			if slices.Contains(corpora[:i], c) {
+				return fmt.Errorf("the %s %s runs over testdata/%s/ twice, where a registry lists each corpus a column runs over once", kind, name, c)
+			}
+		}
+		from := []string{}
+		for _, p := range paths {
+			from = append(from, p.Corpus)
+		}
+		if !slices.Equal(from, corpora) {
+			return fmt.Errorf("the %s %s runs over %s, and has paths from %s, where a registry gives each column one path from each corpus it runs over, in the same order", kind, name, dirList(corpora), dirList(from))
+		}
+		for _, p := range paths {
+			if raw && len(p.Lifts) > 0 {
+				return fmt.Errorf("the %s %s consumes the raw input view, and its path from testdata/%s/ names %s, where a suite over the raw input view passes through no lift", kind, name, p.Corpus, strings.Join(p.Lifts, ", "))
+			}
+			for i, l := range p.Lifts {
+				switch {
+				case l == name:
+					return fmt.Errorf("the %s %s's path from testdata/%s/ names the %s itself, where a column's path names the lifts before it", kind, name, p.Corpus, kind)
+				case !lifts[l]:
+					return fmt.Errorf("the %s %s's path from testdata/%s/ names %s, and the registry lists no lift of that name, where every lift on a column's path is one its package registers", kind, name, p.Corpus, l)
+				case slices.Contains(p.Lifts[:i], l):
+					return fmt.Errorf("the %s %s's path from testdata/%s/ names %s twice, where a column's path names each lift before it once", kind, name, p.Corpus, l)
+				}
+			}
+		}
+		return nil
+	}
+	for _, s := range r.Suites {
+		if err := check("suite", s.Name, s.Consumes == RawInput, s.Corpora, s.Paths); err != nil {
+			return err
+		}
+	}
+	for _, l := range r.Lifts {
+		if err := check("lift", l.Name, false, l.Corpora, l.Paths); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// dirList names corpus directories, as testdata/<dir>/ each, in prose,
+// or none.
+func dirList(dirs []string) string {
+	if len(dirs) == 0 {
+		return "none"
+	}
+	var names []string
+	for _, d := range dirs {
+		names = append(names, "testdata/"+d+"/")
+	}
+	if len(names) == 1 {
+		return names[0]
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }
 
 // decode decodes a registry, refusing a key its Registry doesn't hold.
@@ -307,9 +450,10 @@ const OutcomeFormat = 5
 // added is what each format version added to the one before it, by the
 // key that holds it, which a registry of an older format doesn't hold.
 // Format 4 added each corpus type's transforms, format 5 whether the
-// project supplies Codes and each suite's classifier, and format 6 whether
-// each lift is a bytes lift and its product's declarations. None changed
-// what an earlier key holds. Each format's keys are in
+// project supplies Codes and each suite's classifier, format 6 whether
+// each lift is a bytes lift and its product's declarations, and format 7
+// each lift's and suite's path from each of its corpora. None changed what
+// an earlier key holds. Each format's keys are in
 // testdata/keys-<N>.txt, which TestFormatKeys checks the table against.
 var added = []struct {
 	format int
@@ -329,6 +473,12 @@ var added = []struct {
 	{6, "lifts[].productFiles", func(p presence) bool {
 		return slices.ContainsFunc(p.Lifts, func(l liftPresence) bool { return l.ProductFiles != nil })
 	}},
+	{7, "lifts[].paths", func(p presence) bool {
+		return slices.ContainsFunc(p.Lifts, func(l liftPresence) bool { return l.Paths != nil })
+	}},
+	{7, "suites[].paths", func(p presence) bool {
+		return slices.ContainsFunc(p.Suites, func(s suitePresence) bool { return s.Paths != nil })
+	}},
 }
 
 // presence records which keys that a later format added a registry
@@ -343,6 +493,7 @@ type presence struct {
 type liftPresence struct {
 	Bytes        json.RawMessage `json:"bytes"`
 	ProductFiles json.RawMessage `json:"productFiles"`
+	Paths        json.RawMessage `json:"paths"`
 }
 
 type typePresence struct {
@@ -351,6 +502,7 @@ type typePresence struct {
 
 type suitePresence struct {
 	Classifier json.RawMessage `json:"classifier"`
+	Paths      json.RawMessage `json:"paths"`
 }
 
 // ParseAny parses a registry of any format version from [Oldest] to

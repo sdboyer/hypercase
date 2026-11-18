@@ -114,10 +114,11 @@ type runner struct {
 	rootPackage bool
 	properties  []decl.Property
 	types       []*corpusType
-	lifts       []*lift             // owned and used
-	columns     []*column           // sorted by name
-	plans       []*plan             // one per corpus type and per suite's Corpus, by directory
-	corpora     map[string][]string // each lift's and suite's corpus directories, sorted
+	lifts       []*lift                    // owned and used
+	columns     []*column                  // sorted by name
+	plans       []*plan                    // one per corpus type and per suite's Corpus, by directory
+	corpora     map[string][]string        // each lift's and suite's corpus directories, sorted
+	paths       map[string][]registry.Path // each lift's and suite's path from each of its corpora, in their order
 	stats       map[string]*colStats
 	owned       map[*transform]bool   // the types' transforms the package owns
 	products    map[*lift]*corpusType // each bytes lift's product's corpus type
@@ -157,6 +158,7 @@ func newRunner(t *testing.T) (*runner, bool) {
 		columns:     columns,
 		checks:      checks,
 		corpora:     map[string][]string{},
+		paths:       map[string][]registry.Path{},
 		stats:       map[string]*colStats{},
 	}
 	slices.SortFunc(r.columns, func(a, b *column) int { return strings.Compare(a.name, b.name) })

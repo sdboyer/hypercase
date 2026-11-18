@@ -247,6 +247,13 @@ var projectRender = decl.Project{
 
 var ladderProps = []any{malformed, circular, dangling}
 
+// parse2 is a copy of parse under another name.
+func parse2() decl.Lift[Script, *Parsed] {
+	p := parse
+	p.Name = "parse2"
+	return p
+}
+
 func ladder(p decl.Project, columns ...any) {
 	hypercase.Register(append([]any{p, rootPkg, scriptType, own(columns...)}, ladderProps...)...)
 }
@@ -265,6 +272,22 @@ var liftRegistrations = map[string]func(){
 	},
 	"ladder-b":      func() { hypercase.Register(project, scriptType, hypercase.Use(parse), own(outline)) },
 	"ladder-b-owns": func() { hypercase.Register(project, malformed, scriptType, own(parse, outline)) },
+	// ladder-b-producer uses resolve, and reaches it through parse2, a
+	// copy of parse it owns, where ., as ladder-a-paths, owns parse and
+	// resolve.
+	"ladder-b-producer": func() {
+		hypercase.Register(append([]any{project, scriptType, own(parse2(), evaluate), hypercase.Use(resolve)}, ladderProps...)...)
+	},
+	// ladder-a-uses-producer reaches resolve as ladder-b-producer does, by
+	// using parse2, in place of owning parse.
+	"ladder-a-uses-producer": func() {
+		hypercase.Register(append([]any{project, rootPkg, scriptType, own(resolve, pathsCheck), hypercase.Use(parse2())}, ladderProps...)...)
+	},
+	// ladder-b-shared-producer reaches resolve as . does, by using parse.
+	"ladder-b-shared-producer": func() {
+		hypercase.Register(append([]any{project, scriptType, own(evaluate), hypercase.Use(parse, resolve)}, ladderProps...)...)
+	},
+	"ladder-a-paths": func() { ladder(project, parse, resolve, pathsCheck) },
 	// ladder-b-suite owns a suite named parse, which follows the outline/
 	// tree.
 	"ladder-b-suite": func() { hypercase.Register(project, scriptType, own(steered[Script]("parse", "outline"))) },

@@ -1,6 +1,7 @@
 package hypercase_test
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -51,6 +52,60 @@ func TestRootCheckLifts(t *testing.T) {
 	s.passes(s.run("c", "ladder-b-owns", true))
 	s.fails(s.normal("ladder-a"), "the column parse is owned by ., ./b and ./c, each as a lift. Column names are unique per corpus root, and one package owns each column.\nRename or remove all but one of the lifts. Of ., ./b and ./c, which own the lift, one that only reads its product removes its column by giving the lift to hypercase.Use in place of hypercase.Own.")
 	s.done()
+}
+
+// TestRootCheckUsedPath: a package that uses a lift reaches it from each
+// corpus by the path the lift's owner records. Here . owns parse and
+// resolve, and ./b uses resolve, and reaches it through parse2, a copy of
+// parse it owns, so the cells of resolve that ./b's cells past it are
+// built through are cells no package writes, and the root-package check
+// fails. The paths check finds resolve's cell of the case built through
+// parse, where ./b's evaluate cell is built through parse2. The failure
+// states the two ways the conflict ends, and applying either makes every
+// run pass: ./b reaches resolve by .'s path, using parse in place of
+// parse2, or . by ./b's, using parse2 in place of parse, and the cells of
+// the copy given up, which no package writes then, are deleted. Until
+// they are, the root-package check fails on them, as sections no registry
+// claims.
+func TestRootCheckUsedPath(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name, a, b, drop string
+	}{
+		{"b gives up parse2", "ladder-a-paths", "ladder-b-shared-producer", "out/parse2/"},
+		{"a gives up parse", "ladder-a-uses-producer", "ladder-b-producer", "out/parse/"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := newSandbox(t, "shared-ladder")
+			s.passes(s.run("b", "ladder-b-producer", true))
+			s.passes(s.update("ladder-a-paths"))
+			s.cat("testdata/checks/paths.txt")
+			// A check that reads the cells sees the break, whatever the
+			// root-package check says.
+			const built = "script evaluate: resolve's cell of script/x is built through parse, and the cell through parse2 past it\n"
+			if !strings.Contains(string(s.read("testdata/checks/paths.txt")), built) {
+				t.Errorf("the paths check finds no cell built otherwise than the cell past it")
+			}
+			r := s.normal("ladder-a-paths")
+			s.fails(r, "the lift resolve is used by ./b on the path testdata/script/ → parse2 → resolve, and ., which owns it, runs it on the path testdata/script/ → parse → resolve, so no package writes the cells of resolve that ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either ./b reaches resolve from testdata/script/ by .'s path, or . by ./b's. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If they reach it alike already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
+			if n := strings.Count(string(r.out), " is used by "); n != 1 {
+				t.Errorf("the root-package check fails %d times on lifts used otherwise than their owner reaches them, and should fail once", n)
+			}
+			s.passes(s.run("b", "ladder-b-producer", false))
+
+			s.passes(s.run("b", tt.b, true))
+			s.passes(s.update(tt.a))
+			col := strings.TrimSuffix(strings.TrimPrefix(tt.drop, "out/"), "/")
+			s.fails(s.normal(tt.a), "testdata/script/x.txtar: no registry claims "+tt.drop+"outcome: no column named "+col+" runs over the corpus script.")
+			s.edit("testdata/script/x.txtar", "delete the cells no package writes now", drop(tt.drop))
+			s.passes(s.update(tt.a))
+			s.cat("testdata/checks/paths.txt")
+			s.passes(s.normal(tt.a))
+			s.passes(s.run("b", tt.b, false))
+			s.done()
+		})
+	}
 }
 
 // TestRootCheckLiftOwnerUntested: a registry in a package with no _test.go

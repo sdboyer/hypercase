@@ -63,6 +63,9 @@ func init() {
 		register, ok = topologyRegistration(name)
 	}
 	if !ok {
+		register, ok = cycleRegistrations[name]
+	}
+	if !ok {
 		register, ok = stripRegistrations[name]
 	}
 	if !ok {

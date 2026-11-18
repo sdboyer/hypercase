@@ -1,5 +1,5 @@
 {
-  "format": 6,
+  "format": 7,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step09",
   "rootPackage": false,
@@ -62,6 +62,12 @@
       "consumes": "github.com/sdboyer/hypercase/walkthrough/sheets/step09/sheetcorpus.Sheet",
       "corpora": [
         "sheet"
+      ],
+      "paths": [
+        {
+          "corpus": "sheet",
+          "lifts": []
+        }
       ],
       "outputs": [
         {

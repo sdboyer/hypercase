@@ -1,0 +1,208 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # used-fewer-b
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/import
+    --- PASS: TestCorpus/script
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # used-fewer-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ cat testdata/checks/paths.txt
+export evaluate: parse has no cell of export/prices
+export evaluate: resolve has no cell of export/prices
+export evaluate: through resolve, parse, import
+export import: through no lift
+$ go test  # used-fewer-a
+    the lift parse is used by ./b on the path testdata/export/ → import → parse, and ., which owns it, doesn't run it over testdata/export/, so no package writes its cells of that corpus's cases, which ./b's cells past it are built through.
+        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs parse over testdata/export/ by that path, or ./b doesn't reach parse from testdata/export/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+    the lift resolve is used by ./b on the path testdata/export/ → import → parse → resolve, and ., which owns it, doesn't run it over testdata/export/, so no package writes its cells of that corpus's cases, which ./b's cells past it are built through.
+        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs resolve over testdata/export/ by that path, or ./b doesn't reach resolve from testdata/export/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ go test ./b  # used-fewer-b
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/import
+    --- PASS: TestCorpus/script
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # used-fewer-a-fixed
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ cat testdata/checks/paths.txt
+export evaluate: through resolve, parse, import
+export import: through no lift
+export parse: through import
+export resolve: through parse, import
+$ go test  # used-fewer-a-fixed
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ go test ./b  # used-fewer-b
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/import
+    --- PASS: TestCorpus/script
+PASS
+$ edit testdata/hypercase.json  # drop export from the corpora and paths of parse and resolve in .'s registry, by hand
+$ go test  # used-fewer-a-fixed
+    testdata/hypercase.json differs from what the package registers (-committed +registered):
+                "owned": true,
+                "bytes": false,
+                "corpora": [
+        +         "export",
+                  "script"
+                ],
+                "paths": [
+                  {
+        +           "corpus": "export",
+        +           "lifts": [
+        +             "import"
+        +           ]
+        +         },
+        +         {
+                    "corpus": "script",
+                    "lifts": []
+                  }
+          ...
+                "owned": true,
+                "bytes": false,
+                "corpora": [
+        +         "export",
+                  "script"
+                ],
+                "paths": [
+        +         {
+        +           "corpus": "export",
+        +           "lifts": [
+        +             "parse",
+        +             "import"
+        +           ]
+        +         },
+                  {
+                    "corpus": "script",
+                    "lifts": [
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
+    the lift parse is used by ./b on the path testdata/export/ → import → parse, and ., which owns it, doesn't run it over testdata/export/, so no package writes its cells of that corpus's cases, which ./b's cells past it are built through.
+        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs parse over testdata/export/ by that path, or ./b doesn't reach parse from testdata/export/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+    the lift resolve is used by ./b on the path testdata/export/ → import → parse → resolve, and ., which owns it, doesn't run it over testdata/export/, so no package writes its cells of that corpus's cases, which ./b's cells past it are built through.
+        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs resolve over testdata/export/ by that path, or ./b doesn't reach resolve from testdata/export/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+    testdata/export/prices.txtar: no registry claims out/parse/outcome: no column named parse runs over the corpus export.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column parse at the module root. It removes parse's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
+    testdata/export/prices.txtar: no registry claims out/resolve/outcome: no column named resolve runs over the corpus export.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column resolve at the module root. It removes resolve's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
+    testdata/checks/paths.txt, the corpus check paths's findings, differs (-golden +got):
+        + export evaluate: parse has no cell of export/prices
+        + export evaluate: resolve has no cell of export/prices
+          export evaluate: through resolve, parse, import
+          export import: through no lift
+        - export parse: through import
+        - export resolve: through parse, import
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+    --- PASS: TestCorpus/script
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # used-fewer-a-fixed
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ go test  # used-fewer-a-fixed
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+    --- PASS: TestCorpus/script
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ go test ./b  # used-fewer-b
+    what ran, in order:
+        parse ran on prices
+        resolve ran on prices
+        evaluate's probe ran
+        evaluate ran on prices
+        import ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/evaluate
+            --- PASS: TestCorpus/export/prices/import
+    --- PASS: TestCorpus/script
+PASS

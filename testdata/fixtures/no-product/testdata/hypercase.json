@@ -1,5 +1,5 @@
 {
-  "format": 6,
+  "format": 7,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -38,6 +38,12 @@
       "corpora": [
         "script"
       ],
+      "paths": [
+        {
+          "corpus": "script",
+          "lifts": []
+        }
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
@@ -61,6 +67,14 @@
       "corpora": [
         "script"
       ],
+      "paths": [
+        {
+          "corpus": "script",
+          "lifts": [
+            "pick"
+          ]
+        }
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
@@ -82,6 +96,15 @@
       "consumes": "*github.com/sdboyer/hypercase_test.Parsed",
       "corpora": [
         "script"
+      ],
+      "paths": [
+        {
+          "corpus": "script",
+          "lifts": [
+            "unpick",
+            "pick"
+          ]
+        }
       ],
       "outputs": [
         {
@@ -126,6 +149,14 @@
       "consumes": "github.com/sdboyer/hypercase_test.Picked",
       "corpora": [
         "script"
+      ],
+      "paths": [
+        {
+          "corpus": "script",
+          "lifts": [
+            "pick"
+          ]
+        }
       ],
       "outputs": [
         {

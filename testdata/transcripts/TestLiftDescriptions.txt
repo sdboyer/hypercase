@@ -66,6 +66,14 @@ $ go test  # lift-nodesc
         -       "corpora": [
         -         "script"
         -       ],
+        -       "paths": [
+        -         {
+        -           "corpus": "script",
+        -           "lifts": [
+        -             "parse"
+        -           ]
+        -         }
+        -       ],
         -       "outputs": [
         -         {
         -           "pattern": "error.txt",
@@ -96,6 +104,15 @@ $ go test  # lift-nodesc
         -       "consumes": "*github.com/sdboyer/hypercase_test.Graph",
         -       "corpora": [
         -         "script"
+        -       ],
+        -       "paths": [
+        -         {
+        -           "corpus": "script",
+        -           "lifts": [
+        -             "resolve",
+        -             "parse"
+        -           ]
+        -         }
         -       ],
         -       "outputs": [
         -         {
@@ -136,6 +153,14 @@ $ go test  # lift-nodesc
         -       "consumes": "*github.com/sdboyer/hypercase_test.Parsed",
         -       "corpora": [
         -         "script"
+        -       ],
+        -       "paths": [
+        -         {
+        -           "corpus": "script",
+        -           "lifts": [
+        -             "parse"
+        -           ]
+        -         }
         -       ],
         -       "outputs": [
         -         {

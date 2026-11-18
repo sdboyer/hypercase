@@ -1,5 +1,5 @@
 {
-  "format": 6,
+  "format": 7,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -28,6 +28,12 @@
       "consumes": "github.com/sdboyer/hypercase_test.Script",
       "corpora": [
         "script"
+      ],
+      "paths": [
+        {
+          "corpus": "script",
+          "lifts": []
+        }
       ],
       "outputs": [
         {
@@ -68,6 +74,12 @@
       "consumes": "github.com/sdboyer/hypercase_test.Other",
       "corpora": [
         "other"
+      ],
+      "paths": [
+        {
+          "corpus": "other",
+          "lifts": []
+        }
       ],
       "outputs": [
         {

@@ -1,6 +1,7 @@
 package hypercase_test
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -104,7 +105,7 @@ func TestChain(t *testing.T) {
 	s.hasSections("testdata/hypercase.json", map[string]string{})
 	reg := string(s.read("testdata/hypercase.json"))
 	for _, want := range []string{
-		`"format": 6,`,
+		`"format": 7,`,
 		"\"name\": \"import\",\n      \"description\": \"Imports the export as a script, as its import/ tree says.\",\n      \"input\": \"github.com/sdboyer/hypercase_test.Export\",\n      \"product\": \"github.com/sdboyer/hypercase_test.Script\",\n      \"owned\": true,\n      \"bytes\": true,",
 		"\"productFiles\": [\n        {\n          \"pattern\": \"evaluate/*\",",
 		"\"rejects\": [\n        \"unterminated\"\n      ]",
@@ -1086,6 +1087,328 @@ func TestChainCheck(t *testing.T) {
 	s.fails(r, "--- FAIL: TestCorpus/export/prices/import")
 	s.contains(r, "--- PASS: TestCorpus/checks/products")
 	s.same(findings, committed)
+	s.done()
+}
+
+// TestChainCheckPaths: a cell's path runs through a bytes lift whose
+// product is another corpus type, on to the cell's own corpus type: an
+// export's cell of evaluate is built through resolve, parse and import,
+// and a script's, of the type import makes, through resolve and parse.
+// Past two bytes lifts, the path runs through both. The registry records
+// each path, and a check reads it there.
+func TestChainCheckPaths(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name, fixture, registration string
+		findings                    string
+		paths                       map[string][]registry.Path
+	}{
+		{
+			"through import", "chain", "chain-paths",
+			"export evaluate: through resolve, parse, import\n" +
+				"export import: through no lift\n" +
+				"export list: through import\n" +
+				"export parse: through import\n" +
+				"export resolve: through parse, import\n" +
+				"script evaluate: through resolve, parse\n" +
+				"script list: through no lift\n" +
+				"script parse: through no lift\n" +
+				"script resolve: through parse\n",
+			map[string][]registry.Path{
+				"suite evaluate": {{Corpus: "export", Lifts: []string{"resolve", "parse", "import"}}, {Corpus: "script", Lifts: []string{"resolve", "parse"}}},
+				"suite list":     {{Corpus: "export", Lifts: []string{"import"}}, {Corpus: "script", Lifts: []string{}}},
+				"lift import":    {{Corpus: "export", Lifts: []string{}}},
+				"lift resolve":   {{Corpus: "export", Lifts: []string{"parse", "import"}}, {Corpus: "script", Lifts: []string{"parse"}}},
+			},
+		},
+		{
+			"through export and import", "chain-twice", "chain-twice-paths",
+			"grid export: through no lift\n" +
+				"grid import: through export\n" +
+				"grid list: through import, export\n",
+			map[string][]registry.Path{
+				"suite list":  {{Corpus: "export", Lifts: []string{"import"}}, {Corpus: "grid", Lifts: []string{"import", "export"}}, {Corpus: "script", Lifts: []string{}}},
+				"lift import": {{Corpus: "export", Lifts: []string{}}, {Corpus: "grid", Lifts: []string{"export"}}},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := newSandbox(t, tt.fixture)
+			s.passes(s.update(tt.registration))
+			s.passes(s.normal(tt.registration))
+			const findings = "testdata/checks/paths.txt"
+			s.cat(findings)
+			if got := string(s.read(findings)); got != tt.findings {
+				t.Errorf("the cells' paths are\n%s\nwant\n%s", got, tt.findings)
+			}
+			s.wantPaths("testdata/hypercase.json", tt.paths)
+			s.done()
+		})
+	}
+}
+
+// TestChainSharedCheckPaths: a check reads the path of each column over
+// the corpus root from the registry of the package that owns it, so a
+// cell of a column that another package runs through lifts it only uses
+// carries the path that package's registry records. A registry entry that
+// doesn't give one path from each corpus its column runs over, in the
+// order of its corpora, can't be read, and so can't one whose path names
+// a lift the registry doesn't list, or the column itself, whether the
+// column is the package's or a lift it uses: every check fails, and so
+// does the root-package check. Each hand edit is written as the JSON it
+// makes, not by Marshal, which would sort the paths.
+func TestChainSharedCheckPaths(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "chain-shared")
+	s.passes(s.update("chain-a-paths"))
+	s.passes(s.run("b", "chain-b", true))
+	s.passes(s.normal("chain-a-paths"))
+	s.passes(s.run("b", "chain-b", false))
+	const findings, reg = "testdata/checks/paths.txt", "b/testdata/hypercase.json"
+	s.cat(findings)
+	const want = "export evaluate: through resolve, parse, import\n" +
+		"export import: through no lift\n" +
+		"export list: through import\n" +
+		"export parse: through import\n" +
+		"export resolve: through parse, import\n"
+	if got := string(s.read(findings)); got != want {
+		t.Errorf("the cells' paths are\n%s\nwant\n%s", got, want)
+	}
+	s.wantPaths(reg, map[string][]registry.Path{
+		"suite evaluate": {{Corpus: "export", Lifts: []string{"resolve", "parse", "import"}}, {Corpus: "script", Lifts: []string{"resolve", "parse"}}},
+		"lift resolve":   {{Corpus: "export", Lifts: []string{"parse", "import"}}, {Corpus: "script", Lifts: []string{"parse"}}},
+	})
+
+	clean := s.read(reg)
+	edit := func(why string, change func(*registry.Registry)) {
+		g, err := registry.Parse(clean)
+		if err != nil {
+			t.Fatal(err)
+		}
+		change(g)
+		data, err := json.MarshalIndent(g, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.write(reg, append(data, '\n'), why)
+	}
+	evaluate := func(change func(*registry.Suite)) func(*registry.Registry) {
+		return func(g *registry.Registry) {
+			change(&g.Suites[slices.IndexFunc(g.Suites, func(c registry.Suite) bool { return c.Name == "evaluate" })])
+		}
+	}
+	// refused checks that the root package's normal run fails on b's
+	// registry, which neither the corpus check nor the root-package check
+	// can read, for why, and that the findings stay as they were.
+	refused := func(why string) {
+		s.fails(s.normal("chain-a-paths"),
+			"the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: "+why+". No check runs, and an update writes no findings.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.",
+			"b/testdata/hypercase.json can't be read: "+why+".\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.")
+		s.same(findings, []byte(want))
+	}
+	const evaluateRuns = "the suite evaluate runs over testdata/export/ and testdata/script/, and has paths from "
+	const rule = ", where a registry gives each column one path from each corpus it runs over, in the same order"
+	edit("drop evaluate's path from export from b's registry, by hand", evaluate(func(c *registry.Suite) { c.Paths = c.Paths[1:] }))
+	refused(evaluateRuns + "testdata/script/" + rule)
+	s.fails(s.update("chain-a-paths"), "the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: "+evaluateRuns+"testdata/script/"+rule+". No check runs, and an update writes no findings.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.")
+	s.same(findings, []byte(want))
+	edit("give evaluate a second path from script in b's registry, by hand", evaluate(func(c *registry.Suite) { c.Paths[0].Corpus = "script" }))
+	refused(evaluateRuns + "testdata/script/ and testdata/script/" + rule)
+	edit("give evaluate no paths in b's registry, by hand", evaluate(func(c *registry.Suite) { c.Paths = nil }))
+	refused(evaluateRuns + "none" + rule)
+	edit("list evaluate's paths in the other order from its corpora in b's registry, by hand", evaluate(func(c *registry.Suite) { slices.Reverse(c.Paths) }))
+	refused(evaluateRuns + "testdata/script/ and testdata/export/" + rule)
+	edit("give evaluate a third path, from script, after its two in b's registry, by hand", evaluate(func(c *registry.Suite) { c.Paths = append(c.Paths, c.Paths[1]) }))
+	refused(evaluateRuns + "testdata/export/, testdata/script/ and testdata/script/" + rule)
+	edit("name a lift b's registry doesn't list on evaluate's path from export, by hand", evaluate(func(c *registry.Suite) { c.Paths[0].Lifts = []string{"resolve", "nosuch"} }))
+	refused("the suite evaluate's path from testdata/export/ names nosuch, and the registry lists no lift of that name, where every lift on a column's path is one its package registers")
+
+	// The lifts b uses are held to the same rules as its columns.
+	edit("drop the paths from export of the lifts b uses, parse and resolve, from b's registry, by hand", func(g *registry.Registry) {
+		for i, l := range g.Lifts {
+			if l.Name == "parse" || l.Name == "resolve" {
+				g.Lifts[i].Paths = slices.DeleteFunc(g.Lifts[i].Paths, func(p registry.Path) bool { return p.Corpus == "export" })
+			}
+		}
+	})
+	refused("the lift parse runs over testdata/export/ and testdata/script/, and has paths from testdata/script/" + rule)
+	edit("name resolve on its own path from script in b's registry, by hand", func(g *registry.Registry) {
+		l := &g.Lifts[slices.IndexFunc(g.Lifts, func(l registry.Lift) bool { return l.Name == "resolve" })]
+		l.Paths[1].Lifts = []string{"resolve"}
+	})
+	refused("the lift resolve's path from testdata/script/ names the lift itself, where a column's path names the lifts before it")
+	s.same(findings, []byte(want))
+	s.write(reg, clean, "restore it")
+	s.passes(s.normal("chain-a-paths"))
+	s.done()
+}
+
+// TestChainRootCheckUsedPath: a package that uses a lift reaches it from
+// each corpus by the path the lift's owner records. Here . owns parse and
+// resolve over script alone, and ./b, which uses them, reaches them from
+// export too, through import, which it owns. No package writes the cells
+// of parse and resolve that ./b's cells of export are built through, as
+// the paths check finds, and the root-package check fails once for each
+// lift. Applying the first way each failure states, . running the lift
+// over export by ./b's path, makes every run pass: . registers export's
+// corpus type and uses import. A registry edited by hand back to the
+// conflict brings the failures back, and the update, which they name
+// where a registry is stale, ends them.
+func TestChainRootCheckUsedPath(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "chain-shared")
+	s.passes(s.run("b", "used-fewer-b", true))
+	s.passes(s.update("used-fewer-a"))
+	s.cat("testdata/checks/paths.txt")
+	failures := []string{
+		"the lift parse is used by ./b on the path testdata/export/ → import → parse, and ., which owns it, doesn't run it over testdata/export/, so no package writes its cells of that corpus's cases, which ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs parse over testdata/export/ by that path, or ./b doesn't reach parse from testdata/export/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.",
+		"the lift resolve is used by ./b on the path testdata/export/ → import → parse → resolve, and ., which owns it, doesn't run it over testdata/export/, so no package writes its cells of that corpus's cases, which ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs resolve over testdata/export/ by that path, or ./b doesn't reach resolve from testdata/export/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.",
+	}
+	r := s.normal("used-fewer-a")
+	s.fails(r, failures...)
+	if n := strings.Count(string(r.out), " is used by "); n != len(failures) {
+		t.Errorf("the root-package check fails %d times on lifts used otherwise than their owner reaches them, and should fail %d times", n, len(failures))
+	}
+	s.passes(s.run("b", "used-fewer-b", false))
+
+	// . registers export and uses import, so it runs parse and resolve over
+	// export by ./b's path.
+	s.passes(s.update("used-fewer-a-fixed"))
+	s.cat("testdata/checks/paths.txt")
+	s.passes(s.normal("used-fewer-a-fixed"))
+	s.passes(s.run("b", "used-fewer-b", false))
+
+	// .'s registry, edited by hand so that . runs parse and resolve over
+	// script alone, though it registers what it takes to reach them from
+	// export as ./b does: the failures are back, and the update ends them.
+	clean := s.read("testdata/hypercase.json")
+	g, err := registry.Parse(clean)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, l := range g.Lifts {
+		if l.Name == "parse" || l.Name == "resolve" {
+			g.Lifts[i].Corpora = slices.DeleteFunc(l.Corpora, func(c string) bool { return c == "export" })
+			g.Lifts[i].Paths = slices.DeleteFunc(l.Paths, func(p registry.Path) bool { return p.Corpus == "export" })
+		}
+	}
+	s.write("testdata/hypercase.json", g.Marshal(), "drop export from the corpora and paths of parse and resolve in .'s registry, by hand")
+	s.fails(s.normal("used-fewer-a-fixed"), failures...)
+	s.passes(s.update("used-fewer-a-fixed"))
+	s.same("testdata/hypercase.json", clean)
+	s.passes(s.normal("used-fewer-a-fixed"))
+	s.passes(s.run("b", "used-fewer-b", false))
+	s.done()
+}
+
+// TestChainRootCheckUsedUnowned: ./b uses parse and resolve, which .
+// owns over script alone, and reaches them from export through import,
+// which no package owns. The root-package check fails over import, which
+// no package owns, and over parse and resolve, from export; import, with
+// no owner, has no path to compare with ./b's. Where . registers export
+// and owns import, it runs parse and resolve over export by ./b's path,
+// which ends every failure.
+func TestChainRootCheckUsedUnowned(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "chain-shared")
+	s.passes(s.run("b", "used-unowned-b", true))
+	s.passes(s.update("used-fewer-a"))
+	r := s.normal("used-fewer-a")
+	s.fails(r,
+		"the lift import is used by ./b, and no package owns it, so its error is recorded nowhere.",
+		"the lift parse is used by ./b on the path testdata/export/ → import → parse, and ., which owns it, doesn't run it over testdata/export/, so no package writes its cells of that corpus's cases, which ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs parse over testdata/export/ by that path, or ./b doesn't reach parse from testdata/export/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.",
+		"the lift resolve is used by ./b on the path testdata/export/ → import → parse → resolve, and ., which owns it, doesn't run it over testdata/export/, so no package writes its cells of that corpus's cases, which ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs resolve over testdata/export/ by that path, or ./b doesn't reach resolve from testdata/export/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
+	if n := strings.Count(string(r.out), " is used by "); n != 3 {
+		t.Errorf("the root-package check fails %d times on used lifts, and should fail 3 times: once for import, and once for each of parse and resolve", n)
+	}
+
+	// . registers export and owns import.
+	s.passes(s.update("used-unowned-a-fixed"))
+	s.passes(s.run("b", "used-unowned-b", true))
+	s.passes(s.normal("used-unowned-a-fixed"))
+	s.passes(s.run("b", "used-unowned-b", false))
+	s.done()
+}
+
+// TestUpdateUnreadableUntested: ./b's tests are removed, and its registry,
+// edited by hand, gives its lifts no paths, so it can't be read. The root
+// package's corpus check fails on it, in the update and in a normal run,
+// and so does its root-package check, in a normal run, and each failure
+// says that b holds no _test.go file, so no update writes the registry,
+// and to delete it: the update fails alike, twice. Once the registry is
+// deleted, the failure left is over ./b's cells, which no registry claims
+// then, and once they are deleted too, every run passes. Where the
+// package has tests, the failures say to run the update, as
+// TestUpdateMalformedPaths shows.
+func TestUpdateUnreadableUntested(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared-ladder")
+	s.passes(s.run("b", "ladder-b-shared-producer", true))
+	s.passes(s.update("ladder-a-paths"))
+	s.passes(s.normal("ladder-a-paths"))
+	s.remove("b/corpus_test.go", "remove b's tests, and leave its registry")
+	g, err := registry.Parse(s.read("b/testdata/hypercase.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range g.Lifts {
+		g.Lifts[i].Paths = nil
+	}
+	s.write("b/testdata/hypercase.json", g.Marshal(), "drop the paths of b's lifts, by hand")
+	const why = "the lift parse runs over testdata/script/, and has paths from none, where a registry gives each column one path from each corpus it runs over, in the same order"
+	const check = "the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: " + why + ", and b holds no _test.go file, so no update writes it. No check runs, and an update writes no findings.\nDelete b/testdata/hypercase.json."
+	s.fails(s.normal("ladder-a-paths"), check, "b/testdata/hypercase.json can't be read: "+why+", and b holds no _test.go file, so no update writes it.\nDelete it.")
+	s.fails(s.update("ladder-a-paths"), check)
+	s.fails(s.update("ladder-a-paths"), check)
+	s.remove("b/testdata/hypercase.json", "delete b's registry, which no update writes")
+	s.passes(s.update("ladder-a-paths"))
+	s.fails(s.normal("ladder-a-paths"), "testdata/script/x.txtar: no registry claims out/evaluate/outcome and out/evaluate/values.txt: no column named evaluate runs over the corpus script.")
+	s.edit("testdata/script/x.txtar", "delete ./b's cells, which no package writes", drop("out/evaluate/"))
+	s.passes(s.normal("ladder-a-paths"))
+	s.passes(s.update("ladder-a-paths"))
+	s.done()
+}
+
+// TestUpdateMalformedPaths: over the strip fixture, the registries of
+// both packages give parse, which . owns and ./b uses, no path from
+// export, as edited by hand, so neither can be read. The update walks for
+// symbolic links before it writes anything, the package's own registry
+// included, and before a corpus check reads a registry, so with a link in
+// place of testdata/export it refuses the link and leaves both registries
+// as they were. Without the link, the root package's update rewrites its
+// own registry, and its corpus check cells can't read ./b's, which only
+// ./b's update rewrites. Then every run passes.
+func TestUpdateMalformedPaths(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	s.settle(stripModule...)
+	const regA, regB = "testdata/hypercase.json", "b/testdata/hypercase.json"
+	cleanA, cleanB := s.read(regA), s.read(regB)
+	for _, reg := range []string{regA, regB} {
+		g, err := registry.Parse(s.read(reg))
+		if err != nil {
+			t.Fatal(err)
+		}
+		l := &g.Lifts[slices.IndexFunc(g.Lifts, func(l registry.Lift) bool { return l.Name == "parse" })]
+		l.Paths = slices.DeleteFunc(l.Paths, func(p registry.Path) bool { return p.Corpus == "export" })
+		s.write(reg, g.Marshal(), "drop parse's path from export, by hand")
+	}
+	const why = "the lift parse runs over testdata/export/ and testdata/script/, and has paths from testdata/script/, where a registry gives each column one path from each corpus it runs over, in the same order"
+	s.remove("testdata/.hypercase.lock", "the lock, which the update takes to write an archive")
+	before := s.snapshot()
+	s.link("testdata/export", "")
+	s.fails(s.update("strip-a"), "testdata/ holds no symbolic links: testdata/export is one, so the update wrote nothing.\nRemove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.")
+	s.unlink("testdata/export")
+	s.unchanged(before)
+
+	s.fails(s.update("strip-a"), "the corpus check cells can't read its cells: b/testdata/hypercase.json can't be read: "+why+". No check runs, and an update writes no findings.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.")
+	s.same(regA, cleanA)
+	s.passes(s.run("b", "strip-b", true))
+	s.same(regB, cleanB)
+	s.passes(s.update("strip-a"))
+	s.passes(s.normal("strip-a"))
+	s.passes(s.run("b", "strip-b", false))
 	s.done()
 }
 

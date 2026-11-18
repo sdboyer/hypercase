@@ -57,6 +57,17 @@ type Cell struct {
 	Outcome archive.Outcome
 	// Entry is the cell's column, as its package's registry records it.
 	Entry Entry
+	// Path names the lifts the column's input passes through from the
+	// cell's corpus type, nearest the column first, as the registry of the
+	// column's package records them: resolve, then parse, for evaluate's
+	// cell of a sheet, and past a bytes lift, resolve, parse, then import,
+	// for its cell of a CSV that import makes a sheet of. Each is a lift's
+	// column. Where the root-package check passes, each lift's cell of the
+	// case is the one the cell is built through: a package that uses a lift
+	// reaches it from each corpus by the path the lift's owner records.
+	// Path is empty for a column that consumes its corpus type, and for a
+	// suite that runs over its Corpus's raw input views.
+	Path []string
 	// Properties are what the case states: the base's properties, a
 	// hand-written variant's own, or what a transform gives and each
 	// property it keeps that the base states.
@@ -127,7 +138,15 @@ func (r *runner) runChecks(t *testing.T, found []registry.Found) {
 	t.Run(archive.ChecksDir, func(t *testing.T) {
 		for _, c := range r.checks {
 			t.Run(c.Name, func(t *testing.T) {
-				if err != nil {
+				var reg *unreadableRegistry
+				switch {
+				case errors.As(err, &reg) && reg.tested:
+					t.Errorf("the corpus check %s can't read its cells: %s can't be read: %v. No check runs, and an update writes no findings.\nRun %s to write it.", c.Name, reg.path, reg.err, r.updateCmd())
+					return
+				case errors.As(err, &reg):
+					t.Errorf("the corpus check %s can't read its cells: %s can't be read: %v, and %s holds no _test.go file, so no update writes it. No check runs, and an update writes no findings.\nDelete %s.", c.Name, reg.path, reg.err, reg.dir, reg.path)
+					return
+				case err != nil:
 					t.Errorf("the corpus check %s can't read its cells: %v\nFix what the message names. No check runs, and an update writes no findings.", c.Name, err)
 					return
 				}
@@ -226,9 +245,15 @@ func (r *runner) orphanFindings(t *testing.T) {
 // written, then its transforms' by name, then column. A registry or an
 // archive that can't be read, or a cell's outcome, is an error, and so is
 // a transform's variant whose properties can't be known: one no corpus
-// type lists, or one its transform declines.
+// type lists, or one its transform declines. A registry that registry.Parse
+// refuses is an *unreadableRegistry.
 func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
-	columns := map[string][]Entry{}                          // corpus → its columns
+	// A col is a column over one corpus, and its path from the corpus.
+	type col struct {
+		entry Entry
+		path  []string
+	}
+	columns := map[string][]col{}                            // corpus → its columns
 	products := map[string]bool{}                            // the bytes lifts, by name
 	transforms := map[string]map[string]registry.Transform{} // corpus → transform → its declaration
 	for _, f := range found {
@@ -241,27 +266,29 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 		}
 		g, err := registry.Parse(data)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", r.rel(f.Path), err)
+			return nil, &unreadableRegistry{r.rel(f.Path), r.rel(f.Pkg), hasTestFile(f.Pkg), err}
 		}
 		pkg := r.pkgName(f.Pkg)
+		// Parse refuses paths that aren't one from each corpus, so each
+		// corpus has its path at its index.
+		add := func(e Entry, corpora []string, paths []registry.Path) {
+			for i, corpus := range corpora {
+				columns[corpus] = append(columns[corpus], col{e, paths[i].Lifts})
+			}
+		}
 		for _, s := range g.Suites {
 			e := Entry{Kind: "suite", Name: s.Name, Description: s.Description, Package: pkg, Rejects: s.Rejects}
 			if s.Classifier != nil {
 				e.Classifier = s.Classifier.Name
 			}
-			for _, corpus := range s.Corpora {
-				columns[corpus] = append(columns[corpus], e)
-			}
+			add(e, s.Corpora, s.Paths)
 		}
 		for _, l := range g.Lifts {
 			if !l.Owned {
 				continue
 			}
-			e := Entry{Kind: "lift", Name: l.Name, Description: l.Description, Package: pkg, Rejects: l.Rejects}
 			products[l.Name] = l.Bytes
-			for _, corpus := range l.Corpora {
-				columns[corpus] = append(columns[corpus], e)
-			}
+			add(Entry{Kind: "lift", Name: l.Name, Description: l.Description, Package: pkg, Rejects: l.Rejects}, l.Corpora, l.Paths)
 		}
 		for _, ct := range g.Types {
 			if transforms[ct.Dir] == nil {
@@ -277,7 +304,7 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 	var cells []Cell
 	for _, corpus := range slices.Sorted(maps.Keys(columns)) {
 		cols := columns[corpus]
-		slices.SortStableFunc(cols, func(a, b Entry) int { return strings.Compare(a.Name, b.Name) })
+		slices.SortStableFunc(cols, func(a, b col) int { return strings.Compare(a.entry.Name, b.entry.Name) })
 		dir := filepath.Join(r.corpusRoot, "testdata", corpus)
 		entries, err := os.ReadDir(dir)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -327,18 +354,19 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 			}
 			for _, c := range cases {
 				for _, col := range cols {
-					cell := Cell{Type: corpus, Archive: name, Case: c.name, Column: col.Name, Entry: col, Properties: c.properties, Files: map[string][]byte{}, Gap: c.gaps[col.Name]}
+					e := col.entry
+					cell := Cell{Type: corpus, Archive: name, Case: c.name, Column: e.Name, Entry: e, Path: col.path, Properties: c.properties, Files: map[string][]byte{}, Gap: c.gaps[e.Name]}
 					for _, s := range a.Sections {
-						if f, ok := strings.CutPrefix(s.Name, c.prefix+archive.Out+"/"+col.Name+"/"); ok {
+						if f, ok := strings.CutPrefix(s.Name, c.prefix+archive.Out+"/"+e.Name+"/"); ok {
 							cell.Files[f] = s.Data
 						}
 					}
-					if col.Kind == "lift" && products[col.Name] {
-						cell.Product = committedUnder(a, c.prefix+archive.Via+"/"+col.Name+"/")
+					if e.Kind == "lift" && products[e.Name] {
+						cell.Product = committedUnder(a, c.prefix+archive.Via+"/"+e.Name+"/")
 					}
 					if data, ok := cell.Files[archive.OutcomeFile]; ok {
 						if cell.Outcome, err = archive.ParseOutcome(data); err != nil {
-							return nil, fmt.Errorf("%s, %s%s/%s/%s: %v", r.rel(p), c.prefix, archive.Out, col.Name, archive.OutcomeFile, err)
+							return nil, fmt.Errorf("%s, %s%s/%s/%s: %v", r.rel(p), c.prefix, archive.Out, e.Name, archive.OutcomeFile, err)
 						}
 					}
 					cells = append(cells, cell)
@@ -361,12 +389,24 @@ func gapTexts(transform string, gaps []archive.Gap) map[string]string {
 	return m
 }
 
+// An unreadableRegistry is a registry readCells can't read, by its path
+// and its package's directory, relative to the module root, whether the
+// directory holds a _test.go file, as hasTestFile reports it, and why.
+type unreadableRegistry struct {
+	path, dir string
+	tested    bool
+	err       error
+}
+
+func (e *unreadableRegistry) Error() string { return e.path + ": " + e.err.Error() }
+
 // cloneCells copies cells deeply, so no check sees what another changed.
 func cloneCells(cells []Cell) []Cell {
 	out := make([]Cell, len(cells))
 	for i, c := range cells {
 		c.Outcome.Codes = slices.Clone(c.Outcome.Codes)
 		c.Entry.Rejects = slices.Clone(c.Entry.Rejects)
+		c.Path = slices.Clone(c.Path)
 		c.Properties = slices.Clone(c.Properties)
 		files := make(map[string][]byte, len(c.Files))
 		for p, data := range c.Files {

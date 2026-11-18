@@ -1026,15 +1026,16 @@ skipped no formulas
 The root package's registry, `step05/testdata/hypercase.json`, holds the
 update variable, the corpus root, that the package runs the root-package
 check, the properties it registers, and `evaluate`: the type it consumes,
-`io/fs.FS`, its corpora, its outputs and what it rejects. Its `types` and
-`lifts` stay empty until step 6, and `issueLinks` until step 9. `codes`,
+`io/fs.FS`, its corpora, its path from each, its outputs and what it
+rejects. Its `types` and `lifts` stay empty until step 6, as do the
+`lifts` of `evaluate`'s path, and `issueLinks` until step 9. `codes`,
 whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 `classifier` stays `null`, until step 8:
 
 <!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 6,
+  "format": 7,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
@@ -1063,6 +1064,12 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
       "consumes": "io/fs.FS",
       "corpora": [
         "sheet"
+      ],
+      "paths": [
+        {
+          "corpus": "sheet",
+          "lifts": []
+        }
       ],
       "outputs": [
         {
@@ -1136,9 +1143,9 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 
 - It lists everything the package registers but its corpus checks
   (step 8), each with its description, and for each column the type it
-  consumes, the corpora it runs over, its declared outputs and the
-  properties it rejects. It records the package's corpus root, and whether
-  the package runs the root-package check.
+  consumes, the corpora it runs over, its path from each (step 6), its
+  declared outputs and the properties it rejects. It records the package's
+  corpus root, and whether the package runs the root-package check.
 - It records the name of the project's update variable, for a tool to print
   the update command. No tool reads it yet.
 - It carries a format version, which changes on any change to what the
@@ -1209,6 +1216,10 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
     line naming a property nothing declares, a `gaps` line naming a column
     no registry has;
   - a registry file whose directory holds no `_test.go` file;
+  - a registry it can't read, as one of another format version, whose
+    failure says to run the update, which writes it, where its directory
+    holds a `_test.go` file, and to delete it where the directory holds
+    none, since no update writes it there;
   - a directory under `testdata/` that holds archives and that no registry
     declares;
   - a symbolic link under the corpus root's `testdata/`, `testdata/`
@@ -1455,7 +1466,9 @@ on raw input: `hypercase.Suite[sheetcorpus.Sheet]`, with its outputs and
 - `hypercase.json` lists each corpus type under `types`, with its Go type,
   and each lift under `lifts`, with its input and product types, the
   properties it rejects and whether the package owns it. Each suite's
-  `consumes` names the type it consumes.
+  `consumes` names the type it consumes. Each column's `paths` gives, for
+  each corpus it runs over, the lifts its input passes through, nearest
+  first: `resolve`, then `parse`, for `evaluate` over `sheet`.
 
 `testdata/sheet/stray.txtar`. `parse` rejects the sheet once; `calc` still
 reads the raw cells:
@@ -1572,7 +1585,10 @@ blocked parse
   consumes any other type names no `Corpus`: the type says which archives it
   runs over.
 - There must be exactly one path to each consumed type, or the run fails
-  before any case runs.
+  before any case runs. The registry records that path, for each column
+  and each corpus it runs over, as its lifts, nearest the column first. A
+  column that consumes a corpus type records a path with no lifts, and so
+  does a `Suite[fs.FS]` that names its `Corpus`.
 - Probes are distinct from corpus types: the type decides what a suite
   receives, and the probe decides whether a case is for it.
 - A suite's probe receives the value of the type the suite consumes, and
@@ -1593,6 +1609,31 @@ package owns every column it registers.
   with tests uses and none owns (step 5's rule for packages with no
   tests). A suite named like the lift owns no lift, and the check fails on
   the two as a collision, since lifts share the suites' column names.
+- A package that uses a lift reaches it from each corpus by the path the
+  lift's owner records, so the lift's cells the owner writes are the ones
+  the user's cells past it are built through. The root-package check fails
+  on a lift a package uses from a corpus its owner doesn't run it over,
+  and on one a package reaches by other lifts than its owner, as a copy of
+  `parse` under another name, owned by the package that uses `resolve`,
+  would. It fails once for each package, lift and corpus, and states the
+  conflict: the user, the owner, the lift, the corpus, and the user's path
+  from the corpus, with the owner's where it has one.
+  - Over a corpus the owner doesn't run the lift over, the failure states
+    the two ways the conflict ends: the owner runs the lift over the
+    corpus by the user's path, or the user doesn't reach the lift from the
+    corpus.
+  - Over a path that parts from the owner's, it states the two ways: the
+    user reaches the lift by the owner's path, or the owner by the
+    user's.
+  - It names no registrations: which ones make a way true turns on what
+    else each package registers, and on the other packages that use the
+    lifts. Making a way true may need other registrations to change, such
+    as a lift that would then close a cycle or give a type a second path,
+    and the failure says so. The cells of a lift a package stops owning,
+    which no package writes then, are sections no registry claims, and
+    the check names them too.
+  - Where a way holds already, a registry is stale, and the failure says
+    so. The update, which rewrites the registries, ends it.
 
 **Blocked cells.**
 
@@ -2478,10 +2519,23 @@ S202
   sections, its column's registry entry, its case's stated properties and
   its known gap. `hypercase.Cell` holds (proposed) `Type`, `Archive`,
   `Case` and `Column`; `Outcome`, with its `State`, `Codes` and `Detail`;
-  `Entry`; `Properties`; `Files`, the cell's committed files under its
-  `out/<column>/`; and `Gap`, the text of the `gaps` line that marks the
-  cell, or empty when none does. A transform's variant's `Gap` is read from
-  the base's `gaps`, from the line that starts `transform/<name>`.
+  `Entry`; `Path`, the lifts the column's input passes through from the
+  cell's corpus type, nearest the column first, as its `paths` in the
+  registry give them; `Properties`; `Files`, the cell's committed files
+  under its `out/<column>/`; and `Gap`, the text of the `gaps` line that
+  marks the cell, or empty when none does. A transform's variant's `Gap` is
+  read from the base's `gaps`, from the line that starts
+  `transform/<name>`.
+- A cell's `Path` is read from the registry of the package that owns its
+  column, as its `Entry` is, so a check sees the path of another package's
+  cells too, through the lifts that package uses, and plans none itself.
+  Each lift on the path has a cell of the same case, the one the cell is
+  built through, where the root-package check passes: a package that uses
+  a lift reaches it by the path its owner records (step 6). A rule over
+  what a cell is built on reads those cells: a check that holds back a
+  cell a `gaps` line marks can also hold back each cell built through a
+  lift's cell a line marks, since the cells past it are still built on the
+  lift's product.
 - A check sees every cell, frozen ones included: the framework exempts
   none, and each check decides. One that states a requirement over cells
   can excuse a cell with a `Gap`, so that a known gap and the requirement
@@ -2492,7 +2546,15 @@ S202
   transform. An archive that can't be read fails every check of the
   package, and an update writes no findings. So does a transform's variant
   whose properties can't be known: one no corpus type lists, or one its
-  transform declines.
+  transform declines. So does a registry that lists a suite or a lift
+  name twice, or doesn't give each column, a lift the package uses
+  included, one path from each corpus it runs over, each corpus once and
+  in their order, or whose path names the column itself, a lift the
+  registry doesn't list or one lift twice, or names a lift for a suite
+  over the raw input view. The root-package check fails on such a
+  registry too. Where the package has a `_test.go` file, both say to run
+  the update, which writes its registry; where it has none, both say to
+  delete the registry, which no update writes.
 - A check reads the cells as they are committed when it runs. The module's
   update runs packages at once, so a check can run before another package
   writes its cells: its findings can take a second update to settle, and a
@@ -3220,7 +3282,11 @@ lift.
   a cycle states `circular`, which `resolve` rejects.
 - One type's lift can feed another type's ladder: a `CSV`'s `import` makes a
   sheet. Paths through bytes lifts count toward the one path to each
-  consumed type.
+  consumed type, and a column's path from `csv` in the registry, and so its
+  cells' `Path` (step 8), runs through `import`: `resolve`, `parse`, then
+  `import`, for `evaluate`. The `format` package, which uses `import` and
+  `parse`, reaches `parse` from `csv` through `import`, as the root
+  package, which owns both, does: step 6's rule for a lift a package uses.
 - A suite reaches across types by the type it consumes: `calc`, which
   consumes `Sheet`, runs on every CSV that `import` accepts.
 - Past a bytes lift, a cell's input view, which `RenderError` receives, is

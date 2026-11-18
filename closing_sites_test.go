@@ -651,7 +651,8 @@ var messageSites = map[string][]messageSite{
 	},
 	"runner.rootCheck": {
 		{"Errorf", "reading %s: %v", "a registry that can't be read, in the root-package check"},
-		{"Errorf", "%s can't be read: %v. Run %s to write it.", "a registry that can't be parsed, in the root-package check"},
+		{"Errorf", "%s can't be read: %v. Run %s to write it.", "a registry that can't be parsed, in a package with tests, in the root-package check"},
+		{"Errorf", "%s can't be read: %v, and %s holds no _test.go file, so no update writes it. Delete it.", "a registry that can't be parsed, in a package with no tests, in the root-package check"},
 		{"Errorf", "%s is a registry, and %s holds no _test.go file, so no test compares it, and it still claims sections. Delete it, or restore the package's tests.", "a registry with no tests beside it, in the root-package check"},
 		{"Errorf", "%s register the root-package check for %s. It runs once per corpus root. Register it in one package.", "a root-package check registered twice"},
 		{"Errorf", "the column %s is %s. %s %s", "a column two registrations hold, in the root-package check"},
@@ -683,6 +684,8 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "%s, the corpus check %s's findings, differs (-golden +got): %s If the change is intended, run %s and read the diff before committing.", "a corpus check's findings that differ from their golden"},
 	},
 	"runner.runChecks": {
+		{"Errorf", "the corpus check %s can't read its cells: %s can't be read: %v. No check runs, and an update writes no findings. Run %s to write it.", "a corpus check that can't read a registry in a package with tests"},
+		{"Errorf", "the corpus check %s can't read its cells: %s can't be read: %v, and %s holds no _test.go file, so no update writes it. No check runs, and an update writes no findings. Delete %s.", "a corpus check that can't read a registry in a package with no tests"},
 		{"Errorf", "the corpus check %s can't read its cells: %v Fix what the message names. No check runs, and an update writes no findings.", "a corpus check that can't read its cells"},
 	},
 	"runner.runVariant": {
@@ -690,6 +693,10 @@ var messageSites = map[string][]messageSite{
 	},
 	"runner.skipped": {
 		{"Skipf", "%s: %s's probe says the case isn't for it: %s", "a cell whose probe says the case isn't for it, with no note, which it skips: it fails nothing"},
+	},
+	"runner.usedPaths": {
+		{"Errorf", "the lift %s is used by %s on the path %s, and %s, which owns it, doesn't run it over testdata/%s/, so no package writes its cells of that corpus's cases, which %s's cells past it are built through. A package that uses a lift reaches it from each corpus by the path the lift's owner does: either %s runs %s over testdata/%s/ by that path, or %s doesn't reach %s from testdata/%s/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run %s, which rewrites the registry of every package with tests.", "a lift used from a corpus its owner doesn't run it over, in the root-package check"},
+		{"Errorf", "the lift %s is used by %s on the path %s, and %s, which owns it, runs it on the path %s, so no package writes the cells of %s that %s's cells past it are built through. A package that uses a lift reaches it from each corpus by the path the lift's owner does: either %s reaches %s from testdata/%s/ by %s's path, or %s by %s's. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If they reach it alike already, a registry is stale: run %s, which rewrites the registry of every package with tests.", "a lift used by a path other than its owner's, in the root-package check"},
 	},
 	"runner.write": {
 		{"Errorf", "%s changed while the update ran: its comment or hand-written sections differ from those its cells ran on, so the update wrote nothing to it. Run %s again.", "an archive that changed while the update ran, which it doesn't write"},

@@ -12,6 +12,7 @@ import (
 
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/internal/erase"
+	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/jenny"
 )
 
@@ -98,11 +99,13 @@ func (r *runner) planPaths(t *testing.T) bool {
 		for _, l := range lifts {
 			if len(paths[l.in]) == 1 && cyclic[l.in] == "" {
 				r.corpora[l.name] = append(r.corpora[l.name], ct.dir)
+				r.paths[l.name] = append(r.paths[l.name], pathFrom(ct.dir, paths[l.in][0]))
 			}
 		}
 		for _, c := range p.cols {
 			if c.lift == nil {
 				r.corpora[c.name] = append(r.corpora[c.name], ct.dir)
+				r.paths[c.name] = append(r.paths[c.name], pathFrom(ct.dir, paths[c.consumes][0]))
 			}
 		}
 		r.plans = append(r.plans, p)
@@ -146,8 +149,20 @@ func (r *runner) planRaw() {
 		}
 		p.cols = append(p.cols, c)
 		r.corpora[c.name] = []string{c.corpus}
+		r.paths[c.name] = []registry.Path{pathFrom(c.corpus, nil)}
 	}
 	slices.SortFunc(r.plans, func(a, b *plan) int { return strings.Compare(a.root.dir, b.root.dir) })
+}
+
+// pathFrom is a column's path from the corpus type of the directory dir,
+// as its registry entry records it: the lifts of path, which runs from the
+// corpus type, nearest the column first.
+func pathFrom(dir string, path []*lift) registry.Path {
+	p := registry.Path{Corpus: dir, Lifts: []string{}}
+	for _, l := range slices.Backward(path) {
+		p.Lifts = append(p.Lifts, l.name)
+	}
+	return p
 }
 
 // walkPaths returns every path of lifts from root to each type it reaches

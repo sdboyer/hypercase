@@ -1,5 +1,5 @@
 {
-  "format": 6,
+  "format": 7,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -36,6 +36,12 @@
       "corpora": [
         "grid"
       ],
+      "paths": [
+        {
+          "corpus": "grid",
+          "lifts": []
+        }
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
@@ -58,6 +64,12 @@
       "bytes": false,
       "corpora": [
         "script"
+      ],
+      "paths": [
+        {
+          "corpus": "script",
+          "lifts": []
+        }
       ],
       "outputs": [
         {
@@ -83,6 +95,20 @@
       "corpora": [
         "grid",
         "script"
+      ],
+      "paths": [
+        {
+          "corpus": "grid",
+          "lifts": [
+            "grid-parse"
+          ]
+        },
+        {
+          "corpus": "script",
+          "lifts": [
+            "parse"
+          ]
+        }
       ],
       "outputs": [
         {

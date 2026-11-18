@@ -21,8 +21,9 @@ import (
 // entry with every field set, and each holds a leaf, which moves it.
 func TestLiftFields(t *testing.T) {
 	// The entries are grouped by name. A package owns the lift or only
-	// uses it, and the corpora that reach it are each package's own.
-	exempt := []string{"name", "owned", "corpora"}
+	// uses it, and the corpora that reach it, and the paths from them, are
+	// each package's own.
+	exempt := []string{"name", "owned", "corpora", "paths"}
 	typ := reflect.TypeFor[registry.Lift]()
 	full, ok := registrytest.Full(t, typ).(map[string]any)
 	if !ok {

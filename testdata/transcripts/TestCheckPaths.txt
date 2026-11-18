@@ -1,0 +1,111 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # two-types-paths
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        grid-parse ran on b
+        format's probe ran
+        format ran on b
+        parse ran on a
+        format's probe ran
+        format ran on a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/b
+            --- PASS: TestCorpus/grid/b/format
+            --- PASS: TestCorpus/grid/b/grid-parse
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/a
+            --- PASS: TestCorpus/script/a/format
+            --- PASS: TestCorpus/script/a/parse
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters-paths
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ go test  # two-types-paths
+    what ran, in order:
+        grid-parse ran on b
+        format's probe ran
+        format ran on b
+        parse ran on a
+        format's probe ran
+        format ran on a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/b
+            --- PASS: TestCorpus/grid/b/format
+            --- PASS: TestCorpus/grid/b/grid-parse
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/a
+            --- PASS: TestCorpus/script/a/format
+            --- PASS: TestCorpus/script/a/parse
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters-paths
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ cat testdata/checks/paths.txt
+grid format: through grid-parse
+grid grid-parse: through no lift
+script format: through parse
+script parse: through no lift
+$ edit testdata/hypercase.json  # record format's path from script as grid-parse's, by hand
+$ go test  # two-types-paths
+    testdata/hypercase.json differs from what the package registers (-committed +registered):
+                  {
+                    "corpus": "script",
+                    "lifts": [
+        -             "grid-parse"
+        +             "parse"
+                    ]
+                  }
+                ],
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
+    testdata/checks/paths.txt, the corpus check paths's findings, differs (-golden +got):
+          grid format: through grid-parse
+          grid grid-parse: through no lift
+        - script format: through parse
+        + script format: grid-parse has no cell of script/a
+        + script format: through grid-parse
+          script parse: through no lift
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    what ran, in order:
+        grid-parse ran on b
+        format's probe ran
+        format ran on b
+        parse ran on a
+        format's probe ran
+        format ran on a
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/b
+            --- PASS: TestCorpus/grid/b/format
+            --- PASS: TestCorpus/grid/b/grid-parse
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/a
+            --- PASS: TestCorpus/script/a/format
+            --- PASS: TestCorpus/script/a/parse
+    --- FAIL: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters-paths
+        --- FAIL: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ edit testdata/hypercase.json  # restore it
+$ go test  # two-types-paths
+    what ran, in order:
+        grid-parse ran on b
+        format's probe ran
+        format ran on b
+        parse ran on a
+        format's probe ran
+        format ran on a
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/grid
+        --- PASS: TestCorpus/grid/b
+            --- PASS: TestCorpus/grid/b/format
+            --- PASS: TestCorpus/grid/b/grid-parse
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/a
+            --- PASS: TestCorpus/script/a/format
+            --- PASS: TestCorpus/script/a/parse
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/alters-paths
+        --- PASS: TestCorpus/checks/paths
+PASS

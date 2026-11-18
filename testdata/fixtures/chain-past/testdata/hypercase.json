@@ -1,5 +1,5 @@
 {
-  "format": 6,
+  "format": 7,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -49,6 +49,19 @@
         "export",
         "script"
       ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": [
+            "repack",
+            "unpack"
+          ]
+        },
+        {
+          "corpus": "script",
+          "lifts": []
+        }
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
@@ -73,6 +86,14 @@
       "bytes": true,
       "corpora": [
         "export"
+      ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": [
+            "unpack"
+          ]
+        }
       ],
       "outputs": [
         {
@@ -123,6 +144,22 @@
         "export",
         "script"
       ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": [
+            "parse",
+            "repack",
+            "unpack"
+          ]
+        },
+        {
+          "corpus": "script",
+          "lifts": [
+            "parse"
+          ]
+        }
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
@@ -149,6 +186,12 @@
       "corpora": [
         "export"
       ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": []
+        }
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
@@ -173,6 +216,24 @@
       "corpora": [
         "export",
         "script"
+      ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": [
+            "resolve",
+            "parse",
+            "repack",
+            "unpack"
+          ]
+        },
+        {
+          "corpus": "script",
+          "lifts": [
+            "resolve",
+            "parse"
+          ]
+        }
       ],
       "outputs": [
         {
@@ -214,6 +275,19 @@
       "corpora": [
         "export",
         "script"
+      ],
+      "paths": [
+        {
+          "corpus": "export",
+          "lifts": [
+            "repack",
+            "unpack"
+          ]
+        },
+        {
+          "corpus": "script",
+          "lifts": []
+        }
       ],
       "outputs": [
         {

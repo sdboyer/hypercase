@@ -695,8 +695,8 @@ func resolveViaTwice() string {
 // bytes lift.
 func liftsRegistry() string {
 	return string(registry.Registry{UpdateVar: sheetsVar, CorpusRoot: ".", Lifts: []registry.Lift{
-		{Name: "resolve", Corpora: []string{"sheet"}},
-		{Name: "import", Bytes: true, Corpora: []string{"csv"}},
+		{Name: "resolve", Corpora: []string{"sheet"}, Paths: []registry.Path{{Corpus: "sheet"}}},
+		{Name: "import", Bytes: true, Corpora: []string{"csv"}, Paths: []registry.Path{{Corpus: "csv"}}},
 	}}.Marshal())
 }
 
@@ -709,16 +709,17 @@ func liftsRegistry() string {
 // of another format. Where they disagree, which the root-package check
 // fails on, one saying it is a bytes lift is enough to leave it. A
 // registry that names the corpus root and can't be read fails strip, and
-// nothing is written.
+// nothing is written: one that isn't a registry, and one whose paths
+// don't follow its corpora.
 func TestStripFrozenVia(t *testing.T) {
 	t.Parallel()
 	twice := resolveViaTwice()
 	lifts := liftsRegistry()
-	older := strings.Replace(lifts, `"format": 6`, `"format": 5`, 1)
+	older := strings.Replace(lifts, fmt.Sprintf(`"format": %d`, registry.Format), fmt.Sprintf(`"format": %d`, registry.Format-1), 1)
 	if older == lifts {
-		t.Fatal("the registry holds no format 6")
+		t.Fatalf("the registry holds no format %d", registry.Format)
 	}
-	bytesResolve := string(registry.Registry{UpdateVar: sheetsVar, CorpusRoot: ".", Lifts: []registry.Lift{{Name: "resolve", Bytes: true, Corpora: []string{"sheet"}}}}.Marshal())
+	bytesResolve := string(registry.Registry{UpdateVar: sheetsVar, CorpusRoot: ".", Lifts: []registry.Lift{{Name: "resolve", Bytes: true, Corpora: []string{"sheet"}, Paths: []registry.Path{{Corpus: "sheet"}}}}}.Marshal())
 	const frozen = "testdata/sheet/twice.txtar: left the cell resolve, frozen by its known gap, gaps line 1; hypercase strip -column resolve -frozen strips it, and resolve's other frozen cells\n"
 	for _, tt := range []struct {
 		name, registry, format string
@@ -757,6 +758,12 @@ func TestStripFrozenVia(t *testing.T) {
 	files := with(stripModule(), map[string]string{"testdata/hypercase.json": strings.Replace(lifts, "{\n", "{\n  \"nope\": 1,\n", 1), "testdata/sheet/twice.txtar": twice})
 	top := writeTree(t, files)
 	stripFails(t, top, "", 1, []string{"-column", "resolve"}, "hypercase strip: testdata/hypercase.json can't be read as a registry: it is not a registry: json: unknown field \"nope\". So strip can't tell which of the columns it registers are bytes lifts. Nothing was removed.\nFix the file or delete it, then run hypercase strip -column resolve again.\n")
+	sameTree(t, top, files)
+
+	noPaths := string(registry.Registry{UpdateVar: sheetsVar, CorpusRoot: ".", Lifts: []registry.Lift{{Name: "resolve", Corpora: []string{"sheet"}}}}.Marshal())
+	files = with(stripModule(), map[string]string{"testdata/hypercase.json": noPaths, "testdata/sheet/twice.txtar": twice})
+	top = writeTree(t, files)
+	stripFails(t, top, "", 1, []string{"-column", "resolve"}, "hypercase strip: testdata/hypercase.json can't be read as a registry: the lift resolve runs over testdata/sheet/, and has paths from none, where a registry gives each column one path from each corpus it runs over, in the same order. So strip can't tell which of the columns it registers are bytes lifts. Nothing was removed.\nFix the file or delete it, then run hypercase strip -column resolve again.\n")
 	sameTree(t, top, files)
 }
 

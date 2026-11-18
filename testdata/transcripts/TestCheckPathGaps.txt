@@ -1,0 +1,306 @@
+$ edit testdata/script/gapped-parse.txtar  # a script whose cells of parse a gaps line marks
+$ edit testdata/script/gapped-resolve.txtar  # a script whose cells of resolve a gaps line marks
+$ edit testdata/script/gapped-evaluate.txtar  # a script whose cells of evaluate a gaps line marks
+$ edit testdata/script/gapped-format.txtar  # a script whose cells of format a gaps line marks
+$ edit testdata/script/gapped-calc.txtar  # a script whose cells of calc a gaps line marks
+$ edit testdata/script/gapped-both.txtar  # a script whose cells of parse and resolve a gaps line marks
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-page
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/both: evaluate is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: format is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: resolve is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/loop: evaluate is blocked: the lift resolve failed on the case, and testdata/script/loop.txtar, out/resolve/error.txt, records its error.
+    script/stray: evaluate is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: format is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: resolve is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on both
+        parse ran on both
+        calc ran on fine
+        parse ran on fine
+        resolve ran on fine
+        evaluate's probe ran
+        evaluate ran on fine
+        format's probe ran
+        format ran on fine
+        calc ran on gapped-both
+        parse ran on gapped-both
+        resolve ran on gapped-both
+        evaluate's probe ran
+        evaluate ran on gapped-both
+        format's probe ran
+        format ran on gapped-both
+        calc ran on gapped-calc
+        parse ran on gapped-calc
+        resolve ran on gapped-calc
+        evaluate's probe ran
+        evaluate ran on gapped-calc
+        format's probe ran
+        format ran on gapped-calc
+        calc ran on gapped-evaluate
+        parse ran on gapped-evaluate
+        resolve ran on gapped-evaluate
+        evaluate's probe ran
+        evaluate ran on gapped-evaluate
+        format's probe ran
+        format ran on gapped-evaluate
+        calc ran on gapped-format
+        parse ran on gapped-format
+        resolve ran on gapped-format
+        evaluate's probe ran
+        evaluate ran on gapped-format
+        format's probe ran
+        format ran on gapped-format
+        calc ran on gapped-parse
+        parse ran on gapped-parse
+        resolve ran on gapped-parse
+        evaluate's probe ran
+        evaluate ran on gapped-parse
+        format's probe ran
+        format ran on gapped-parse
+        calc ran on gapped-resolve
+        parse ran on gapped-resolve
+        resolve ran on gapped-resolve
+        evaluate's probe ran
+        evaluate ran on gapped-resolve
+        format's probe ran
+        format ran on gapped-resolve
+        calc ran on loop
+        parse ran on loop
+        resolve ran on loop
+        format's probe ran
+        format ran on loop
+        calc ran on noisy
+        parse ran on noisy
+        resolve ran on noisy
+        evaluate's probe ran
+        evaluate ran on noisy
+        format's probe ran
+        format ran on noisy
+        calc ran on stray
+        parse ran on stray
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/both
+            --- PASS: TestCorpus/script/both/calc
+            --- SKIP: TestCorpus/script/both/evaluate
+            --- SKIP: TestCorpus/script/both/format
+            --- PASS: TestCorpus/script/both/parse
+            --- SKIP: TestCorpus/script/both/resolve
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/calc
+            --- PASS: TestCorpus/script/fine/evaluate
+            --- PASS: TestCorpus/script/fine/format
+            --- PASS: TestCorpus/script/fine/parse
+            --- PASS: TestCorpus/script/fine/resolve
+        --- PASS: TestCorpus/script/gapped-both
+            --- PASS: TestCorpus/script/gapped-both/calc
+            --- PASS: TestCorpus/script/gapped-both/evaluate
+            --- PASS: TestCorpus/script/gapped-both/format
+            --- PASS: TestCorpus/script/gapped-both/parse
+            --- PASS: TestCorpus/script/gapped-both/resolve
+        --- PASS: TestCorpus/script/gapped-calc
+            --- PASS: TestCorpus/script/gapped-calc/calc
+            --- PASS: TestCorpus/script/gapped-calc/evaluate
+            --- PASS: TestCorpus/script/gapped-calc/format
+            --- PASS: TestCorpus/script/gapped-calc/parse
+            --- PASS: TestCorpus/script/gapped-calc/resolve
+        --- PASS: TestCorpus/script/gapped-evaluate
+            --- PASS: TestCorpus/script/gapped-evaluate/calc
+            --- PASS: TestCorpus/script/gapped-evaluate/evaluate
+            --- PASS: TestCorpus/script/gapped-evaluate/format
+            --- PASS: TestCorpus/script/gapped-evaluate/parse
+            --- PASS: TestCorpus/script/gapped-evaluate/resolve
+        --- PASS: TestCorpus/script/gapped-format
+            --- PASS: TestCorpus/script/gapped-format/calc
+            --- PASS: TestCorpus/script/gapped-format/evaluate
+            --- PASS: TestCorpus/script/gapped-format/format
+            --- PASS: TestCorpus/script/gapped-format/parse
+            --- PASS: TestCorpus/script/gapped-format/resolve
+        --- PASS: TestCorpus/script/gapped-parse
+            --- PASS: TestCorpus/script/gapped-parse/calc
+            --- PASS: TestCorpus/script/gapped-parse/evaluate
+            --- PASS: TestCorpus/script/gapped-parse/format
+            --- PASS: TestCorpus/script/gapped-parse/parse
+            --- PASS: TestCorpus/script/gapped-parse/resolve
+        --- PASS: TestCorpus/script/gapped-resolve
+            --- PASS: TestCorpus/script/gapped-resolve/calc
+            --- PASS: TestCorpus/script/gapped-resolve/evaluate
+            --- PASS: TestCorpus/script/gapped-resolve/format
+            --- PASS: TestCorpus/script/gapped-resolve/parse
+            --- PASS: TestCorpus/script/gapped-resolve/resolve
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/calc
+            --- SKIP: TestCorpus/script/loop/evaluate
+            --- PASS: TestCorpus/script/loop/format
+            --- PASS: TestCorpus/script/loop/parse
+            --- PASS: TestCorpus/script/loop/resolve
+        --- PASS: TestCorpus/script/noisy
+            --- PASS: TestCorpus/script/noisy/calc
+            --- PASS: TestCorpus/script/noisy/evaluate
+            --- PASS: TestCorpus/script/noisy/format
+            --- PASS: TestCorpus/script/noisy/parse
+            --- PASS: TestCorpus/script/noisy/resolve
+        --- PASS: TestCorpus/script/stray
+            --- PASS: TestCorpus/script/stray/calc
+            --- SKIP: TestCorpus/script/stray/evaluate
+            --- SKIP: TestCorpus/script/stray/format
+            --- PASS: TestCorpus/script/stray/parse
+            --- SKIP: TestCorpus/script/stray/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/page
+PASS
+$ go test  # ladder-page
+    script/both: evaluate is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: format is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: resolve is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/loop: evaluate is blocked: the lift resolve failed on the case, and testdata/script/loop.txtar, out/resolve/error.txt, records its error.
+    script/stray: evaluate is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: format is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: resolve is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on both
+        parse ran on both
+        calc ran on fine
+        parse ran on fine
+        resolve ran on fine
+        evaluate's probe ran
+        evaluate ran on fine
+        format's probe ran
+        format ran on fine
+        calc ran on gapped-both
+        parse ran on gapped-both
+        resolve ran on gapped-both
+        evaluate's probe ran
+        evaluate ran on gapped-both
+        format's probe ran
+        format ran on gapped-both
+        calc ran on gapped-calc
+        parse ran on gapped-calc
+        resolve ran on gapped-calc
+        evaluate's probe ran
+        evaluate ran on gapped-calc
+        format's probe ran
+        format ran on gapped-calc
+        calc ran on gapped-evaluate
+        parse ran on gapped-evaluate
+        resolve ran on gapped-evaluate
+        evaluate's probe ran
+        evaluate ran on gapped-evaluate
+        format's probe ran
+        format ran on gapped-evaluate
+        calc ran on gapped-format
+        parse ran on gapped-format
+        resolve ran on gapped-format
+        evaluate's probe ran
+        evaluate ran on gapped-format
+        format's probe ran
+        format ran on gapped-format
+        calc ran on gapped-parse
+        parse ran on gapped-parse
+        resolve ran on gapped-parse
+        evaluate's probe ran
+        evaluate ran on gapped-parse
+        format's probe ran
+        format ran on gapped-parse
+        calc ran on gapped-resolve
+        parse ran on gapped-resolve
+        resolve ran on gapped-resolve
+        evaluate's probe ran
+        evaluate ran on gapped-resolve
+        format's probe ran
+        format ran on gapped-resolve
+        calc ran on loop
+        parse ran on loop
+        resolve ran on loop
+        format's probe ran
+        format ran on loop
+        calc ran on noisy
+        parse ran on noisy
+        resolve ran on noisy
+        evaluate's probe ran
+        evaluate ran on noisy
+        format's probe ran
+        format ran on noisy
+        calc ran on stray
+        parse ran on stray
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/both
+            --- PASS: TestCorpus/script/both/calc
+            --- SKIP: TestCorpus/script/both/evaluate
+            --- SKIP: TestCorpus/script/both/format
+            --- PASS: TestCorpus/script/both/parse
+            --- SKIP: TestCorpus/script/both/resolve
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/calc
+            --- PASS: TestCorpus/script/fine/evaluate
+            --- PASS: TestCorpus/script/fine/format
+            --- PASS: TestCorpus/script/fine/parse
+            --- PASS: TestCorpus/script/fine/resolve
+        --- PASS: TestCorpus/script/gapped-both
+            --- PASS: TestCorpus/script/gapped-both/calc
+            --- PASS: TestCorpus/script/gapped-both/evaluate
+            --- PASS: TestCorpus/script/gapped-both/format
+            --- PASS: TestCorpus/script/gapped-both/parse
+            --- PASS: TestCorpus/script/gapped-both/resolve
+        --- PASS: TestCorpus/script/gapped-calc
+            --- PASS: TestCorpus/script/gapped-calc/calc
+            --- PASS: TestCorpus/script/gapped-calc/evaluate
+            --- PASS: TestCorpus/script/gapped-calc/format
+            --- PASS: TestCorpus/script/gapped-calc/parse
+            --- PASS: TestCorpus/script/gapped-calc/resolve
+        --- PASS: TestCorpus/script/gapped-evaluate
+            --- PASS: TestCorpus/script/gapped-evaluate/calc
+            --- PASS: TestCorpus/script/gapped-evaluate/evaluate
+            --- PASS: TestCorpus/script/gapped-evaluate/format
+            --- PASS: TestCorpus/script/gapped-evaluate/parse
+            --- PASS: TestCorpus/script/gapped-evaluate/resolve
+        --- PASS: TestCorpus/script/gapped-format
+            --- PASS: TestCorpus/script/gapped-format/calc
+            --- PASS: TestCorpus/script/gapped-format/evaluate
+            --- PASS: TestCorpus/script/gapped-format/format
+            --- PASS: TestCorpus/script/gapped-format/parse
+            --- PASS: TestCorpus/script/gapped-format/resolve
+        --- PASS: TestCorpus/script/gapped-parse
+            --- PASS: TestCorpus/script/gapped-parse/calc
+            --- PASS: TestCorpus/script/gapped-parse/evaluate
+            --- PASS: TestCorpus/script/gapped-parse/format
+            --- PASS: TestCorpus/script/gapped-parse/parse
+            --- PASS: TestCorpus/script/gapped-parse/resolve
+        --- PASS: TestCorpus/script/gapped-resolve
+            --- PASS: TestCorpus/script/gapped-resolve/calc
+            --- PASS: TestCorpus/script/gapped-resolve/evaluate
+            --- PASS: TestCorpus/script/gapped-resolve/format
+            --- PASS: TestCorpus/script/gapped-resolve/parse
+            --- PASS: TestCorpus/script/gapped-resolve/resolve
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/calc
+            --- SKIP: TestCorpus/script/loop/evaluate
+            --- PASS: TestCorpus/script/loop/format
+            --- PASS: TestCorpus/script/loop/parse
+            --- PASS: TestCorpus/script/loop/resolve
+        --- PASS: TestCorpus/script/noisy
+            --- PASS: TestCorpus/script/noisy/calc
+            --- PASS: TestCorpus/script/noisy/evaluate
+            --- PASS: TestCorpus/script/noisy/format
+            --- PASS: TestCorpus/script/noisy/parse
+            --- PASS: TestCorpus/script/noisy/resolve
+        --- PASS: TestCorpus/script/stray
+            --- PASS: TestCorpus/script/stray/calc
+            --- SKIP: TestCorpus/script/stray/evaluate
+            --- SKIP: TestCorpus/script/stray/format
+            --- PASS: TestCorpus/script/stray/parse
+            --- SKIP: TestCorpus/script/stray/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/page
+PASS
+$ cat testdata/checks/page.txt
+script/fine: shown
+script/gapped-both: held back, built through the known gaps of resolve, parse
+script/gapped-calc: shown
+script/gapped-evaluate: held back, a known gap
+script/gapped-format: shown
+script/gapped-parse: held back, built through the known gaps of parse
+script/gapped-resolve: held back, built through the known gaps of resolve
+script/noisy: shown

@@ -2,10 +2,14 @@ package hypercase_test
 
 import (
 	"bytes"
+	"maps"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/internal/registry"
 )
 
 // Step 8: outcomes, Codes, classifiers and corpus checks.
@@ -652,6 +656,124 @@ func TestCheckGaps(t *testing.T) {
 		s.write(p, before, "restore the line")
 	}
 	s.passes(s.normal("check-gaps"))
+	s.done()
+}
+
+// columnPaths returns the paths a registry records for its column of the
+// given kind, suite or lift, and name.
+func (s *sandbox) columnPaths(reg, kind, name string) []registry.Path {
+	s.t.Helper()
+	g, err := registry.Parse(s.read(reg))
+	if err != nil {
+		s.t.Fatal(err)
+	}
+	if kind == "lift" {
+		if i := slices.IndexFunc(g.Lifts, func(l registry.Lift) bool { return l.Name == name }); i >= 0 {
+			return g.Lifts[i].Paths
+		}
+	} else if i := slices.IndexFunc(g.Suites, func(c registry.Suite) bool { return c.Name == name }); i >= 0 {
+		return g.Suites[i].Paths
+	}
+	s.t.Fatalf("%s records no %s %s", reg, kind, name)
+	return nil
+}
+
+// wantPaths checks the paths a registry records for each column, by its
+// kind and name, as "<kind> <name>".
+func (s *sandbox) wantPaths(reg string, want map[string][]registry.Path) {
+	s.t.Helper()
+	for _, col := range slices.Sorted(maps.Keys(want)) {
+		kind, name, _ := strings.Cut(col, " ")
+		if got := s.columnPaths(reg, kind, name); !reflect.DeepEqual(got, want[col]) {
+			s.t.Errorf("%s records the paths of the %s as %+v, want %+v", reg, col, got, want[col])
+		}
+	}
+}
+
+// TestCheckPaths: a cell carries the path of lifts its column's input
+// passes through from the cell's corpus type, nearest the column first,
+// and none for a column that consumes its corpus type. The update records
+// a column's path from each of its corpora in its registry entry, which a
+// normal run compares like a golden, and a check reads the path there, as
+// the registry commits it. So a column over two corpus types has a path
+// from each, and each of its cells the one from the cell's corpus type. No
+// check sees a path another changed.
+func TestCheckPaths(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "two-types")
+	s.passes(s.update("two-types-paths"))
+	s.passes(s.normal("two-types-paths"))
+	const reg, findings = "testdata/hypercase.json", "testdata/checks/paths.txt"
+	s.cat(findings)
+	const want = "grid format: through grid-parse\ngrid grid-parse: through no lift\nscript format: through parse\nscript parse: through no lift\n"
+	if got := string(s.read(findings)); got != want {
+		t.Errorf("the cells' paths are\n%s\nwant\n%s", got, want)
+	}
+	if got := string(s.read("testdata/checks/alters-paths.txt")); got != "" {
+		t.Errorf("alters-paths found %q, want nothing", got)
+	}
+	s.wantPaths(reg, map[string][]registry.Path{
+		"suite format":    {{Corpus: "grid", Lifts: []string{"grid-parse"}}, {Corpus: "script", Lifts: []string{"parse"}}},
+		"lift grid-parse": {{Corpus: "grid", Lifts: []string{}}},
+		"lift parse":      {{Corpus: "script", Lifts: []string{}}},
+	})
+
+	// A path the registry records by hand fails a normal run, which
+	// compares the registry like a golden, and the check reads it: format's
+	// cells of a script are built through grid-parse, which has none.
+	clean := s.read(reg)
+	g, err := registry.Parse(clean)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.Suites[slices.IndexFunc(g.Suites, func(c registry.Suite) bool { return c.Name == "format" })].Paths[1].Lifts = []string{"grid-parse"}
+	s.write(reg, g.Marshal(), "record format's path from script as grid-parse's, by hand")
+	s.fails(s.normal("two-types-paths"),
+		"testdata/hypercase.json differs from what the package registers (-committed +registered):",
+		"-             \"grid-parse\"\n+             \"parse\"",
+		"testdata/checks/paths.txt, the corpus check paths's findings, differs (-golden +got):",
+		"- script format: through parse\n+ script format: grid-parse has no cell of script/a\n+ script format: through grid-parse")
+	s.write(reg, clean, "restore it")
+	s.passes(s.normal("two-types-paths"))
+	s.done()
+}
+
+// TestCheckPathGaps: a check that makes a page of evaluate's cells holds
+// back, by each cell's Path, a cell built through a lift's cell that a
+// gaps line marks, as well as a cell a gaps line marks. The line freezes
+// the lift's cell, and the lift's product still reaches evaluate's cell,
+// which runs on it. A line on a column off evaluate's path holds nothing
+// back, and nor does a line on another case.
+func TestCheckPathGaps(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "ladder")
+	gapped := func(name string, cols ...string) {
+		var gaps strings.Builder
+		for _, c := range cols {
+			gaps.WriteString(c + " The script is one " + c + " should treat otherwise. Waits on sheets#5.\n")
+		}
+		s.write("testdata/script/"+name+".txtar", []byte("A script every column accepts, and a gaps line marks the cells of "+strings.Join(cols, " and ")+".\n-- in/evaluate/out/values.txt --\nevaluate 1\n-- gaps --\n"+gaps.String()),
+			"a script whose cells of "+strings.Join(cols, " and ")+" a gaps line marks")
+	}
+	for _, c := range []string{"parse", "resolve", "evaluate", "format", "calc"} {
+		gapped("gapped-"+c, c)
+	}
+	gapped("gapped-both", "parse", "resolve")
+	s.passes(s.update("ladder-page"))
+	s.passes(s.normal("ladder-page"))
+	const findings = "testdata/checks/page.txt"
+	s.cat(findings)
+	const want = "script/fine: shown\n" +
+		"script/gapped-both: held back, built through the known gaps of resolve, parse\n" +
+		"script/gapped-calc: shown\n" +
+		"script/gapped-evaluate: held back, a known gap\n" +
+		"script/gapped-format: shown\n" +
+		"script/gapped-parse: held back, built through the known gaps of parse\n" +
+		"script/gapped-resolve: held back, built through the known gaps of resolve\n" +
+		"script/noisy: shown\n"
+	if got := string(s.read(findings)); got != want {
+		t.Errorf("the page is\n%s\nwant\n%s", got, want)
+	}
 	s.done()
 }
 

@@ -1,5 +1,5 @@
 {
-  "format": 6,
+  "format": 7,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step10",
   "rootPackage": false,
@@ -71,6 +71,12 @@
       "corpora": [
         "csv"
       ],
+      "paths": [
+        {
+          "corpus": "csv",
+          "lifts": []
+        }
+      ],
       "outputs": [
         {
           "pattern": "error.txt",
@@ -98,6 +104,18 @@
       "corpora": [
         "csv",
         "sheet"
+      ],
+      "paths": [
+        {
+          "corpus": "csv",
+          "lifts": [
+            "import"
+          ]
+        },
+        {
+          "corpus": "sheet",
+          "lifts": []
+        }
       ],
       "outputs": [
         {

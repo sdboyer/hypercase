@@ -322,19 +322,43 @@ var chainRegistrations = map[string]func(){
 	"chain-check": func() {
 		chain(project, exportType, own(importLift, parse, resolve, evaluate, list, louder, exportCheck))
 	},
-	"chain-codes":     func() { chain(projectCodesAs, exportType, own(importLift, parse, resolve, evaluate, list, louder)) },
-	"chain-render":    func() { chain(projectRender, plainExportType, own(importLift, parse, resolve, evaluate)) },
-	"chain-past":      func() { chain(project, plainExportType, own(unpack, repack, parse, resolve, evaluate, list)) },
-	"chain-two-paths": func() { chain(project, plainExportType, own(importLift, parse, importParsed, format)) },
-	"chain-twice":     func() { chain(project, gridType, plainExportType, own(exportGrid, importLift, list)) },
+	"chain-paths": func() {
+		chain(project, exportType, own(importLift, parse, resolve, evaluate, list, louder, pathsCheck))
+	},
+	"chain-twice-paths": func() { chain(project, gridType, plainExportType, own(exportGrid, importLift, list, pathsCheck)) },
+	"chain-codes":       func() { chain(projectCodesAs, exportType, own(importLift, parse, resolve, evaluate, list, louder)) },
+	"chain-render":      func() { chain(projectRender, plainExportType, own(importLift, parse, resolve, evaluate)) },
+	"chain-past":        func() { chain(project, plainExportType, own(unpack, repack, parse, resolve, evaluate, list)) },
+	"chain-two-paths":   func() { chain(project, plainExportType, own(importLift, parse, importParsed, format)) },
+	"chain-twice":       func() { chain(project, gridType, plainExportType, own(exportGrid, importLift, list)) },
 
 	// Packages over one export corpus: . owns import, parse and resolve,
 	// and ./b uses them, and owns evaluate, list and the transform louder.
 	// In the -render pairs, one package's Project is projectRender.
 	"chain-a":        func() { chain(project, exportType, own(importLift, parse, resolve)) },
+	"chain-a-paths":  func() { chain(project, exportType, own(importLift, parse, resolve, pathsCheck)) },
 	"chain-b":        func() { chainB(project) },
 	"chain-a-render": func() { chain(projectRender, exportType, own(importLift, parse, resolve)) },
-	"chain-b-render": func() { chainB(projectRender) },
+	// used-fewer-a and -b reach parse and resolve otherwise: . owns them
+	// over script alone, and ./b, which uses them, reaches them from
+	// export too, through import, which it owns.
+	"used-fewer-a": func() { chain(project, own(parse, resolve, pathsCheck)) },
+	// used-fewer-a-fixed reaches parse and resolve from export as ./b
+	// does, by using import.
+	"used-fewer-a-fixed": func() {
+		chain(project, plainExportType, own(parse, resolve, pathsCheck), hypercase.Use(importLift))
+	},
+	"used-fewer-b": func() {
+		hypercase.Register(append([]any{project, scriptType, plainExportType, own(importLift, evaluate), hypercase.Use(parse, resolve)}, chainProps...)...)
+	},
+	// used-unowned-b is used-fewer-b using import, which no package owns,
+	// and used-unowned-a-fixed reaches parse and resolve from export as
+	// ./b does, by owning import.
+	"used-unowned-b": func() {
+		hypercase.Register(append([]any{project, scriptType, plainExportType, own(evaluate), hypercase.Use(importLift, parse, resolve)}, chainProps...)...)
+	},
+	"used-unowned-a-fixed": func() { chain(project, plainExportType, own(importLift, parse, resolve, pathsCheck)) },
+	"chain-b-render":       func() { chainB(projectRender) },
 	// chain-b-nooutputs is chain-b with a copy of import that declares no
 	// outputs.
 	"chain-b-nooutputs": func() {

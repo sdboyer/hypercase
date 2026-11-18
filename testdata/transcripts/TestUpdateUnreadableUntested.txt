@@ -1,0 +1,144 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # ladder-b-shared-producer
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a-paths
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ go test  # ladder-a-paths
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ rm b/corpus_test.go  # remove b's tests, and leave its registry
+$ edit b/testdata/hypercase.json  # drop the paths of b's lifts, by hand
+$ go test  # ladder-a-paths
+    b/testdata/hypercase.json can't be read: the lift parse runs over testdata/script/, and has paths from none, where a registry gives each column one path from each corpus it runs over, in the same order, and b holds no _test.go file, so no update writes it.
+        Delete it.
+    testdata/script/x.txtar: no registry claims out/evaluate/outcome and out/evaluate/values.txt: no column named evaluate runs over the corpus script.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column evaluate at the module root. It removes evaluate's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
+    the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: the lift parse runs over testdata/script/, and has paths from none, where a registry gives each column one path from each corpus it runs over, in the same order, and b holds no _test.go file, so no update writes it. No check runs, and an update writes no findings.
+        Delete b/testdata/hypercase.json.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a-paths
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: the lift parse runs over testdata/script/, and has paths from none, where a registry gives each column one path from each corpus it runs over, in the same order, and b holds no _test.go file, so no update writes it. No check runs, and an update writes no findings.
+        Delete b/testdata/hypercase.json.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a-paths
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    the corpus check paths can't read its cells: b/testdata/hypercase.json can't be read: the lift parse runs over testdata/script/, and has paths from none, where a registry gives each column one path from each corpus it runs over, in the same order, and b holds no _test.go file, so no update writes it. No check runs, and an update writes no findings.
+        Delete b/testdata/hypercase.json.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+    --- FAIL: TestCorpus/checks
+        --- FAIL: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ rm b/testdata/hypercase.json  # delete b's registry, which no update writes
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a-paths
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ go test  # ladder-a-paths
+    testdata/script/x.txtar: no registry claims out/evaluate/outcome and out/evaluate/values.txt: no column named evaluate runs over the corpus script.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column evaluate at the module root. It removes evaluate's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ edit testdata/script/x.txtar  # delete ./b's cells, which no package writes
+$ go test  # ladder-a-paths
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a-paths
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
