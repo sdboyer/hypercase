@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 9,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -75,5 +75,6 @@
       "rejects": [],
       "classifier": null
     }
-  ]
+  ],
+  "checks": []
 }

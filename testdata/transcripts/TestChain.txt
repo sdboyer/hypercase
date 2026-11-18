@@ -327,7 +327,7 @@ accepted
 accepted
 $ cat testdata/hypercase.json
 {
-  "format": 8,
+  "format": 9,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -623,7 +623,8 @@ $ cat testdata/hypercase.json
       "rejects": [],
       "classifier": null
     }
-  ]
+  ],
+  "checks": []
 }
 $ go test  # chain
     export/empty/transform/louder: louder declines the base: the export makes no output of evaluate

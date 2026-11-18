@@ -1073,13 +1073,13 @@ from each, its outputs, each with what its `Inputs` states, and what it
 rejects. Step 11 explains `positions` and `inputs`. Its `types` and
 `lifts` stay empty until step 6, as do the `lifts` of `evaluate`'s path,
 and `issueLinks` until step 9. `codes`, whether the project supplies
-`Codes`, stays `false`, and `evaluate`'s `classifier` stays `null`, until
-step 8:
+`Codes`, stays `false`, `evaluate`'s `classifier` stays `null`, and
+`checks`, the package's corpus checks, stays empty, until step 8:
 
 <!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 8,
+  "format": 9,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
@@ -1135,7 +1135,8 @@ step 8:
       ],
       "classifier": null
     }
-  ]
+  ],
+  "checks": []
 }
 ```
 
@@ -1179,17 +1180,17 @@ step 8:
 - Everything a package registers is registered when the package is
   initialized, before any test runs: properties, corpus types, lifts,
   suites, transforms, the root-package check and corpus checks (step 8).
-  Its registry lists all but the corpus checks. A test function runs what
-  was registered, and registers nothing. So the registry and the orphan
-  checks don't depend on `-run`.
+  Its registry lists them all. A test function runs what was registered,
+  and registers nothing. So the registry and the orphan checks don't
+  depend on `-run`.
 - A refusal at registration, such as two properties with one name, panics
   during package initialization with the message the framework would
   otherwise print. So it doesn't depend on `-run` either.
 
 **The registry.** It is each package's `testdata/hypercase.json`.
 
-- It lists everything the package registers but its corpus checks
-  (step 8), each with its description, and for each column the type it
+- It lists everything the package registers, its corpus checks (step 8)
+  included, each with its description, and for each column the type it
   consumes, the corpora it runs over, its path from each (step 6), its
   declared outputs, each with what its `Inputs` states (step 11), and the
   properties it rejects. It records the package's corpus root, whether
@@ -2575,9 +2576,10 @@ run now gives `rejected S101`. So they fail, and no update writes them. A
 person deletes those four `outcome` files, and the next update adds them, as
 step 4's upgrade does for a frozen cell whose other files match its run.
 
-`hypercase.json` records each suite's classifier, and whether the project
-supplies `Codes`: step 5's shows them unset, and the registry of step 8's
-root package sets both.
+`hypercase.json` records each suite's classifier, whether the project
+supplies `Codes`, and the package's corpus checks: step 5's shows them unset
+and lists no check, and the registry of step 8's root package sets both and
+lists `codes`.
 
 ### Rules
 
@@ -2694,9 +2696,10 @@ S202
 
 - A corpus check has a name, a description and a `Run` over every cell, and
   is registered when its package is initialized, given to `Register` or to
-  `Own`. The package that registers it owns it, and no registry lists it.
-  A test function runs it: `hypercase.Test` runs each as the subtest
-  `checks/<name>` (proposed).
+  `Own`. The package that registers it owns it, and its registry lists it
+  under `checks`, by its name, with its description. A test function runs
+  it: `hypercase.Test` runs each as the subtest `checks/<name>`
+  (proposed).
 - A cell, as a check sees it, exposes its committed outcome, its committed
   sections, its column's registry entry, its case's stated properties and
   its known gap. `hypercase.Cell` holds (proposed) `Type`, `Archive`,
@@ -2728,16 +2731,18 @@ S202
   transform. An archive that can't be read fails every check of the
   package, and an update writes no findings. So does a transform's variant
   whose properties can't be known: one no corpus type lists, or one its
-  transform declines. So does a registry that lists a suite or a lift
-  name twice, or doesn't give each column, a lift the package uses
-  included, one path from each corpus it runs over, each corpus once and
-  in their order, or whose path names the column itself, a lift the
-  registry doesn't list or one lift twice, or names a lift for a suite
-  over the raw input view. So does one that records an output's or a
-  product file's `"inputs"` as no declaration registration takes would
-  (step 11). The root-package check fails on such a registry too. Where the package has a `_test.go` file, both say to run
-  the update, which writes its registry; where it has none, both say to
-  delete the registry, which no update writes.
+  transform declines. So does a registry that lists a suite or a lift name
+  twice, or doesn't give each column, a lift the package uses included,
+  one path from each corpus it runs over, each corpus once and in their
+  order, or whose path names the column itself, a lift the registry
+  doesn't list or one lift twice, or names a lift for a suite over the raw
+  input view. So does one whose `"inputs"`, for an output or a product
+  file, names no statement of `Inputs`, or one registration refuses there
+  (step 11), and one that lists a corpus check twice, or gives no list of
+  them. The root-package check fails on such a registry too. Where the
+  package has a `_test.go` file, both say to run the update, which writes
+  its registry; where it has none, both say to delete the registry, which
+  no update writes.
 - A check reads the cells as they are committed when it runs. The module's
   update runs packages at once, so a check can run before another package
   writes its cells: its findings can take a second update to settle, and a
@@ -2895,11 +2900,13 @@ the same outcome.
 - It reads every registry format from 3 to its own, and refuses any other,
   naming the revision, the registry and its format: for a newer format,
   saying to run the report from that revision's hypercase, and for one
-  older than 3, that no hypercase's report reads it. A registry of an older
-  format that holds what a later format added is refused too, and so is
-  one its format's update couldn't have written, as a check refuses one of
-  today's (step 8): by its names and corpora at every format, its paths
-  from format 7, and its `"inputs"` from format 8.
+  older than 3, that no hypercase's report reads it. A registry of an
+  older format that holds what a later format added is refused too, and so
+  is one its format's update couldn't have written, as a check refuses one
+  of today's (step 8): by its names and corpora at every format, its paths
+  from format 7, its `"inputs"` from format 8, and from format 9 its
+  `checks`, which the registry lists, empty where its package registers
+  none, each check once.
 - A cell exists at a revision when its `outcome` file does, from registry
   format 5 on. A changed cell takes the first of these ranks that applies:
   outcome changed, at both revisions; appeared, at `<b>` only; disappeared,

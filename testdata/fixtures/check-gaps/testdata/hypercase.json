@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 9,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -107,6 +107,12 @@
         "dangling"
       ],
       "classifier": null
+    }
+  ],
+  "checks": [
+    {
+      "name": "located",
+      "description": "Every rejected cell's error starts with the cell it is about, but a known gap's."
     }
   ]
 }

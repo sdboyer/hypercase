@@ -413,6 +413,10 @@ var registrations = map[string]func(){
 	},
 
 	"echo-shout": func() { hypercase.Register(project, rootPkg, scriptType, own(echo, shout)) },
+	// echo-shout, with two corpus checks, registered out of name order.
+	"echo-shout-checks": func() {
+		hypercase.Register(project, rootPkg, scriptType, own(echo, shout), steeredCheck("none", nil, nil), cellsCheck)
+	},
 	"two-corpora": func() {
 		hypercase.Register(project, rootPkg, scriptType, otherType, own(echo, steered[Other]("shout", "shout")))
 	},

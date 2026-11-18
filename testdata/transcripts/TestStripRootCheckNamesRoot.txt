@@ -92,7 +92,7 @@ $ edit step09/testdata/export/prices.txtar  # a removed column's outcome
 $ go test  # strip-a
     testdata/hypercase.json differs from what the package registers (-committed +registered):
           {
-            "format": 8,
+            "format": 9,
             "updateVar": "FIXTURE_UPDATE_GOLDEN",
         -   "corpusRoot": "step09",
         +   "corpusRoot": ".",

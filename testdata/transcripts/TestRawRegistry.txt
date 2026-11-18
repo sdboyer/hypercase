@@ -7,7 +7,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # raw-echo
 PASS
 $ cat testdata/hypercase.json
 {
-  "format": 8,
+  "format": 9,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -71,7 +71,8 @@ $ cat testdata/hypercase.json
       "rejects": [],
       "classifier": null
     }
-  ]
+  ],
+  "checks": []
 }
 $ go test  # raw-echo
 --- PASS: TestCorpus

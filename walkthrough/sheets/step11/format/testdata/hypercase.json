@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 9,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step11",
   "rootPackage": false,
@@ -164,5 +164,6 @@
       "rejects": [],
       "classifier": null
     }
-  ]
+  ],
+  "checks": []
 }

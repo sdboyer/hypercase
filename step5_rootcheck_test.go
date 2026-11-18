@@ -297,8 +297,8 @@ func TestRootCheckRegistries(t *testing.T) {
 	s.passes(s.normal("pkg-a"))
 	s.remove("b/x_test.go", "remove the excluded file")
 	s.write("b/corpus_test.go", []byte(packageTestFile), "restore b's tests")
-	s.write("b/testdata/hypercase.json", []byte("{\n  \"format\": 9\n}\n"), "a registry from a later hypercase")
-	s.fails(s.normal("pkg-a"), fmt.Sprintf("b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format %d.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.", registry.Format))
+	s.write("b/testdata/hypercase.json", fmt.Appendf(nil, "{\n  \"format\": %d\n}\n", registry.Format+1), "a registry from a later hypercase")
+	s.fails(s.normal("pkg-a"), fmt.Sprintf("b/testdata/hypercase.json can't be read: it holds format %d, and this hypercase reads format %d.\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.", registry.Format+1, registry.Format))
 	s.done()
 }
 
