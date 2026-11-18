@@ -8,7 +8,10 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"runtime"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/sdboyer/hypercase"
@@ -48,55 +51,80 @@ var (
 // projectNoPositions is project with no Positions.
 var projectNoPositions = decl.Project{UpdateVar: fixtureUpdate}
 
-// A viewRecord is what recordingViews records of one call of Positions:
-// the error's text, a digest of the view Positions received, and digests
-// of each view RenderError received with the same error, none where it
-// received none.
+// A viewRecord is what recordingViews records of one call of Positions: a
+// digest of the view it received, and of the view the RenderError call
+// before it received, with the bytes that call rendered, which are a
+// cell's error.txt; both "" where no RenderError call came before it.
 type viewRecord struct {
-	Error       string   `json:"error"`
-	Positions   string   `json:"positions"`
-	RenderError []string `json:"renderError"`
+	Positions   string `json:"positions"`
+	RenderError string `json:"renderError"`
+	Rendered    string `json:"rendered"`
 }
 
-// recordingViews is p, which supplies Positions and no RenderError, with a
-// RenderError and a Positions that record the view each receives: a child
-// run with hooksEnv set to a file's path gives it the fixtures' project.
-// RenderError keeps a digest of its view by the error it renders, a value
-// of a comparable type, and renders as the framework does with no
-// RenderError, so a cell's error.txt is the error's text. Positions
-// appends a viewRecord to the file at path, with the digests RenderError
-// kept for the same error, and finds what p's finds.
+// recordingViews is p, which supplies Positions, with a RenderError and a
+// Positions that record the view each receives: a child run with hooksEnv
+// set to a file's path gives it the fixtures' project. RenderError renders
+// as p's does, or, where p has none, as the framework does. Positions
+// appends a viewRecord to the file at path, and finds what p's finds.
+//
+// A cell's RenderError and Positions run one after the other on the
+// goroutine that judges the cell, so the record pairs each call of
+// Positions with the last call of RenderError on its goroutine, which it
+// takes. Pairing by the error instead would pair two cells' calls where
+// they share one error value.
 func recordingViews(p decl.Project, path string) decl.Project {
-	if p.RenderError != nil || p.Positions == nil {
-		panic("selftest: recordingViews takes a project that supplies Positions and no RenderError")
+	if p.Positions == nil {
+		panic("selftest: recordingViews takes a project that supplies Positions")
 	}
+	type rendering struct{ view, out string }
 	var mu sync.Mutex
-	rendered := map[error][]string{}
-	positions := p.Positions
+	last := map[uint64]rendering{}
+	render, positions := p.RenderError, p.Positions
 	p.RenderError = func(in fs.FS, err error) []byte {
-		d := digestOf(in)
-		mu.Lock()
-		if !slices.Contains(rendered[err], d) {
-			rendered[err] = append(rendered[err], d)
+		out := []byte(err.Error() + "\n")
+		if render != nil {
+			out = render(in, err)
 		}
-		mu.Unlock()
-		return []byte(err.Error() + "\n")
+		r := rendering{digestOf(in), string(out)}
+		mu.Lock()
+		defer mu.Unlock()
+		last[goroutineID()] = r
+		return out
 	}
 	p.Positions = func(in fs.FS, err error) []decl.Range {
-		rec := viewRecord{Error: err.Error(), Positions: digestOf(in)}
-		mu.Lock()
-		rec.RenderError = slices.Clone(rendered[err])
-		data, e := json.Marshal(rec)
-		if e == nil {
-			e = appendLine(path, data)
-		}
-		mu.Unlock()
-		if e != nil {
-			panic(e)
-		}
+		rec := viewRecord{Positions: digestOf(in)}
+		id := goroutineID()
+		func() {
+			mu.Lock()
+			defer mu.Unlock()
+			if r, ok := last[id]; ok {
+				rec.RenderError, rec.Rendered = r.view, r.out
+				delete(last, id)
+			}
+			data, e := json.Marshal(rec)
+			if e == nil {
+				e = appendLine(path, data)
+			}
+			if e != nil {
+				panic(e)
+			}
+		}()
 		return positions(in, err)
 	}
 	return p
+}
+
+// goroutineID is the number the runtime gives the calling goroutine, as
+// the first line of its stack names it.
+func goroutineID() uint64 {
+	var buf [64]byte
+	line := string(buf[:runtime.Stack(buf[:], false)])
+	n, _, _ := strings.Cut(strings.TrimPrefix(line, "goroutine "), " ")
+	id, err := strconv.ParseUint(n, 10, 64)
+	if err != nil {
+		panic(fmt.Sprintf("selftest: no goroutine's number in %q", line))
+	}
+	return id
 }
 
 // appendLine appends data and a newline to the file at path, in one write.
