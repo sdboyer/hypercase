@@ -886,10 +886,10 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 		couldWrite := writable
 		writable = false
 		missing := lacking(goldens)
-		diffs := frozenDiffs(c.outDir(col.name), goldens, files, unjudged, missing)
+		diffs := frozenDiffs(c.outDir(col.name), goldens, files, unjudged)
 		var productDiffs []string
 		if bytesLift && held {
-			productDiffs = frozenDiffs(col.lift.viaDir(c.prefix), cf.product, product, nil, nil)
+			productDiffs = frozenDiffs(col.lift.viaDir(c.prefix), cf.product, product, nil)
 			diffs = append(diffs, productDiffs...)
 		}
 		// The upgrade adds the missing files the run made.
@@ -1108,15 +1108,16 @@ func lacks(sections []string) string {
 // frozenDiffs says how the files a frozen cell's run made, got, differ from
 // its committed ones, each named by its path under dir: its files under
 // out/<column>/, or a bytes lift's product under via/<lift>/. A path that
-// unjudged holds is left out, and so is one of missing, the framework's
-// files the cell lacks, which the upgrade adds.
-func frozenDiffs(dir string, committed, got map[string][]byte, unjudged map[string]bool, missing []string) []string {
+// unjudged holds is left out, and so is a framework file every cell that
+// ran has, which the upgrade adds when the cell lacks it. No product file
+// is one: each is in a tree.
+func frozenDiffs(dir string, committed, got map[string][]byte, unjudged map[string]bool) []string {
 	var diffs []string
 	for _, p := range slices.Sorted(maps.Keys(got)) {
 		g, ok := committed[p]
 		switch {
 		case unjudged[p]:
-		case !ok && slices.Contains(missing, p):
+		case !ok && slices.Contains(ranFiles, p):
 		case !ok:
 			diffs = append(diffs, fmt.Sprintf("%s is new", dir+p))
 		case !bytes.Equal(g, got[p]):
@@ -1396,7 +1397,10 @@ func (r *runner) outputs(ns *notes, c *aCase, col *column, view fs.FS, out *call
 			unjudged[errorFile] = true
 		}
 	}
-	names := []string{c.out(col.name, outcomeFile)} // every cell has one
+	var names []string
+	for _, p := range ranFiles { // every cell that ran has them
+		names = append(names, c.out(col.name, p))
+	}
 	for _, p := range slices.Sorted(maps.Keys(files)) {
 		names = append(names, c.out(col.name, p))
 	}

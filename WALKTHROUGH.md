@@ -1509,10 +1509,10 @@ on raw input: `hypercase.Suite[sheetcorpus.Sheet]`, with its outputs and
   `RenderError` quotes the input, so a person deletes that file and the next
   update writes it.
 - `error.txt` holds what `RenderError` writes. Two new archives show its
-  other forms. `notes` holds a file under `in/sheet/` that is not a cell,
-  and its error, about the file as a whole, names only `sheet/notes`.
-  `blank`'s `A1` is empty, and its error names the line by number alone,
-  `sheet/A1:1`.
+  other form, an error about a file as a whole, which names only the file.
+  `notes` holds a file under `in/sheet/` that is not a cell, and its error
+  names `sheet/notes`. `blank`'s `A1` is empty, with no line to point at,
+  and its error names `sheet/A1`.
 - `hypercase.json` lists each corpus type under `types`, with its Go type,
   and each lift under `lifts`, with its input and product types, the
   properties it rejects and whether the package owns it. Each suite's
@@ -3858,9 +3858,9 @@ cells blocked at `parse` have no `inputs`.
   `FromPositions` in a project with no `Positions`: every package that
   registers such a declaration, owned or used, supplies
   `Positions func(err error) []Range`, which finds where an error points.
-  The cells still run and the update writes their outputs. A cell with a
-  file of such a declaration has no `inputs`, and every other cell has its
-  own.
+  The cells still run and the update writes their outputs. It writes no
+  `inputs` for a cell with a file of such a declaration, and leaves one
+  the cell has as it is; every other cell gets its own.
 - `Range{Path, Start, End}` uses lines counted from 1, `End` included, in
   the cell's input view, and `0, 0` means the whole file.
 - A cell has one input view: its case's inputs, with a variant's overlay and

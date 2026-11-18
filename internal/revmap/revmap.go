@@ -283,6 +283,9 @@ func parseName(s string) (string, string, error) {
 			return "", "", fmt.Errorf("%q opens a quote it doesn't close", s)
 		}
 		n, _ := strconv.Unquote(q)
+		if n == "" {
+			return "", "", errors.New(`"" names nothing, and a path or a section is never empty`)
+		}
 		return n, s[len(q):], nil
 	}
 	n, rest, _ := strings.Cut(s, ":")

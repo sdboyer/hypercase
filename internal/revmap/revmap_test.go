@@ -112,6 +112,9 @@ func TestParseRefuses(t *testing.T) {
 		" v\n",                        // a leading space
 		"v \n",                        // a trailing space
 		"\n",                          // an empty path
+		"\"\"\n",                      // an empty path, quoted
+		"v\n  \"\"\n",                 // an empty section, quoted
+		"v\n  \"\":1-1\n",             // an empty section's lines
 		"v\n   in/x\n",                // three spaces
 		"v\n  \"in/x\" \n",            // text after a quoted section
 	} {

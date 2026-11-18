@@ -40,7 +40,9 @@ func TestInputsRefusals(t *testing.T) {
 // FromPositions in a project with no Positions. The cells still run: the
 // update still writes their outputs. A cell with a file of such a
 // declaration, a product file among them, gets no inputs file, and every
-// other cell gets its own.
+// other cell gets its own. The update leaves an inputs file such a cell
+// has as it is, as it leaves any output it doesn't write, while it
+// rewrites the cell's other files.
 func TestInputsRequired(t *testing.T) {
 	t.Parallel()
 	t.Run("suite", func(t *testing.T) {
@@ -55,6 +57,20 @@ func TestInputsRequired(t *testing.T) {
 		s.fails(s.update("inputs-none-suite"), want...)
 		s.hasSections("testdata/script/twice.txtar", map[string]string{"out/echo/outcome": "accepted\n", "out/echo/values.txt": "A1 6\nB1 3\n"}, "out/echo/inputs")
 		s.fails(s.normal("inputs-none-suite"), want...)
+		s.done()
+	})
+	t.Run("kept", func(t *testing.T) {
+		t.Parallel()
+		s := newSandbox(t, "basic")
+		want := "the suite echo declares the output values.txt with no Inputs."
+		const twice = "testdata/script/twice.txtar"
+		s.edit(twice, "echo's values.txt, for the update to write, beside the inputs file of an older map", func(a *archive.Archive) {
+			drop("out/echo/values.txt")(a)
+			set("out/echo/inputs", "values.txt\n  in/do/out/values.txt:1-1\n")(a)
+		})
+		s.fails(s.update("inputs-none-suite"), want)
+		s.hasSections(twice, map[string]string{"out/echo/values.txt": "A1 6\nB1 3\n", "out/echo/inputs": "values.txt\n  in/do/out/values.txt:1-1\n"})
+		s.fails(s.normal("inputs-none-suite"), want)
 		s.done()
 	})
 	t.Run("lift", func(t *testing.T) {
@@ -286,5 +302,18 @@ func TestInputsPositionsOfAnotherPackage(t *testing.T) {
 		"out/evaluate/outcome": "blocked import\n",
 		"out/list/outcome":     "blocked import\n",
 	})
+	s.done()
+}
+
+// TestInputsClash: a column's output under inputs/ is one no archive can
+// hold beside the cell's inputs file, as one under outcome/ is beside its
+// outcome (TestOutcomeClash).
+func TestInputsClash(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "file-dir")
+	const clash = "testdata/script/clash.txtar"
+	s.write(clash, []byte("echo writes a file under inputs/.\n-- in/do/out/inputs/x --\nx\n"), "a case whose output is inputs/x")
+	s.fails(s.update("nested"), "script/clash: echo writes a file under inputs/.\n    echo: Does what the case's do/ tree says.\n    out/echo/inputs can't be held in an archive: the section is also the directory of out/echo/inputs/x.\n    Fix the code. An update writes nothing for this cell.")
+	s.hasSections(clash, nil, "out/")
 	s.done()
 }
