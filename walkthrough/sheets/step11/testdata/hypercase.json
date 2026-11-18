@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 9,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step11",
   "rootPackage": true,
@@ -223,6 +223,12 @@
         "name": "div-zero",
         "description": "Adds div-zero when some cell divides by zero."
       }
+    }
+  ],
+  "checks": [
+    {
+      "name": "codes",
+      "description": "Every code the formula evaluator and the CSV importer define is the code of some rejected cell."
     }
   ]
 }

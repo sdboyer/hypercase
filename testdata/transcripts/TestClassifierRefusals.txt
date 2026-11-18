@@ -39,7 +39,7 @@ $ go test  # cl-no-description
         +         "description": " "
                 }
               }
-            ]
+            ],
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
     script/skipped: echo's probe says the case isn't for it: the case is for no one
 --- FAIL: TestCorpus

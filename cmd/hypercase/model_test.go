@@ -17,7 +17,7 @@ func TestPageStates(t *testing.T) {
 	t.Parallel()
 	reg := moduleRegistry()
 	for _, name := range []string{"format", "parse", "resolve"} {
-		reg.Suites = append(reg.Suites, registry.Suite{Name: name, Description: "Runs " + name + ".", Consumes: registry.RawInput, Corpora: []string{"sheet"}})
+		reg.Suites = append(reg.Suites, registry.Suite{Name: name, Description: "Runs " + name + ".", Consumes: registry.RawInput, Corpora: []string{"sheet"}, Paths: []registry.Path{{Corpus: "sheet"}}})
 	}
 	files := module(map[string]string{"x": "A case.\n-- in/sheet/A1 --\n1\n" +
 		"-- out/calc/outcome --\naccepted div-zero\n-- out/evaluate/outcome --\nblocked resolve\n-- out/format/outcome --\nskipped no formulas\n" +
@@ -85,7 +85,7 @@ func TestPageRows(t *testing.T) {
 func TestTwoCorpora(t *testing.T) {
 	t.Parallel()
 	reg := moduleRegistry()
-	reg.Suites = append(reg.Suites, registry.Suite{Name: "export", Description: "Exports a CSV.", Consumes: registry.RawInput, Corpora: []string{"csv"}})
+	reg.Suites = append(reg.Suites, registry.Suite{Name: "export", Description: "Exports a CSV.", Consumes: registry.RawInput, Corpora: []string{"csv"}, Paths: []registry.Path{{Corpus: "csv"}}})
 	a := module(map[string]string{"x": "A sheet.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"})
 	a["testdata/hypercase.json"] = string(reg.Marshal())
 	a["testdata/csv/x.txtar"] = mapped("A CSV.\n-- in/csv/x.csv --\n1\n-- out/export/outcome --\naccepted\n")
@@ -114,7 +114,7 @@ func TestTwoRoots(t *testing.T) {
 	root := func(dir string, archive, desc string) map[string]string {
 		reg := moduleRegistry()
 		reg.CorpusRoot = dir
-		reg.Suites = []registry.Suite{{Name: "calc", Description: desc, Consumes: registry.RawInput, Corpora: []string{"sheet"}}}
+		reg.Suites = []registry.Suite{{Name: "calc", Description: desc, Consumes: registry.RawInput, Corpora: []string{"sheet"}, Paths: []registry.Path{{Corpus: "sheet"}}}}
 		return map[string]string{
 			dir + "/testdata/hypercase.json":   string(reg.Marshal()),
 			dir + "/testdata/sheet/" + archive: mapped("A case.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"),
@@ -178,7 +178,7 @@ func TestProblems(t *testing.T) {
 	reg := moduleRegistry()
 	reg.Types = []registry.Type{{Dir: "sheet", Description: "A sheet.", GoType: "example.com/m.Sheet"}}
 	other := registry.Registry{UpdateVar: "M_UPDATE_GOLDEN", CorpusRoot: ".", Types: reg.Types,
-		Suites: []registry.Suite{{Name: "evaluate", Description: "Evaluates, as another package says.", Consumes: registry.RawInput, Corpora: []string{"sheet"}}}}
+		Suites: []registry.Suite{{Name: "evaluate", Description: "Evaluates, as another package says.", Consumes: registry.RawInput, Corpora: []string{"sheet"}, Paths: []registry.Path{{Corpus: "sheet"}}}}}
 	files := module(map[string]string{
 		"x": "A case.\n-- in/sheet/A1 --\n1\n-- properties --\ncircular\nlooped\n" +
 			"-- gaps --\nnope Waits on sheets#1.\ntransform/gone calc Waits on sheets#2.\n" +
@@ -360,20 +360,20 @@ func TestPageDescriptions(t *testing.T) {
 			{Name: "looped", Description: "Loops, " + version + ".", Gives: []string{"circular"}, Owned: true},
 		}}}
 		r.Suites[0].Description = "Runs calc, " + version + "."
-		r.Suites[0].Outputs = []registry.Output{{Pattern: "stdout.txt", Description: "What calc prints, " + version + "."}}
+		r.Suites[0].Outputs = []registry.Output{{Pattern: "stdout.txt", Description: "What calc prints, " + version + ".", Inputs: registry.InputsAll}}
 		r.Suites[1].Classifier = &registry.Classifier{Name: "div-zero", Description: "Adds div-zero, " + version + "."}
 		return r
 	}
 	ra, rb := reg("at a"), reg("at b")
 	// b drops calc's stdout.txt and evaluate's classifier; a's describe
 	// them. calc's classifier is at both, and b's describes it.
-	ra.Suites[0].Outputs = append(ra.Suites[0].Outputs, registry.Output{Pattern: "stderr.txt", Description: "What calc warns, at a."})
-	rb.Suites[0].Outputs = []registry.Output{{Pattern: "stderr.txt", Description: "What calc warns, at b."}}
+	ra.Suites[0].Outputs = append(ra.Suites[0].Outputs, registry.Output{Pattern: "stderr.txt", Description: "What calc warns, at a.", Inputs: registry.InputsAll})
+	rb.Suites[0].Outputs = []registry.Output{{Pattern: "stderr.txt", Description: "What calc warns, at b.", Inputs: registry.InputsAll}}
 	ra.Suites[0].Classifier = &registry.Classifier{Name: "slow", Description: "Adds slow, at a."}
 	rb.Suites[0].Classifier = &registry.Classifier{Name: "slow", Description: "Adds slow, at b."}
 	rb.Suites[1].Classifier = nil
-	ra.Suites = append(ra.Suites, registry.Suite{Name: "old", Description: "A column only a has.", Consumes: registry.RawInput, Corpora: []string{"sheet"},
-		Outputs: []registry.Output{{Pattern: "old.txt", Description: "What old wrote."}}})
+	ra.Suites = append(ra.Suites, registry.Suite{Name: "old", Description: "A column only a has.", Consumes: registry.RawInput, Corpora: []string{"sheet"}, Paths: []registry.Path{{Corpus: "sheet"}},
+		Outputs: []registry.Output{{Pattern: "old.txt", Description: "What old wrote.", Inputs: registry.InputsAll}}})
 	ra.Types[0].Transforms = append(ra.Types[0].Transforms, registry.Transform{Name: "doubled", Description: "A transform only a has.", Keeps: []string{"dangling"}, Owned: true})
 	ra.Properties = append(ra.Properties, registry.Property{Name: "retired", Description: "A property only a lists."})
 	rb.Types = append(rb.Types, registry.Type{Dir: "csv", Description: "A CSV, only at b.", GoType: "example.com/m.CSV"})
@@ -420,10 +420,10 @@ func TestPageDescriptions(t *testing.T) {
 func TestPageDescribeConflict(t *testing.T) {
 	t.Parallel()
 	ra := moduleRegistry()
-	ra.Suites[0].Outputs = []registry.Output{{Pattern: "stdout.txt", Description: "What calc prints, at a."}}
+	ra.Suites[0].Outputs = []registry.Output{{Pattern: "stdout.txt", Description: "What calc prints, at a.", Inputs: registry.InputsAll}}
 	ra.Suites[0].Classifier = &registry.Classifier{Name: "slow", Description: "Adds slow, at a."}
 	other := registry.Registry{UpdateVar: "M_UPDATE_GOLDEN", CorpusRoot: ".",
-		Suites: []registry.Suite{{Name: "calc", Description: "Runs calc, as another package says.", Consumes: registry.RawInput, Corpora: []string{"sheet"}}}}
+		Suites: []registry.Suite{{Name: "calc", Description: "Runs calc, as another package says.", Consumes: registry.RawInput, Corpora: []string{"sheet"}, Paths: []registry.Path{{Corpus: "sheet"}}}}}
 	const x = "A case.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"
 	a := module(map[string]string{"x": x})
 	a["testdata/hypercase.json"] = string(ra.Marshal())
@@ -450,7 +450,7 @@ func TestPageProducts(t *testing.T) {
 	const x = "A CSV.\n-- in/csv/x.csv --\n4\n-- via/import/sheet/A1 --\nV\n-- via/calc/sheet/A1 --\nV\n" +
 		"-- out/calc/outcome --\naccepted\n-- out/import/outcome --\naccepted\n"
 	ra := productRegistry()
-	ra.Lifts[0].ProductFiles = append(ra.Lifts[0].ProductFiles, registry.Output{Pattern: "notes/*", Description: "A note, only at a."})
+	ra.Lifts[0].ProductFiles = append(ra.Lifts[0].ProductFiles, registry.Output{Pattern: "notes/*", Description: "A note, only at a.", Inputs: registry.InputsFunc})
 	a := productModule(map[string]string{"x": strings.ReplaceAll(x, "V", "4")})
 	a["testdata/hypercase.json"] = string(ra.Marshal())
 	b := productModule(map[string]string{"x": strings.ReplaceAll(x, "V", "5")})

@@ -64,7 +64,7 @@ error.txt
 rejected S1; saw-error
 $ cat testdata/hypercase.json
 {
-  "format": 8,
+  "format": 9,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -145,7 +145,8 @@ $ cat testdata/hypercase.json
         "description": "Gives the detail the case's cl/ tree says."
       }
     }
-  ]
+  ],
+  "checks": []
 }
 $ go test  # outcomes
     script/skipped: echo's probe says the case isn't for it: the case is for no one

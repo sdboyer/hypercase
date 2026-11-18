@@ -109,7 +109,7 @@ func TestChain(t *testing.T) {
 	s.hasSections("testdata/hypercase.json", map[string]string{})
 	reg := string(s.read("testdata/hypercase.json"))
 	for _, want := range []string{
-		`"format": 8,`,
+		`"format": 9,`,
 		"\"name\": \"import\",\n      \"description\": \"Imports the export as a script, as its import/ tree says.\",\n      \"input\": \"github.com/sdboyer/hypercase_test.Export\",\n      \"product\": \"github.com/sdboyer/hypercase_test.Script\",\n      \"owned\": true,\n      \"bytes\": true,",
 		"\"productFiles\": [\n        {\n          \"pattern\": \"evaluate/*\",",
 		"\"rejects\": [\n        \"unterminated\"\n      ]",
@@ -1161,9 +1161,12 @@ func TestChainCheckPaths(t *testing.T) {
 // doesn't give one path from each corpus its column runs over, in the
 // order of its corpora, can't be read, and so can't one whose path names
 // a lift the registry doesn't list, or the column itself, whether the
-// column is the package's or a lift it uses: every check fails, and so
-// does the root-package check. Each hand edit is written as the JSON it
-// makes, not by Marshal, which would sort the paths.
+// column is the package's or a lift it uses, and so can't one whose
+// inputs, for an output, name no statement of Inputs, or one
+// registration refuses there, or one that lists a corpus check twice, or
+// gives no list of them: every check fails, and so does the root-package
+// check. Each hand edit is written as the JSON it makes, not by Marshal,
+// which would sort the paths.
 func TestChainSharedCheckPaths(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "chain-shared")
@@ -1229,6 +1232,17 @@ func TestChainSharedCheckPaths(t *testing.T) {
 	refused(evaluateRuns + "testdata/export/, testdata/script/ and testdata/script/" + rule)
 	edit("name a lift b's registry doesn't list on evaluate's path from export, by hand", evaluate(func(c *registry.Suite) { c.Paths[0].Lifts = []string{"resolve", "nosuch"} }))
 	refused("the suite evaluate's path from testdata/export/ names nosuch, and the registry lists no lift of that name, where every lift on a column's path is one its package registers")
+	edit("record evaluate's values.txt with inputs no declaration states in b's registry, by hand", evaluate(func(c *registry.Suite) {
+		c.Outputs[slices.IndexFunc(c.Outputs, func(o registry.Output) bool { return o.Pattern == "values.txt" })].Inputs = "lines"
+	}))
+	refused(`the suite evaluate declares the output values.txt with inputs "lines", where a registry records "func", "positions", "all" or "none"`)
+	edit("list the corpus check codes twice in b's registry, by hand", func(g *registry.Registry) {
+		codes := registry.Check{Name: "codes", Description: "Lists the codes."}
+		g.Checks = append(g.Checks, codes, codes)
+	})
+	refused("the registry lists the corpus check codes twice, where each corpus check a package registers has a name of its own")
+	edit("give b's registry no list of corpus checks, by hand", func(g *registry.Registry) { g.Checks = nil })
+	refused("the registry gives no list of corpus checks, where a registry lists each corpus check its package registers, and an empty list for none")
 
 	// The lifts b uses are held to the same rules as its columns.
 	edit("drop the paths from export of the lifts b uses, parse and resolve, from b's registry, by hand", func(g *registry.Registry) {

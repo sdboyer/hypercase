@@ -20,7 +20,7 @@ func TestChangeClosedGap(t *testing.T) {
 		Format:     registry.Format,
 		IssueLinks: []registry.IssueLink{{Pattern: `sheets#(\d+)`, URL: "https://example.com/sheets/issues/$1"}},
 		Types:      []registry.Type{{Dir: "sheet", Description: "A sheet."}},
-		Suites:     []registry.Suite{{Name: "parse", Description: "Parses the sheet.", Corpora: []string{"sheet"}}},
+		Suites:     []registry.Suite{{Name: "parse", Description: "Parses the sheet.", Corpora: []string{"sheet"}, Paths: []registry.Path{{Corpus: "sheet"}}}},
 	}
 	at := func(name, negative string) *snapshot {
 		t.Helper()

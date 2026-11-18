@@ -1,8 +1,15 @@
 package hypercase_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"io/fs"
+	"maps"
+	"os"
 	"slices"
+	"sync"
 
 	"github.com/sdboyer/hypercase"
 	"github.com/sdboyer/hypercase/decl"
@@ -40,6 +47,77 @@ var (
 
 // projectNoPositions is project with no Positions.
 var projectNoPositions = decl.Project{UpdateVar: fixtureUpdate}
+
+// A viewRecord is what recordingViews records of one call of Positions:
+// the error's text, what the project renders it as, which is a cell's
+// error.txt, and a digest of the view Positions received.
+type viewRecord struct {
+	Error     string `json:"error"`
+	Rendered  string `json:"rendered"`
+	Positions string `json:"positions"`
+}
+
+// recordingViews is p, which supplies Positions, with a Positions that
+// records the view it receives: a child run with hooksEnv set to a file's
+// path gives it the fixtures' project. It appends a viewRecord to the file
+// at path, rendering the error as p's RenderError does, or, where p has
+// none, as the framework does, and finds what p's finds.
+func recordingViews(p decl.Project, path string) decl.Project {
+	if p.Positions == nil {
+		panic("selftest: recordingViews takes a project that supplies Positions")
+	}
+	var mu sync.Mutex
+	render, positions := p.RenderError, p.Positions
+	p.Positions = func(in fs.FS, err error) []decl.Range {
+		rendered := []byte(err.Error() + "\n")
+		if render != nil {
+			rendered = render(in, err)
+		}
+		data, e := json.Marshal(viewRecord{Error: err.Error(), Rendered: string(rendered), Positions: digestOf(in)})
+		if e == nil {
+			mu.Lock()
+			e = appendLine(path, data)
+			mu.Unlock()
+		}
+		if e != nil {
+			panic(e)
+		}
+		return positions(in, err)
+	}
+	return p
+}
+
+// appendLine appends data and a newline to the file at path, in one write.
+func appendLine(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(append(data, '\n')); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
+}
+
+// digestOf is the viewDigest of a view's files.
+func digestOf(view fs.FS) string {
+	files, err := viewFiles(view)
+	if err != nil {
+		panic(err)
+	}
+	return viewDigest(files)
+}
+
+// viewDigest is a digest of a view's files, by path, as an Observed
+// records them.
+func viewDigest(files map[string]string) string {
+	h := sha256.New()
+	for _, p := range slices.Sorted(maps.Keys(files)) {
+		fmt.Fprintf(h, "%d %s %d\n%s", len(p), p, len(files[p]), files[p])
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
 
 // sharedStderr is one declaration of stderr.txt, which the lift
 // parseShared and the suite chatty each declare: the file comes from

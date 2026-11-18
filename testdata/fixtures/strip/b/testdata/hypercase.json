@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 9,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": false,
@@ -294,6 +294,12 @@
       ],
       "rejects": [],
       "classifier": null
+    }
+  ],
+  "checks": [
+    {
+      "name": "products",
+      "description": "Lists each file of import's committed product."
     }
   ]
 }

@@ -13,6 +13,19 @@ panic: hypercase: two corpus checks are named none. Check names are unique per p
 $ go test  # check-no-description
     the corpus check none has no description.
         Add one: it says what the check asserts, in prose.
+    testdata/hypercase.json differs from what the package registers (-committed +registered):
+                "classifier": null
+              }
+            ],
+        -   "checks": []
+        +   "checks": [
+        +     {
+        +       "name": "none",
+        +       "description": "\n"
+        +     }
+        +   ]
+          }
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
     testdata/checks/none.txt, the corpus check none's findings, has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
 --- FAIL: TestCorpus

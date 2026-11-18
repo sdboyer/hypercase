@@ -33,33 +33,38 @@ func sheetsRegistries(link string) map[string]string {
 	owner.Transforms = []registry.Transform{looped}
 	const parsed, graph = "*example.com/sheets/sheet.Parsed", "*example.com/sheets/sheet.Graph"
 	corpora := []string{"sheet"}
-	errorTxt := []registry.Output{{Pattern: "error.txt", Description: "The error, and each line it points at."}}
-	parse := registry.Lift{Name: "parse", Description: "Parses every cell.", Input: sheet.GoType, Product: parsed, Owned: true, Corpora: corpora, Outputs: errorTxt, Rejects: []string{"malformed"}}
-	resolve := registry.Lift{Name: "resolve", Description: "Orders the cells so that each comes after the cells it refers to.", Input: parsed, Product: graph, Owned: true, Corpora: corpora, Outputs: errorTxt, Rejects: []string{"circular", "dangling"}}
+	// path is a column's path from the sheet, through lifts.
+	path := func(lifts ...string) []registry.Path { return []registry.Path{{Corpus: "sheet", Lifts: lifts}} }
+	errorTxt := []registry.Output{{Pattern: "error.txt", Description: "The error, and each line it points at.", Inputs: registry.InputsPositions}}
+	parse := registry.Lift{Name: "parse", Description: "Parses every cell.", Input: sheet.GoType, Product: parsed, Owned: true, Corpora: corpora, Paths: path(), Outputs: errorTxt, Rejects: []string{"malformed"}}
+	resolve := registry.Lift{Name: "resolve", Description: "Orders the cells so that each comes after the cells it refers to.", Input: parsed, Product: graph, Owned: true, Corpora: corpora, Paths: path("parse"), Outputs: errorTxt, Rejects: []string{"circular", "dangling"}}
 	used := parse
 	used.Owned = false
-	suite := func(name, desc, consumes, output, outputDesc string, rejects ...string) registry.Suite {
-		return registry.Suite{Name: name, Description: desc, Consumes: consumes, Corpora: corpora,
-			Outputs: []registry.Output{{Pattern: output, Description: outputDesc}}, Rejects: rejects}
+	suite := func(name, desc, consumes string, paths []registry.Path, output registry.Output, rejects ...string) registry.Suite {
+		return registry.Suite{Name: name, Description: desc, Consumes: consumes, Corpora: corpora, Paths: paths,
+			Outputs: []registry.Output{output}, Rejects: rejects}
 	}
-	evaluate := suite("evaluate", "Evaluates every cell of the sheet.", graph, "values.txt", "Each cell's value, one per line, in cell order.")
+	evaluate := suite("evaluate", "Evaluates every cell of the sheet.", graph, path("resolve", "parse"),
+		registry.Output{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: registry.InputsFunc})
 	evaluate.Classifier = &registry.Classifier{Name: "div-zero", Description: "Adds div-zero when some cell divides by zero."}
 	return map[string]string{
 		"go.mod": "module example.com/sheets\n\ngo 1.27\n",
 		"step09/testdata/hypercase.json": string(registry.Registry{
-			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", RootPackage: true, Codes: true,
+			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", RootPackage: true, Codes: true, Positions: true,
 			IssueLinks: links, Properties: props, Types: []registry.Type{owner},
 			Lifts:  []registry.Lift{parse, resolve},
 			Suites: []registry.Suite{evaluate},
 		}.Marshal()),
 		"step09/format/testdata/hypercase.json": string(registry.Registry{
-			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", Codes: true, IssueLinks: links, Properties: props, Types: []registry.Type{sheet},
-			Lifts:  []registry.Lift{used},
-			Suites: []registry.Suite{suite("format", "Prints each formula back in canonical form.", parsed, "formulas.txt", "Each formula, in canonical form, one per line.")},
+			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", Codes: true, Positions: true, IssueLinks: links, Properties: props, Types: []registry.Type{sheet},
+			Lifts: []registry.Lift{used},
+			Suites: []registry.Suite{suite("format", "Prints each formula back in canonical form.", parsed, path("parse"),
+				registry.Output{Pattern: "formulas.txt", Description: "Each formula, in canonical form, one per line.", Inputs: registry.InputsFunc})},
 		}.Marshal()),
 		"step09/cli/testdata/hypercase.json": string(registry.Registry{
-			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", Codes: true, IssueLinks: links, Properties: props, Types: []registry.Type{sheet},
-			Suites: []registry.Suite{suite("calc", "Runs the calc command on the sheet; see sheets#12.", sheet.GoType, "stdout.txt", "What calc prints: each cell's value, as one CSV line.", "circular", "dangling", "malformed")},
+			UpdateVar: "SHEETS_UPDATE_GOLDEN", CorpusRoot: "step09", Codes: true, Positions: true, IssueLinks: links, Properties: props, Types: []registry.Type{sheet},
+			Suites: []registry.Suite{suite("calc", "Runs the calc command on the sheet; see sheets#12.", sheet.GoType, path(),
+				registry.Output{Pattern: "stdout.txt", Description: "What calc prints: each cell's value, as one CSV line.", Inputs: registry.InputsAll}, "circular", "dangling", "malformed")},
 		}.Marshal()),
 	}
 }

@@ -247,7 +247,7 @@ $ go test  # bytes-product-nodesc
         -         {
         -           "pattern": "archive.txt",
         -           "description": "The archive's name, as the run received it.",
-          ... (64 more lines of diff)
+          ... (65 more lines of diff)
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
     export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
         import: Imports the export as a script, as its import/ tree says.

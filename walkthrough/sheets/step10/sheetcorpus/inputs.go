@@ -52,8 +52,9 @@ var Export = decl.InputsFunc(func(in fs.FS, _ string) ([]decl.Range, error) {
 
 // positions finds the lines an error points at, sheet.Positions's: each
 // line it names, or the whole file for a position about the file as a
-// whole, whose Line is 0.
-func positions(err error) []decl.Range {
+// whole, whose Line is 0. Its paths are in the input view already, so it
+// doesn't read the view.
+func positions(_ fs.FS, err error) []decl.Range {
 	var rs []decl.Range
 	for _, p := range sheet.Positions(err) {
 		rs = append(rs, decl.Range{Path: p.Path, Start: p.Line, End: p.Line})

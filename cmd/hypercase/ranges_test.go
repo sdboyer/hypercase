@@ -13,7 +13,7 @@ import (
 
 // registryAt returns a registry's bytes at an older format than today's,
 // one from before registry.InputsFormat: what Marshal writes, less the
-// keys registry.InputsFormat added.
+// keys registry.InputsFormat and the formats after it added.
 func registryAt(r registry.Registry, format int) string {
 	if format >= registry.InputsFormat {
 		panic(fmt.Sprintf("registryAt writes formats before %d, not %d", registry.InputsFormat, format))
@@ -24,6 +24,7 @@ func registryAt(r registry.Registry, format int) string {
 	}
 	v["format"] = format
 	delete(v, "positions")
+	delete(v, "checks")
 	for _, list := range []string{"suites", "lifts"} {
 		cols, _ := v[list].([]any)
 		for _, c := range cols {

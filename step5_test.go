@@ -192,6 +192,15 @@ func TestRegistry(t *testing.T) {
 	want := "testdata/.hypercase-tmp-hypercase.json-99 is a temp file left by a write that was cut short.\nDelete it."
 	s.fails(s.normal("echo-shout"), want)
 	s.fails(s.update("echo-shout"), want)
+	s.remove("testdata/.hypercase-tmp-hypercase.json-99", "the temp file is deleted")
+
+	// A corpus check changes what the package registers too: the registry
+	// lists each by name, with its description, sorted by name.
+	s.fails(s.normal("echo-shout-checks"), "testdata/hypercase.json differs from what the package registers (-committed +registered):",
+		"+       \"name\": \"cells\",\n        +       \"description\": \"Lists every cell,", "+       \"name\": \"none\",\n        +       \"description\": \"Gives the findings it was declared with.\"")
+	s.passes(s.update("echo-shout-checks"))
+	s.passes(s.normal("echo-shout-checks"))
+	s.cat("testdata/hypercase.json")
 	s.done()
 }
 

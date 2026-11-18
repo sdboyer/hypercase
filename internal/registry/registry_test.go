@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -29,11 +30,93 @@ const olderData = `{"format": 1, "updateVar": "X", "corpusRoot": "step05", "root
 // marshaled; one of another format, older or newer, is a FormatError that
 // names it; and what is no registry is refused as none. Marshal sorts a
 // column's paths by corpus, and keeps each path's lifts in their order,
-// the nearest to the column first, writing none as []. A registry the
-// update couldn't have written is refused: one whose paths it couldn't
-// have planned, or that records an Inputs registration refuses.
+// the nearest to the column first, writing none as [], and sorts the
+// corpus checks by name. A registry the update couldn't have written is
+// refused: one whose paths it couldn't have planned, that records an
+// Inputs registration refuses, or that lists a corpus check twice.
 func TestParse(t *testing.T) {
-	now := Registry{
+	now := parseNow()
+	got, err := Parse(now.Marshal())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got.Marshal(), now.Marshal()) {
+		t.Errorf("format %d read back as\n%s\nwant\n%s", Format, got.Marshal(), now.Marshal())
+	}
+	// Marshal sorts the transforms by name, and their properties.
+	if trs := got.Types[0].Transforms; trs[0].Name != "looped" || !slices.Equal(trs[1].Keeps, []string{"circular", "dangling"}) || trs[0].Keeps == nil {
+		t.Errorf("the transforms are written as %+v", trs)
+	}
+	if want := []Check{{Name: "codes", Description: "Lists the codes."}, {Name: "rejected", Description: "Lists the rejected cells."}}; !slices.Equal(got.Checks, want) {
+		t.Errorf("the corpus checks are written as %+v, want %+v", got.Checks, want)
+	}
+	wantPaths := []Path{{Corpus: "csv", Lifts: []string{"resolve", "parse", "import"}}, {Corpus: "sheet", Lifts: []string{"resolve", "parse"}}}
+	if ps := got.Suites[1].Paths; !reflect.DeepEqual(ps, wantPaths) {
+		t.Errorf("evaluate's paths are written as %+v, want %+v", ps, wantPaths)
+	}
+	if ps := got.Lifts[1].Paths; len(ps) != 1 || ps[0].Lifts == nil || !bytes.Contains(now.Marshal(), []byte(`"corpus": "sheet",
+          "lifts": []`)) {
+		t.Errorf("parse's path is written as %+v, and the registry as\n%s", ps, now.Marshal())
+	}
+
+	// A registry the update couldn't have written is refused.
+	for _, tt := range byHand {
+		r, err := Parse(now.Marshal())
+		if err != nil {
+			t.Fatal(err)
+		}
+		tt.edit(r)
+		data, err := json.MarshalIndent(r, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Parse(data); err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("a registry edited by hand: got %v, want %q", err, tt.want)
+		}
+	}
+	// A registry without "checks" is refused, as one whose checks are null
+	// is: from format 9, a registry with no checks lists none.
+	var m map[string]any
+	if err := json.Unmarshal(now.Marshal(), &m); err != nil {
+		t.Fatal(err)
+	}
+	delete(m, "checks")
+	if data, err := json.Marshal(m); err != nil {
+		t.Fatal(err)
+	} else if _, err := Parse(data); err == nil || err.Error() != "the registry gives no list of corpus checks, where a registry lists each corpus check its package registers, and an empty list for none" {
+		t.Errorf("a registry without checks: got %v", err)
+	}
+
+	for _, data := range []string{olderData, fmt.Sprintf(`{"format": %d}`, Format+1)} {
+		_, err = Parse([]byte(data))
+		var fe *FormatError
+		want := 1
+		if data != olderData {
+			want = Format + 1
+		}
+		if !errors.As(err, &fe) || fe.Format != want {
+			t.Errorf("format %d: got %v, want a FormatError", want, err)
+		}
+	}
+
+	for _, bad := range []string{
+		`{"format": 0}`,
+		`{"updateVar": "X"}`,
+		`{"format": "3"}`,
+		fmt.Sprintf(`{"format": %d, "a field this hypercase doesn't know": []}`, Format),
+		`[]`,
+	} {
+		if _, err := Parse([]byte(bad)); err == nil || !strings.HasPrefix(err.Error(), "it is not a registry") {
+			t.Errorf("%s: got %v, want it refused as no registry", bad, err)
+		}
+	}
+}
+
+// parseNow is a registry of today's format that the update could have
+// written, with a column of each kind, and paths and output declarations
+// of each kind Parse checks.
+func parseNow() Registry {
+	return Registry{
 		UpdateVar: "X", CorpusRoot: ".", Positions: true,
 		IssueLinks: []IssueLink{{Pattern: `sheets#(\d+)`, URL: "https://example.com/$1"}},
 		Types: []Type{{Dir: "sheet", Description: "A sheet.", GoType: "example.com/m.Sheet", Transforms: []Transform{
@@ -64,100 +147,53 @@ func TestParse(t *testing.T) {
 			{Name: "import", Corpora: []string{"csv"}, Paths: []Path{{Corpus: "csv"}}, Bytes: true,
 				ProductFiles: []Output{{Pattern: "*", Description: "A file.", Inputs: InputsFunc}}},
 		},
+		Checks: []Check{{Name: "rejected", Description: "Lists the rejected cells."}, {Name: "codes", Description: "Lists the codes."}},
 	}
-	got, err := Parse(now.Marshal())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got.Marshal(), now.Marshal()) {
-		t.Errorf("format %d read back as\n%s\nwant\n%s", Format, got.Marshal(), now.Marshal())
-	}
-	// Marshal sorts the transforms by name, and their properties.
-	if trs := got.Types[0].Transforms; trs[0].Name != "looped" || !slices.Equal(trs[1].Keeps, []string{"circular", "dangling"}) || trs[0].Keeps == nil {
-		t.Errorf("the transforms are written as %+v", trs)
-	}
-	wantPaths := []Path{{Corpus: "csv", Lifts: []string{"resolve", "parse", "import"}}, {Corpus: "sheet", Lifts: []string{"resolve", "parse"}}}
-	if ps := got.Suites[1].Paths; !reflect.DeepEqual(ps, wantPaths) {
-		t.Errorf("evaluate's paths are written as %+v, want %+v", ps, wantPaths)
-	}
-	if ps := got.Lifts[1].Paths; len(ps) != 1 || ps[0].Lifts == nil || !bytes.Contains(now.Marshal(), []byte(`"corpus": "sheet",
-          "lifts": []`)) {
-		t.Errorf("parse's path is written as %+v, and the registry as\n%s", ps, now.Marshal())
-	}
+}
 
-	// A registry the update couldn't have written is refused, as written
-	// by hand, which Marshal, which sorts, doesn't do.
-	for _, tt := range []struct {
-		edit func(r *Registry)
-		want string
-	}{
-		{func(r *Registry) { r.Suites[1].Paths = r.Suites[1].Paths[1:] }, "the suite evaluate runs over testdata/csv/ and testdata/sheet/, and has paths from testdata/sheet/, where a registry gives each column one path from each corpus it runs over, in the same order"},
-		{func(r *Registry) { slices.Reverse(r.Suites[1].Paths) }, "the suite evaluate runs over testdata/csv/ and testdata/sheet/, and has paths from testdata/sheet/ and testdata/csv/,"},
-		{func(r *Registry) { r.Suites[1].Paths = append(r.Suites[1].Paths, r.Suites[1].Paths[1]) }, "has paths from testdata/csv/, testdata/sheet/ and testdata/sheet/,"},
-		{func(r *Registry) { r.Suites[0].Paths = nil }, "the suite calc runs over testdata/sheet/, and has paths from none,"},
-		{func(r *Registry) { r.Lifts[2].Paths = nil }, "the lift resolve runs over testdata/sheet/, and has paths from none,"},
-		{func(r *Registry) { r.Suites[1].Paths[0].Lifts[2] = "nosuch" }, "the suite evaluate's path from testdata/csv/ names nosuch, and the registry lists no lift of that name, where every lift on a column's path is one its package registers"},
-		{func(r *Registry) { r.Lifts[2].Paths[0].Lifts = []string{"resolve"} }, "the lift resolve's path from testdata/sheet/ names the lift itself, where a column's path names the lifts before it"},
-		{func(r *Registry) {
-			r.Lifts[2].Corpora = []string{"sheet", "sheet"}
-			r.Lifts[2].Paths = append(r.Lifts[2].Paths, r.Lifts[2].Paths[0])
-		}, "the lift resolve runs over testdata/sheet/ twice, where a registry lists each corpus a column runs over once"},
-		{func(r *Registry) { r.Suites[0].Paths[0].Lifts = []string{"parse"} }, "the suite calc consumes the raw input view, and its path from testdata/sheet/ names parse, where a suite over the raw input view passes through no lift"},
-		{func(r *Registry) { r.Suites[1].Paths[1].Lifts = []string{"resolve", "parse", "parse"} }, "the suite evaluate's path from testdata/sheet/ names parse twice, where a column's path names each lift before it once"},
-		{func(r *Registry) { r.Lifts = append(r.Lifts, r.Lifts[2]) }, "the registry lists the lift resolve twice, where each suite and lift a package registers, owned or used, has a name of its own"},
-		{func(r *Registry) { r.Suites = append(r.Suites, r.Suites[0]) }, "the registry lists the suite calc twice, where each suite and lift a package registers, owned or used, has a name of its own"},
-		{func(r *Registry) { r.Suites[0].Name = "parse" }, "the registry lists a suite and a lift named parse, where each suite and lift a package registers, owned or used, has a name of its own"},
-		{func(r *Registry) { r.Suites[0].Outputs[1].Inputs = "" }, `the suite calc declares the output stdout.txt with inputs "", where a registry records "func", "positions", "all" or "none"`},
-		{func(r *Registry) { r.Lifts[0].ProductFiles[0].Inputs = "lines" }, `the lift import declares the product file * with inputs "lines", where a registry records "func", "positions", "all" or "none"`},
-		{func(r *Registry) { r.Suites[1].Outputs[1].Inputs = InputsPositions }, `the suite evaluate declares the output values.txt with inputs "positions", where only an output whose pattern is error.txt takes its ranges from Positions`},
-		{func(r *Registry) { r.Lifts[0].ProductFiles[0] = Output{Pattern: "error.txt", Inputs: InputsPositions} }, `the lift import declares the product file error.txt with inputs "positions", where only an output whose pattern is error.txt takes its ranges from Positions`},
-		{func(r *Registry) { r.Suites[1].Outputs[0].Inputs = InputsFunc }, `the suite evaluate declares the output e* with inputs "func", and the pattern matches error.txt, where error.txt's ranges come from Positions or the whole input view, never from a function`},
-		{func(r *Registry) { r.Lifts[1].Outputs[0].Inputs = InputsFunc }, `the lift parse declares the output error.txt with inputs "func", and the pattern matches error.txt,`},
-	} {
-		r, err := Parse(now.Marshal())
-		if err != nil {
-			t.Fatal(err)
-		}
-		tt.edit(r)
-		data, err := json.MarshalIndent(r, "", "  ")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := Parse(data); err == nil || !strings.Contains(err.Error(), tt.want) {
-			t.Errorf("a registry edited by hand: got %v, want %q", err, tt.want)
-		}
-	}
-
-	for _, data := range []string{olderData, fmt.Sprintf(`{"format": %d}`, Format+1)} {
-		_, err = Parse([]byte(data))
-		var fe *FormatError
-		want := 1
-		if data != olderData {
-			want = Format + 1
-		}
-		if !errors.As(err, &fe) || fe.Format != want {
-			t.Errorf("format %d: got %v, want a FormatError", want, err)
-		}
-	}
-
-	for _, bad := range []string{
-		`{"format": 0}`,
-		`{"updateVar": "X"}`,
-		`{"format": "3"}`,
-		fmt.Sprintf(`{"format": %d, "a field this hypercase doesn't know": []}`, Format),
-		`[]`,
-	} {
-		if _, err := Parse([]byte(bad)); err == nil || !strings.HasPrefix(err.Error(), "it is not a registry") {
-			t.Errorf("%s: got %v, want it refused as no registry", bad, err)
-		}
-	}
+// byHand are edits of parseNow's registry, read back by Parse, that the
+// update couldn't have written, each with what Parse's error says. Each is
+// written by hand, as Marshal, which sorts, doesn't write it.
+var byHand = []struct {
+	edit func(r *Registry)
+	want string
+}{
+	{func(r *Registry) { r.Suites[1].Paths = r.Suites[1].Paths[1:] }, "the suite evaluate runs over testdata/csv/ and testdata/sheet/, and has paths from testdata/sheet/, where a registry gives each column one path from each corpus it runs over, in the same order"},
+	{func(r *Registry) { slices.Reverse(r.Suites[1].Paths) }, "the suite evaluate runs over testdata/csv/ and testdata/sheet/, and has paths from testdata/sheet/ and testdata/csv/,"},
+	{func(r *Registry) { r.Suites[1].Paths = append(r.Suites[1].Paths, r.Suites[1].Paths[1]) }, "has paths from testdata/csv/, testdata/sheet/ and testdata/sheet/,"},
+	{func(r *Registry) { r.Suites[0].Paths = nil }, "the suite calc runs over testdata/sheet/, and has paths from none,"},
+	{func(r *Registry) { r.Lifts[2].Paths = nil }, "the lift resolve runs over testdata/sheet/, and has paths from none,"},
+	{func(r *Registry) { r.Suites[1].Paths[0].Lifts[2] = "nosuch" }, "the suite evaluate's path from testdata/csv/ names nosuch, and the registry lists no lift of that name, where every lift on a column's path is one its package registers"},
+	{func(r *Registry) { r.Lifts[2].Paths[0].Lifts = []string{"resolve"} }, "the lift resolve's path from testdata/sheet/ names the lift itself, where a column's path names the lifts before it"},
+	{func(r *Registry) {
+		r.Lifts[2].Corpora = []string{"sheet", "sheet"}
+		r.Lifts[2].Paths = append(r.Lifts[2].Paths, r.Lifts[2].Paths[0])
+	}, "the lift resolve runs over testdata/sheet/ twice, where a registry lists each corpus a column runs over once"},
+	{func(r *Registry) { r.Suites[0].Paths[0].Lifts = []string{"parse"} }, "the suite calc consumes the raw input view, and its path from testdata/sheet/ names parse, where a suite over the raw input view passes through no lift"},
+	{func(r *Registry) { r.Suites[1].Paths[1].Lifts = []string{"resolve", "parse", "parse"} }, "the suite evaluate's path from testdata/sheet/ names parse twice, where a column's path names each lift before it once"},
+	{func(r *Registry) { r.Lifts = append(r.Lifts, r.Lifts[2]) }, "the registry lists the lift resolve twice, where each suite and lift a package registers, owned or used, has a name of its own"},
+	{func(r *Registry) { r.Suites = append(r.Suites, r.Suites[0]) }, "the registry lists the suite calc twice, where each suite and lift a package registers, owned or used, has a name of its own"},
+	{func(r *Registry) { r.Suites[0].Name = "parse" }, "the registry lists a suite and a lift named parse, where each suite and lift a package registers, owned or used, has a name of its own"},
+	{func(r *Registry) { r.Suites[0].Outputs[1].Inputs = "" }, `the suite calc declares the output stdout.txt with inputs "", where a registry records "func", "positions", "all" or "none"`},
+	{func(r *Registry) { r.Lifts[0].ProductFiles[0].Inputs = "lines" }, `the lift import declares the product file * with inputs "lines", where a registry records "func", "positions", "all" or "none"`},
+	{func(r *Registry) { r.Suites[1].Outputs[1].Inputs = InputsPositions }, `the suite evaluate declares the output values.txt with inputs "positions", where only an output whose pattern is error.txt takes its ranges from Positions`},
+	{func(r *Registry) { r.Lifts[0].ProductFiles[0] = Output{Pattern: "error.txt", Inputs: InputsPositions} }, `the lift import declares the product file error.txt with inputs "positions", where only an output whose pattern is error.txt takes its ranges from Positions`},
+	{func(r *Registry) { r.Suites[1].Outputs[0].Inputs = InputsFunc }, `the suite evaluate declares the output e* with inputs "func", and the pattern matches error.txt, where error.txt's ranges come from Positions or the whole input view, never from a function`},
+	{func(r *Registry) { r.Lifts[1].Outputs[0].Inputs = InputsFunc }, `the lift parse declares the output error.txt with inputs "func", and the pattern matches error.txt,`},
+	{func(r *Registry) { r.Checks = nil }, "the registry gives no list of corpus checks, where a registry lists each corpus check its package registers, and an empty list for none"},
+	{func(r *Registry) { r.Checks = append(r.Checks, Check{Name: "codes", Description: "Lists them again."}) }, "the registry lists the corpus check codes twice, where each corpus check a package registers has a name of its own"},
 }
 
 // TestParseAny: a registry of each format from Oldest to Format reads in
 // today's form, holding what its format holds; one that holds a key a
 // later format added is no registry; and a format older than Oldest or
 // newer than Format is a FormatError that names it. Parse still reads
-// Format alone.
+// Format alone. ParseAny refuses what Parse would refuse at the registry's
+// format: each of byHand's edits breaks one of Parse's checks, each check
+// is broken by one of them, and an edited registry, given at each format,
+// is refused with the check's error from the format the check holds from,
+// and read before it. A check holds from the first format that can show
+// what breaks it: a format before it can't show one of its edits.
 func TestParseAny(t *testing.T) {
 	// A format 3 registry, as hypercase's main branch wrote it: corpus
 	// types with no transforms, no codes, and suites with no classifier.
@@ -190,6 +226,14 @@ func TestParseAny(t *testing.T) {
 	v7 = strings.Replace(v7, `"corpora": ["sheet"], "outputs": []`, `"corpora": ["sheet"], "paths": [{"corpus": "sheet", "lifts": []}], "outputs": [{"pattern": "error.txt", "description": "Why it fails."}]`, 1)
 	v7 = strings.Replace(v7, `"productFiles": []`, `"productFiles": [{"pattern": "sheet/*", "description": "A cell."}]`, 1)
 	v7 = strings.Replace(v7, `"consumes": "io/fs.FS", "corpora": ["sheet"],`, `"consumes": "io/fs.FS", "corpora": ["sheet"], "paths": [{"corpus": "sheet", "lifts": []}],`, 1)
+	// A format 8 registry, whose output declarations say what their Inputs
+	// state, and which says whether the project supplies Positions, but
+	// lists no corpus checks.
+	v8 := strings.Replace(v7, `"format": 7`, `"format": 8`, 1)
+	v8 = strings.Replace(v8, `"rootPackage": true,`, `"rootPackage": true, "positions": false,`, 1)
+	v8 = strings.Replace(v8, `"description": "Why it fails."}`, `"description": "Why it fails.", "inputs": "all"}`, 1)
+	v8 = strings.Replace(v8, `"description": "A cell."}`, `"description": "A cell.", "inputs": "func"}`, 1)
+	v8 = strings.Replace(v8, `"description": "What it prints."}`, `"description": "What it prints.", "inputs": "all"}`, 1)
 	for _, tt := range []struct {
 		data              string
 		format            int
@@ -200,6 +244,7 @@ func TestParseAny(t *testing.T) {
 		{v5, 5, 1, 1},
 		{v6, 6, 1, 1},
 		{v7, 7, 1, 1},
+		{v8, 8, 1, 1},
 	} {
 		g, err := ParseAny([]byte(tt.data))
 		if err != nil {
@@ -216,8 +261,9 @@ func TestParseAny(t *testing.T) {
 			len(g.Lifts) != tt.lifts || slices.ContainsFunc(g.Lifts, func(l Lift) bool { return l.Bytes }) ||
 			tt.format < 6 && slices.ContainsFunc(g.Lifts, func(l Lift) bool { return l.ProductFiles != nil }) ||
 			tt.format < 7 && (g.Suites[0].Paths != nil || slices.ContainsFunc(g.Lifts, func(l Lift) bool { return l.Paths != nil })) ||
-			tt.format == 7 && (len(g.Suites[0].Paths) != 1 || len(outputs) != 2) ||
-			g.Positions || slices.ContainsFunc(append(outputs, g.Suites[0].Outputs...), func(o Output) bool { return o.Inputs != "" }) {
+			tt.format >= 7 && (len(g.Suites[0].Paths) != 1 || len(outputs) != 2) ||
+			g.Positions || slices.ContainsFunc(append(outputs, g.Suites[0].Outputs...), func(o Output) bool { return (o.Inputs != "") != (tt.format >= 8) }) ||
+			g.Checks != nil {
 			t.Errorf("format %d reads as %+v", tt.format, g)
 		}
 		if _, err := Parse([]byte(tt.data)); !errors.As(err, new(*FormatError)) {
@@ -225,10 +271,11 @@ func TestParseAny(t *testing.T) {
 		}
 	}
 	now := Registry{CorpusRoot: ".", Codes: true, Positions: true, Suites: []Suite{{Name: "evaluate", Classifier: &Classifier{Name: "div-zero", Description: "Divides by zero."},
-		Corpora: []string{"sheet"}, Paths: []Path{{Corpus: "sheet", Lifts: []string{"resolve", "parse"}}},
+		Corpora: []string{"csv"}, Paths: []Path{{Corpus: "csv", Lifts: []string{"import"}}},
 		Outputs: []Output{{Pattern: "error.txt", Description: "Why it fails.", Inputs: InputsPositions}}}},
-		Lifts: []Lift{{Name: "import", Bytes: true, ProductFiles: []Output{{Pattern: "sheet/*", Description: "A cell.", Inputs: InputsFunc}}, Corpora: []string{"csv"}, Paths: []Path{{Corpus: "csv"}}}}}
-	if g, err := ParseAny(now.Marshal()); err != nil || !bytes.Equal(g.Marshal(), now.Marshal()) {
+		Lifts:  []Lift{{Name: "import", Bytes: true, ProductFiles: []Output{{Pattern: "sheet/*", Description: "A cell.", Inputs: InputsFunc}}, Corpora: []string{"csv"}, Paths: []Path{{Corpus: "csv"}}}},
+		Checks: []Check{{Name: "codes", Description: "Lists the codes."}}}
+	if g, err := ParseAny(now.Marshal()); err != nil || !bytes.Equal(g.Marshal(), now.Marshal()) || len(g.Checks) != 1 {
 		t.Errorf("format %d: got %+v, %v", Format, g, err)
 	}
 
@@ -245,7 +292,15 @@ func TestParseAny(t *testing.T) {
 		{strings.Replace(v7, `"description": "A cell."}`, `"description": "A cell.", "inputs": "func"}`, 1), "it is not a registry: it holds format 7, and lifts[].productFiles[].inputs, which format 8 added"},
 		{strings.Replace(v7, `"rootPackage": true,`, `"rootPackage": true, "positions": false,`, 1), "it is not a registry: it holds format 7, and positions, which format 8 added"},
 		{strings.Replace(v7, `"description": "What it prints."}`, `"description": "What it prints.", "inputs": "all"}`, 1), "it is not a registry: it holds format 7, and suites[].outputs[].inputs, which format 8 added"},
+		{strings.Replace(v8, `"rootPackage": true,`, `"rootPackage": true, "checks": [],`, 1), "it is not a registry: it holds format 8, and checks, which format 9 added"},
+		{strings.Replace(v8, `"rootPackage": true,`, `"rootPackage": true, "checks": null,`, 1), "it is not a registry: it holds format 8, and checks, which format 9 added"},
+		// v8, at format 9, holds no "checks" key.
+		{strings.Replace(v8, `"format": 8`, `"format": 9`, 1), "the registry gives no list of corpus checks, where a registry lists each corpus check its package registers, and an empty list for none"},
 		{strings.Replace(v4, `"rejects": ["circular"]}`, `"rejects": ["circular"], "later": 1}`, 1), `it is not a registry: json: unknown field "later"`},
+		// Registration has refused a second column of one name, and
+		// listed each corpus a column runs over once, since format 3.
+		{strings.Replace(v3, `"suites": [{"name": "calc"`, `"suites": [{"name": "calc", "description": "Runs calc again.", "consumes": "io/fs.FS", "corpora": ["sheet"], "outputs": [], "rejects": []}, {"name": "calc"`, 1), "the registry lists the suite calc twice,"},
+		{strings.Replace(v3, `"corpora": ["sheet"]`, `"corpora": ["sheet", "sheet"]`, 1), "the suite calc runs over testdata/sheet/ twice,"},
 		{`{"format": 0}`, "it is not a registry: it holds no format version"},
 		{`[]`, "it is not a registry"},
 	} {
@@ -260,6 +315,110 @@ func TestParseAny(t *testing.T) {
 			t.Errorf("format %d: got %v, want a FormatError", format, err)
 		}
 	}
+
+	// ParseAny refuses what Parse would refuse at the registry's format.
+	// parseNow's registry, and each of byHand's edits of it, is given at
+	// each format, holding only the keys of that format.
+	keys := formatKeys(t)
+	at := func(r *Registry, f int) []byte {
+		t.Helper()
+		data, err := json.Marshal(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var v any
+		if err := json.Unmarshal(data, &v); err != nil {
+			t.Fatal(err)
+		}
+		m := shape(v, "", func(k string) bool { return slices.Contains(keys[f], k) }, "").(map[string]any)
+		m["format"] = f
+		if data, err = json.Marshal(m); err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	base := parseNow()
+	for f := Oldest; f <= Format; f++ {
+		if _, err := ParseAny(at(&base, f)); err != nil {
+			t.Errorf("parseNow's registry, at format %d: %v", f, err)
+		}
+	}
+	// Each of byHand's edits breaks one of Parse's checks, and each check
+	// is broken by one of them, so that every check is tried at every
+	// format. A check holds from the format that added what it checks, so
+	// the format before it reads one of its edits as the unedited registry:
+	// that holds each check's format in parseChecks to the formats' keys.
+	unedited, err := Parse(base.Marshal())
+	if err != nil {
+		t.Fatal(err)
+	}
+	broken := make([]bool, len(parseChecks))
+	hidden := make([]bool, len(parseChecks))
+	for _, e := range byHand {
+		r, err := Parse(base.Marshal())
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.edit(r)
+		var by []int
+		for i, c := range parseChecks {
+			if c.check(r) != nil {
+				by = append(by, i)
+			}
+		}
+		if len(by) != 1 {
+			t.Errorf("the registry edited by hand that Parse refuses with %q breaks %d of Parse's checks, where each of byHand's edits breaks one", e.want, len(by))
+			continue
+		}
+		c := parseChecks[by[0]]
+		broken[by[0]] = true
+		if c.format > Oldest && bytes.Equal(at(r, c.format-1), at(unedited, c.format-1)) {
+			hidden[by[0]] = true
+		}
+		want := c.check(r).Error()
+		for f := Oldest; f <= Format; f++ {
+			switch _, err := ParseAny(at(r, f)); {
+			case f >= c.format && (err == nil || err.Error() != want):
+				t.Errorf("a format %d registry, edited by hand to break %s, which holds from format %d: got %v, want %q", f, checkName(c.check), c.format, err, want)
+			case f < c.format && err != nil:
+				t.Errorf("a format %d registry, edited by hand to break %s, which holds from format %d: got %v, want it read", f, checkName(c.check), c.format, err)
+			}
+		}
+	}
+	for i, c := range parseChecks {
+		switch {
+		case !broken[i]:
+			t.Errorf("none of byHand's edits breaks %s, which holds from format %d: give byHand an edit that breaks it alone.", checkName(c.check), c.format)
+		case c.format > Oldest && !hidden[i]:
+			t.Errorf("each of byHand's edits that breaks %s shows at format %d, before the format %d it holds from, where a check holds from the first format that can show what breaks it", checkName(c.check), c.format-1, c.format)
+		}
+	}
+}
+
+// checkName names one of Parse's checks.
+func checkName(check func(*Registry) error) string {
+	name := runtime.FuncForPC(reflect.ValueOf(check).Pointer()).Name()
+	return name[strings.LastIndex(name, ".")+1:]
+}
+
+// formatKeys returns the key paths of each format from Oldest to Format,
+// as testdata/keys-<N>.txt holds them.
+func formatKeys(t *testing.T) map[int][]string {
+	t.Helper()
+	keys := map[int][]string{}
+	for f := Oldest; f <= Format; f++ {
+		data, err := os.ReadFile(keysFile(f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		keys[f] = strings.Fields(string(data))
+	}
+	return keys
+}
+
+// keysFile is the file that holds format f's key paths.
+func keysFile(f int) string {
+	return filepath.Join("testdata", fmt.Sprintf("keys-%d.txt", f))
 }
 
 // keysVar writes today's format's keys, as it writes the module's other
@@ -279,6 +438,7 @@ var frozenKeys = map[int]string{
 	6: "8296bfb2da3b7ab45e4e249079e81a8f51cc23de8fb2a204e4632029c3e662e4",
 	7: "10ed6d7e887c1f6afc455f8de8f6cbdc4c1184ee7e34ba900faced74b4fbcd3f",
 	8: "814db4c29a8ee83244465ac6dcda61e31eb7609e36400a01c96c9b71e740790e",
+	9: "ca550388eaeffc7e48d45af5036c875b605122fe53c7a1edf9abcf166e1e9fb6",
 }
 
 // TestFormatKeys: testdata/keys-<N>.txt holds the key paths of a registry
@@ -293,30 +453,29 @@ var frozenKeys = map[int]string{
 // keys.
 func TestFormatKeys(t *testing.T) {
 	now := []byte(strings.Join(registrytest.KeyPaths(t, reflect.TypeFor[Registry]()), "\n") + "\n")
-	golden := func(f int) string { return filepath.Join("testdata", fmt.Sprintf("keys-%d.txt", f)) }
 	if os.Getenv(keysVar) == "1" {
-		if err := os.WriteFile(golden(Format), now, 0o644); err != nil {
+		if err := os.WriteFile(keysFile(Format), now, 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 	keys := map[int][]string{}
 	for f := Oldest; f <= Format; f++ {
-		data, err := os.ReadFile(golden(f))
+		data, err := os.ReadFile(keysFile(f))
 		if err != nil {
 			t.Fatalf("%v\nRun %s=1 go test ./... to write format %d's keys.", err, keysVar, Format)
 		}
 		if f == Format && !bytes.Equal(data, now) {
-			t.Errorf("a registry's keys are not those of format %d (-%s +today):\n%s\nA change to them is a new format, unless no commit of main holds format %d: bump Format if one does, give added what the change adds, and run %s=1 go test ./... to write the keys.", Format, golden(f), diff.Lines(data, now), Format, keysVar)
+			t.Errorf("a registry's keys are not those of format %d (-%s +today):\n%s\nA change to them is a new format, unless no commit of main holds format %d: bump Format if one does, give added what the change adds, and run %s=1 go test ./... to write the keys.", Format, keysFile(f), diff.Lines(data, now), Format, keysVar)
 		}
 		switch sum := fmt.Sprintf("%x", sha256.Sum256(data)); {
 		case frozenKeys[f] == "" && f < Format:
-			t.Errorf("format %d is below today's, %d, and frozenKeys has no sum of its keys, %s.\nGive frozenKeys %d: %q, the sum of the keys format %d held while it was today's.", f, Format, golden(f), f, sum, f)
+			t.Errorf("format %d is below today's, %d, and frozenKeys has no sum of its keys, %s.\nGive frozenKeys %d: %q, the sum of the keys format %d held while it was today's.", f, Format, keysFile(f), f, sum, f)
 		case frozenKeys[f] == "":
-			t.Errorf("frozenKeys has no sum of today's format's keys, %s.\nGive frozenKeys %d: %q, once the keys are those format %d holds.", golden(f), f, sum, f)
+			t.Errorf("frozenKeys has no sum of today's format's keys, %s.\nGive frozenKeys %d: %q, once the keys are those format %d holds.", keysFile(f), f, sum, f)
 		case sum != frozenKeys[f] && f < Format:
-			t.Errorf("%s changed: format %d is below today's, %d, so its keys are history, and frozenKeys has the sum %s, where the file's is %s.\nRestore the keys whose sum frozenKeys holds. A change to a registry's keys is a new format.", golden(f), f, Format, frozenKeys[f], sum)
+			t.Errorf("%s changed: format %d is below today's, %d, so its keys are history, and frozenKeys has the sum %s, where the file's is %s.\nRestore the keys whose sum frozenKeys holds. A change to a registry's keys is a new format.", keysFile(f), f, Format, frozenKeys[f], sum)
 		case sum != frozenKeys[f]:
-			t.Errorf("%s changed: frozenKeys has the sum %s of today's format's keys, where the file's is %s.\nIf a commit of main holds format %d, the change is a new format: restore the keys, bump Format, give added what the change adds, and run %s=1 go test ./... to write the new format's keys. If none does, give frozenKeys %d: %q.", golden(f), frozenKeys[f], sum, f, keysVar, f, sum)
+			t.Errorf("%s changed: frozenKeys has the sum %s of today's format's keys, where the file's is %s.\nIf a commit of main holds format %d, the change is a new format: restore the keys, bump Format, give added what the change adds, and run %s=1 go test ./... to write the new format's keys. If none does, give frozenKeys %d: %q.", keysFile(f), frozenKeys[f], sum, f, keysVar, f, sum)
 		}
 		keys[f] = strings.Fields(string(data))
 	}
@@ -351,7 +510,21 @@ func TestFormatKeys(t *testing.T) {
 		t.Errorf("added holds %v, and the formats' keys say each format added %v, in format order.\nGive added each key a format adds, whose parent the format before it holds, at that format. A key added at today's format, %d, is a new format if a commit of main holds format %d: then bump Format, give added the key at the new format, and run %s=1 go test ./... to write its keys.", table, adds, Format, Format, keysVar)
 	}
 
-	full := registrytest.Full(t, reflect.TypeFor[Registry]())
+	// A registry that holds every key, and that the update could have
+	// written, so that ParseAny's checks of what it holds pass: its lift is
+	// named apart from its suite, the suite's path passes through the lift,
+	// and each output declaration records one of the statements of Inputs.
+	g := registrytest.Populated(t, reflect.TypeFor[Registry]()).Interface().(Registry)
+	g.Lifts[0].Name = "y"
+	g.Lifts[0].Paths[0].Lifts = []string{}
+	g.Suites[0].Paths[0].Lifts = []string{"y"}
+	for _, o := range []*Output{&g.Suites[0].Outputs[0], &g.Lifts[0].Outputs[0], &g.Lifts[0].ProductFiles[0]} {
+		o.Inputs = InputsAll
+	}
+	var full any
+	if err := json.Unmarshal(g.Marshal(), &full); err != nil {
+		t.Fatal(err)
+	}
 	for f := Oldest; f <= Format; f++ {
 		holds := func(more string) func(string) bool {
 			return func(k string) bool {
@@ -395,7 +568,8 @@ func parentKey(k string) string {
 }
 
 // shape returns v holding only the keys that holds holds, and null for the
-// key null names.
+// key null names. A list keeps its length, an empty one included, and a
+// key that holds null keeps it.
 func shape(v any, prefix string, holds func(string) bool, null string) any {
 	switch v := v.(type) {
 	case map[string]any:
@@ -403,7 +577,7 @@ func shape(v any, prefix string, holds func(string) bool, null string) any {
 		for k, c := range v {
 			switch p := prefix + k; {
 			case !holds(p):
-			case p == null:
+			case p == null, c == nil:
 				m[k] = nil
 			case reflect.TypeOf(c).Kind() == reflect.Slice:
 				m[k] = shape(c, p+"[].", holds, null)
@@ -413,7 +587,7 @@ func shape(v any, prefix string, holds func(string) bool, null string) any {
 		}
 		return m
 	case []any:
-		var l []any
+		l := []any{}
 		for _, c := range v {
 			l = append(l, shape(c, prefix, holds, null))
 		}

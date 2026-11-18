@@ -38,6 +38,9 @@ const (
 	observeEnv     = "HYPERCASE_SELFTEST_OBSERVE"
 	fixtureUpdate  = "FIXTURE_UPDATE_GOLDEN"
 	transcriptsVar = "HYPERCASE_UPDATE_GOLDEN"
+	// hooksEnv, set to a file's path, has the child record the views its
+	// project's Positions receives (recordingViews).
+	hooksEnv = "HYPERCASE_SELFTEST_HOOKS"
 )
 
 func init() {
@@ -75,6 +78,9 @@ func init() {
 	}
 	if !ok {
 		panic("selftest: no registration named " + name)
+	}
+	if p := os.Getenv(hooksEnv); p != "" {
+		project = recordingViews(project, p)
 	}
 	register()
 }
@@ -256,7 +262,7 @@ func childEnv() []string {
 	var env []string
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
-		if k != fixtureEnv && k != reverseEnv && k != observeEnv && k != fixtureUpdate && k != transcriptsVar && k != "GOFLAGS" && k != "PWD" {
+		if k != fixtureEnv && k != reverseEnv && k != observeEnv && k != hooksEnv && k != fixtureUpdate && k != transcriptsVar && k != "GOFLAGS" && k != "PWD" {
 			env = append(env, kv)
 		}
 	}
