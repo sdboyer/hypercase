@@ -179,8 +179,14 @@ func steeredRanges(in fs.FS, file string) (rs []decl.Range, ok bool, err error) 
 // steeredPositions is the fixtures' Positions: each line of an error's
 // text of the form "at <start> <end> <path>" is a range of the lines from
 // start to end of the file at path, the rest of the line; and a line "at
-// panic <text>" panics with the text.
-func steeredPositions(err error) []decl.Range {
+// panic <text>" panics with the text. A path under the root that the
+// view's file loader/root names, an absolute path as a loader's positions
+// give, is of the file at the rest of the path.
+func steeredPositions(in fs.FS, err error) []decl.Range {
+	var root string
+	if data, e := fs.ReadFile(in, "loader/root"); e == nil {
+		root = strings.TrimSuffix(string(data), "\n") + "/"
+	}
 	var rs []decl.Range
 	for _, line := range strings.Split(err.Error(), "\n") {
 		rest, ok := strings.CutPrefix(line, "at ")
@@ -196,6 +202,9 @@ func steeredPositions(err error) []decl.Range {
 		e, err2 := strconv.Atoi(end)
 		if err1 != nil || err2 != nil {
 			continue
+		}
+		if under, ok := strings.CutPrefix(p, root); ok {
+			p = under
 		}
 		rs = append(rs, decl.Range{Path: p, Start: s, End: e})
 	}
