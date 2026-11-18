@@ -2,16 +2,21 @@ package hypercase_test
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 
 	"github.com/sdboyer/hypercase"
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/decl"
 	"github.com/sdboyer/hypercase/internal/revmap"
 )
 
@@ -333,14 +338,14 @@ func TestInputsPositionsReadTheView(t *testing.T) {
 }
 
 // TestInputsPositionsView: Positions receives the view RenderError
-// receives, at every cell. It runs the chain, variant and transform
-// fixtures under recordingViews, in an update and then a normal run, and
-// requires each call of Positions to receive the view RenderError
+// receives, at every cell of the chain, variant and transform fixtures.
+// It runs each under recordingViews, in an update and then a normal run,
+// and requires each call of Positions to receive a view RenderError
 // received with the same error, and each cell whose error.txt takes its
-// ranges from Positions to have had it called on the cell's input view,
-// as the cell's Observed records that view. Among the cells it checks are
-// a base's, a hand-written variant's, a transform's variant's, one past a
-// bytes lift, and a bytes lift's own.
+// ranges from Positions to have its own call, on the cell's input view as
+// the cell's Observed records it: no two cells count one call. Among the
+// cells it checks are a base's, a hand-written variant's, a transform's
+// variant's, one past a bytes lift, and a bytes lift's own.
 func TestInputsPositionsView(t *testing.T) {
 	t.Parallel()
 	var mu sync.Mutex
@@ -363,28 +368,29 @@ func TestInputsPositionsView(t *testing.T) {
 					}
 					records := readViewRecords(t, hooks)
 					for _, rec := range records {
-						switch rec.RenderError {
-						case "":
+						switch {
+						case len(rec.RenderError) == 0:
 							t.Errorf("the %s run called Positions on the error %q, which RenderError never received", run, rec.Error)
-						case rec.Positions:
-						default:
+						case !slices.Contains(rec.RenderError, rec.Positions):
 							t.Errorf("the %s run gave Positions a view other than RenderError's, on the error %q", run, rec.Error)
 						}
 					}
+					var cells []hypercase.Observed
 					for _, o := range readObserved(t, observed) {
-						if o.Record != "cell" || !positioned(t, o) {
-							continue
+						if o.Record == "cell" && positioned(t, o) {
+							cells = append(cells, o)
 						}
-						text, view := strings.TrimSuffix(o.Files["error.txt"], "\n"), viewDigest(o.View)
-						if !slices.ContainsFunc(records, func(rec viewRecord) bool { return rec.Error == text && rec.Positions == view }) {
-							t.Errorf("in the %s run, %s %s%s: no call of Positions on its error received the cell's input view", run, o.Case, o.Prefix, o.Column)
-						}
-						mu.Lock()
+					}
+					for _, o := range uncalled(records, cells) {
+						t.Errorf("in the %s run, %s %s%s: no call of Positions on its error received the cell's input view", run, o.Case, o.Prefix, o.Column)
+					}
+					mu.Lock()
+					for _, o := range cells {
 						for _, k := range viewKinds(o) {
 							checked[k] = true
 						}
-						mu.Unlock()
 					}
+					mu.Unlock()
 				}
 			})
 		}
@@ -394,6 +400,81 @@ func TestInputsPositionsView(t *testing.T) {
 			t.Errorf("no cell checked is %s", k)
 		}
 	}
+}
+
+// uncalled is the cells, of those given, that have no call of Positions
+// of their own among the records: one on the cell's error, by its
+// error.txt, and on its input view, by its Observed. The cells take the
+// calls in order of case, prefix and column, so no two take one call, and
+// the cells it gives are in that order.
+func uncalled(records []viewRecord, cells []hypercase.Observed) []hypercase.Observed {
+	type call struct{ text, view string }
+	calls := map[call]int{}
+	for _, rec := range records {
+		calls[call{rec.Error, rec.Positions}]++
+	}
+	cells = slices.Clone(cells)
+	slices.SortFunc(cells, func(a, b hypercase.Observed) int {
+		return cmp.Or(strings.Compare(a.Case, b.Case), strings.Compare(a.Prefix, b.Prefix), strings.Compare(a.Column, b.Column))
+	})
+	var out []hypercase.Observed
+	for _, o := range cells {
+		c := call{strings.TrimSuffix(o.Files["error.txt"], "\n"), viewDigest(o.View)}
+		if calls[c] == 0 {
+			out = append(out, o)
+			continue
+		}
+		calls[c]--
+	}
+	return out
+}
+
+// TestUncalled: two cells on one view, with one error, and one call of
+// Positions between them: uncalled gives the second of them, which has no
+// call of its own.
+func TestUncalled(t *testing.T) {
+	t.Parallel()
+	view := map[string]string{"do/error": "boom\n"}
+	cell := func(c string) hypercase.Observed {
+		return hypercase.Observed{Case: c, Column: "echo", Files: map[string]string{"error.txt": "boom\n"}, View: view}
+	}
+	records := []viewRecord{{Error: "boom", Positions: viewDigest(view), RenderError: []string{viewDigest(view)}}}
+	got := uncalled(records, []hypercase.Observed{cell("script/b"), cell("script/a")})
+	if len(got) != 1 || got[0].Case != "script/b" {
+		t.Errorf("uncalled gives %v, want script/b's cell alone", got)
+	}
+}
+
+// TestRecordingViews: recordingViews keeps every view RenderError
+// receives with one error, so where two cells share an error value on
+// two views, each one's Positions agrees with its own RenderError. It
+// refuses a project with a RenderError, whose error.txt need not be the
+// error's text, which TestInputsPositionsView finds a cell's call by.
+func TestRecordingViews(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "hooks.jsonl")
+	p := recordingViews(decl.Project{Positions: func(fs.FS, error) []decl.Range { return nil }}, path)
+	shared := errors.New("boom")
+	a, b := fstest.MapFS{"do/a": {Data: []byte("a\n")}}, fstest.MapFS{"do/b": {Data: []byte("b\n")}}
+	p.RenderError(a, shared)
+	p.RenderError(b, shared)
+	p.Positions(a, shared)
+	p.Positions(b, shared)
+	records := readViewRecords(t, path)
+	if len(records) != 2 {
+		t.Fatalf("recordingViews recorded %d calls of Positions, want 2", len(records))
+	}
+	for _, rec := range records {
+		if !slices.Contains(rec.RenderError, rec.Positions) {
+			t.Errorf("a call of Positions disagrees with RenderError, which received its view with its error: %+v", rec)
+		}
+	}
+	defer func() {
+		if recover() == nil {
+			t.Error("recordingViews took a project with a RenderError")
+		}
+	}()
+	recordingViews(decl.Project{Positions: p.Positions, RenderError: p.RenderError}, path)
 }
 
 // positioned reports whether a cell's Observed records a call of

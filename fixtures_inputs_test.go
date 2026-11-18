@@ -49,39 +49,43 @@ var (
 var projectNoPositions = decl.Project{UpdateVar: fixtureUpdate}
 
 // A viewRecord is what recordingViews records of one call of Positions:
-// the error's text, and digests of the views that RenderError and
-// Positions received with it, "" where RenderError received none.
+// the error's text, a digest of the view Positions received, and digests
+// of each view RenderError received with the same error, none where it
+// received none.
 type viewRecord struct {
-	Error       string `json:"error"`
-	RenderError string `json:"renderError"`
-	Positions   string `json:"positions"`
+	Error       string   `json:"error"`
+	Positions   string   `json:"positions"`
+	RenderError []string `json:"renderError"`
 }
 
-// recordingViews is p, which supplies Positions, with a RenderError and a
-// Positions that record the view each receives: a child run with hooksEnv
-// set to a file's path gives it the fixtures' project. RenderError keeps a
-// digest of its view by the error it renders, and renders as p's does, or,
-// where p has none, as the framework does. Positions appends a viewRecord
-// to the file at path, with the digest RenderError kept for the same
-// error, and finds what p's finds.
+// recordingViews is p, which supplies Positions and no RenderError, with a
+// RenderError and a Positions that record the view each receives: a child
+// run with hooksEnv set to a file's path gives it the fixtures' project.
+// RenderError keeps a digest of its view by the error it renders, a value
+// of a comparable type, and renders as the framework does with no
+// RenderError, so a cell's error.txt is the error's text. Positions
+// appends a viewRecord to the file at path, with the digests RenderError
+// kept for the same error, and finds what p's finds.
 func recordingViews(p decl.Project, path string) decl.Project {
+	if p.RenderError != nil || p.Positions == nil {
+		panic("selftest: recordingViews takes a project that supplies Positions and no RenderError")
+	}
 	var mu sync.Mutex
-	rendered := map[error]string{}
-	render, positions := p.RenderError, p.Positions
+	rendered := map[error][]string{}
+	positions := p.Positions
 	p.RenderError = func(in fs.FS, err error) []byte {
 		d := digestOf(in)
 		mu.Lock()
-		rendered[err] = d
-		mu.Unlock()
-		if render == nil {
-			return []byte(err.Error() + "\n")
+		if !slices.Contains(rendered[err], d) {
+			rendered[err] = append(rendered[err], d)
 		}
-		return render(in, err)
+		mu.Unlock()
+		return []byte(err.Error() + "\n")
 	}
 	p.Positions = func(in fs.FS, err error) []decl.Range {
 		rec := viewRecord{Error: err.Error(), Positions: digestOf(in)}
 		mu.Lock()
-		rec.RenderError = rendered[err]
+		rec.RenderError = slices.Clone(rendered[err])
 		data, e := json.Marshal(rec)
 		if e == nil {
 			e = appendLine(path, data)
