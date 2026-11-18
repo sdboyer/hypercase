@@ -45,11 +45,9 @@ var (
 // its files, and that of every package of its module that it imports,
 // against the export data of the other modules' packages and the standard
 // library's, which go list builds. It uses the go command and the
-// standard library alone, so the module needs no loader:
-// golang.org/x/tools/go/packages would bring in golang.org/x/mod, a
-// module hypercase doesn't otherwise require. It fails on a non-test file
-// of one of the module's packages that build constraints exclude here,
-// which it can't read, so no check of the source misses one.
+// standard library alone, so the module needs no loader. It fails on a
+// non-test file of one of the module's packages that build constraints
+// exclude here, which it can't read, so no check of the source misses one.
 func loadSource(t *testing.T) *source {
 	t.Helper()
 	loadedOnce.Do(func() { loaded, loadErr = typeCheck(".") })
