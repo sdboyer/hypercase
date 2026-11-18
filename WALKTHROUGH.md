@@ -1163,10 +1163,12 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 - The root-package check (below) runs in normal runs alone, so an update
   walks the corpus root's `testdata/` for symbolic links itself, before it
   takes the lock or writes anything. Its walk skips a nested module, as
-  the check's does, but not another corpus root. On a link there,
-  `testdata/` itself included, which would take a write through it, the
-  update writes nothing and fails, naming the link in the check's words.
-  So it does when the walk can't read a directory. A link made while the
+  the check's does, but not another corpus root, which a registry in a
+  package no test runs may record. On any link it reaches, `testdata/`
+  itself included, the update writes nothing and fails, naming the link in
+  the check's words. That includes some that no check reports: one in
+  another corpus root's directory, outside that root's own `testdata/`. It
+  fails too when the walk can't read a directory. A link made while the
   update runs is left to the next normal run's check.
 - A temp file left by a killed write, beside an archive, a registry or a
   findings file, fails the run, naming it.

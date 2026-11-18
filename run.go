@@ -77,9 +77,10 @@ func Test(t *testing.T) {
 //
 // The check leaves another corpus root to that root's check. A registry
 // that records one, in a package no test runs as well, would hide its
-// directory from a walk that skipped it, while the update writes there,
-// and a link under another corpus root's testdata/ breaks that root's
-// rule anyway.
+// directory from a walk that skipped it, while the update writes there.
+// So the update refuses every link under this root's testdata/ but in a
+// nested module, some that no check reports among them: one in another
+// corpus root's directory, outside that root's own testdata/.
 func (r *runner) refuseLinks(t *testing.T) bool {
 	t.Helper()
 	td := filepath.Join(r.corpusRoot, "testdata")

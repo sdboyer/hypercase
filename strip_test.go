@@ -37,6 +37,11 @@ var stripRegistrations = map[string]func(){
 	// louder dropped from the export type, as both packages register it.
 	"strip-a-plain": func() { chain(project, plainExportType, own(importLift, parse, resolve, cellsCheck)) },
 	"strip-b-plain": func() { stripB(plainExportType, own(evaluate, list, exportCheck)) },
+	// A corpus root inside the module-root corpus's testdata/, with its own
+	// root-package check.
+	"strip-inner": func() {
+		hypercase.Register(project, hypercase.Root("testdata/inner"), rootPkg, scriptType, own(echo))
+	},
 }
 
 func stripB(export decl.Type[Export], owned hypercase.Option) {
@@ -792,6 +797,37 @@ func TestUpdateLinkOtherRoot(t *testing.T) {
 		t.Errorf("%s is no symbolic link after the update, which wrote in its place", prices)
 	}
 	s.unlink(prices)
+	s.unchanged(before)
+	s.done()
+}
+
+// TestUpdateLinkInnerRoot: the update's walk skips no other corpus root,
+// so it refuses a symbolic link inside a nested corpus root's directory,
+// outside that root's own testdata/, where no normal run reports one: the
+// module-root corpus's check leaves the directory to that root's check,
+// which reads only its testdata/. That is strict on purpose. The walk
+// can't tell a corpus root a package checks from one a stray registry
+// records, where it would miss a link a write goes through
+// (TestUpdateLinkOtherRoot), so it skips neither. The nested root's own
+// update walks only its testdata/, and passes.
+func TestUpdateLinkInnerRoot(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	inner := childRun{"inner", "strip-inner", true}
+	s.write("inner/corpus_test.go", []byte("package fixture\n"), "a package, inner, whose corpus root is testdata/inner")
+	s.write("testdata/inner/testdata/script/twice.txtar", []byte("A1 is twice B1, which inner prints with echo.\n-- in/do/out/values.txt --\nA1 6\n"), "an archive of the corpus root testdata/inner")
+	s.write("testdata/inner/README.txt", []byte("Notes on the corpus root testdata/inner.\n"), "a file in the corpus root testdata/inner, outside its testdata/")
+	s.settle(append(slices.Clone(stripModule), inner)...)
+	before := s.snapshot()
+	s.link("testdata/inner/README.txt", "")
+	const fix = "testdata/ holds no symbolic links: testdata/inner/README.txt is one, so the update wrote nothing.\nRemove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again."
+	s.fails(s.update("strip-a"), fix)
+	s.fails(s.run("b", "strip-b", true), fix)
+	s.passes(s.run(inner.pkg, inner.registration, true))
+	s.passes(s.normal("strip-a"))
+	s.passes(s.run("b", "strip-b", false))
+	s.passes(s.run(inner.pkg, inner.registration, false))
+	s.unlink("testdata/inner/README.txt")
 	s.unchanged(before)
 	s.done()
 }
