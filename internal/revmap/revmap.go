@@ -1,9 +1,9 @@
 // Package revmap reads and writes a cell's inputs file, out/<column>/inputs:
 // its reverse maps, which give, for each of the cell's output files, the
 // archive sections and lines it comes from, or that it depends on all of
-// the cell's inputs. The framework writes it with Format, and Parse reads
-// it back: today only tests do, as the report shows the file as any other,
-// and the report of #18 will read it. It doesn't import testing.
+// the cell's inputs. The framework writes it with Format, and tests read it
+// back with Parse; the report shows the file as it shows any other. It
+// doesn't import testing.
 //
 // The file holds, for each output file, in path order, bytewise, a line
 // holding the file's path, then one line per range, indented two spaces:

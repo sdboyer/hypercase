@@ -254,8 +254,10 @@ func TestResolve(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("got  %s\nwant %s", got, tt.want)
 			}
-			if _, err := sheet.EvalCells(tt.cells); err != nil && describe(t, sheetFS(tt.cells), err) != tt.want {
-				t.Errorf("EvalCells: got %s, want %s", describe(t, sheetFS(tt.cells), err), tt.want)
+			if _, err := sheet.EvalCells(tt.cells); err != nil {
+				if got := describe(t, sheetFS(tt.cells), err); got != tt.want {
+					t.Errorf("EvalCells: got %s, want %s", got, tt.want)
+				}
 			}
 		})
 	}

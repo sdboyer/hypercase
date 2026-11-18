@@ -68,9 +68,11 @@ func Format(p *Parsed) []byte {
 }
 
 // Parse reads and parses every cell of the sheet in fsys. A file system with
-// no sheet/ holds an empty sheet. Parse fails with S101 on the first problem
-// it meets, taking the cells in cell order, then whatever under sheet/ is not
-// named for a cell, by name.
+// no sheet/ holds an empty sheet. Parse reads everything under sheet/ before
+// it parses a cell, so an error reading a file or a directory comes before
+// any cell's problem. Then it fails with S101 on the first problem it meets,
+// taking the cells in cell order, then whatever under sheet/ is not named
+// for a cell, by name.
 func Parse(fsys fs.FS) (*Parsed, error) {
 	files, err := readCells(fsys)
 	if err != nil {
@@ -139,7 +141,10 @@ type cellFile struct {
 	name, path string
 	data       []byte
 	dir        bool
-	files      []string // a directory's files, by path, in lexical order
+	// files are a directory's files, by path, in fs.WalkDir's order: each
+	// directory's entries sorted by name, with a subdirectory's files where
+	// its name falls, so sheet/A1/a/b comes before sheet/A1/a-b.
+	files []string
 }
 
 // readCells reads every entry under sheet/, in cell order.
