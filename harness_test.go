@@ -39,7 +39,7 @@ const (
 	fixtureUpdate  = "FIXTURE_UPDATE_GOLDEN"
 	transcriptsVar = "HYPERCASE_UPDATE_GOLDEN"
 	// hooksEnv, set to a file's path, has the child record the views its
-	// project's RenderError and Positions receive (recordingViews).
+	// project's Positions receives (recordingViews).
 	hooksEnv = "HYPERCASE_SELFTEST_HOOKS"
 )
 

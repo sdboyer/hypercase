@@ -3862,7 +3862,9 @@ cells blocked at `parse` have no `inputs`.
   points. It receives the cell's input view, the one `RenderError`
   receives, so it can read what turns a position into a path in the view,
   such as a file that names the root a loader's absolute positions are
-  under. The cells still run and the update writes their outputs. It
+  under. It is called for each such `error.txt` on each run of its cell,
+  so it is a function of its arguments alone. The cells still run and the
+  update writes their outputs. It
   writes no `inputs` for a cell with a file of such a declaration, and
   leaves one the cell has as it is; every other cell gets its own.
 - `Range{Path, Start, End}` uses lines counted from 1, `End` included, in

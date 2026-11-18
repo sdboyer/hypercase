@@ -36,9 +36,10 @@ type Project struct {
 	// declaration states FromPositions. It receives that view, the one
 	// RenderError receives, so it can read what turns a position into a
 	// path in the view, such as a file that names the root the error's
-	// positions are under. Every package that registers such a
-	// declaration, owned or used, supplies it. A panic's error.txt has no
-	// error to give it, and so no ranges.
+	// positions are under. It is called for each such error.txt on each
+	// run of its cell, so it is a function of its arguments alone. Every
+	// package that registers such a declaration, owned or used, supplies
+	// it. A panic's error.txt has no error to give it, and so no ranges.
 	Positions func(in fs.FS, err error) []Range
 	// IssueLinks link the text that names an issue, in a gaps line or a
 	// description, to the issue: one per issue tracker the project's gaps

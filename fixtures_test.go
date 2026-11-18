@@ -203,7 +203,7 @@ func steeredPositions(in fs.FS, err error) []decl.Range {
 		if err1 != nil || err2 != nil {
 			continue
 		}
-		if under, ok := strings.CutPrefix(p, root); ok && root != "" {
+		if under, ok := strings.CutPrefix(p, root); ok {
 			p = under
 		}
 		rs = append(rs, decl.Range{Path: p, Start: s, End: e})
