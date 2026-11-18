@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/internal/registry"
 )
 
@@ -15,11 +16,121 @@ func TestRootCheckRemovedSuite(t *testing.T) {
 	s := newSandbox(t, "shared")
 	before := s.read(twice)
 	s.passes(s.run("b", "pkg-b-gone", true))
-	want := "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place."
+	want := "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root . -column shout at the module root. It removes shout's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports."
 	s.fails(s.normal("pkg-a"), want)
 	s.passes(s.update("pkg-a"))
 	s.same(twice, before)
-	s.fails(s.normal("pkg-a"), want)
+	r := s.normal("pkg-a")
+	s.fails(r, want)
+	// The command the message names, then the update, leave the check
+	// passing.
+	s.passes(s.strip(s.printedStrip(r, "-column", "shout")...))
+	for _, r := range s.settle(childRun{"", "pkg-a", true}, childRun{"b", "pkg-b-gone", true}) {
+		s.passes(r)
+	}
+	s.hasSections(twice, nil, "out/shout/")
+	s.passes(s.normal("pkg-a"))
+	s.done()
+}
+
+// TestRootCheckRemovedSuiteRoot: under a corpus root other than the
+// module root, the message names it with -root, as the module root sees
+// it, and the command it names, run there, strips that corpus root alone.
+func TestRootCheckRemovedSuiteRoot(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	corp := "corp/testdata/script/twice.txtar"
+	s.write(corp, s.read(twice), "a corpus under the root corp, whose package registers echo alone")
+	s.passes(s.update("corp-a"))
+	r := s.normal("corp-a")
+	s.fails(r, corp+": no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root corp -column shout at the module root.")
+	before := s.read(twice)
+	s.passes(s.strip(s.printedStrip(r, "-column", "shout")...))
+	for _, r := range s.settle(childRun{"", "corp-a", true}) {
+		s.passes(r)
+	}
+	s.hasSections(corp, nil, "out/shout/")
+	s.same(twice, before)
+	s.passes(s.normal("corp-a"))
+	s.done()
+}
+
+// TestRootCheckRemovedSuiteSpaced: a corpus root whose path has a space is
+// quoted in the strip command the message names, so that a shell reads
+// the path as one word.
+func TestRootCheckRemovedSuiteSpaced(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	corp := "my corp/testdata/script/twice.txtar"
+	s.write(corp, s.read(twice), "a corpus under the root \"my corp\", whose package registers echo alone")
+	s.passes(s.update("spaced-a"))
+	s.fails(s.normal("spaced-a"), corp+": no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root 'my corp' -column shout at the module root.")
+	s.done()
+}
+
+// TestRootCheckRemovedSuiteMarked: a removed suite's sections, in a cell
+// a gaps line marks. Strip leaves a marked cell's sections, so the message
+// says to remove the line before the strip. Strip run with the line still
+// there leaves the sections, and the check still fails on them; once the
+// line is gone, strip and the update leave the check passing.
+func TestRootCheckRemovedSuiteMarked(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.passes(s.run("b", "pkg-b-gone", true))
+	s.edit(twice, "a gaps line marks shout's cell", insert("gaps", "shout Prints A1 as SIX. Waits on sheets#15.\n", "out/"))
+	const line = "testdata/script/twice.txtar: gaps, line 1, names shout, and no registry has a column of that name over the corpus script.\nRegister the column, or remove the line."
+	const want = "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -root . -column shout at the module root. It removes shout's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports."
+	r := s.normal("pkg-a")
+	s.fails(r, line, want)
+	cmd := s.printedStrip(r, "-column", "shout")
+
+	// Strip, with the line still there, leaves the sections.
+	r = s.strip(cmd...)
+	s.passes(r)
+	s.contains(r, "testdata/script/twice.txtar: left the cell shout, frozen by its known gap, gaps line 1; hypercase strip -column shout -frozen strips it, and shout's other frozen cells\n")
+	s.fails(s.normal("pkg-a"), line, want)
+
+	s.edit(twice, "remove the line, as the message says", drop("gaps"))
+	s.passes(s.strip(cmd...))
+	for _, r := range s.settle(childRun{"", "pkg-a", true}, childRun{"b", "pkg-b-gone", true}) {
+		s.passes(r)
+	}
+	s.hasSections(twice, nil, "out/shout/")
+	s.passes(s.normal("pkg-a"))
+	s.done()
+}
+
+// TestRootCheckViaMarked: a via/ of no column, in a cell a gaps line
+// marks. No registry says the column is no bytes lift, so strip reads the
+// via/ as part of the marked cell and leaves it, and the message says to
+// remove the line before the strip, as for a removed suite's sections.
+// Once the line is gone, strip and the update leave the check passing.
+func TestRootCheckViaMarked(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.edit(twice, "a product no bytes lift makes, in a cell a gaps line marks", func(a *archive.Archive) {
+		insert("gaps", "nobody Writes A1's product. Waits on sheets#16.\n", "out/")(a)
+		insert("via/nobody/script/A1", "3\n", "out/")(a)
+	})
+	const line = "testdata/script/twice.txtar: gaps, line 1, names nobody, and no registry has a column of that name over the corpus script.\nRegister the column, or remove the line."
+	const want = "testdata/script/twice.txtar: no registry claims via/nobody/script/A1: no bytes lift named nobody runs over the corpus script.\nIf a bytes lift should write them, register it. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -root . -column nobody at the module root."
+	r := s.normal("pkg-a")
+	s.fails(r, line, want)
+	cmd := s.printedStrip(r, "-column", "nobody")
+
+	// Strip, with the line still there, leaves the section.
+	r = s.strip(cmd...)
+	s.passes(r)
+	s.contains(r, "testdata/script/twice.txtar: left the cell nobody, frozen by its known gap, gaps line 1; ")
+	s.fails(s.normal("pkg-a"), line, want)
+
+	s.edit(twice, "remove the line, as the message says", drop("gaps"))
+	s.passes(s.strip(cmd...))
+	for _, r := range s.settle(childRun{"", "pkg-a", true}) {
+		s.passes(r)
+	}
+	s.hasSections(twice, nil, "via/nobody/")
+	s.passes(s.normal("pkg-a"))
 	s.done()
 }
 
@@ -136,7 +247,7 @@ func TestRootCheckArchives(t *testing.T) {
 		"testdata/script/typo.txtar has problems of form, so none of its cells run, and no update writes it:\n  ni/do/out/values.txt: ni is not one of the framework's top-level names",
 		"testdata/script/old/ holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.",
 		"testdata/renamed/ holds archives, and no registry declares the directory: no corpus type has it as its Dir, and no suite names it as its Corpus.\nDeclare a decl.Type with that Dir, or move or delete the archives.",
-		"testdata/ holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.\nMove the archives into one.",
+		"testdata/ holds archives directly, and an archive belongs in a corpus's directory, testdata/<corpus>/.\nMove the archives into one, or delete them.",
 		"--- PASS: TestCorpus/script/nameless/echo",
 		"--- PASS: TestCorpus/script/loopy/echo")
 	s.passes(s.run("b", "pkg-b", true))
@@ -154,6 +265,17 @@ func TestRootCheckDeclaredDirectory(t *testing.T) {
 	s.write(twice, []byte("A1 is twice B1, and only echo prints it.\n-- in/do/out/values.txt --\nA1 6\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 6\n"), "")
 	r := s.normal("pkg-a")
 	s.passes(r)
+	s.done()
+}
+
+// TestRootCheckNoTestdata: a corpus root with no testdata/ holds no
+// archive, and the root-package check passes over it.
+func TestRootCheckNoTestdata(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "shared")
+	s.write("corp/README", []byte("A corpus root with no testdata/ yet.\n"), "a corpus root, corp, with no testdata/")
+	s.passes(s.update("corp-root-only"))
+	s.passes(s.normal("corp-root-only"))
 	s.done()
 }
 

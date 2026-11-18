@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/sdboyer/hypercase/internal/hooks"
 )
 
 // tempPrefix starts the name of every temp file a write creates. A temp file
@@ -20,10 +22,6 @@ const tempPrefix = ".hypercase-tmp-"
 func IsTemp(name string) bool {
 	return strings.HasPrefix(filepath.Base(name), tempPrefix)
 }
-
-// afterTemp, when set, runs once a write's temp file is written and before
-// it is renamed. Tests set it to make a write fail at that point.
-var afterTemp func(tmp string) error
 
 // WriteFile writes data to the named file through a temp file in the same
 // directory, synced and renamed over it, so a reader sees the old file or
@@ -61,8 +59,8 @@ func WriteFile(name string, data []byte) (err error) {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	if afterTemp != nil {
-		if err := afterTemp(tmp); err != nil {
+	if hooks.AfterTemp != nil {
+		if err := hooks.AfterTemp(tmp); err != nil {
 			return err
 		}
 	}

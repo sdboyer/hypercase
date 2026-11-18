@@ -143,7 +143,7 @@ func TestVariantRootCheck(t *testing.T) {
 		"testdata/script/twice.txtar: variant/more/gaps, line 1, names format, and no registry has a column of that name over the corpus script.",
 		"testdata/script/twice.txtar: gaps, line 1, names transform/nope, and no corpus type of testdata/script/ lists a transform of that name.\nList the transform, or remove the line.",
 		"testdata/script/twice.txtar: no registry claims variant/more/out/shout/values.txt: no column named shout runs over the corpus script.",
-		"testdata/script/twice.txtar: no registry claims transform/nope/in/do/out/values.txt and transform/nope/out/echo/values.txt: no corpus type of testdata/script/ lists a transform named nope.\nIf a transform should make the variant, list it in its corpus type's Transforms. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.")
+		"testdata/script/twice.txtar: no registry claims transform/nope/in/do/out/values.txt and transform/nope/out/echo/values.txt: no corpus type of testdata/script/ lists a transform named nope.\nIf a transform should make the variant, list it in its corpus type's Transforms. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -root . -transform nope at the module root.")
 	s.done()
 }
 

@@ -1,6 +1,6 @@
 $ go test  # echo
     testdata/script/gone.txtar: no registry claims out/other/values.txt: no column named other runs over the corpus script.
-        If a column should write them, register the column. If not, delete them by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves them in place.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column other at the module root. It removes other's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     script/gone: The run no longer writes old.txt, and no column named other is registered.
         echo: Does what the case's do/ tree says.
         out/echo/old.txt is an output the run no longer produces.

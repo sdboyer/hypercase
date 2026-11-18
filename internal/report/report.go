@@ -35,9 +35,11 @@ type Options struct {
 	Dir string
 	// Env is git's environment, or nil for this process's.
 	Env []string
-	// Root is the corpus root, relative to Dir. When it is empty, the
-	// corpus root is found as a test finds it: the one the registry of the
-	// package in Dir records, or else the module root.
+	// Root is the corpus root, relative to Dir and inside the repository;
+	// an absolute path is refused. When it is empty, the corpus root is
+	// found as a test finds it: the one the registry of the package in Dir
+	// records, at B, or at A where B has no module there, or, with no
+	// registry there, the module root, from any directory of the module.
 	Root string
 	// A and B are the revisions to compare.
 	A, B string
