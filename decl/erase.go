@@ -109,10 +109,10 @@ func (l Lift[In, Out]) erase() any {
 		Jenny:       !reflect.ValueOf(l.Jenny).IsZero(),
 	}
 	for _, o := range l.Outputs {
-		e.Outputs = append(e.Outputs, erase.Output(o))
+		e.Outputs = append(e.Outputs, o.erased())
 	}
 	for _, o := range l.Product {
-		e.Product = append(e.Product, erase.Output(o))
+		e.Product = append(e.Product, o.erased())
 	}
 	if e.Jenny {
 		j := l.Jenny
@@ -128,4 +128,10 @@ func (l Lift[In, Out]) erase() any {
 		}
 	}
 	return e
+}
+
+// erased is the output declaration as a lift's erased form holds it, with
+// its Inputs as an opaque value: erase can't import decl, which imports it.
+func (o Output) erased() erase.Output {
+	return erase.Output{Pattern: o.Pattern, Description: o.Description, Inputs: o.Inputs}
 }

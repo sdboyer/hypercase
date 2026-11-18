@@ -255,6 +255,7 @@ func (r *registrations) addColumn(c *column) {
 	}
 	checkListed("the suite "+c.name, "Rejects", c.rejects)
 	checkPatterns("suite", c.name, c.outputs)
+	checkInputs("suite", c.name, c.outputs)
 	r.checkColumnName("suite", c.name, c.describe())
 	r.columns = append(r.columns, c)
 }
@@ -275,6 +276,7 @@ func (r *registrations) addLift(l *lift) {
 			refuse(fmt.Sprintf("the lift %s's product, %s, is a corpus type, and the lift declares no Product. Declare the product's files in Product, each with a pattern and a description, as a suite declares its outputs.", l.name, l.out))
 		}
 		checkProductPatterns(l)
+		checkProductInputs(l)
 	} else {
 		switch {
 		case l.jenny:
@@ -297,6 +299,7 @@ func (r *registrations) addLift(l *lift) {
 			refuse(fmt.Sprintf("the lift %s declares an output with the pattern %q, which matches neither %s nor %s, the only files a lift's cell writes. Remove the declaration.", l.name, o.Pattern, errorFile, stderrFile))
 		}
 	}
+	checkInputs("lift", l.name, l.outputs)
 	for _, o := range r.lifts {
 		if o.name != l.name || o.in != l.in || o.out != l.out {
 			continue

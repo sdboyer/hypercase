@@ -189,15 +189,22 @@ func newLift(e *erase.Lift, owned bool) *lift {
 		generate:    e.Generate,
 	}
 	for _, o := range e.Outputs {
-		l.outputs = append(l.outputs, decl.Output(o))
+		l.outputs = append(l.outputs, unerased(o))
 	}
 	for _, o := range e.Product {
-		l.product = append(l.product, decl.Output(o))
+		l.product = append(l.product, unerased(o))
 	}
 	for _, p := range e.Rejects {
 		l.rejects = append(l.rejects, decl.Property(p))
 	}
 	return l
+}
+
+// unerased is a lift's output declaration, as decl declares it. Its
+// Inputs is the declaration's, or nil where it states none.
+func unerased(o erase.Output) decl.Output {
+	in, _ := o.Inputs.(decl.Inputs)
+	return decl.Output{Pattern: o.Pattern, Description: o.Description, Inputs: in}
 }
 
 func (l *lift) describe() string {
