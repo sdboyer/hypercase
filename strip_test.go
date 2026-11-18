@@ -638,40 +638,56 @@ func (s *sandbox) unlink(rel string) {
 // TestRootCheckLinks: nothing under a corpus root's testdata/ is a
 // symbolic link. A normal run reads archives through one, where hypercase
 // strip and the root-package check follow none, and the report reads none
-// from git. So the check fails on each link, naming it, whatever it names
-// and wherever it sits: a corpus's directory, an archive,
+// from git. So the check fails on the links, naming each, whatever it
+// names and wherever it sits: a corpus's directory, an archive,
 // testdata/checks/, nothing, itself, or testdata/ itself, naming a
-// directory, nothing, itself or a file. Strip refuses to run, with the
-// same reason, and removes nothing. With the link replaced, the check
-// passes.
+// directory, nothing, itself or a file. It fails once for several links,
+// naming them all. Strip refuses to run, with the same reason, and
+// removes nothing. With the links replaced, the check passes.
 func TestRootCheckLinks(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "strip")
 	s.settle(stripModule...)
-	for _, l := range []struct{ rel, target string }{
-		{"testdata/export", ""},
-		{prices, ""},
-		{"testdata/checks", ""},
-		{"testdata/script", "../shared/missing"},
-		{"testdata/script", "script"},
-		{"testdata", ""},
-		{"testdata", "shared/missing"},
-		{"testdata", "testdata"},
-		{"testdata", "shared/testdata.d/hypercase.json"},
+	type link struct{ rel, target string } // a target of "" names what the link replaces
+	for _, tt := range []struct {
+		links   []link
+		why, it string // for more than one link: the reason, and the word for them
+	}{
+		{links: []link{{"testdata/export", ""}}},
+		{links: []link{{prices, ""}}},
+		{links: []link{{"testdata/checks", ""}}},
+		{links: []link{{"testdata/script", "../shared/missing"}}},
+		{links: []link{{"testdata/script", "script"}}},
+		{links: []link{{"testdata", ""}}},
+		{links: []link{{"testdata", "shared/missing"}}},
+		{links: []link{{"testdata", "testdata"}}},
+		{links: []link{{"testdata", "shared/testdata.d/hypercase.json"}}},
+		{
+			links: []link{{"testdata/export", ""}, {"testdata/script", ""}},
+			why:   "testdata/ holds no symbolic links: testdata/export and testdata/script are links.",
+			it:    "each",
+		},
 	} {
-		why := "testdata/ holds no symbolic links: " + l.rel + " is one."
-		if l.rel == "testdata" {
-			why = "testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none."
+		if len(tt.links) == 1 {
+			tt.why, tt.it = "testdata/ holds no symbolic links: "+tt.links[0].rel+" is one.", "it"
+			if tt.links[0].rel == "testdata" {
+				tt.why = "testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none."
+			}
 		}
+		fix := "Remove " + tt.it + ", or replace it with a copy of what it names, if it names anything"
 		before := s.snapshot()
-		s.link(l.rel, l.target)
-		s.fails(s.normal("strip-a"), why+"\nRemove it, or replace it with a copy of what it names, if it names anything.")
+		for _, l := range tt.links {
+			s.link(l.rel, l.target)
+		}
+		s.fails(s.normal("strip-a"), tt.why+"\n"+fix+".")
 		r := s.strip()
 		if r.code != 1 {
-			t.Errorf("hypercase strip exited %d, not 1, with %s a link:\n%s", r.code, l.rel, r.out)
+			t.Errorf("hypercase strip exited %d, not 1, with %v links:\n%s", r.code, tt.links, r.out)
 		}
-		s.contains(r, "hypercase strip: "+why+" Nothing was removed.\nRemove it, or replace it with a copy of what it names, if it names anything, then run hypercase strip again.")
-		s.unlink(l.rel)
+		s.contains(r, "hypercase strip: "+tt.why+" Nothing was removed.\n"+fix+", then run hypercase strip again.")
+		for _, l := range tt.links {
+			s.unlink(l.rel)
+		}
 		s.unchanged(before)
 		s.passes(s.normal("strip-a"))
 	}
