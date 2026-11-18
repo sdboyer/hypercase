@@ -877,19 +877,25 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	if frozen {
 		// The known gap freezes the cell: its committed files record
 		// today's behavior, and no update writes to it, but to add the
-		// outcome of a cell frozen before outcomes were written, when
-		// nothing else keeps an update from writing the cell. couldWrite
-		// is true when nothing else does.
+		// framework's files of a cell frozen before they were written,
+		// when nothing else keeps an update from writing the cell.
+		// couldWrite is true when nothing else does.
 		couldWrite := writable
 		writable = false
-		_, hasOutcome := goldens[outcomeFile]
-		diffs := frozenDiffs(c.outDir(col.name), goldens, files, unjudged)
+		missing := lacking(goldens)
+		diffs := frozenDiffs(c.outDir(col.name), goldens, files, unjudged, missing)
 		var productDiffs []string
 		if bytesLift && held {
-			productDiffs = frozenDiffs(col.lift.viaDir(c.prefix), cf.product, product, nil)
+			productDiffs = frozenDiffs(col.lift.viaDir(c.prefix), cf.product, product, nil, nil)
 			diffs = append(diffs, productDiffs...)
 		}
-		_, made := files[outcomeFile]
+		// The upgrade adds the missing files the run made.
+		var adds []string
+		for _, p := range missing {
+			if _, made := files[p]; made && !unjudged[p] {
+				adds = append(adds, p)
+			}
+		}
 		switch {
 		case len(diffs) > 0:
 			var cl closing
@@ -912,16 +918,25 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 			ns.add(aboutFrozen,
 				fmt.Sprintf("The cell is frozen by its known gap, %s line %d: %q\nIts committed files record today's behavior, and the run now produces different ones:\n%s", c.gapsAt, gap.Line, gap.Raw, strings.Join(diffs, "\n")),
 				cl)
-		case hasOutcome || !made || !couldWrite:
+		case len(adds) == 0 || !couldWrite:
 		case r.update:
 			// The upgrade, the one write an update makes to a frozen cell:
-			// it adds the outcome, and changes nothing the cell has.
+			// it adds the framework's files the cell lacks, and changes
+			// nothing the cell has.
 			writable = true
-			files = map[string][]byte{outcomeFile: files[outcomeFile]}
+			upgrade := map[string][]byte{}
+			for _, p := range adds {
+				upgrade[p] = files[p]
+			}
+			files = upgrade
 		default:
+			var sections []string
+			for _, p := range adds {
+				sections = append(sections, c.out(col.name, p))
+			}
 			ns.add(aboutFrozen,
-				fmt.Sprintf("The cell is frozen by its known gap, %s line %d: %q\nIts committed files match the run, and it has no %s, which every cell has.", c.gapsAt, gap.Line, gap.Raw, c.out(col.name, outcomeFile)),
-				closing{claims: claims{OnlyOutcome: c.out(col.name, outcomeFile)}})
+				fmt.Sprintf("The cell is frozen by its known gap, %s line %d: %q\nIts committed files match the run, and %s.", c.gapsAt, gap.Line, gap.Raw, lacks(sections)),
+				closing{claims: claims{OnlyAdds: sections}})
 		}
 	} else {
 		r.compare(&ns, c, col, files, goldens, unjudged, writable)
@@ -938,7 +953,8 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	}
 	res.writable = writable
 	res.files = files
-	// An update writes a frozen cell only to add its outcome.
+	// An update writes a frozen cell only to add the framework's files it
+	// lacks.
 	res.via = bytesLift && !frozen
 	res.product = product
 }
@@ -1050,18 +1066,41 @@ func accepts(data []byte) bool {
 	return err == nil && o.State == archive.Accepted
 }
 
+// ranFiles are the framework's files every cell that ran has: those the
+// upgrade adds to a frozen cell that lacks them, when its committed files
+// match its run.
+var ranFiles = []string{outcomeFile}
+
+// lacking returns the files of ranFiles that a cell's committed files
+// lack, in the order of ranFiles.
+func lacking(committed map[string][]byte) []string {
+	var missing []string
+	for _, p := range ranFiles {
+		if _, ok := committed[p]; !ok {
+			missing = append(missing, p)
+		}
+	}
+	return missing
+}
+
+// lacks says, in a frozen cell's note, that the cell has none of the
+// sections, the framework's files it lacks, and which cells have them.
+func lacks(sections []string) string {
+	return fmt.Sprintf("it has no %s, which every cell has", strings.Join(sections, " or "))
+}
+
 // frozenDiffs says how the files a frozen cell's run made, got, differ from
 // its committed ones, each named by its path under dir: its files under
 // out/<column>/, or a bytes lift's product under via/<lift>/. A path that
-// unjudged holds is left out, and so is an outcome the cell lacks, which
-// the upgrade adds.
-func frozenDiffs(dir string, committed, got map[string][]byte, unjudged map[string]bool) []string {
+// unjudged holds is left out, and so is one of missing, the framework's
+// files the cell lacks, which the upgrade adds.
+func frozenDiffs(dir string, committed, got map[string][]byte, unjudged map[string]bool, missing []string) []string {
 	var diffs []string
 	for _, p := range slices.Sorted(maps.Keys(got)) {
 		g, ok := committed[p]
 		switch {
 		case unjudged[p]:
-		case !ok && p == outcomeFile:
+		case !ok && slices.Contains(missing, p):
 		case !ok:
 			diffs = append(diffs, fmt.Sprintf("%s is new", dir+p))
 		case !bytes.Equal(g, got[p]):

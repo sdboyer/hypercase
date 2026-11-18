@@ -3,6 +3,7 @@ package hypercase
 import (
 	"bytes"
 	"fmt"
+	"path"
 	"strings"
 	"testing"
 
@@ -151,13 +152,14 @@ type claims struct {
 	// Frozen that a gaps line freezes it.
 	Nothing bool `json:"nothing,omitempty"`
 	Frozen  bool `json:"frozen,omitempty"`
-	// Writes is a section the update writes, OnlyOutcome a cell's outcome
-	// section, which the update adds, changing nothing else of the cell,
-	// Leaves a section it leaves in place, and Removes one it removes.
-	Writes      string `json:"writes,omitempty"`
-	OnlyOutcome string `json:"onlyOutcome,omitempty"`
-	Leaves      string `json:"leaves,omitempty"`
-	Removes     string `json:"removes,omitempty"`
+	// Writes is a section the update writes, OnlyAdds the sections of a
+	// frozen cell's framework files that it adds, changing nothing else of
+	// the cell, Leaves a section it leaves in place, and Removes one it
+	// removes.
+	Writes   string   `json:"writes,omitempty"`
+	OnlyAdds []string `json:"onlyAdds,omitempty"`
+	Leaves   string   `json:"leaves,omitempty"`
+	Removes  string   `json:"removes,omitempty"`
 	// RemovesInputs names the transform whose variant's inputs the update
 	// removes, and WritesInputs one whose variant's inputs, which the
 	// archive lacks, the update writes. RewritesInputs names one this
@@ -470,8 +472,9 @@ func (st *staging) text(n note, c closing) string {
 	if cl.Writes != "" {
 		says = append(says, said{fmt.Sprintf("Run %s to write it, and read it before committing.", u), fmt.Sprintf("run %s to write it, and read it before committing.", u)})
 	}
-	if cl.OnlyOutcome != "" {
-		says = append(says, said{fmt.Sprintf("Run %s to add it. The update adds the outcome and changes nothing else.", u), fmt.Sprintf("run %s to add it. The update adds the outcome and changes nothing else.", u)})
+	if len(cl.OnlyAdds) > 0 {
+		adds := fmt.Sprintf("to add it. The update adds %s and changes nothing else.", frameworkWords(cl.OnlyAdds))
+		says = append(says, said{fmt.Sprintf("Run %s %s", u, adds), fmt.Sprintf("run %s %s", u, adds)})
 	}
 	if cl.Leaves != "" {
 		s := fmt.Sprintf("%s leaves it in place.", u)
@@ -516,6 +519,21 @@ func (st *staging) text(n note, c closing) string {
 		return all
 	}
 	return all + sep + strings.Join(rest, " ")
+}
+
+// frameworkWords names, in a closing, the framework's files of a cell
+// whose sections are given.
+func frameworkWords(sections []string) string {
+	var words []string
+	for _, s := range sections {
+		switch path.Base(s) {
+		case outcomeFile:
+			words = append(words, "the outcome")
+		default:
+			panic(fmt.Sprintf("hypercase: no words for the framework's file %s", s))
+		}
+	}
+	return andList(words)
 }
 
 // A said is a sentence a closing's claims say: own, as it reads on its

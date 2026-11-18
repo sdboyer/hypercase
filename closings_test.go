@@ -1220,15 +1220,21 @@ var claimChecks = map[string]claimCheck{
 		}
 		return ""
 	}},
-	"OnlyOutcome": {check: func(c *noteCheck, u *updated) string {
-		if c.cl.OnlyOutcome == "" {
+	"OnlyAdds": {check: func(c *noteCheck, u *updated) string {
+		if len(c.cl.OnlyAdds) == 0 {
 			return ""
 		}
 		was, is := cellSections(c.before, c.n.Prefix, c.n.Column), cellSections(u.after, c.n.Prefix, c.n.Column)
-		_, had := was[c.cl.OnlyOutcome]
-		was[c.cl.OnlyOutcome] = u.cell.Files["outcome"]
-		if had || c.cl.OnlyOutcome != c.out("outcome") || !maps.Equal(was, is) {
-			return fmt.Sprintf("the closing says the update adds %s and changes nothing else of the cell, and the cell had it: %v, or the cell is %v", c.cl.OnlyOutcome, had, is)
+		for _, s := range c.cl.OnlyAdds {
+			rel, ok := strings.CutPrefix(s, c.out(""))
+			_, had := was[s]
+			if !ok || had || !slices.Contains(upgraded, rel) {
+				return fmt.Sprintf("the closing says the update adds %v and changes nothing else of the cell, and %s is no framework file of the cell's that the upgrade adds, or the cell had it: %v", c.cl.OnlyAdds, s, had)
+			}
+			was[s] = u.cell.Files[rel]
+		}
+		if !maps.Equal(was, is) {
+			return fmt.Sprintf("the closing says the update adds %v and changes nothing else of the cell, and the cell is %v", c.cl.OnlyAdds, is)
 		}
 		return ""
 	}},
@@ -1889,7 +1895,8 @@ func xtestTypes(t *testing.T) typedFiles {
 // did: the same fate, files and product, written alike, and where both ran
 // it, on the same input view. A probe that fails the cell in both, alike,
 // fails it alike on any value. An update writes a frozen cell only to add
-// the outcome it lacks, which the normal run says.
+// framework files it lacks, upgraded, which the normal run says, as the
+// normal run made them.
 func sameCell(n, u hypercase.Observed) bool {
 	if n.Fate != u.Fate || n.Frozen != u.Frozen || !maps.Equal(n.Product, u.Product) || n.Via != u.Via || n.Ran != u.Ran {
 		return false
@@ -1898,10 +1905,19 @@ func sameCell(n, u hypercase.Observed) bool {
 		return false
 	}
 	if u.Frozen && u.Writable {
-		return maps.Equal(u.Files, map[string]string{"outcome": n.Files["outcome"]})
+		for p, data := range u.Files {
+			if made, ok := n.Files[p]; !ok || made != data || !slices.Contains(upgraded, p) {
+				return false
+			}
+		}
+		return len(u.Files) > 0
 	}
 	return n.Writable == u.Writable && maps.Equal(n.Files, u.Files)
 }
+
+// upgraded are the framework's files the upgrade adds to a frozen cell
+// that lacks them, by path under its column's directory.
+var upgraded = []string{"outcome"}
 
 func compareCells(a, b cellKey) int {
 	return strings.Compare(a.pkg+" "+a.c+" "+a.col, b.pkg+" "+b.c+" "+b.col)
