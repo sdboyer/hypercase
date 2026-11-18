@@ -36,7 +36,7 @@ type Project struct {
 	// declaration states FromPositions. It receives that view, the one
 	// RenderError receives, so it can read what turns a position into a
 	// path in the view, such as a file that names the root the error's
-	// positions are under. It is called for each such error.txt on each
+	// positions are under. It may be called for such an error.txt on any
 	// run of its cell, so it is a function of its arguments alone. Every
 	// package that registers such a declaration, owned or used, supplies
 	// it. A panic's error.txt has no error to give it, and so no ranges.

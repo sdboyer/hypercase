@@ -345,10 +345,11 @@ func TestInputsPositionsReadTheView(t *testing.T) {
 // whose error.txt takes its ranges from Positions to match one to one:
 // each cell has a call whose error, rendered on the view the call
 // received, is the cell's error.txt, and whose view is the cell's input
-// view, as its Observed records them. That RenderError alone receiving
-// another view is TestChainRenderError's to find. Among the cells it
-// checks are a base's, a hand-written variant's, a transform's variant's,
-// one past a bytes lift, and a bytes lift's own.
+// view, as its Observed records them. It doesn't check RenderError's view:
+// TestChainRenderError finds RenderError alone receiving another view past
+// a bytes lift, and at a variant's or a transform's cells no test does
+// (#77). Among the cells it checks are a base's, a hand-written variant's,
+// a transform's variant's, one past a bytes lift, and a bytes lift's own.
 func TestInputsPositionsView(t *testing.T) {
 	t.Parallel()
 	var mu sync.Mutex

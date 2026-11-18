@@ -3854,19 +3854,20 @@ cells blocked at `parse` have no `inputs`.
   `FromPositions`, and never one in a `Product`. One whose pattern matches
   `error.txt` states no `InputsFunc`, so an `error.txt` states
   `FromPositions` or `AllInputs`. Registration refuses the others.
+- Every package that registers a declaration stating `FromPositions`,
+  owned or used, supplies `Positions func(in fs.FS, err error) []Range`,
+  which finds where an error points. It receives the cell's input view,
+  the one `RenderError` receives, so it can read what turns a position into
+  a path in the view, such as a file that names the root a loader's
+  absolute positions are under. It may be called for such a declaration's
+  `error.txt` on any run of its cell, so it is a function of its arguments
+  alone.
 - A declaration that states nothing fails the run, naming it and what it
   can state, as a missing description does (step 3). So does
-  `FromPositions` in a project with no `Positions`: every package that
-  registers such a declaration, owned or used, supplies
-  `Positions func(in fs.FS, err error) []Range`, which finds where an error
-  points. It receives the cell's input view, the one `RenderError`
-  receives, so it can read what turns a position into a path in the view,
-  such as a file that names the root a loader's absolute positions are
-  under. It is called for each such `error.txt` on each run of its cell,
-  so it is a function of its arguments alone. The cells still run and the
-  update writes their outputs. It
-  writes no `inputs` for a cell with a file of such a declaration, and
-  leaves one the cell has as it is; every other cell gets its own.
+  `FromPositions` in a project with no `Positions`. The cells still run and
+  the update writes their outputs. It writes no `inputs` for a cell with a
+  file of a declaration that fails the run, and leaves one the cell has as
+  it is; every other cell gets its own.
 - `Range{Path, Start, End}` uses lines counted from 1, `End` included, in
   the cell's input view, and `0, 0` means the whole file.
 - A cell has one input view: its case's inputs, with a variant's overlay and
