@@ -3666,8 +3666,9 @@ var Field = decl.InputsFunc(func(in fs.FS, path string) ([]decl.Range, error) {
 
 // positions finds the lines an error points at, sheet.Positions's: each
 // line it names, or the whole file for a position about the file as a
-// whole, whose Line is 0.
-func positions(err error) []decl.Range {
+// whole, whose Line is 0. Its paths are in the input view already, so it
+// doesn't read the view.
+func positions(_ fs.FS, err error) []decl.Range {
 	var rs []decl.Range
 	for _, p := range sheet.Positions(err) {
 		rs = append(rs, decl.Range{Path: p.Path, Start: p.Line, End: p.Line})
@@ -3857,10 +3858,13 @@ cells blocked at `parse` have no `inputs`.
   can state, as a missing description does (step 3). So does
   `FromPositions` in a project with no `Positions`: every package that
   registers such a declaration, owned or used, supplies
-  `Positions func(err error) []Range`, which finds where an error points.
-  The cells still run and the update writes their outputs. It writes no
-  `inputs` for a cell with a file of such a declaration, and leaves one
-  the cell has as it is; every other cell gets its own.
+  `Positions func(in fs.FS, err error) []Range`, which finds where an error
+  points. It receives the cell's input view, the one `RenderError`
+  receives, so it can read what turns a position into a path in the view,
+  such as a file that names the root a loader's absolute positions are
+  under. The cells still run and the update writes their outputs. It
+  writes no `inputs` for a cell with a file of such a declaration, and
+  leaves one the cell has as it is; every other cell gets its own.
 - `Range{Path, Start, End}` uses lines counted from 1, `End` included, in
   the cell's input view, and `0, 0` means the whole file.
 - A cell has one input view: its case's inputs, with a variant's overlay and

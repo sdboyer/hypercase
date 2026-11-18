@@ -1,10 +1,18 @@
 package hypercase_test
 
 import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/sdboyer/hypercase"
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/internal/revmap"
 )
 
 // TestInputsRefusals: registration refuses what an output declaration's
@@ -303,6 +311,148 @@ func TestInputsPositionsOfAnotherPackage(t *testing.T) {
 		"out/list/outcome":     "blocked import\n",
 	})
 	s.done()
+}
+
+// TestInputsPositionsReadTheView: Positions receives the cell's input
+// view, and can read it to turn where an error points into a path in the
+// view. Here the error names its file by an absolute path, under the root
+// that the view's file loader/root names, and a variant that moves the root
+// overlays a root of its own, which its cell's Positions reads.
+func TestInputsPositionsReadTheView(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "basic")
+	const rooted = "testdata/script/rooted.txtar"
+	s.write(rooted, []byte("The error names its file by an absolute path, under the root the view names.\n-- in/do/error --\nA1 -> A1: cycle\nat 2 2 /sheets@v1/do/error\n-- in/loader/root --\n/sheets@v1\n-- properties --\ncircular\n-- variant/moved/about --\nThe root moves, and the error names its file under the new one.\n-- variant/moved/properties --\ncircular\n-- variant/moved/in/do/error --\nA1 -> A1: cycle\nat 1 2 /sheets@v2/do/error\n-- variant/moved/in/loader/root --\n/sheets@v2\n"), "a case whose error names its file under the root its view names")
+	s.passes(s.update("rejects"))
+	s.hasSections(rooted, map[string]string{
+		"out/echo/inputs":               "error.txt\n  in/do/error:2-2\n",
+		"variant/moved/out/echo/inputs": "error.txt\n  variant/moved/in/do/error:1-2\n",
+	})
+	s.passes(s.normal("rejects"))
+	s.done()
+}
+
+// TestInputsPositionsView: Positions receives the view RenderError
+// receives, at every cell. It runs the chain, variant and transform
+// fixtures under recordingViews, in an update and then a normal run, and
+// requires each call of Positions to receive the view RenderError
+// received with the same error, and each cell whose error.txt takes its
+// ranges from Positions to have had it called on the cell's input view,
+// as the cell's Observed records that view. Among the cells it checks are
+// a base's, a hand-written variant's, a transform's variant's, one past a
+// bytes lift, and a bytes lift's own.
+func TestInputsPositionsView(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	checked := map[string]bool{}
+	t.Run("fixtures", func(t *testing.T) {
+		for _, fixture := range []string{"chain", "variants", "transforms"} {
+			t.Run(fixture, func(t *testing.T) {
+				t.Parallel()
+				s := newSandbox(t, fixture)
+				dir := t.TempDir()
+				for _, run := range []string{"update", "normal"} {
+					hooks, observed := filepath.Join(dir, run+"-hooks.jsonl"), filepath.Join(dir, run+"-observed.jsonl")
+					env := []string{hooksEnv + "=" + hooks, observeEnv + "=" + observed}
+					if run == "update" {
+						env = append(env, fixtureUpdate+"=1")
+					}
+					r := s.execRaw("", fixture, env)
+					if !r.ok() {
+						t.Fatalf("the %s run failed:\n%s", run, s.shown(r))
+					}
+					records := readViewRecords(t, hooks)
+					for _, rec := range records {
+						switch rec.RenderError {
+						case "":
+							t.Errorf("the %s run called Positions on the error %q, which RenderError never received", run, rec.Error)
+						case rec.Positions:
+						default:
+							t.Errorf("the %s run gave Positions a view other than RenderError's, on the error %q", run, rec.Error)
+						}
+					}
+					for _, o := range readObserved(t, observed) {
+						if o.Record != "cell" || !positioned(t, o) {
+							continue
+						}
+						text, view := strings.TrimSuffix(o.Files["error.txt"], "\n"), viewDigest(o.View)
+						if !slices.ContainsFunc(records, func(rec viewRecord) bool { return rec.Error == text && rec.Positions == view }) {
+							t.Errorf("in the %s run, %s %s%s: no call of Positions on its error received the cell's input view", run, o.Case, o.Prefix, o.Column)
+						}
+						mu.Lock()
+						for _, k := range viewKinds(o) {
+							checked[k] = true
+						}
+						mu.Unlock()
+					}
+				}
+			})
+		}
+	})
+	for _, k := range []string{"a base's", "a hand-written variant's", "a transform's variant's", "one past a bytes lift", "a bytes lift's own"} {
+		if !checked[k] {
+			t.Errorf("no cell checked is %s", k)
+		}
+	}
+}
+
+// positioned reports whether a cell's Observed records a call of
+// Positions: the cell has an error.txt, which no panic gave it, and an
+// inputs file, which doesn't map error.txt to all inputs.
+func positioned(t *testing.T, o hypercase.Observed) bool {
+	t.Helper()
+	inputs, ok := o.Files["inputs"]
+	if _, has := o.Files["error.txt"]; !has || !ok || o.Files["outcome"] == archive.Panicked+"\n" {
+		return false
+	}
+	files, err := revmap.Parse([]byte(inputs))
+	if err != nil {
+		t.Fatalf("%s %s%s: its inputs file: %v", o.Case, o.Prefix, o.Column, err)
+	}
+	i := slices.IndexFunc(files, func(f revmap.File) bool { return f.Path == "error.txt" })
+	return i >= 0 && !files[i].All
+}
+
+// viewKinds names the kinds of input view a cell's Observed records, as
+// TestInputsPositionsView requires some cell of each.
+func viewKinds(o hypercase.Observed) []string {
+	var kinds []string
+	switch {
+	case strings.HasPrefix(o.Prefix, "variant/"):
+		kinds = append(kinds, "a hand-written variant's")
+	case strings.HasPrefix(o.Prefix, "transform/"):
+		kinds = append(kinds, "a transform's variant's")
+	case len(o.Path) == 0 && !o.Via:
+		kinds = append(kinds, "a base's")
+	}
+	if len(o.Path) > 0 {
+		kinds = append(kinds, "one past a bytes lift")
+	}
+	if o.Via {
+		kinds = append(kinds, "a bytes lift's own")
+	}
+	return kinds
+}
+
+// readViewRecords reads what recordingViews wrote to the file at path.
+func readViewRecords(t *testing.T, path string) []viewRecord {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []viewRecord
+	for line := range bytes.Lines(data) {
+		var rec viewRecord
+		if err := json.Unmarshal(line, &rec); err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, rec)
+	}
+	return out
 }
 
 // TestInputsClash: a column's output under inputs/ is one no archive can

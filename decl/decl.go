@@ -33,10 +33,13 @@ type Project struct {
 	Codes func(err error) []string
 	// Positions finds where in the cell's input view an error that a
 	// column's function returned points: the ranges of an error.txt whose
-	// declaration states FromPositions. Every package that registers such
-	// a declaration, owned or used, supplies it. A panic's error.txt has no
+	// declaration states FromPositions. It receives that view, the one
+	// RenderError receives, so it can read what turns a position into a
+	// path in the view, such as a file that names the root the error's
+	// positions are under. Every package that registers such a
+	// declaration, owned or used, supplies it. A panic's error.txt has no
 	// error to give it, and so no ranges.
-	Positions func(err error) []Range
+	Positions func(in fs.FS, err error) []Range
 	// IssueLinks link the text that names an issue, in a gaps line or a
 	// description, to the issue: one per issue tracker the project's gaps
 	// lines name. The registry records them, and hypercase report reads

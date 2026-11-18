@@ -107,7 +107,7 @@ type runner struct {
 	updateVar   string
 	renderError func(in fs.FS, err error) []byte
 	codes       func(err error) []string
-	positions   func(err error) []decl.Range
+	positions   func(in fs.FS, err error) []decl.Range
 	issueLinks  []decl.IssueLink
 	moduleRoot  string
 	pkgDir      string
@@ -1033,7 +1033,7 @@ func (r *runner) bare() *runner {
 	b := *r
 	b.renderError = func(fs.FS, error) []byte { return []byte("\n") }
 	b.codes = nil
-	b.positions = func(error) []decl.Range { return nil }
+	b.positions = func(fs.FS, error) []decl.Range { return nil }
 	return &b
 }
 
