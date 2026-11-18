@@ -2731,17 +2731,18 @@ S202
   transform. An archive that can't be read fails every check of the
   package, and an update writes no findings. So does a transform's variant
   whose properties can't be known: one no corpus type lists, or one its
-  transform declines. So does a registry that lists a suite or a lift
-  name twice, or doesn't give each column, a lift the package uses
-  included, one path from each corpus it runs over, each corpus once and
-  in their order, or whose path names the column itself, a lift the
-  registry doesn't list or one lift twice, or names a lift for a suite
-  over the raw input view. So does one that records an output's or a
-  product file's `"inputs"` as no declaration registration takes would
-  (step 11), or lists a corpus check twice. The root-package check fails
-  on such a registry too. Where the package has a `_test.go` file, both say to run
-  the update, which writes its registry; where it has none, both say to
-  delete the registry, which no update writes.
+  transform declines. So does a registry that lists a suite or a lift name
+  twice, or doesn't give each column, a lift the package uses included,
+  one path from each corpus it runs over, each corpus once and in their
+  order, or whose path names the column itself, a lift the registry
+  doesn't list or one lift twice, or names a lift for a suite over the raw
+  input view. So does one whose `"inputs"`, for an output or a product
+  file, names no statement of `Inputs`, or one registration refuses there
+  (step 11), and one that lists a corpus check twice, or gives no list of
+  them. The root-package check fails on such a registry too. Where the
+  package has a `_test.go` file, both say to run the update, which writes
+  its registry; where it has none, both say to delete the registry, which
+  no update writes.
 - A check reads the cells as they are committed when it runs. The module's
   update runs packages at once, so a check can run before another package
   writes its cells: its findings can take a second update to settle, and a
@@ -2899,12 +2900,13 @@ the same outcome.
 - It reads every registry format from 3 to its own, and refuses any other,
   naming the revision, the registry and its format: for a newer format,
   saying to run the report from that revision's hypercase, and for one
-  older than 3, that no hypercase's report reads it. A registry of an older
-  format that holds what a later format added is refused too, and so is
-  one its format's update couldn't have written, as a check refuses one of
-  today's (step 8): by its names and corpora at every format, its paths
-  from format 7, its `"inputs"` from format 8, and its `checks` from
-  format 9.
+  older than 3, that no hypercase's report reads it. A registry of an
+  older format that holds what a later format added is refused too, and so
+  is one its format's update couldn't have written, as a check refuses one
+  of today's (step 8): by its names and corpora at every format, its paths
+  from format 7, its `"inputs"` from format 8, and from format 9 its
+  `checks`, which the registry lists, empty where its package registers
+  none, each check once.
 - A cell exists at a revision when its `outcome` file does, from registry
   format 5 on. A changed cell takes the first of these ranks that applies:
   outcome changed, at both revisions; appeared, at `<b>` only; disappeared,

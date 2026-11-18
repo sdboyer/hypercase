@@ -56,7 +56,8 @@ type Registry struct {
 	Suites     []Suite     `json:"suites"`
 	// Checks are the corpus checks the package registers, sorted by name.
 	// It is nil in a registry of a format before ChecksFormat, which
-	// records none.
+	// records none, and only there: from ChecksFormat on, a package that
+	// registers none lists none.
 	Checks []Check `json:"checks"`
 }
 
@@ -338,8 +339,8 @@ func (e *FormatError) Error() string {
 // from each, in their order, and name only lifts the registry lists, each
 // once, never the column itself, and none for a suite over the raw input
 // view; each output declaration records one of the statements of Inputs,
-// in a place registration admits it; and it lists each corpus check under
-// a name of its own.
+// in a place registration admits it; and it lists its corpus checks, an
+// empty list for none, each under a name of its own.
 func Parse(data []byte) (*Registry, error) {
 	var head struct {
 		Format int `json:"format"`
@@ -367,8 +368,10 @@ func Parse(data []byte) (*Registry, error) {
 // oldest format whose registries it holds of: from that format on, the
 // update couldn't have written a registry the check refuses. Registration
 // has refused a second column, or lift, of one name since format 3, and
-// planned a column over each corpus once. Format 7 added the paths,
-// format 8 the statements of Inputs, and format 9 the corpus checks.
+// planned a column over each corpus once: no test holds that, but main's
+// history does, read commit by commit from format 3 on. Format 7 added the
+// paths, format 8 the statements of Inputs, and format 9 the corpus
+// checks.
 var parseChecks = []struct {
 	format int
 	check  func(*Registry) error
@@ -377,6 +380,7 @@ var parseChecks = []struct {
 	{3, (*Registry).checkCorpora},
 	{7, (*Registry).checkPaths},
 	{8, (*Registry).checkInputs},
+	{9, (*Registry).checkChecksListed},
 	{9, (*Registry).checkCheckNames},
 }
 
@@ -493,6 +497,15 @@ func (r *Registry) checkCorpora() error {
 
 // checkCheckNames reports the first corpus check the registry lists
 // twice: registration refuses a second check of one name in a package.
+// checkChecksListed reports a registry that gives no list of corpus checks,
+// which the update writes, empty where the package registers none.
+func (r *Registry) checkChecksListed() error {
+	if r.Checks == nil {
+		return errors.New("the registry gives no list of corpus checks, where a registry lists each corpus check its package registers, and an empty list for none")
+	}
+	return nil
+}
+
 func (r *Registry) checkCheckNames() error {
 	for i, c := range r.Checks {
 		if slices.ContainsFunc(r.Checks[:i], func(o Check) bool { return o.Name == c.Name }) {

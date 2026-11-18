@@ -74,6 +74,18 @@ func TestParse(t *testing.T) {
 			t.Errorf("a registry edited by hand: got %v, want %q", err, tt.want)
 		}
 	}
+	// A registry without "checks" is refused, as one whose checks are null
+	// is: from format 9, a registry with no checks lists none.
+	var m map[string]any
+	if err := json.Unmarshal(now.Marshal(), &m); err != nil {
+		t.Fatal(err)
+	}
+	delete(m, "checks")
+	if data, err := json.Marshal(m); err != nil {
+		t.Fatal(err)
+	} else if _, err := Parse(data); err == nil || err.Error() != "the registry gives no list of corpus checks, where a registry lists each corpus check its package registers, and an empty list for none" {
+		t.Errorf("a registry without checks: got %v", err)
+	}
 
 	for _, data := range []string{olderData, fmt.Sprintf(`{"format": %d}`, Format+1)} {
 		_, err = Parse([]byte(data))
@@ -168,6 +180,7 @@ var byHand = []struct {
 	{func(r *Registry) { r.Lifts[0].ProductFiles[0] = Output{Pattern: "error.txt", Inputs: InputsPositions} }, `the lift import declares the product file error.txt with inputs "positions", where only an output whose pattern is error.txt takes its ranges from Positions`},
 	{func(r *Registry) { r.Suites[1].Outputs[0].Inputs = InputsFunc }, `the suite evaluate declares the output e* with inputs "func", and the pattern matches error.txt, where error.txt's ranges come from Positions or the whole input view, never from a function`},
 	{func(r *Registry) { r.Lifts[1].Outputs[0].Inputs = InputsFunc }, `the lift parse declares the output error.txt with inputs "func", and the pattern matches error.txt,`},
+	{func(r *Registry) { r.Checks = nil }, "the registry gives no list of corpus checks, where a registry lists each corpus check its package registers, and an empty list for none"},
 	{func(r *Registry) { r.Checks = append(r.Checks, Check{Name: "codes", Description: "Lists them again."}) }, "the registry lists the corpus check codes twice, where each corpus check a package registers has a name of its own"},
 }
 
