@@ -12,7 +12,8 @@ import (
 // WriteHTML writes the report as one static HTML page, which loads
 // nothing: its style sheet is inline, and it has no scripts. It holds the
 // problems the report found, the ranked changes with each changed file's
-// line diff, then the matrix of each corpus at B, each case with the
+// line diff and what changed in its reverse map, then the matrix of each
+// corpus at B, each case with the
 // properties it states and each known gap on the cell it marks, then the
 // descriptions of what the registries declare. Text that names an issue
 // links to it.
@@ -112,6 +113,15 @@ func lines(n int) string {
 	return fmt.Sprintf("%d lines", n)
 }
 
+// rangeClass returns the class that styles a line of a reverse map that
+// one revision's map lacks, as a diff line's.
+func rangeClass(l RangeLine) string {
+	if l.Kind == '-' {
+		return "del"
+	}
+	return "add"
+}
+
 var page = template.Must(template.New("page").Funcs(template.FuncMap{
 	"groups":        groups,
 	"problemGroups": problemGroups,
@@ -121,6 +131,10 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
 	"class":         Rank.class,
 	"diffClass":     func(l diff.Line) string { c, _ := diffLine(l); return c },
 	"diffText":      func(l diff.Line) string { _, t := diffLine(l); return t },
+	"howClass":      func(how string) string { return strings.ReplaceAll(how, " ", "-") },
+	"rangesOnly":    func(f FileChange) bool { return f.How == RangesOnly },
+	"rangeClass":    rangeClass,
+	"rangeText":     func(l RangeLine) string { return string(l.Kind) + " " + l.Text },
 }).Parse(pageTemplate))
 
 const pageTemplate = `<!doctype html>
@@ -152,6 +166,9 @@ const pageTemplate = `<!doctype html>
 {{- end}}
 <section id="changes">
 <h2>Changes</h2>
+{{- with .Unranged}}
+<p class="note">The newest registry at <span class="rev">{{.At}}</span> is of format {{.Format}}, from before inputs files, so the report shows no ranges at <span class="rev">{{.At}}</span>, and ranks no cell on its inputs file.</p>
+{{- end}}
 {{- if not .Changes}}
 <p class="none">No cell changed.</p>
 {{- end}}
@@ -166,8 +183,11 @@ const pageTemplate = `<!doctype html>
 {{- if .Files}}
 <ul class="files">
 {{- range .Files}}
-<li class="{{.How}}"><details><summary><code>{{.Path}}</code> {{.How}} <span class="stat">{{if .Unaligned}}partly unaligned{{else}}<span class="add">+{{.Added}}</span> <span class="del">-{{.Removed}}</span>{{end}}</span></summary>
-<pre class="diff">{{range .Diff}}<span class="{{diffClass .}}">{{diffText .}}</span>{{end}}</pre></details></li>
+<li class="{{howClass .How}}">{{if rangesOnly .}}<code>{{.Path}}</code> {{.How}}{{else}}<details><summary><code>{{.Path}}</code> {{.How}} <span class="stat">{{if .Unaligned}}partly unaligned{{else}}<span class="add">+{{.Added}}</span> <span class="del">-{{.Removed}}</span>{{end}}</span></summary>
+<pre class="diff">{{range .Diff}}<span class="{{diffClass .}}">{{diffText .}}</span>{{end}}</pre></details>{{end}}
+{{- if .Ranges}}
+<pre class="ranges">{{range .Ranges}}<span class="{{rangeClass .}}">{{rangeText .}}</span>{{end}}</pre>
+{{- end}}</li>
 {{- end}}
 </ul>
 {{- end}}
@@ -272,14 +292,14 @@ const pageStyle = `
   color-scheme: light dark;
   --bg: #fdfdfc; --fg: #1d1d1b; --muted: #6b6b66; --line: #deddd8; --head: #f3f2ee;
   --accepted: #e3f1e4; --rejected: #fbecd6; --panicked: #f8dcdc; --blocked: #e9e4f3; --skipped: #ecebe8;
-  --changed: #c0392b; --appeared: #1f7a3f; --bytes: #9a6b00; --link: #1f5fa8;
+  --changed: #c0392b; --appeared: #1f7a3f; --bytes: #9a6b00; --ranges: #2f7f86; --link: #1f5fa8;
   --add: #e3f1e4; --del: #f8dcdc;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #171716; --fg: #e8e7e3; --muted: #a09f99; --line: #3a3936; --head: #22221f;
     --accepted: #1f3a24; --rejected: #44341a; --panicked: #4a2222; --blocked: #322b45; --skipped: #2b2a27;
-    --changed: #ff7b6b; --appeared: #6fd08f; --bytes: #e0b24a; --link: #8cbcff;
+    --changed: #ff7b6b; --appeared: #6fd08f; --bytes: #e0b24a; --ranges: #6cc4c9; --link: #8cbcff;
     --add: #1f3a24; --del: #4a2222;
   }
 }
@@ -301,6 +321,7 @@ ul.problems li { margin: 2px 0; overflow-wrap: anywhere; }
 .rank.outcome-changed { color: var(--changed); }
 .rank.appeared, .rank.disappeared { color: var(--appeared); }
 .rank.bytes-changed { color: var(--bytes); }
+.rank.ranges-changed { color: var(--ranges); }
 ul.changes { list-style: none; padding: 0; margin: 0; }
 li.change { padding: 6px 0; border-bottom: 1px solid var(--line); }
 .line { overflow-wrap: anywhere; }
@@ -317,10 +338,10 @@ ul.files { list-style: none; margin: 4px 0 0 20px; padding: 0; color: var(--mute
 summary { cursor: pointer; }
 .stat .add { color: var(--appeared); }
 .stat .del { color: var(--changed); }
-pre.diff { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
-pre.diff span { display: block; padding: 0 8px; white-space: pre; }
-pre.diff .add { background: var(--add); }
-pre.diff .del { background: var(--del); }
+pre.diff, pre.ranges { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
+pre.diff span, pre.ranges span { display: block; padding: 0 8px; white-space: pre; }
+pre.diff .add, pre.ranges .add { background: var(--add); }
+pre.diff .del, pre.ranges .del { background: var(--del); }
 pre.diff .skip, pre.diff .unaligned { color: var(--muted); }
 .props { margin-left: 6px; }
 .prop { display: inline-block; margin: 0 4px 0 0; padding: 0 6px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); }
@@ -345,11 +366,12 @@ td.cell .outcome { background: transparent; padding: 0; }
 td.outcome-changed { box-shadow: inset 0 0 0 2px var(--changed); }
 td.appeared { box-shadow: inset 0 0 0 2px var(--appeared); }
 td.bytes-changed { box-shadow: inset 0 0 0 2px var(--bytes); }
+td.ranges-changed { box-shadow: inset 0 0 0 2px var(--ranges); }
 td.frozen { background-image: repeating-linear-gradient(135deg, transparent 0 8px, rgba(127,127,127,0.12) 8px 16px); }
 dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 4px 0 0; }
 dt { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 600; }
 dd { margin: 0; color: var(--muted); }
 dd p, dd ul { margin: 2px 0 0; }
 ul.outputs { padding-left: 18px; }
-.none { color: var(--muted); }
+.none, .note { color: var(--muted); }
 `

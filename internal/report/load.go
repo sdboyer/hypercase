@@ -12,6 +12,7 @@ import (
 
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/internal/registry"
+	"github.com/sdboyer/hypercase/internal/revmap"
 )
 
 // A snapshot is a corpus root as one revision commits it: its registries,
@@ -22,11 +23,14 @@ type snapshot struct {
 	links []registry.IssueLink
 	// linkRegs holds the registries that give each link pattern, by path.
 	linkRegs map[string][]string
-	// format is the newest format version of the registries, and outcomes
+	// format is the newest format version of the registries, outcomes
 	// whether the cells commit outcome files, as they do from
-	// registry.OutcomeFormat on. Before it, a cell's state is unknown.
+	// registry.OutcomeFormat on, and ranges whether they commit inputs
+	// files, as they do from registry.InputsFormat on. Before the one, a
+	// cell's state is unknown, and before the other, its ranges are.
 	format   int
 	outcomes bool
+	ranges   bool
 	// types holds the description of each corpus type, by its directory.
 	types map[string]string
 	// columns holds each column the registries claim, by name, which is
@@ -145,19 +149,53 @@ const (
 	Kept  = "kept"  // the transform keeps it, and the base states it
 )
 
-// A cellAt is a cell's committed files: its outcome, the rest of its
-// files under out/<column>/, and, for a bytes lift's cell, its product
-// under via/<column>/. A cell exists at a revision when its outcome file
-// does. Before registry.OutcomeFormat, every cell of a case that runs under
-// a column the registries claim exists, and so does every cell with files,
-// whether or not its case runs or a registry claims its column; and its
-// state is unknown.
+// A cellAt is a cell's committed files: its outcome, its inputs file, the
+// rest of its files under out/<column>/, and, for a bytes lift's cell, its
+// product under via/<column>/. A cell exists at a revision when its
+// outcome file does. Before registry.OutcomeFormat, every cell of a case
+// that runs under a column the registries claim exists, and so does every
+// cell with files, whether or not its case runs or a registry claims its
+// column; and its state is unknown.
 type cellAt struct {
 	known   bool // whether its state is: whether it has an outcome
 	outcome archive.Outcome
 	line    string            // the outcome file, less its newline, or Unknown
-	files   map[string][]byte // by path under out/<column>/
+	files   map[string][]byte // by path under out/<column>/, less outcome and inputs
 	product map[string][]byte // by path under via/<column>/
+	// inputs is the cell's inputs file, or nil where it has none, or its
+	// revision predates registry.InputsFormat and the report leaves it out.
+	inputs *inputsAt
+}
+
+// An inputsAt is a cell's inputs file: its bytes, and the reverse maps it
+// holds, by the file each maps, a product's file as via/<column>/<path>.
+// maps is nil where the report shows none of them: where the file doesn't
+// parse, or the cell didn't run.
+type inputsAt struct {
+	data []byte
+	maps map[string]revmap.File
+}
+
+// ran reports whether the cell ran: whether it is accepted, rejected or
+// panicked, and so has an inputs file from registry.InputsFormat on.
+func (c *cellAt) ran() bool {
+	return c.known && c.outcome.State != archive.Skipped && c.outcome.State != archive.Blocked
+}
+
+// mapOf returns the reverse map of one of the cell's files, by its path
+// under out/<column>/, or as via/<column>/<path> for its product's, or nil
+// where the cell's inputs file gives none: where the cell has none, the
+// report shows none of its maps, or it doesn't map the file. The cell may
+// be nil.
+func (c *cellAt) mapOf(path string) *revmap.File {
+	if c == nil || c.inputs == nil {
+		return nil
+	}
+	f, ok := c.inputs.maps[path]
+	if !ok {
+		return nil
+	}
+	return &f
 }
 
 // Unknown is the outcome of a cell whose state is unknown: at a revision
@@ -245,6 +283,7 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 		s.format = max(s.format, f.reg.Format)
 	}
 	s.outcomes = s.format >= registry.OutcomeFormat
+	s.ranges = s.format >= registry.InputsFormat
 	declared := map[string]bool{} // the corpora's directories
 	for _, f := range regs {
 		g := f.reg
@@ -420,9 +459,27 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 				s.problem(p+", "+sec.Name, fmt.Sprintf("the section is an outcome file, and registry format %d predates outcome files, so the report leaves it out.", s.format))
 				continue
 			}
+			if file == revmap.Name && !s.ranges {
+				s.problem(p+", "+sec.Name, fmt.Sprintf("the section is an inputs file, and registry format %d predates inputs files, so the report leaves it out.", s.format))
+				continue
+			}
 			place(k)
 			c := cellOf(cellKey{c: k, column: col})
-			if file != archive.OutcomeFile {
+			switch file {
+			case revmap.Name:
+				c.inputs = &inputsAt{data: sec.Data}
+				parsed, err := revmap.Parse(sec.Data)
+				if err != nil {
+					s.problem(p+", "+sec.Name, fmt.Sprintf("the inputs file can't be read: %v. So the report shows no ranges for the cell's files.", err))
+					continue
+				}
+				c.inputs.maps = map[string]revmap.File{}
+				for _, f := range parsed {
+					c.inputs.maps[f.Path] = f
+				}
+				continue
+			case archive.OutcomeFile:
+			default:
 				c.files[file] = sec.Data
 				continue
 			}
@@ -502,18 +559,25 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 			// product under via/<column>/.
 			var dirs []string
 			has := "files"
-			if len(c.files) > 0 {
+			if len(c.files) > 0 || c.inputs != nil {
 				dirs = append(dirs, ck.c.prefix()+archive.Out+"/"+ck.column+"/")
 			}
 			if len(c.product) > 0 {
 				dirs = append(dirs, ck.c.prefix()+archive.Via+"/"+ck.column+"/")
 				has = "files and its product,"
-				if len(c.files) == 0 {
+				if len(c.files) == 0 && c.inputs == nil {
 					has = "its product"
 				}
 			}
 			s.problem(p+", "+strings.Join(dirs, " and "), "the cell has "+has+" and no outcome file. A cell exists where its outcome file does, so the report shows no cell here.")
 			delete(s.cells, ck)
+		}
+		if s.ranges {
+			for _, ck := range cells {
+				if c := s.cells[ck]; c != nil {
+					s.checkInputs(p, ck, c)
+				}
+			}
 		}
 	} else {
 		// Before outcome files, a case runs under every column the
@@ -558,6 +622,49 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 		}
 	}
 	return nil
+}
+
+// checkInputs records a problem for each way a cell's inputs file
+// disagrees with the cell, at a revision whose cells commit inputs files:
+// a cell that ran and has none; one beside a cell that didn't run, whose
+// maps the report shows none of; and, in one the report reads, each file
+// it maps that the cell lacks, and each of the cell's files it doesn't
+// map. A product's files are mapped as via/<column>/<path>, except where
+// the report leaves the product out, whose files it doesn't compare. p is
+// the archive's path.
+func (s *snapshot) checkInputs(p string, ck cellKey, c *cellAt) {
+	dir := p + ", " + ck.c.prefix() + archive.Out + "/" + ck.column + "/"
+	switch {
+	case c.inputs == nil && c.ran():
+		s.problem(dir, fmt.Sprintf("the cell is %s, and has no inputs file, which every cell that ran has from registry format %d on. So the report shows no ranges for its files.", c.outcome.State, registry.InputsFormat))
+		return
+	case c.inputs == nil:
+		return
+	case !c.ran():
+		s.problem(dir+revmap.Name, fmt.Sprintf("the cell is %s, and a cell that didn't run has no inputs file, so the report shows no ranges from it.", c.outcome.State))
+		c.inputs.maps = nil
+		return
+	case c.inputs.maps == nil:
+		return // it doesn't parse, which is a problem already
+	}
+	via := archive.Via + "/" + ck.column + "/"
+	files := map[string]bool{}
+	for f := range c.files {
+		files[f] = true
+	}
+	for f := range c.product {
+		files[via+f] = true
+	}
+	for _, f := range slices.Sorted(maps.Keys(c.inputs.maps)) {
+		if !files[f] && !(s.leftOut[ck] && strings.HasPrefix(f, via)) {
+			s.problem(dir+revmap.Name, fmt.Sprintf("the inputs file maps %s, and the cell has no such file.", f))
+		}
+	}
+	for _, f := range slices.Sorted(maps.Keys(files)) {
+		if _, ok := c.inputs.maps[f]; !ok {
+			s.problem(dir+revmap.Name, fmt.Sprintf("the inputs file doesn't map %s, a file of the cell, so the report shows no ranges for it.", f))
+		}
+	}
 }
 
 // unclaimedColumns records a problem for each column that has committed

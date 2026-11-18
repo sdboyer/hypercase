@@ -88,10 +88,10 @@ func TestTwoCorpora(t *testing.T) {
 	reg.Suites = append(reg.Suites, registry.Suite{Name: "export", Description: "Exports a CSV.", Consumes: registry.RawInput, Corpora: []string{"csv"}})
 	a := module(map[string]string{"x": "A sheet.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"})
 	a["testdata/hypercase.json"] = string(reg.Marshal())
-	a["testdata/csv/x.txtar"] = "A CSV.\n-- in/csv/x.csv --\n1\n-- out/export/outcome --\naccepted\n"
+	a["testdata/csv/x.txtar"] = mapped("A CSV.\n-- in/csv/x.csv --\n1\n-- out/export/outcome --\naccepted\n")
 	b := module(map[string]string{"x": "A sheet.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\nrejected\n"})
 	b["testdata/hypercase.json"] = a["testdata/hypercase.json"]
-	b["testdata/csv/x.txtar"] = "A CSV.\n-- in/csv/x.csv --\n1\n-- out/export/outcome --\nrejected\n"
+	b["testdata/csv/x.txtar"] = mapped("A CSV.\n-- in/csv/x.csv --\n1\n-- out/export/outcome --\nrejected\n")
 	g := gittest.New(t)
 	c := revisions(t, g, a, b)
 	want := "outcome changed\n  csv/x export: accepted -> rejected\n  sheet/x calc: accepted -> rejected\n"
@@ -117,7 +117,7 @@ func TestTwoRoots(t *testing.T) {
 		reg.Suites = []registry.Suite{{Name: "calc", Description: desc, Consumes: registry.RawInput, Corpora: []string{"sheet"}}}
 		return map[string]string{
 			dir + "/testdata/hypercase.json":   string(reg.Marshal()),
-			dir + "/testdata/sheet/" + archive: "A case.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n",
+			dir + "/testdata/sheet/" + archive: mapped("A case.\n-- in/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"),
 		}
 	}
 	files := map[string]string{"go.mod": "module example.com/m\n\ngo 1.27\n"}
@@ -454,7 +454,7 @@ func TestPageProducts(t *testing.T) {
 	a := productModule(map[string]string{"x": strings.ReplaceAll(x, "V", "4")})
 	a["testdata/hypercase.json"] = string(ra.Marshal())
 	b := productModule(map[string]string{"x": strings.ReplaceAll(x, "V", "5")})
-	b["testdata/sheet/y.txtar"] = "A sheet.\n-- in/sheet/A1 --\n1\n-- via/import/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n"
+	b["testdata/sheet/y.txtar"] = mapped("A sheet.\n-- in/sheet/A1 --\n1\n-- via/import/sheet/A1 --\n1\n-- out/calc/outcome --\naccepted\n")
 	g := gittest.New(t)
 	c := revisions(t, g, a, b)
 	page := ok(t, g, "", "report", c[0], c[1])

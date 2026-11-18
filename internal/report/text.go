@@ -12,9 +12,12 @@ import (
 // under that, one line per problem, its place, where it has one, then what
 // it is. Each rank that has changes has a heading, in rank order. Under it
 // is one line per cell: its case, its column, and its outcome, or the
-// change in it, so the outcome file is never listed as a file. Under each
-// cell is one line per other file of the cell that was added, changed or
-// removed.
+// change in it, so the outcome file is never listed as a file, and nor is
+// the inputs file. Under each cell is one line per other file of the cell
+// that was added, changed or removed, or whose reverse map alone changed,
+// and under a file that both revisions map, what changed in its map: each
+// line of A's that B's lacks, marked -, then each of B's that A's lacks,
+// marked +.
 func (r *Report) WriteText(w io.Writer) error {
 	bw := bufio.NewWriter(w)
 	if len(r.Problems) > 0 {
@@ -37,6 +40,9 @@ func (r *Report) WriteText(w io.Writer) error {
 		bw.WriteString("  " + ch.Case + " " + ch.Column + ": " + strings.Join(ch.Outcomes(), " -> ") + "\n")
 		for _, f := range ch.Files {
 			bw.WriteString("    " + f.Path + " " + f.How + "\n")
+			for _, l := range f.Ranges {
+				bw.WriteString("      " + string(l.Kind) + " " + l.Text + "\n")
+			}
 		}
 	}
 	return bw.Flush()

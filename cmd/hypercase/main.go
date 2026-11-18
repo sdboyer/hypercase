@@ -11,11 +11,12 @@
 // stdout, which runs no script and loads nothing: the problems it found
 // and doesn't pick between; the cells that changed, ranked, with changed
 // outcomes first, then cells that appeared, then cells that disappeared,
-// then files that changed under the same outcome, each file with its line
-// diff; the matrix of each corpus at <b>; and the descriptions of what the
-// registries and archives declare, from <b>, or from <a> for what <b>
-// lacks. With -text it writes the problems and the ranked changes as plain
-// text instead.
+// then files that changed under the same outcome, then inputs files that
+// alone changed, each file with its line diff and what changed in its
+// reverse map; the matrix of each corpus at <b>; and the descriptions of
+// what the registries and archives declare, from <b>, or from <a> for what
+// <b> lacks. With -text it writes the problems and the ranked changes as
+// plain text instead.
 //
 // It reads registries of every format from the oldest this hypercase
 // knows to its own, and refuses a newer one, naming the hypercase that

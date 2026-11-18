@@ -66,8 +66,8 @@ func sheetsRegistries(link string) map[string]string {
 
 const sheetDir = "step09/testdata/sheet/"
 
-// sheets makes the fixture, and returns the repository and its two
-// commits.
+// sheets makes the fixture, each archive with the inputs files of mapped,
+// and returns the repository and its two commits.
 func sheets(t testing.TB) (g *gittest.Repo, a, b string) {
 	g = gittest.New(t)
 	files := sheetsRegistries("https://old.example.com/$1")
@@ -78,7 +78,7 @@ func sheets(t testing.TB) (g *gittest.Repo, a, b string) {
 		"div.txtar":      divA,
 		"blank.txtar":    blank,
 	} {
-		files[sheetDir+name] = data
+		files[sheetDir+name] = mapped(data)
 	}
 	g.Write(files)
 	a = g.Commit("a")
@@ -90,7 +90,7 @@ func sheets(t testing.TB) (g *gittest.Repo, a, b string) {
 		"div.txtar":   divB,
 		"ratio.txtar": ratio,
 	} {
-		files[sheetDir+name] = data
+		files[sheetDir+name] = mapped(data)
 	}
 	g.Write(files)
 	g.Remove(sheetDir + "blank.txtar")
