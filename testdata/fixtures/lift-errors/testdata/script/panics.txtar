@@ -7,6 +7,8 @@ D1: not a number
 malformed
 -- out/calc/error.txt --
 D1: not a number
+-- out/calc/inputs --
+error.txt
 -- out/calc/outcome --
 rejected
 -- out/evaluate/outcome --

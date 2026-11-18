@@ -12,8 +12,9 @@ import (
 
 // hasSections checks an archive holds each section, with its bytes, and
 // lacks each section whose name starts with one in lacking, but a cell's
-// outcome, which every cell has: lacking out/evaluate/ says the cell holds
-// nothing but its outcome.
+// outcome, which every cell has, and the sections it holds: lacking
+// out/evaluate/ says the cell holds nothing but its outcome and what want
+// names in it.
 func (s *sandbox) hasSections(rel string, want map[string]string, lacking ...string) {
 	s.t.Helper()
 	data := s.read(rel)
@@ -24,7 +25,7 @@ func (s *sandbox) hasSections(rel string, want map[string]string, lacking ...str
 	}
 	for _, name := range lacking {
 		for _, sec := range archive.Parse(data).Sections {
-			if strings.HasPrefix(sec.Name, name) && !isOutcome(sec.Name) {
+			if _, wanted := want[sec.Name]; strings.HasPrefix(sec.Name, name) && !isOutcome(sec.Name) && !wanted {
 				s.t.Errorf("%s holds %s, and shouldn't:\n%s", rel, name, data)
 				break
 			}
@@ -60,6 +61,7 @@ func TestLadder(t *testing.T) {
 		"out/resolve/error.txt": "A1 -> A1: cycle\n",
 		"out/format/trail.txt":  "parse\n",
 		"out/evaluate/outcome":  "blocked resolve\n",
+		"out/parse/inputs":      "",
 		"out/parse/outcome":     "accepted\n",
 	}, "out/evaluate/", "out/parse/")
 	s.hasSections("testdata/script/both.txtar", map[string]string{"out/parse/error.txt": "D1: not a number\n", "out/resolve/outcome": "blocked parse\n"}, "out/resolve/")
@@ -229,6 +231,11 @@ func TestPaths(t *testing.T) {
 		s.lacks(r, "--- PASS: TestCorpus/")
 	}
 	s.passes(s.update("split-second"))
+	// ladder blocks the cells of evaluate that direct let run, so their
+	// inputs files are orphans, for a person to delete.
+	for _, a := range []string{"both", "loop"} {
+		s.edit("testdata/script/"+a+".txtar", "delete the inputs of evaluate's cell, which ladder blocks", drop("out/evaluate/inputs"))
+	}
 	s.passes(s.update("ladder"))
 	r := s.normal("cycle")
 	s.fails(r, "*hypercase_test.Graph, which the lift back and the suite evaluate consume, is reached through the cycle resolve, back, so by more than one path:\n  hypercase_test.Script → parse → *hypercase_test.Parsed → resolve → *hypercase_test.Graph")

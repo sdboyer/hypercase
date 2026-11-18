@@ -6,6 +6,9 @@ B1 0
 circular
 -- gaps --
 echo A cycle is an error. Waits on sheets#4.
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --

@@ -68,7 +68,7 @@ var Parse = decl.Lift[Sheet, *sheet.Parsed]{
 	Name:        "parse",
 	Description: "Parses every cell.",
 	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The cell that is neither a number nor a formula."},
+		{Pattern: "error.txt", Description: "The cell that is neither a number nor a formula.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{Malformed},
 	Run: func(archive string, in Sheet, stderr io.Writer) (*sheet.Parsed, error) {
@@ -80,7 +80,7 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 	Name:        "resolve",
 	Description: "Orders the cells so that each comes after the cells it refers to.",
 	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The cycle, or the reference to a missing cell."},
+		{Pattern: "error.txt", Description: "The cycle, or the reference to a missing cell.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{Circular, Dangling},
 	Run: func(archive string, p *sheet.Parsed, stderr io.Writer) (*sheet.Graph, error) {
@@ -115,10 +115,10 @@ var Import = decl.Lift[CSV, Sheet]{
 	Name:        "import",
 	Description: "Turns each CSV field into a cell: row 1, field 2 is B1.",
 	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The line the importer can't read, and why."},
+		{Pattern: "error.txt", Description: "The line the importer can't read, and why.", Inputs: decl.FromPositions},
 	},
 	Product: []decl.Output{
-		{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them."},
+		{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them.", Inputs: Export},
 	},
 	Rejects: []decl.Property{Unterminated, StrayQuote, OutOfRange},
 	Jenny: jenny.For[CSV]().New("import", func(in CSV) (jenny.Files, error) {

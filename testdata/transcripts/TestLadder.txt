@@ -76,26 +76,42 @@ evaluate 1
 format 1
 -- in/parse/archive --
 yes
+-- out/calc/inputs --
+values.txt
+  in/calc/out/values.txt
 -- out/calc/outcome --
 accepted
 -- out/calc/values.txt --
 calc 1
 -- out/evaluate/archive.txt --
 fine
+-- out/evaluate/inputs --
+archive.txt
+  in/evaluate/archive
+values.txt
+  in/evaluate/out/values.txt
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
 evaluate 1
+-- out/format/inputs --
+trail.txt
+values.txt
+  in/format/out/values.txt
 -- out/format/outcome --
 accepted
 -- out/format/trail.txt --
 parse
 -- out/format/values.txt --
 format 1
+-- out/parse/inputs --
+stderr.txt
+  all inputs
 -- out/parse/outcome --
 accepted
 -- out/parse/stderr.txt --
 archive: fine
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 $ cat testdata/script/stray.txtar
@@ -110,6 +126,8 @@ evaluate's probe says no, if it is called.
 malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
+-- out/calc/inputs --
+error.txt
 -- out/calc/outcome --
 rejected
 -- out/evaluate/outcome --
@@ -118,6 +136,8 @@ blocked parse
 blocked parse
 -- out/parse/error.txt --
 D1: not a number or a formula: "total"
+-- out/parse/inputs --
+error.txt
 -- out/parse/outcome --
 rejected
 -- out/resolve/outcome --
@@ -130,20 +150,28 @@ A1 -> A1: cycle
 format 2
 -- properties --
 circular
+-- out/calc/inputs --
 -- out/calc/outcome --
 accepted
 -- out/evaluate/outcome --
 blocked resolve
+-- out/format/inputs --
+trail.txt
+values.txt
+  in/format/out/values.txt
 -- out/format/outcome --
 accepted
 -- out/format/trail.txt --
 parse
 -- out/format/values.txt --
 format 2
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
 -- out/resolve/error.txt --
 A1 -> A1: cycle
+-- out/resolve/inputs --
+error.txt
 -- out/resolve/outcome --
 rejected
 $ cat testdata/script/both.txtar
@@ -159,6 +187,8 @@ malformed
 circular
 -- out/calc/error.txt --
 D1: not a number
+-- out/calc/inputs --
+error.txt
 -- out/calc/outcome --
 rejected
 -- out/evaluate/outcome --
@@ -167,6 +197,8 @@ blocked parse
 blocked parse
 -- out/parse/error.txt --
 D1: not a number
+-- out/parse/inputs --
+error.txt
 -- out/parse/outcome --
 rejected
 -- out/resolve/outcome --
@@ -175,18 +207,26 @@ $ cat testdata/script/noisy.txtar
 parse warns on stderr, and goes on.
 -- in/parse/stderr --
 parse: a warning
+-- out/calc/inputs --
 -- out/calc/outcome --
 accepted
+-- out/evaluate/inputs --
 -- out/evaluate/outcome --
 accepted
+-- out/format/inputs --
+trail.txt
 -- out/format/outcome --
 accepted
 -- out/format/trail.txt --
 parse
+-- out/parse/inputs --
+stderr.txt
+  all inputs
 -- out/parse/outcome --
 accepted
 -- out/parse/stderr.txt --
 parse: a warning
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 $ go test  # ladder

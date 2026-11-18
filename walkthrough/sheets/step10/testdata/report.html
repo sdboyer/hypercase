@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>hypercase report: 77697f21607ef295eef541306cfc6b27be82b23b to HEAD</title>
+<title>hypercase report: cb1226581a27f00d6b3321ac6ec2b27d4118b1d7 to HEAD</title>
 <style>
 :root {
   color-scheme: light dark;
@@ -94,7 +94,7 @@ ul.outputs { padding-left: 18px; }
 <body>
 <header>
 <h1>hypercase report</h1>
-<p class="revs"><span class="rev">77697f21607ef295eef541306cfc6b27be82b23b</span> <code>77697f21607e</code> to <span class="rev">HEAD</span> <code>a532737bf966</code>, over the corpus root <code>step10</code></p>
+<p class="revs"><span class="rev">cb1226581a27f00d6b3321ac6ec2b27d4118b1d7</span> <code>cb1226581a27</code> to <span class="rev">HEAD</span> <code>9f52a3c7d0cc</code>, over the corpus root <code>step10</code></p>
 </header>
 <main>
 <section id="changes">
@@ -114,7 +114,9 @@ ul.outputs { padding-left: 18px; }
 <div class="line"><span class="case">sheet/empty</span> <span class="col">calc</span> <span class="outcome s-rejected">rejected S101</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
 <ul class="files">
 <li class="added"><details><summary><code>error.txt</code> added <span class="stat"><span class="add">+2</span> <span class="del">-0</span></span></summary>
-<pre class="diff"><span class="add">&#43; A1: not a number or a formula: &#34;&#34;</span><span class="add">&#43;   sheet/A1:1</span></pre></details></li>
+<pre class="diff"><span class="add">&#43; A1: not a number or a formula: &#34;&#34;</span><span class="add">&#43;   sheet/A1</span></pre></details></li>
+<li class="added"><details><summary><code>inputs</code> added <span class="stat"><span class="add">+2</span> <span class="del">-0</span></span></summary>
+<pre class="diff"><span class="add">&#43; error.txt</span><span class="add">&#43;   in/sheet/A1</span></pre></details></li>
 </ul>
 </li>
 <li class="change appeared">
@@ -127,7 +129,9 @@ ul.outputs { padding-left: 18px; }
 <div class="line"><span class="case">sheet/empty</span> <span class="col">parse</span> <span class="outcome s-rejected">rejected S101</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
 <ul class="files">
 <li class="added"><details><summary><code>error.txt</code> added <span class="stat"><span class="add">+2</span> <span class="del">-0</span></span></summary>
-<pre class="diff"><span class="add">&#43; A1: not a number or a formula: &#34;&#34;</span><span class="add">&#43;   sheet/A1:1</span></pre></details></li>
+<pre class="diff"><span class="add">&#43; A1: not a number or a formula: &#34;&#34;</span><span class="add">&#43;   sheet/A1</span></pre></details></li>
+<li class="added"><details><summary><code>inputs</code> added <span class="stat"><span class="add">+2</span> <span class="del">-0</span></span></summary>
+<pre class="diff"><span class="add">&#43; error.txt</span><span class="add">&#43;   in/sheet/A1</span></pre></details></li>
 </ul>
 </li>
 <li class="change appeared">
@@ -140,7 +144,9 @@ ul.outputs { padding-left: 18px; }
 <div class="line"><span class="case">sheet/blank</span> <span class="col">calc</span> <span class="outcome s-rejected">rejected S101</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
 <ul class="files">
 <li class="removed"><details><summary><code>error.txt</code> removed <span class="stat"><span class="add">+0</span> <span class="del">-2</span></span></summary>
-<pre class="diff"><span class="del">- A1: not a number or a formula: &#34;&#34;</span><span class="del">-   sheet/A1:1</span></pre></details></li>
+<pre class="diff"><span class="del">- A1: not a number or a formula: &#34;&#34;</span><span class="del">-   sheet/A1</span></pre></details></li>
+<li class="removed"><details><summary><code>inputs</code> removed <span class="stat"><span class="add">+0</span> <span class="del">-2</span></span></summary>
+<pre class="diff"><span class="del">- error.txt</span><span class="del">-   in/sheet/A1</span></pre></details></li>
 </ul>
 </li>
 <li class="change disappeared">
@@ -153,7 +159,9 @@ ul.outputs { padding-left: 18px; }
 <div class="line"><span class="case">sheet/blank</span> <span class="col">parse</span> <span class="outcome s-rejected">rejected S101</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
 <ul class="files">
 <li class="removed"><details><summary><code>error.txt</code> removed <span class="stat"><span class="add">+0</span> <span class="del">-2</span></span></summary>
-<pre class="diff"><span class="del">- A1: not a number or a formula: &#34;&#34;</span><span class="del">-   sheet/A1:1</span></pre></details></li>
+<pre class="diff"><span class="del">- A1: not a number or a formula: &#34;&#34;</span><span class="del">-   sheet/A1</span></pre></details></li>
+<li class="removed"><details><summary><code>inputs</code> removed <span class="stat"><span class="add">+0</span> <span class="del">-2</span></span></summary>
+<pre class="diff"><span class="del">- error.txt</span><span class="del">-   in/sheet/A1</span></pre></details></li>
 </ul>
 </li>
 <li class="change disappeared">
@@ -472,7 +480,7 @@ ul.outputs { padding-left: 18px; }
 <dt>looped</dt><dd>The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.<p>Gives <span class="prop">circular</span>.</p></dd>
 <dt>renamed</dt><dd>Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.<p>Keeps <span class="prop">circular</span>, <span class="prop">dangling</span>.</p></dd>
 </dl>
-<h4>Cases only at <span class="rev">77697f21607ef295eef541306cfc6b27be82b23b</span></h4>
+<h4>Cases only at <span class="rev">cb1226581a27f00d6b3321ac6ec2b27d4118b1d7</span></h4>
 <dl class="cases">
 <dt><span class="case">sheet/blank</span></dt><dd>A1 is a cell file with nothing in it.</dd>
 </dl>

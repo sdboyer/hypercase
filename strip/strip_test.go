@@ -364,3 +364,58 @@ accepted
 		})
 	}
 }
+
+// TestFrozenInputs: a cell's inputs file is one of its update-written
+// sections: a frozen cell keeps it with its other sections, and lists it
+// among them, and a selection that strips frozen cells removes it, as one
+// of a cell that isn't frozen is removed.
+func TestFrozenInputs(t *testing.T) {
+	t.Parallel()
+	a := archive.Parse([]byte(`A sheet whose evaluate cell a gaps line freezes.
+-- in/sheet/A1 --
+3
+-- gaps --
+evaluate Prints A1 wrongly. Waits on sheets#3.
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+-- out/evaluate/outcome --
+accepted
+-- out/evaluate/values.txt --
+A1 3
+-- out/list/files.txt --
+1 file
+-- out/list/inputs --
+files.txt
+  all inputs
+-- out/list/outcome --
+accepted
+`))
+	if ps := a.Check(); len(ps) > 0 {
+		t.Fatalf("the archive has problems of form: %v", ps)
+	}
+	evaluate := []string{"out/evaluate/inputs", "out/evaluate/outcome", "out/evaluate/values.txt"}
+	list := []string{"out/list/files.txt", "out/list/inputs", "out/list/outcome"}
+	for _, tt := range []struct {
+		sel     Selection
+		removed []string
+		frozen  []string
+	}{
+		{Selection{}, list, evaluate},
+		{Selection{Column: "evaluate"}, nil, evaluate},
+		{Selection{Column: "evaluate", Frozen: true}, evaluate, nil},
+		{Selection{Frozen: true}, slices.Concat(evaluate, list), nil},
+	} {
+		r := Plan(a, tt.sel)
+		if !slices.Equal(r.Removed, tt.removed) {
+			t.Errorf("Plan(%+v) removes %q, not %q", tt.sel, r.Removed, tt.removed)
+		}
+		var frozen []string
+		for _, f := range r.Frozen {
+			frozen = append(frozen, f.Sections...)
+		}
+		if !slices.Equal(frozen, tt.frozen) {
+			t.Errorf("Plan(%+v) leaves the frozen sections %q, not %q", tt.sel, frozen, tt.frozen)
+		}
+	}
+}

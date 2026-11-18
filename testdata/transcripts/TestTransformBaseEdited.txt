@@ -18,12 +18,26 @@ PASS
 $ edit testdata/script/twice.txtar  # rename the base's values.txt, which trim's delete names, and its golden
 $ go test  # trim
     script/garbled/transform/trim: trim declines the base: the base states malformed, which trim neither gives nor keeps
+    script/twice: echo prints a1 six.
+        echo: Does what the case's do/ tree says.
+        out/echo/inputs differs (-golden +got):
+        - values.txt
+        -   in/do/out/values.txt
+        + v.txt
+        +   in/do/out/v.txt
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
     script/twice/transform/trim: Removes do/out/values.txt, and adds do/out/k.txt.
         trim's variant of the base differs from its committed inputs:
         transform/trim/delete is no longer made
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
     script/twice/transform/trim: Removes do/out/values.txt, and adds do/out/k.txt.
         echo: Does what the case's do/ tree says.
+        transform/trim/out/echo/inputs differs (-golden +got):
+          k.txt
+            transform/trim/in/do/out/k.txt
+        + v.txt
+        +   in/do/out/v.txt
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         transform/trim/out/echo/v.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
 --- FAIL: TestCorpus
@@ -36,7 +50,7 @@ $ go test  # trim
             --- PASS: TestCorpus/script/garbled/echo
             --- SKIP: TestCorpus/script/garbled/transform/trim
         --- FAIL: TestCorpus/script/twice
-            --- PASS: TestCorpus/script/twice/echo
+            --- FAIL: TestCorpus/script/twice/echo
             --- FAIL: TestCorpus/script/twice/transform/trim
                 --- FAIL: TestCorpus/script/twice/transform/trim/echo
 FAIL
@@ -108,6 +122,11 @@ $ go test  # transforms
         echo: Does what the case's do/ tree says.
         out/echo/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/echo/inputs differs (-golden +got):
+        + error.txt
+          v.txt
+            in/do/out/v.txt
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         out/echo/outcome differs (-golden +got):
         - accepted
         + rejected
@@ -117,6 +136,8 @@ $ go test  # transforms
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to remove them.
         transform/looped/out/echo/error.txt is recorded, and looped declines the base: the base's do/ tree already errs
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/looped/out/echo/inputs is recorded, and looped declines the base: the base's do/ tree already errs
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/looped/out/echo/outcome is recorded, and looped declines the base: the base's do/ tree already errs
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/looped/out/echo/v.txt is recorded, and looped declines the base: the base's do/ tree already errs
@@ -125,6 +146,11 @@ $ go test  # transforms
         echo: Does what the case's do/ tree says.
         transform/upper/out/echo/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        transform/upper/out/echo/inputs differs (-golden +got):
+        + error.txt
+          v.txt
+            transform/upper/in/do/out/v.txt
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         transform/upper/out/echo/outcome differs (-golden +got):
         - accepted
         + rejected
@@ -154,6 +180,8 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # transforms
     script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
     script/twice/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.
         transform/looped/out/echo/error.txt is recorded, and looped declines the base: the base's do/ tree already errs
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/looped/out/echo/inputs is recorded, and looped declines the base: the base's do/ tree already errs
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/looped/out/echo/outcome is recorded, and looped declines the base: the base's do/ tree already errs
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.

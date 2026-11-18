@@ -7,10 +7,12 @@ $ go test  # rejects
     script/negative: A1 is a negative number, which the code wrongly rejects.
         echo: Does what the case's do/ tree says.
         The cell is frozen by its known gap, gaps line 1: "echo A negative number is valid, and evaluates to itself. Waits on sheets#3."
-        Its committed files match the run, and it has no out/echo/outcome, which every cell has.
+        Its committed files match the run, and it has no out/echo/outcome, which every cell that ran has.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to add it. The update adds the outcome and changes nothing else.
     script/unwritten: A1 rounds wrongly, and nothing has run the update since the gap was stated.
         echo: Does what the case's do/ tree says.
+        out/echo/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/values.txt has no golden.

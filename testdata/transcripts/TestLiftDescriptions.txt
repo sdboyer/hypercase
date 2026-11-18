@@ -42,16 +42,18 @@ $ go test  # lift-nodesc
                 "outputs": [
                   {
                     "pattern": "error.txt",
-        -           "description": "Why the lift rejects the case."
-        +           "description": " "
+        -           "description": "Why the lift rejects the case.",
+        +           "description": " ",
+                    "inputs": "positions"
                   },
                   {
                     "pattern": "stderr.txt",
-        -           "description": "What the lift writes to stderr."
-        +           "description": "What it writes."
+        -           "description": "What the lift writes to stderr.",
+        +           "description": "What it writes.",
+                    "inputs": "all"
                   }
                 ],
-                "productFiles": [],
+          ...
                 "rejects": [
                   "malformed"
                 ]
@@ -77,11 +79,13 @@ $ go test  # lift-nodesc
         -       "outputs": [
         -         {
         -           "pattern": "error.txt",
-        -           "description": "Why the lift rejects the case."
+        -           "description": "Why the lift rejects the case.",
+        -           "inputs": "positions"
         -         },
         -         {
         -           "pattern": "stderr.txt",
-        -           "description": "What the lift writes to stderr."
+        -           "description": "What the lift writes to stderr.",
+        -           "inputs": "all"
         -         }
         -       ],
         -       "productFiles": [],
@@ -117,31 +121,38 @@ $ go test  # lift-nodesc
         -       "outputs": [
         -         {
         -           "pattern": "?.txt",
-        -           "description": "A file the case's instructions name with one letter."
+        -           "description": "A file the case's instructions name with one letter.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "archive.txt",
-        -           "description": "The archive's name, as the run received it."
+        -           "description": "The archive's name, as the run received it.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "dir.txt",
-        -           "description": "The path of a temp dir the run made."
+        -           "description": "The path of a temp dir the run made.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "error.txt",
-        -           "description": "The error the case's instructions give."
+        -           "description": "The error the case's instructions give.",
+        -           "inputs": "positions"
         -         },
         -         {
         -           "pattern": "stderr.txt",
-        -           "description": "What the case's instructions write to stderr."
+        -           "description": "What the case's instructions write to stderr.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "stdout.txt",
-        -           "description": "What the case's instructions write to stdout."
+        -           "description": "What the case's instructions write to stdout.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "values.txt",
-        -           "description": "The values the case's instructions give."
+        -           "description": "The values the case's instructions give.",
+        -           "inputs": "func"
         -         }
         -       ],
         -       "rejects": [],
@@ -165,45 +176,48 @@ $ go test  # lift-nodesc
         -       "outputs": [
         -         {
         -           "pattern": "?.txt",
-        -           "description": "A file the case's instructions name with one letter."
+        -           "description": "A file the case's instructions name with one letter.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "archive.txt",
-        -           "description": "The archive's name, as the run received it."
+        -           "description": "The archive's name, as the run received it.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "dir.txt",
-        -           "description": "The path of a temp dir the run made."
+        -           "description": "The path of a temp dir the run made.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "error.txt",
-        -           "description": "The error the case's instructions give."
+        -           "description": "The error the case's instructions give.",
+        -           "inputs": "positions"
         -         },
         -         {
         -           "pattern": "stderr.txt",
-        -           "description": "What the case's instructions write to stderr."
+        -           "description": "What the case's instructions write to stderr.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "stdout.txt",
-        -           "description": "What the case's instructions write to stdout."
+        -           "description": "What the case's instructions write to stdout.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "trail.txt",
-        -           "description": "The trail of the parsed script, as the suite received it."
+        -           "description": "The trail of the parsed script, as the suite received it.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "values.txt",
-        -           "description": "The values the case's instructions give."
-        -         }
-        -       ],
-        -       "rejects": [],
-                "classifier": null
-              }
-            ]
+          ... (8 more lines of diff)
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
     script/both: The script is malformed and circular. parse rejects it, so resolve's cell is blocked, and nothing expects it to err.
         calc: Does what the case's calc/ tree says.
         out/calc/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/calc/inputs has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/calc/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
@@ -211,22 +225,30 @@ $ go test  # lift-nodesc
         parse: 
         out/parse/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/parse/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/parse/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/fine: A script every column reads, and no lift rejects.
         calc: Does what the case's calc/ tree says.
+        out/calc/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/calc/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/calc/values.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/fine: A script every column reads, and no lift rejects.
         parse: 
+        out/parse/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/parse/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/parse/stderr.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/noisy: parse warns on stderr, and goes on.
         parse: 
+        out/parse/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/parse/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/parse/stderr.txt has no golden.
@@ -235,11 +257,15 @@ $ go test  # lift-nodesc
         calc: Does what the case's calc/ tree says.
         out/calc/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/calc/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/calc/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/stray: parse rejects the script, which states malformed. calc reads the raw trees, and rejects it too.
         parse: 
         out/parse/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/parse/inputs has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/parse/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.

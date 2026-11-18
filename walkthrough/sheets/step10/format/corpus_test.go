@@ -35,7 +35,7 @@ var format = hypercase.Suite[*sheet.Parsed]{
 		return "", true
 	},
 	Outputs: []decl.Output{
-		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order."},
+		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order.", Inputs: sheetcorpus.Formulas},
 	},
 	Run: func(t testing.TB, archive string, p *sheet.Parsed, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		return []hypercase.File{{Path: "formulas.txt", Data: sheet.Format(p)}}, nil

@@ -7,10 +7,15 @@ PASS
 $ go test  # pkg-a
     the column echo is owned by . and ./b, each as a suite. Column names are unique per corpus root, and one package owns each column.
         Rename one of the suites, or remove one.
-    testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
+    testdata/script/twice.txtar: no registry claims out/shout/inputs, out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
         If a column should write them, register the column. If not, run hypercase strip -root . -column shout at the module root. It removes shout's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     script/twice: A1 is twice B1. The root package, ., prints it with echo, and ./b with shout.
         echo: Does what the case's do/ tree says.
+        out/echo/inputs differs (-golden +got):
+          values.txt
+        -   in/shout/out/values.txt
+        +   in/do/out/values.txt
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         out/echo/values.txt differs (-golden +got):
         - A1 SIX
         + A1 6
@@ -31,10 +36,15 @@ PASS
 $ go test  # pkg-a
     the column echo is owned by ., ./b and ./c, each as a suite. Column names are unique per corpus root, and one package owns each column.
         Rename or remove all but one of the suites.
-    testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
+    testdata/script/twice.txtar: no registry claims out/shout/inputs, out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
         If a column should write them, register the column. If not, run hypercase strip -root . -column shout at the module root. It removes shout's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     script/twice: A1 is twice B1. The root package, ., prints it with echo, and ./b with shout.
         echo: Does what the case's do/ tree says.
+        out/echo/inputs differs (-golden +got):
+          values.txt
+        -   in/shout/out/values.txt
+        +   in/do/out/values.txt
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         out/echo/values.txt differs (-golden +got):
         - A1 SIX
         + A1 6

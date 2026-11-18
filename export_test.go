@@ -168,11 +168,15 @@ func observeTo(path string) {
 			}
 			typ = l.in
 		}
+		var view fs.FS
+		if res.origin != nil {
+			view = res.origin.view
+		}
 		write(Observed{
 			Record: "cell", Update: r.update, Pkg: r.rel(r.pkgDir), Case: c.name, Prefix: c.prefix, Column: col.name,
 			Fate: FateString(res.fate), Ran: res.ran, Writable: res.writable, Files: strs(res.files),
 			Via: res.via, Product: strs(res.product), Frozen: c.committed(col).frozen(marked),
-			OnValue: res.onValue, View: files(res.view), Root: files(c.state.view), Path: path, Failed: failed,
+			OnValue: res.onValue, View: files(view), Root: files(c.state.origin.view), Path: path, Failed: failed,
 		})
 	}
 	observe.note = func(st *staging, n note, closing string, cl claims) {

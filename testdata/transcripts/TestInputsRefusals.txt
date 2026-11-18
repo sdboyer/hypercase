@@ -1,0 +1,32 @@
+$ go test  # inputs-positions-values
+panic: hypercase: the suite echo declares the output "values.txt" with Inputs: decl.FromPositions, which only a declaration whose pattern is error.txt states: Positions finds where an error points, and only error.txt holds one. Give it a decl.InputsFunc or decl.AllInputs.
+[stack]
+[exit 2]
+$ go test  # inputs-func-error
+panic: hypercase: the suite echo declares the output error.txt with a decl.InputsFunc. Its ranges come from where the error points, through the project's Positions, or from the whole input view: state decl.FromPositions or decl.AllInputs.
+[stack]
+[exit 2]
+$ go test  # inputs-func-star
+panic: hypercase: the suite echo declares the output "*.txt" with a decl.InputsFunc, and the pattern matches error.txt, whose ranges come from the project's Positions or the whole input view, never from a function. State decl.AllInputs, or change the pattern so it doesn't match error.txt and declare error.txt on its own, with decl.FromPositions or decl.AllInputs.
+[stack]
+[exit 2]
+$ go test  # inputs-other
+panic: hypercase: the suite echo declares the output "values.txt" with an Inputs that is none of decl.InputsFunc, decl.AllInputs and decl.FromPositions. State one of them.
+[stack]
+[exit 2]
+$ go test  # inputs-lift-positions
+panic: hypercase: the lift parse declares the output "stderr.txt" with Inputs: decl.FromPositions, which only a declaration whose pattern is error.txt states: Positions finds where an error points, and only error.txt holds one. Give it a decl.InputsFunc or decl.AllInputs.
+[stack]
+[exit 2]
+$ go test  # inputs-lift-func
+panic: hypercase: the lift parse declares the output "*.txt" with a decl.InputsFunc, and the pattern matches error.txt, whose ranges come from the project's Positions or the whole input view, never from a function. State decl.AllInputs, or change the pattern so it doesn't match error.txt and declare error.txt on its own, with decl.FromPositions or decl.AllInputs.
+[stack]
+[exit 2]
+$ go test  # inputs-product-positions
+panic: hypercase: the lift import declares the product file "parse/*" with Inputs: decl.FromPositions, and Positions finds where an error points, which a product file never holds. Give it a decl.InputsFunc or decl.AllInputs.
+[stack]
+[exit 2]
+$ go test  # inputs-product-other
+panic: hypercase: the lift import declares the product file "parse/*" with an Inputs that is none of decl.InputsFunc, decl.AllInputs and decl.FromPositions. State a decl.InputsFunc or decl.AllInputs.
+[stack]
+[exit 2]

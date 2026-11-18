@@ -3,6 +3,7 @@ parse rejects a valid script, a known gap.
 A1: wrongly rejected
 -- gaps --
 parse rejects a valid script. Waits on sheets#3.
+-- out/calc/inputs --
 -- out/calc/outcome --
 accepted
 -- out/evaluate/outcome --
@@ -11,6 +12,8 @@ blocked parse
 blocked parse
 -- out/parse/error.txt --
 A1: wrongly rejected
+-- out/parse/inputs --
+error.txt
 -- out/parse/outcome --
 rejected
 -- out/resolve/outcome --

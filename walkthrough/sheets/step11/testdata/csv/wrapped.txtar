@@ -1,0 +1,40 @@
+A price and a formula the export wrapped onto a second line, in a quoted field.
+-- in/csv/wrapped.csv --
+4,"=A1*
+2"
+-- properties --
+malformed
+-- via/import/sheet/A1 --
+4
+-- via/import/sheet/B1 --
+=A1*
+2
+-- out/calc/error.txt --
+B1: more than one line
+  sheet/B1:2: 2
+-- out/calc/inputs --
+error.txt
+  via/import/sheet/B1:2-2
+-- out/calc/outcome --
+rejected S101
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/import/inputs --
+via/import/sheet/A1
+  in/csv/wrapped.csv:1-1
+via/import/sheet/B1
+  in/csv/wrapped.csv:1-2
+-- out/import/outcome --
+accepted
+-- out/parse/error.txt --
+B1: more than one line
+  sheet/B1:2: 2
+-- out/parse/inputs --
+error.txt
+  via/import/sheet/B1:2-2
+-- out/parse/outcome --
+rejected S101
+-- out/resolve/outcome --
+blocked parse

@@ -31,12 +31,65 @@ type Project struct {
 	// or newline.
 	// Without Codes, a rejected cell carries no codes.
 	Codes func(err error) []string
+	// Positions finds where in the cell's input view an error that a
+	// column's function returned points: the ranges of an error.txt whose
+	// declaration states FromPositions. Every package that registers such
+	// a declaration, owned or used, supplies it. A panic's error.txt has no
+	// error to give it, and so no ranges.
+	Positions func(err error) []Range
 	// IssueLinks link the text that names an issue, in a gaps line or a
 	// description, to the issue: one per issue tracker the project's gaps
 	// lines name. The registry records them, and hypercase report reads
 	// them from there.
 	IssueLinks []IssueLink
 }
+
+// A Range is a span of lines in one file of a cell's input view: the view
+// RenderError receives, the case's input view with its variant's overlay
+// laid over it, or, past a bytes lift, the last one's product.
+type Range struct {
+	// Path is the file's slash path in the view: sheet/A1.
+	Path string
+	// Start and End are the span's first and last lines, counted from 1,
+	// End included. Start and End both 0 is the whole file.
+	Start, End int
+}
+
+// Inputs says where an output declaration's files come from, in the
+// cell's input view: an InputsFunc, which maps each file to its ranges;
+// AllInputs, which says each file depends on the whole view; or, on a
+// declaration whose pattern is error.txt, FromPositions. Nothing else
+// implements it.
+type Inputs interface{ inputs() }
+
+// An InputsFunc maps one output file, by its path under the column's
+// directory, or, for a bytes lift's product, by its path in the product,
+// to the ranges of the cell's input view it comes from. It receives that
+// view, the one RenderError receives, which past a bytes lift is the last
+// one's product; for a bytes lift's own declarations, it is the lift's
+// input view. It is called for each file of each run of the cell, so it
+// is a function of its arguments alone. An error.txt declaration takes no
+// InputsFunc.
+type InputsFunc func(in fs.FS, path string) ([]Range, error)
+
+func (InputsFunc) inputs() {}
+
+// inputsKind is the kind of AllInputs and FromPositions, which a
+// declaration states in place of a function.
+type inputsKind int
+
+func (inputsKind) inputs() {}
+
+const (
+	// AllInputs states that each of the declaration's files depends on the
+	// whole input view. It is the explicit escape from a map, and the
+	// cell's inputs file says so of each file.
+	AllInputs inputsKind = 1
+	// FromPositions states that an error.txt's ranges are where the
+	// project's Positions says the error points. Only a declaration whose
+	// pattern is exactly error.txt states it.
+	FromPositions inputsKind = 2
+)
 
 // An IssueLink links text that names an issue to the issue. Each match of
 // Pattern, in a gaps line or a description, links to the URL that the
@@ -210,4 +263,10 @@ type Output struct {
 	Pattern string
 	// Description says what the files hold. It is required.
 	Description string
+	// Inputs says where in the cell's input view the files come from: a
+	// map, an InputsFunc; AllInputs; or, for error.txt, FromPositions or
+	// AllInputs. It is required: a declaration that states none fails the
+	// run. The cell's inputs file, out/<column>/inputs, records what it
+	// gives for each file.
+	Inputs Inputs
 }

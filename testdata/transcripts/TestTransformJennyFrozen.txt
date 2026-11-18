@@ -171,6 +171,8 @@ $ edit testdata/script/twice.txtar  # delete upper's frozen cell of echo
 $ go test  # tr-jenny
     script/twice/transform/upper: Uppercases every file under do/out/.
         echo: Does what the case's do/ tree says.
+        transform/upper/out/echo/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         transform/upper/out/echo/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         transform/upper/out/echo/values.txt has no golden.
@@ -209,6 +211,8 @@ $ edit testdata/script/twice.txtar  # delete upper's frozen cell of echo, and cl
 $ go test  # tr-jenny
     script/twice/transform/upper: Uppercases every file under do/out/.
         echo: Does what the case's do/ tree says.
+        transform/upper/out/echo/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         transform/upper/out/echo/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         transform/upper/out/echo/values.txt has no golden.
@@ -312,6 +316,8 @@ PASS
 $ go test  # tr-jenny
     script/twice/transform/upper: Uppercases every file under do/out/.
         echo: Does what the case's do/ tree says.
+        transform/upper/out/echo/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         transform/upper/out/echo/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         transform/upper/out/echo/values.txt has no golden.

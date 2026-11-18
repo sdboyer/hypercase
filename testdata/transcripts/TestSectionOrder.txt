@@ -30,6 +30,11 @@ b
 a
 -- out/echo/b.txt --
 b
+-- out/echo/inputs --
+a.txt
+  in/do/out/a.txt
+b.txt
+  in/do/out/b.txt
 -- out/echo/outcome --
 accepted
 $ cat testdata/script/between.txtar
@@ -42,6 +47,11 @@ b
 a
 -- out/echo/b.txt --
 b
+-- out/echo/inputs --
+a.txt
+  in/do/out/a.txt
+b.txt
+  in/do/out/b.txt
 -- out/echo/outcome --
 accepted
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # echo

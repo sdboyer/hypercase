@@ -3,6 +3,10 @@ A1 is a negative number, which the code rejects.
 A1: unexpected "-"
 -- in/do/out/values.txt --
 A1 -3
+-- out/echo/inputs --
+error.txt
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 rejected
 -- out/echo/values.txt --

@@ -23,7 +23,7 @@ import (
 
 // Format is the version of what a registry holds. It changes on any change
 // to that.
-const Format = 7
+const Format = 8
 
 // Name is a registry's file name, in its package's testdata/ directory.
 const Name = "hypercase.json"
@@ -43,6 +43,10 @@ type Registry struct {
 	// Codes records that the project supplies Codes, which gives a
 	// rejected cell's outcome its codes.
 	Codes bool `json:"codes"`
+	// Positions records that the project supplies Positions, which finds
+	// where an error points: the ranges of each error.txt whose
+	// declaration states FromPositions.
+	Positions bool `json:"positions"`
 	// IssueLinks are the project's link patterns, which link text naming an
 	// issue to the issue.
 	IssueLinks []IssueLink `json:"issueLinks"`
@@ -186,7 +190,25 @@ type Classifier struct {
 type Output struct {
 	Pattern     string `json:"pattern"`
 	Description string `json:"description"`
+	// Inputs is what the declaration states its files' ranges come from:
+	// InputsFunc, InputsPositions, InputsAll or InputsNone. It is "" in a
+	// registry of a format before InputsFormat, which records none.
+	Inputs string `json:"inputs"`
 }
+
+// What an output declaration's Inputs states, as [Output.Inputs] records
+// it.
+const (
+	// InputsFunc maps each file with a function.
+	InputsFunc = "func"
+	// InputsPositions takes an error.txt's ranges from where the error
+	// points, through the project's Positions.
+	InputsPositions = "positions"
+	// InputsAll maps each file to the whole input view.
+	InputsAll = "all"
+	// InputsNone states nothing, which fails the run.
+	InputsNone = "none"
+)
 
 // BytesLifts returns what the registries say of the columns over each
 // corpus, by corpus and then column: whether the column is a bytes lift,
@@ -304,7 +326,8 @@ func (e *FormatError) Error() string {
 // own, a column runs over each of its corpora once, and its paths are one
 // from each, in their order, and name only lifts the registry lists, each
 // once, never the column itself, and none for a suite over the raw input
-// view.
+// view; and each output declaration records one of the statements of
+// Inputs, in a place registration admits it.
 func Parse(data []byte) (*Registry, error) {
 	var head struct {
 		Format int `json:"format"`
@@ -328,7 +351,54 @@ func Parse(data []byte) (*Registry, error) {
 	if err := r.checkPaths(); err != nil {
 		return nil, err
 	}
+	if err := r.checkInputs(); err != nil {
+		return nil, err
+	}
 	return r, nil
+}
+
+// errorFile is the output file that holds a column's error.
+const errorFile = "error.txt"
+
+// checkInputs reports the first output declaration, a suite's, a lift's or
+// a product file's, whose Inputs the update couldn't have written: one
+// that records none of the four statements, InputsPositions on a pattern
+// that isn't error.txt or on a product file, or InputsFunc on an output
+// pattern that matches error.txt. Registration refuses each of these.
+func (r *Registry) checkInputs() error {
+	check := func(kind, name, what string, outs []Output) error {
+		for _, o := range outs {
+			matches, _ := path.Match(o.Pattern, errorFile)
+			switch o.Inputs {
+			case InputsAll, InputsNone:
+			case InputsFunc:
+				if what == "output" && matches {
+					return fmt.Errorf("the %s %s declares the %s %s with inputs %q, and the pattern matches %s, where %s's ranges come from Positions or the whole input view, never from a function", kind, name, what, o.Pattern, o.Inputs, errorFile, errorFile)
+				}
+			case InputsPositions:
+				if what != "output" || o.Pattern != errorFile {
+					return fmt.Errorf("the %s %s declares the %s %s with inputs %q, where only an output whose pattern is %s takes its ranges from Positions", kind, name, what, o.Pattern, o.Inputs, errorFile)
+				}
+			default:
+				return fmt.Errorf("the %s %s declares the %s %s with inputs %q, where a registry records %q, %q, %q or %q", kind, name, what, o.Pattern, o.Inputs, InputsFunc, InputsPositions, InputsAll, InputsNone)
+			}
+		}
+		return nil
+	}
+	for _, s := range r.Suites {
+		if err := check("suite", s.Name, "output", s.Outputs); err != nil {
+			return err
+		}
+	}
+	for _, l := range r.Lifts {
+		if err := check("lift", l.Name, "output", l.Outputs); err != nil {
+			return err
+		}
+		if err := check("lift", l.Name, "product file", l.ProductFiles); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // checkNames reports the first name the registry lists twice among its
@@ -447,14 +517,21 @@ const Oldest = 3
 // its column writes, and none at all when it writes none.
 const OutcomeFormat = 5
 
+// InputsFormat is the first format version whose registries record what
+// each output declaration's Inputs states, and whether the project
+// supplies Positions.
+const InputsFormat = 8
+
 // added is what each format version added to the one before it, by the
 // key that holds it, which a registry of an older format doesn't hold.
 // Format 4 added each corpus type's transforms, format 5 whether the
 // project supplies Codes and each suite's classifier, format 6 whether
-// each lift is a bytes lift and its product's declarations, and format 7
-// each lift's and suite's path from each of its corpora. None changed what
-// an earlier key holds. Each format's keys are in
-// testdata/keys-<N>.txt, which TestFormatKeys checks the table against.
+// each lift is a bytes lift and its product's declarations, format 7 each
+// lift's and suite's path from each of its corpora, and format 8 whether
+// the project supplies Positions and what each output declaration's
+// Inputs states. None changed what an earlier key holds. Each format's
+// keys are in testdata/keys-<N>.txt, which TestFormatKeys checks the table
+// against.
 var added = []struct {
 	format int
 	key    string
@@ -479,21 +556,39 @@ var added = []struct {
 	{7, "suites[].paths", func(p presence) bool {
 		return slices.ContainsFunc(p.Suites, func(s suitePresence) bool { return s.Paths != nil })
 	}},
+	{8, "lifts[].outputs[].inputs", func(p presence) bool {
+		return slices.ContainsFunc(p.Lifts, func(l liftPresence) bool { return holdsInputs(l.Outputs) })
+	}},
+	{8, "lifts[].productFiles[].inputs", func(p presence) bool {
+		return slices.ContainsFunc(p.Lifts, func(l liftPresence) bool {
+			// productFiles that aren't a list hold no inputs, and decode
+			// refuses them.
+			var files []outputPresence
+			_ = json.Unmarshal(l.ProductFiles, &files)
+			return holdsInputs(files)
+		})
+	}},
+	{8, "positions", func(p presence) bool { return p.Positions != nil }},
+	{8, "suites[].outputs[].inputs", func(p presence) bool {
+		return slices.ContainsFunc(p.Suites, func(s suitePresence) bool { return holdsInputs(s.Outputs) })
+	}},
 }
 
 // presence records which keys that a later format added a registry
 // holds. A key given as null is held.
 type presence struct {
-	Codes  json.RawMessage `json:"codes"`
-	Types  []typePresence  `json:"types"`
-	Lifts  []liftPresence  `json:"lifts"`
-	Suites []suitePresence `json:"suites"`
+	Codes     json.RawMessage `json:"codes"`
+	Positions json.RawMessage `json:"positions"`
+	Types     []typePresence  `json:"types"`
+	Lifts     []liftPresence  `json:"lifts"`
+	Suites    []suitePresence `json:"suites"`
 }
 
 type liftPresence struct {
-	Bytes        json.RawMessage `json:"bytes"`
-	ProductFiles json.RawMessage `json:"productFiles"`
-	Paths        json.RawMessage `json:"paths"`
+	Bytes        json.RawMessage  `json:"bytes"`
+	Outputs      []outputPresence `json:"outputs"`
+	ProductFiles json.RawMessage  `json:"productFiles"`
+	Paths        json.RawMessage  `json:"paths"`
 }
 
 type typePresence struct {
@@ -501,8 +596,18 @@ type typePresence struct {
 }
 
 type suitePresence struct {
-	Classifier json.RawMessage `json:"classifier"`
-	Paths      json.RawMessage `json:"paths"`
+	Classifier json.RawMessage  `json:"classifier"`
+	Outputs    []outputPresence `json:"outputs"`
+	Paths      json.RawMessage  `json:"paths"`
+}
+
+type outputPresence struct {
+	Inputs json.RawMessage `json:"inputs"`
+}
+
+// holdsInputs reports whether any of the output declarations holds inputs.
+func holdsInputs(outs []outputPresence) bool {
+	return slices.ContainsFunc(outs, func(o outputPresence) bool { return o.Inputs != nil })
 }
 
 // ParseAny parses a registry of any format version from [Oldest] to

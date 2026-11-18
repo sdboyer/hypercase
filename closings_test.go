@@ -27,6 +27,7 @@ import (
 	"github.com/sdboyer/hypercase"
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/internal/registry"
+	"github.com/sdboyer/hypercase/internal/revmap"
 )
 
 // TestClosings: every closing a run gives says what the update then does.
@@ -1220,15 +1221,21 @@ var claimChecks = map[string]claimCheck{
 		}
 		return ""
 	}},
-	"OnlyOutcome": {check: func(c *noteCheck, u *updated) string {
-		if c.cl.OnlyOutcome == "" {
+	"OnlyAdds": {check: func(c *noteCheck, u *updated) string {
+		if len(c.cl.OnlyAdds) == 0 {
 			return ""
 		}
 		was, is := cellSections(c.before, c.n.Prefix, c.n.Column), cellSections(u.after, c.n.Prefix, c.n.Column)
-		_, had := was[c.cl.OnlyOutcome]
-		was[c.cl.OnlyOutcome] = u.cell.Files["outcome"]
-		if had || c.cl.OnlyOutcome != c.out("outcome") || !maps.Equal(was, is) {
-			return fmt.Sprintf("the closing says the update adds %s and changes nothing else of the cell, and the cell had it: %v, or the cell is %v", c.cl.OnlyOutcome, had, is)
+		for _, s := range c.cl.OnlyAdds {
+			rel, ok := strings.CutPrefix(s, c.out(""))
+			_, had := was[s]
+			if !ok || had || !slices.Contains(upgraded, rel) {
+				return fmt.Sprintf("the closing says the update adds %v and changes nothing else of the cell, and %s is no framework file of the cell's that the upgrade adds, or the cell had it: %v", c.cl.OnlyAdds, s, had)
+			}
+			was[s] = u.cell.Files[rel]
+		}
+		if !maps.Equal(was, is) {
+			return fmt.Sprintf("the closing says the update adds %v and changes nothing else of the cell, and the cell is %v", c.cl.OnlyAdds, is)
 		}
 		return ""
 	}},
@@ -1889,7 +1896,8 @@ func xtestTypes(t *testing.T) typedFiles {
 // did: the same fate, files and product, written alike, and where both ran
 // it, on the same input view. A probe that fails the cell in both, alike,
 // fails it alike on any value. An update writes a frozen cell only to add
-// the outcome it lacks, which the normal run says.
+// framework files it lacks, upgraded, which the normal run says, as the
+// normal run made them.
 func sameCell(n, u hypercase.Observed) bool {
 	if n.Fate != u.Fate || n.Frozen != u.Frozen || !maps.Equal(n.Product, u.Product) || n.Via != u.Via || n.Ran != u.Ran {
 		return false
@@ -1898,10 +1906,19 @@ func sameCell(n, u hypercase.Observed) bool {
 		return false
 	}
 	if u.Frozen && u.Writable {
-		return maps.Equal(u.Files, map[string]string{"outcome": n.Files["outcome"]})
+		for p, data := range u.Files {
+			if made, ok := n.Files[p]; !ok || made != data || !slices.Contains(upgraded, p) {
+				return false
+			}
+		}
+		return len(u.Files) > 0
 	}
 	return n.Writable == u.Writable && maps.Equal(n.Files, u.Files)
 }
+
+// upgraded are the framework's files the upgrade adds to a frozen cell
+// that lacks them, by path under its column's directory.
+var upgraded = []string{"outcome", "inputs"}
 
 func compareCells(a, b cellKey) int {
 	return strings.Compare(a.pkg+" "+a.c+" "+a.col, b.pkg+" "+b.c+" "+b.col)
@@ -1981,7 +1998,9 @@ func inputs(x *indexed, tr string) map[string]string {
 
 // written checks each cell the update records against the archive after
 // it: a cell it wrote holds its files, and a bytes lift's its product, and
-// a cell it didn't write is as it was.
+// a cell it didn't write is as it was. Each range of an inputs file it
+// wrote names a section of the cell's view's directories, which holds the
+// bytes the view had at the range's path, and lines of them (inputsHeld).
 func (j *judge) written() {
 	t := j.t
 	t.Helper()
@@ -1997,7 +2016,88 @@ func (j *judge) written() {
 		if msg := holdsCell(j.u.after, ur); msg != "" {
 			t.Errorf("%s, %s, in %s: %s", k.c, k.col, k.pkg, msg)
 		}
+		if _, ok := ur.Files["inputs"]; ok {
+			if msg := inputsHeld(j.u.after, ur, j.frozenOnPath(ur), j.unowned(ur)); msg != "" {
+				t.Errorf("%s, %s, in %s: %s", k.c, k.col, k.pkg, msg)
+			}
+		}
 	}
+}
+
+// unowned reports whether a cell is of a transform's variant that no
+// package owns: no update rewrites the variant's inputs, so its own
+// sections keep the bytes they had, and the update ran the cell on what
+// the transform makes.
+func (j *judge) unowned(ur hypercase.Observed) bool {
+	kind, name, _ := archive.SplitCase(ur.Prefix)
+	return kind == archive.Transform && !j.u.owners[name]
+}
+
+// frozenOnPath reports whether the last bytes lift on a cell's path, the
+// one whose product the cell's ranges name, has a frozen cell in the
+// update, in any package: the archive then keeps the lift's committed
+// product, and the cell's view is what the lift made.
+func (j *judge) frozenOnPath(ur hypercase.Observed) bool {
+	if len(ur.Path) == 0 {
+		return false
+	}
+	for k, o := range j.u.cells {
+		if k.c == ur.Case && k.prefix == ur.Prefix && k.col == ur.Path[0] && o.Frozen {
+			return true
+		}
+	}
+	return false
+}
+
+// inputsHeld says how the inputs file an update wrote for a cell doesn't
+// map it into the cell's view, or "". Each range names a section under the
+// directory that commits the view's files: past a bytes lift, the last
+// one's product's, <prefix>via/<lift>/; otherwise in/, or the case's own
+// <prefix>in/. The section holds the bytes the view had at its path, and
+// the range's lines are lines of them, unless the update left the section
+// as it was: past a bytes lift whose cell is frozen, frozen, or in the
+// own in/ of a transform's variant no package owns, unowned.
+func inputsHeld(x *indexed, ur hypercase.Observed, frozen, unowned bool) string {
+	files, err := revmap.Parse([]byte(ur.Files["inputs"]))
+	if err != nil {
+		return fmt.Sprintf("the update wrote an inputs file that doesn't parse: %v", err)
+	}
+	dirs := []string{ur.Prefix + "in/", "in/"}
+	if len(ur.Path) > 0 {
+		dirs = []string{ur.Prefix + "via/" + ur.Path[0] + "/"}
+	}
+	for _, f := range files {
+		for _, r := range f.Ranges {
+			var p string
+			ok := false
+			for _, d := range dirs {
+				if p, ok = strings.CutPrefix(r.Section, d); ok {
+					break
+				}
+			}
+			if !ok {
+				return fmt.Sprintf("the inputs file maps %s to the section %s, under none of %q, which commit the files of the cell's view", f.Path, r.Section, dirs)
+			}
+			if frozen || unowned && ur.Prefix != "" && strings.HasPrefix(r.Section, ur.Prefix+"in/") {
+				continue
+			}
+			view, inView := ur.View[p]
+			got, held := section(x, r.Section)
+			lines := strings.Count(view, "\n")
+			if view != "" && !strings.HasSuffix(view, "\n") {
+				lines++
+			}
+			switch {
+			case !inView:
+				return fmt.Sprintf("the inputs file maps %s to the section %s, and the cell's view has no file %s", f.Path, r.Section, p)
+			case !held || got != view:
+				return fmt.Sprintf("the inputs file maps %s to the section %s, which holds %q, and the cell's view had %q at %s", f.Path, r.Section, got, view, p)
+			case r.End > lines:
+				return fmt.Sprintf("the inputs file maps %s to lines %d to %d of the section %s, which has %d", f.Path, r.Start, r.End, r.Section, lines)
+			}
+		}
+	}
+	return ""
 }
 
 // holdsCell says how an archive doesn't hold what an update records it

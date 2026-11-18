@@ -1,9 +1,10 @@
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step06",
   "rootPackage": true,
   "codes": false,
+  "positions": true,
   "issueLinks": [],
   "properties": [
     {
@@ -47,7 +48,8 @@
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "The cell that is neither a number nor a formula."
+          "description": "The cell that is neither a number nor a formula.",
+          "inputs": "positions"
         }
       ],
       "productFiles": [],
@@ -76,7 +78,8 @@
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "The cycle, or the reference to a missing cell."
+          "description": "The cycle, or the reference to a missing cell.",
+          "inputs": "positions"
         }
       ],
       "productFiles": [],
@@ -106,7 +109,8 @@
       "outputs": [
         {
           "pattern": "values.txt",
-          "description": "Each cell's value, one per line, in cell order."
+          "description": "Each cell's value, one per line, in cell order.",
+          "inputs": "func"
         }
       ],
       "rejects": [],

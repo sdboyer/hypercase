@@ -5,6 +5,8 @@ $ go test  # echo
         Fix the code. A panic is never an expected error.
         out/echo/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/echo/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     stack of the panic: [stack]
@@ -39,5 +41,7 @@ A1 6
 index out of range
 -- out/echo/error.txt --
 index out of range
+-- out/echo/inputs --
+error.txt
 -- out/echo/outcome --
 panicked

@@ -9,5 +9,12 @@ b
 printed
 -- out/echo/a.txt --
 stale a
+-- out/echo/inputs --
+a.txt
+  in/do/out/a.txt
+b.txt
+  in/do/out/b.txt
+stdout.txt
+  in/do/stdout
 -- out/echo/outcome --
 accepted

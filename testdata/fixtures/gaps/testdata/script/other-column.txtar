@@ -3,6 +3,9 @@ A known gap naming a column that doesn't run on the case.
 A1 6
 -- gaps --
 format A1 prints as =6. Waits on sheets#8.
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --

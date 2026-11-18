@@ -12,6 +12,9 @@ blocked import
 -- out/import/error.txt --
 import: line 1: quote inside an unquoted field
   csv/stray-quote.csv:1: 4,6",=A1+B1
+-- out/import/inputs --
+error.txt
+  in/csv/stray-quote.csv:1-1
 -- out/import/outcome --
 rejected C102
 -- out/parse/outcome --

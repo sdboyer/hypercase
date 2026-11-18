@@ -135,9 +135,9 @@ $ go test  # strip-a
 FAIL
 [exit 1]
 $ hypercase strip -column parse
-testdata/export/prices.txtar: removed 2 sections
+testdata/export/prices.txtar: removed 4 sections
 testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells
-testdata/script/plain.txtar: removed 2 sections
+testdata/script/plain.txtar: removed 4 sections
 Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
 # run the update, as the lift's failure says
 # the update, run until a pass changes nothing; that pass:
@@ -270,9 +270,9 @@ $ go test  # strip-a
 FAIL
 [exit 1]
 $ hypercase strip -root . -column parse
-testdata/export/prices.txtar: removed 3 sections
+testdata/export/prices.txtar: removed 5 sections
 testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells
-testdata/script/plain.txtar: removed 2 sections
+testdata/script/plain.txtar: removed 4 sections
 Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
 # the update, run until a pass changes nothing; that pass:
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a

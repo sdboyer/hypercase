@@ -322,7 +322,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 	var diffs string
 	switch {
 	case v.tr == nil:
-		c.setView(r, p, pc.base.VariantView(v.committed))
+		c.setView(r, p, overlayOrigin(pc.base.VariantView(v.committed), c.prefix, v.committed.Overlay))
 	case v.problem != "" && owner:
 		var ns notes
 		ns.add(aboutFault, v.problem, closing{advice: v.fix})
@@ -340,7 +340,7 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if owner {
 			r.judgeInputs(t, c, pc, v, w)
 		}
-		c.setView(r, p, archive.NewFS(v.made))
+		c.setView(r, p, madeOrigin(v, c.prefix))
 	default:
 		// A normal run reads the inputs the archive holds.
 		view, invalid := pc.base.InputView(v.committed)
@@ -355,14 +355,14 @@ func (r *runner) runVariant(t *testing.T, p *plan, pc plannedCase, v *plannedVar
 		if owner {
 			r.judgeInputs(t, c, pc, v, w)
 		}
-		c.setView(r, p, view)
+		c.setView(r, p, overlayOrigin(view, c.prefix, v.committed.Overlay))
 		// A cell the inputs block may be one the update, which stages the
 		// variant on what the transform makes, runs. Inputs that differ
 		// only in a delete line naming a path the base lacks give the same
 		// view, on which the update runs each cell as this run does, so no
 		// failure is theirs.
 		if diffs = v.inputDiffs(pc.a); diffs != "" && !holdsExactly(view, v.made) {
-			c.state.made = archive.NewFS(v.made)
+			c.state.made = madeOrigin(v, c.prefix)
 			stale = !owner
 		}
 	}

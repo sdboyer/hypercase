@@ -10,9 +10,9 @@ never pans out.
 
 hypercase is one framework, with everything on. It has no levels to opt into.
 A project that upgrades to a later commit carries what later steps add: an
-`outcome` file per cell (step 8), and `Inputs` or `AllInputs` on every output
-declaration (step 11). Earlier steps' examples keep running, and gain what
-later steps require.
+`outcome` file per cell (step 8), and `Inputs` on every output declaration,
+with an `inputs` file per cell that runs (step 11). Earlier steps' examples
+keep running, and gain what later steps require.
 
 Every step is shown in one toy domain, spreadsheet formulas, which step 1
 introduces. Steps 1 to 11 show the Go an author writes at that
@@ -278,7 +278,7 @@ var evaluate = hypercase.Suite[fs.FS]{
 	Description: "Evaluates every cell of the sheet.",
 	Corpus:      "sheet",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
 	},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		values, err := sheet.Eval(in) // the cells under sheet/
@@ -292,6 +292,10 @@ var evaluate = hypercase.Suite[fs.FS]{
 func TestCorpus(t *testing.T) { hypercase.Test(t) }
 ```
 
+Each output declaration also states `Inputs`: where in the case's input view
+its files come from. Step 11 explains it, and the steps before it show it
+without comment.
+
 ### How the files change
 
 Each table row and its golden become one archive of the corpus `sheet`.
@@ -304,6 +308,10 @@ A1 is twice B1.
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+  in/sheet/B1
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
@@ -312,7 +320,9 @@ B1 3
 ```
 
 `out/evaluate/outcome` holds the cell's outcome, the code's verdict on the
-case, which step 8 adds to every cell.
+case, which step 8 adds to every cell. `out/evaluate/inputs` holds where
+each output file comes from, the sections of the archive its declaration's
+`Inputs` maps it to, which step 11 adds to every cell that runs.
 
 The package also writes its registry, `testdata/hypercase.json`, which lists
 what it registers (step 5).
@@ -626,8 +636,8 @@ var evaluate = hypercase.Suite[fs.FS]{
 	Description: "Evaluates every cell of the sheet.",
 	Corpus:      "sheet",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
-		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
+		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{sheetcorpus.Circular},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
@@ -656,6 +666,10 @@ A1 and B1 refer to each other.
 circular
 -- out/evaluate/error.txt --
 A1 -> B1 -> A1: cycle
+-- out/evaluate/inputs --
+error.txt
+  in/sheet/A1:1-1
+  in/sheet/B1:1-1
 -- out/evaluate/outcome --
 rejected
 ```
@@ -672,6 +686,9 @@ A1 is a negative number.
 evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/evaluate/error.txt --
 A1: unexpected "-"
+-- out/evaluate/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/evaluate/outcome --
 rejected
 ```
@@ -857,8 +874,8 @@ var evaluate = hypercase.Suite[fs.FS]{
 	Description: "Evaluates every cell of the sheet.",
 	Corpus:      "sheet",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
-		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
+		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
@@ -893,8 +910,8 @@ var format = hypercase.Suite[fs.FS]{
 		return "", true
 	},
 	Outputs: []decl.Output{
-		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order."},
-		{Pattern: "error.txt", Description: "Why the sheet doesn't parse."},
+		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order.", Inputs: sheetcorpus.Formulas},
+		{Pattern: "error.txt", Description: "Why the sheet doesn't parse.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
@@ -926,9 +943,9 @@ var calc = hypercase.Suite[fs.FS]{
 	Description: "Runs the calc command on the sheet.",
 	Corpus:      "sheet",
 	Outputs: []decl.Output{
-		{Pattern: "stdout.txt", Description: "The sheet's values as CSV, one row per line."},
-		{Pattern: "stderr.txt", Description: "A warning for each cell that divides by zero."},
-		{Pattern: "error.txt", Description: "Why calc failed."},
+		{Pattern: "stdout.txt", Description: "The sheet's values as CSV, one row per line.", Inputs: decl.AllInputs},
+		{Pattern: "stderr.txt", Description: "A warning for each cell that divides by zero.", Inputs: decl.AllInputs},
+		{Pattern: "error.txt", Description: "Why calc failed.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
@@ -953,10 +970,17 @@ A1 is twice B1.
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/calc/inputs --
+stdout.txt
+  all inputs
 -- out/calc/outcome --
 accepted
 -- out/calc/stdout.txt --
 6,3
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+  in/sheet/B1
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
@@ -964,6 +988,9 @@ A1 6
 B1 3
 -- out/format/formulas.txt --
 A1 =B1 * 2
+-- out/format/inputs --
+formulas.txt
+  in/sheet/A1
 -- out/format/outcome --
 accepted
 ```
@@ -986,14 +1013,23 @@ total
 malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
+-- out/calc/inputs --
+error.txt
+  in/sheet/D1:1-1
 -- out/calc/outcome --
 rejected
 -- out/evaluate/error.txt --
 D1: not a number or a formula: "total"
+-- out/evaluate/inputs --
+error.txt
+  in/sheet/D1:1-1
 -- out/evaluate/outcome --
 rejected
 -- out/format/error.txt --
 D1: not a number or a formula: "total"
+-- out/format/inputs --
+error.txt
+  in/sheet/D1:1-1
 -- out/format/outcome --
 rejected
 ```
@@ -1013,10 +1049,16 @@ evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
 calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/calc/error.txt --
 A1: unexpected "-"
+-- out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/calc/outcome --
 rejected
 -- out/evaluate/error.txt --
 A1: unexpected "-"
+-- out/evaluate/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/evaluate/outcome --
 rejected
 -- out/format/outcome --
@@ -1025,21 +1067,24 @@ skipped no formulas
 
 The root package's registry, `step05/testdata/hypercase.json`, holds the
 update variable, the corpus root, that the package runs the root-package
-check, the properties it registers, and `evaluate`: the type it consumes,
-`io/fs.FS`, its corpora, its path from each, its outputs and what it
-rejects. Its `types` and `lifts` stay empty until step 6, as do the
-`lifts` of `evaluate`'s path, and `issueLinks` until step 9. `codes`,
-whether the project supplies `Codes`, stays `false`, and `evaluate`'s
-`classifier` stays `null`, until step 8:
+check, that the project supplies `Positions`, the properties it registers,
+and `evaluate`: the type it consumes, `io/fs.FS`, its corpora, its path
+from each, its outputs, each with what its `Inputs` states, and what it
+rejects. Step 11 explains `positions` and `inputs`. Its `types` and
+`lifts` stay empty until step 6, as do the `lifts` of `evaluate`'s path,
+and `issueLinks` until step 9. `codes`, whether the project supplies
+`Codes`, stays `false`, and `evaluate`'s `classifier` stays `null`, until
+step 8:
 
 <!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
   "codes": false,
+  "positions": true,
   "issueLinks": [],
   "properties": [
     {
@@ -1074,11 +1119,13 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "Why the sheet can't be evaluated."
+          "description": "Why the sheet can't be evaluated.",
+          "inputs": "positions"
         },
         {
           "pattern": "values.txt",
-          "description": "Each cell's value, one per line, in cell order."
+          "description": "Each cell's value, one per line, in cell order.",
+          "inputs": "func"
         }
       ],
       "rejects": [
@@ -1144,8 +1191,10 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 - It lists everything the package registers but its corpus checks
   (step 8), each with its description, and for each column the type it
   consumes, the corpora it runs over, its path from each (step 6), its
-  declared outputs and the properties it rejects. It records the package's
-  corpus root, and whether the package runs the root-package check.
+  declared outputs, each with what its `Inputs` states (step 11), and the
+  properties it rejects. It records the package's corpus root, whether
+  the project supplies `Positions` (step 11), and whether the package runs
+  the root-package check.
 - It records the name of the project's update variable, for a tool to print
   the update command. No tool reads it yet.
 - It carries a format version, which changes on any change to what the
@@ -1319,7 +1368,7 @@ var Parse = decl.Lift[Sheet, *sheet.Parsed]{
 	Name:        "parse",
 	Description: "Parses every cell.",
 	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The cell that is neither a number nor a formula."},
+		{Pattern: "error.txt", Description: "The cell that is neither a number nor a formula.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{Malformed},
 	Run: func(archive string, in Sheet, stderr io.Writer) (*sheet.Parsed, error) {
@@ -1331,7 +1380,7 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 	Name:        "resolve",
 	Description: "Orders the cells so that each comes after the cells it refers to.",
 	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The cycle, or the reference to a missing cell."},
+		{Pattern: "error.txt", Description: "The cycle, or the reference to a missing cell.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{Circular, Dangling},
 	Run: func(archive string, p *sheet.Parsed, stderr io.Writer) (*sheet.Graph, error) {
@@ -1348,6 +1397,7 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
+	Positions:   positions,
 }
 
 // renderError writes the error's text, then quotes each line it points at. A
@@ -1389,7 +1439,7 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 	Name:        "evaluate",
 	Description: "Evaluates every cell of the sheet.",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
 	},
 	Run: func(t testing.TB, archive string, g *sheet.Graph, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		return []hypercase.File{{Path: "values.txt", Data: g.Evaluate().Format()}}, nil
@@ -1424,7 +1474,7 @@ var format = hypercase.Suite[*sheet.Parsed]{
 		return "", true
 	},
 	Outputs: []decl.Output{
-		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order."},
+		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order.", Inputs: sheetcorpus.Formulas},
 	},
 	Run: func(t testing.TB, archive string, p *sheet.Parsed, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		return []hypercase.File{{Path: "formulas.txt", Data: sheet.Format(p)}}, nil
@@ -1459,10 +1509,10 @@ on raw input: `hypercase.Suite[sheetcorpus.Sheet]`, with its outputs and
   `RenderError` quotes the input, so a person deletes that file and the next
   update writes it.
 - `error.txt` holds what `RenderError` writes. Two new archives show its
-  other forms. `notes` holds a file under `in/sheet/` that is not a cell,
-  and its error, about the file as a whole, names only `sheet/notes`.
-  `blank`'s `A1` is empty, and its error names the line by number alone,
-  `sheet/A1:1`.
+  other form, an error about a file as a whole, which names only the file.
+  `notes` holds a file under `in/sheet/` that is not a cell, and its error
+  names `sheet/notes`. `blank`'s `A1` is empty, with no line to point at,
+  and its error names `sheet/A1`.
 - `hypercase.json` lists each corpus type under `types`, with its Go type,
   and each lift under `lifts`, with its input and product types, the
   properties it rejects and whether the package owns it. Each suite's
@@ -1489,6 +1539,9 @@ malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
   sheet/D1:1: total
+-- out/calc/inputs --
+error.txt
+  in/sheet/D1:1-1
 -- out/calc/outcome --
 rejected
 -- out/evaluate/outcome --
@@ -1498,6 +1551,9 @@ blocked parse
 -- out/parse/error.txt --
 D1: not a number or a formula: "total"
   sheet/D1:1: total
+-- out/parse/inputs --
+error.txt
+  in/sheet/D1:1-1
 -- out/parse/outcome --
 rejected
 -- out/resolve/outcome --
@@ -1517,6 +1573,9 @@ calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/calc/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/calc/outcome --
 rejected
 -- out/evaluate/outcome --
@@ -1526,6 +1585,9 @@ blocked parse
 -- out/parse/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/parse/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/parse/outcome --
 rejected
 -- out/resolve/outcome --
@@ -1654,7 +1716,7 @@ package owns every column it registers.
 - Its output ends with a newline; one that doesn't fails the cell.
 - A panic in it fails the cell, and an update writes nothing for that cell.
 - The other hooks land with their first readers: `Codes` at step 8, and
-  `Positions` and `Range` at step 11.
+  `Positions` at step 11.
 
 **Parameters.**
 
@@ -1814,10 +1876,17 @@ A1 is twice B1.
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/calc/inputs --
+stdout.txt
+  all inputs
 -- out/calc/outcome --
 accepted
 -- out/calc/stdout.txt --
 6,3
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+  in/sheet/B1
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
@@ -1825,10 +1894,15 @@ A1 6
 B1 3
 -- out/format/formulas.txt --
 A1 =B1 * 2
+-- out/format/inputs --
+formulas.txt
+  in/sheet/A1
 -- out/format/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 -- variant/cycle/about --
@@ -1841,6 +1915,10 @@ circular
 A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1*2
   sheet/B1:1: =A1
+-- variant/cycle/out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
+  variant/cycle/in/sheet/B1:1-1
 -- variant/cycle/out/calc/outcome --
 rejected
 -- variant/cycle/out/evaluate/outcome --
@@ -1848,14 +1926,23 @@ blocked resolve
 -- variant/cycle/out/format/formulas.txt --
 A1 =B1 * 2
 B1 =A1
+-- variant/cycle/out/format/inputs --
+formulas.txt
+  in/sheet/A1
+  variant/cycle/in/sheet/B1
 -- variant/cycle/out/format/outcome --
 accepted
+-- variant/cycle/out/parse/inputs --
 -- variant/cycle/out/parse/outcome --
 accepted
 -- variant/cycle/out/resolve/error.txt --
 A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1*2
   sheet/B1:1: =A1
+-- variant/cycle/out/resolve/inputs --
+error.txt
+  in/sheet/A1:1-1
+  variant/cycle/in/sheet/B1:1-1
 -- variant/cycle/out/resolve/outcome --
 rejected
 -- variant/missing/about --
@@ -1867,19 +1954,29 @@ sheet/B1
 -- variant/missing/out/calc/error.txt --
 A1: B1 doesn't exist
   sheet/A1:1: =B1*2
+-- variant/missing/out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- variant/missing/out/calc/outcome --
 rejected
 -- variant/missing/out/evaluate/outcome --
 blocked resolve
 -- variant/missing/out/format/formulas.txt --
 A1 =B1 * 2
+-- variant/missing/out/format/inputs --
+formulas.txt
+  in/sheet/A1
 -- variant/missing/out/format/outcome --
 accepted
+-- variant/missing/out/parse/inputs --
 -- variant/missing/out/parse/outcome --
 accepted
 -- variant/missing/out/resolve/error.txt --
 A1: B1 doesn't exist
   sheet/A1:1: =B1*2
+-- variant/missing/out/resolve/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- variant/missing/out/resolve/outcome --
 rejected
 -- transform/looped/in/sheet/A1 --
@@ -1887,19 +1984,29 @@ rejected
 -- transform/looped/out/calc/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/calc/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/calc/outcome --
 rejected
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
 A1 =A1
+-- transform/looped/out/format/inputs --
+formulas.txt
+  transform/looped/in/sheet/A1
 -- transform/looped/out/format/outcome --
 accepted
+-- transform/looped/out/parse/inputs --
 -- transform/looped/out/parse/outcome --
 accepted
 -- transform/looped/out/resolve/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/resolve/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/resolve/outcome --
 rejected
 -- transform/renamed/in/sheet/A2 --
@@ -1909,11 +2016,18 @@ rejected
 -- transform/renamed/delete --
 sheet/A1
 sheet/B1
+-- transform/renamed/out/calc/inputs --
+stdout.txt
+  all inputs
 -- transform/renamed/out/calc/outcome --
 accepted
 -- transform/renamed/out/calc/stdout.txt --
 ,
 6,3
+-- transform/renamed/out/evaluate/inputs --
+values.txt
+  transform/renamed/in/sheet/A2
+  transform/renamed/in/sheet/B2
 -- transform/renamed/out/evaluate/outcome --
 accepted
 -- transform/renamed/out/evaluate/values.txt --
@@ -1921,10 +2035,15 @@ A2 6
 B2 3
 -- transform/renamed/out/format/formulas.txt --
 A2 =B2 * 2
+-- transform/renamed/out/format/inputs --
+formulas.txt
+  transform/renamed/in/sheet/A2
 -- transform/renamed/out/format/outcome --
 accepted
+-- transform/renamed/out/parse/inputs --
 -- transform/renamed/out/parse/outcome --
 accepted
+-- transform/renamed/out/resolve/inputs --
 -- transform/renamed/out/resolve/outcome --
 accepted
 ```
@@ -2106,6 +2225,9 @@ transform/renamed calc A negative number is valid, and evaluates to itself. Wait
 -- out/calc/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/calc/outcome --
 rejected
 -- out/evaluate/outcome --
@@ -2115,6 +2237,9 @@ blocked parse
 -- out/parse/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/parse/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/parse/outcome --
 rejected
 -- out/resolve/outcome --
@@ -2124,19 +2249,29 @@ blocked parse
 -- transform/looped/out/calc/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/calc/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/calc/outcome --
 rejected
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
 A1 =A1
+-- transform/looped/out/format/inputs --
+formulas.txt
+  transform/looped/in/sheet/A1
 -- transform/looped/out/format/outcome --
 accepted
+-- transform/looped/out/parse/inputs --
 -- transform/looped/out/parse/outcome --
 accepted
 -- transform/looped/out/resolve/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/resolve/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/resolve/outcome --
 rejected
 -- transform/renamed/in/sheet/A2 --
@@ -2146,6 +2281,9 @@ sheet/A1
 -- transform/renamed/out/calc/error.txt --
 A2: unexpected "-"
   sheet/A2:1: -3
+-- transform/renamed/out/calc/inputs --
+error.txt
+  transform/renamed/in/sheet/A2:1-1
 -- transform/renamed/out/calc/outcome --
 rejected
 -- transform/renamed/out/evaluate/outcome --
@@ -2155,6 +2293,9 @@ blocked parse
 -- transform/renamed/out/parse/error.txt --
 A2: unexpected "-"
   sheet/A2:1: -3
+-- transform/renamed/out/parse/inputs --
+error.txt
+  transform/renamed/in/sheet/A2:1-1
 -- transform/renamed/out/parse/outcome --
 rejected
 -- transform/renamed/out/resolve/outcome --
@@ -2236,6 +2377,7 @@ classifier reads.
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
+	Positions:   positions,
 	Codes: func(err error) []string {
 		var e *sheet.Error
 		if errors.As(err, &e) {
@@ -2268,7 +2410,7 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 	Name:        "evaluate",
 	Description: "Evaluates every cell of the sheet.",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
 	},
 	Run: func(t testing.TB, archive string, g *sheet.Graph, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		return []hypercase.File{{Path: "values.txt", Data: g.Evaluate().Format()}}, nil
@@ -2307,12 +2449,22 @@ A1 divides B1 by C1, which is zero.
 1
 -- in/sheet/C1 --
 0
+-- out/calc/inputs --
+stderr.txt
+  all inputs
+stdout.txt
+  all inputs
 -- out/calc/outcome --
 accepted
 -- out/calc/stderr.txt --
 A1: divides by zero
 -- out/calc/stdout.txt --
 #DIV/0!,1,0
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+  in/sheet/B1
+  in/sheet/C1
 -- out/evaluate/outcome --
 accepted div-zero
 -- out/evaluate/values.txt --
@@ -2321,10 +2473,15 @@ B1 1
 C1 0
 -- out/format/formulas.txt --
 A1 =B1 / C1
+-- out/format/inputs --
+formulas.txt
+  in/sheet/A1
 -- out/format/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 -- transform/looped/in/sheet/A1 --
@@ -2332,19 +2489,29 @@ accepted
 -- transform/looped/out/calc/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/calc/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/calc/outcome --
 rejected S201
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
 A1 =A1
+-- transform/looped/out/format/inputs --
+formulas.txt
+  transform/looped/in/sheet/A1
 -- transform/looped/out/format/outcome --
 accepted
+-- transform/looped/out/parse/inputs --
 -- transform/looped/out/parse/outcome --
 accepted
 -- transform/looped/out/resolve/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/resolve/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/resolve/outcome --
 rejected S201
 -- transform/renamed/in/sheet/A2 --
@@ -2357,6 +2524,11 @@ rejected S201
 sheet/A1
 sheet/B1
 sheet/C1
+-- transform/renamed/out/calc/inputs --
+stderr.txt
+  all inputs
+stdout.txt
+  all inputs
 -- transform/renamed/out/calc/outcome --
 accepted
 -- transform/renamed/out/calc/stderr.txt --
@@ -2364,6 +2536,11 @@ A2: divides by zero
 -- transform/renamed/out/calc/stdout.txt --
 ,,
 #DIV/0!,1,0
+-- transform/renamed/out/evaluate/inputs --
+values.txt
+  transform/renamed/in/sheet/A2
+  transform/renamed/in/sheet/B2
+  transform/renamed/in/sheet/C2
 -- transform/renamed/out/evaluate/outcome --
 accepted div-zero
 -- transform/renamed/out/evaluate/values.txt --
@@ -2372,10 +2549,15 @@ B2 1
 C2 0
 -- transform/renamed/out/format/formulas.txt --
 A2 =B2 / C2
+-- transform/renamed/out/format/inputs --
+formulas.txt
+  transform/renamed/in/sheet/A2
 -- transform/renamed/out/format/outcome --
 accepted
+-- transform/renamed/out/parse/inputs --
 -- transform/renamed/out/parse/outcome --
 accepted
+-- transform/renamed/out/resolve/inputs --
 -- transform/renamed/out/resolve/outcome --
 accepted
 ```
@@ -2607,6 +2789,7 @@ regular expression and a URL template.
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
+	Positions:   positions,
 	Codes: func(err error) []string {
 		var e *sheet.Error
 		if errors.As(err, &e) {
@@ -2667,6 +2850,9 @@ malformed
 -- out/calc/error.txt --
 notes: not a cell name
   sheet/notes
+-- out/calc/inputs --
+error.txt
+  in/sheet/notes
 -- out/calc/outcome --
 rejected S101
 -- out/evaluate/outcome --
@@ -2676,6 +2862,9 @@ blocked parse
 -- out/parse/error.txt --
 notes: not a cell name
   sheet/notes
+-- out/parse/inputs --
+error.txt
+  in/sheet/notes
 -- out/parse/outcome --
 rejected S101
 -- out/resolve/outcome --
@@ -2816,18 +3005,22 @@ outcome changed
 appeared
   sheet/empty calc: rejected S101
     error.txt added
+    inputs added
   sheet/empty evaluate: blocked parse
   sheet/empty format: blocked parse
   sheet/empty parse: rejected S101
     error.txt added
+    inputs added
   sheet/empty resolve: blocked parse
 disappeared
   sheet/blank calc: rejected S101
     error.txt removed
+    inputs removed
   sheet/blank evaluate: blocked parse
   sheet/blank format: blocked parse
   sheet/blank parse: rejected S101
     error.txt removed
+    inputs removed
   sheet/blank resolve: blocked parse
 bytes changed
   sheet/notes calc: rejected S101
@@ -2913,10 +3106,10 @@ var Import = decl.Lift[CSV, Sheet]{
 	Name:        "import",
 	Description: "Turns each CSV field into a cell: row 1, field 2 is B1.",
 	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The line the importer can't read, and why."},
+		{Pattern: "error.txt", Description: "The line the importer can't read, and why.", Inputs: decl.FromPositions},
 	},
 	Product: []decl.Output{
-		{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them."},
+		{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them.", Inputs: Export},
 	},
 	Rejects: []decl.Property{Unterminated, StrayQuote, OutOfRange},
 	Jenny: jenny.For[CSV]().New("import", func(in CSV) (jenny.Files, error) {
@@ -3011,10 +3204,18 @@ Two prices and their total, exported as CSV.
 6
 -- via/import/sheet/C1 --
 =A1+B1
+-- out/calc/inputs --
+stdout.txt
+  all inputs
 -- out/calc/outcome --
 accepted
 -- out/calc/stdout.txt --
 4,6,10
+-- out/evaluate/inputs --
+values.txt
+  via/import/sheet/A1
+  via/import/sheet/B1
+  via/import/sheet/C1
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
@@ -3023,12 +3224,24 @@ B1 6
 C1 10
 -- out/format/formulas.txt --
 C1 =A1 + B1
+-- out/format/inputs --
+formulas.txt
+  via/import/sheet/C1
 -- out/format/outcome --
 accepted
+-- out/import/inputs --
+via/import/sheet/A1
+  in/csv/prices.csv
+via/import/sheet/B1
+  in/csv/prices.csv
+via/import/sheet/C1
+  in/csv/prices.csv
 -- out/import/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 ```
@@ -3052,6 +3265,9 @@ blocked import
 -- out/import/error.txt --
 import: line 1: quote never closes
   csv/open-quote.csv:1: 4,"six,=A1+B1
+-- out/import/inputs --
+error.txt
+  in/csv/open-quote.csv:1-1
 -- out/import/outcome --
 rejected C101
 -- out/parse/outcome --
@@ -3101,6 +3317,10 @@ circular
 A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1
   sheet/B1:1: =A1
+-- out/calc/inputs --
+error.txt
+  via/import/sheet/A1:1-1
+  via/import/sheet/B1:1-1
 -- out/calc/outcome --
 rejected S201
 -- out/evaluate/outcome --
@@ -3108,16 +3328,30 @@ blocked resolve
 -- out/format/formulas.txt --
 A1 =B1
 B1 =A1
+-- out/format/inputs --
+formulas.txt
+  via/import/sheet/A1
+  via/import/sheet/B1
 -- out/format/outcome --
 accepted
+-- out/import/inputs --
+via/import/sheet/A1
+  in/csv/loop.csv
+via/import/sheet/B1
+  in/csv/loop.csv
 -- out/import/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
 -- out/resolve/error.txt --
 A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1
   sheet/B1:1: =A1
+-- out/resolve/inputs --
+error.txt
+  via/import/sheet/A1:1-1
+  via/import/sheet/B1:1-1
 -- out/resolve/outcome --
 rejected S201
 ```
@@ -3180,17 +3414,17 @@ lift.
   the lift's cell commits. That is the owner's verdict, under its Project.
   A package that only uses the lift doesn't judge the lift's cell with its
   own Project, which may differ from the owner's: it judges the cell under
-  a bare Project, whose `RenderError` and `Codes` fail no cell, and by its
-  own declaration of the lift. When it registers the owner's declaration,
-  it holds the cells past the lift back on what keeps the cell from being
-  written under any Project, such as a fault of the jenny or a product an
-  archive can't hold. The root-package check fails when the declarations
-  differ in what the registries record, below; it can't compare two
-  jennies. When the owner's Project alone keeps its update from writing
-  the lift's cell, as a `RenderError` that panics on the lift's error
-  does, the using package's update writes the cells past the lift, and its
-  normal runs, which read the lift's committed outcome, fail them until the
-  owner's update writes that cell.
+  a bare Project, whose `RenderError`, `Codes` and `Positions` (step 11)
+  fail no cell, and by its own declaration of the lift. When it registers
+  the owner's declaration, it holds the cells past the lift back on what
+  keeps the cell from being written under any Project, such as a fault of
+  the jenny or a product an archive can't hold. The root-package check
+  fails when the declarations differ in what the registries record, below;
+  it can't compare two jennies. When the owner's Project alone keeps its
+  update from writing the lift's cell, as a `RenderError` or a `Positions`
+  that panics on the lift's error does, the using package's update writes
+  the cells past the lift, and its normal runs, which read the lift's
+  committed outcome, fail them until the owner's update writes that cell.
 - The lift's own cell files sit in `out/<lift>/`, like any column's. A
   lift's name covers both directories.
 - A variant's product goes under `variant/<name>/via/<lift>/` or
@@ -3352,88 +3586,116 @@ hand, and, through a bytes lift, the CSV.
 
 ### What the author writes
 
-Every output declaration says which input lines its files come from. That
-map from an output back to its inputs is a **reverse map**. A **range** is a
-span of lines in one file of the cell's input view.
+Every output declaration says which input lines its files come from, in its
+`Inputs` field. That map from an output back to its inputs is a **reverse
+map**. A **range** is a span of lines in one file of the cell's input view.
+The steps before this one show their declarations' `Inputs` without
+comment.
 
-Proposed names: `decl.Output`'s `Inputs` field; `decl.InputsFunc`, a
-function that maps one output file; `decl.AllInputs`, the escape;
-`decl.FromPositions`, which an `error.txt` declaration states to take its
-ranges from `Positions`; `decl.Range`; and `decl.Project`'s `Positions`
-field.
+Adopting this step means editing every output declaration: each suite's,
+`stdout.txt`, `stderr.txt` and `error.txt` included, each lift's `Outputs`,
+and each bytes lift's `Product`. Each states one of these (proposed names):
 
+- a `decl.InputsFunc`, a function that maps one output file to its ranges;
+- `decl.AllInputs`, which says each file depends on the whole input view;
+- `decl.FromPositions`, on a declaration whose pattern is exactly
+  `error.txt`, which takes the error's ranges from the project's
+  `Positions`.
+
+`walkthrough/sheets/step11/sheetcorpus/inputs.go` holds the toy's maps, and
+the `Positions` its `Project` sets, `Positions: positions`:
+
+<!-- source: walkthrough/sheets/step11/sheetcorpus/inputs.go -->
 ```go
-// walkthrough/sheets/step11/sheetcorpus/project.go: Project gains
-	Positions: func(err error) []decl.Range {
-		var rs []decl.Range
-		for _, p := range sheet.Positions(err) {
-			rs = append(rs, decl.Range{Path: p.Path, Start: p.Line, End: p.Line})
-		}
-		return rs
-	},
+// walkthrough/sheets/step11/sheetcorpus/inputs.go
+package sheetcorpus
+
+import (
+	"fmt"
+	"io/fs"
+	"strings"
+
+	"github.com/sdboyer/hypercase/decl"
+	"github.com/sdboyer/hypercase/walkthrough/sheets/sheet"
+)
+
+// Cells maps an output file to every cell of the sheet, whole: a cell's
+// value depends on the cells its formula refers to, and theirs on others.
+var Cells = decl.InputsFunc(func(in fs.FS, _ string) ([]decl.Range, error) {
+	cells, err := fs.Glob(in, "sheet/*")
+	if err != nil {
+		return nil, err
+	}
+	rs := make([]decl.Range, len(cells))
+	for i, c := range cells {
+		rs[i] = decl.Range{Path: c} // 0, 0: the whole file
+	}
+	return rs, nil
+})
+
+// Formulas maps an output file to the cells that hold a formula, whole:
+// the cells format prints.
+var Formulas = decl.InputsFunc(func(in fs.FS, _ string) ([]decl.Range, error) {
+	p, err := sheet.Parse(in)
+	if err != nil {
+		return nil, err
+	}
+	var rs []decl.Range
+	for _, name := range p.Formulas() {
+		rs = append(rs, decl.Range{Path: "sheet/" + name})
+	}
+	return rs, nil
+})
+
+// Field maps a product file of import, one cell of the sheet, to the lines
+// of the CSV export its field spans.
+var Field = decl.InputsFunc(func(in fs.FS, path string) ([]decl.Range, error) {
+	csvs, err := fs.Glob(in, "csv/*.csv")
+	if err != nil {
+		return nil, err
+	}
+	if len(csvs) != 1 {
+		return nil, fmt.Errorf("the input holds %q, and a CSV export is one file", csvs)
+	}
+	first, last, err := sheet.FieldLines(in, csvs[0], strings.TrimPrefix(path, "sheet/"))
+	if err != nil {
+		return nil, err
+	}
+	return []decl.Range{{Path: csvs[0], Start: first, End: last}}, nil
+})
+
+// positions finds the lines an error points at, sheet.Positions's: each
+// line it names, or the whole file for a position about the file as a
+// whole, whose Line is 0.
+func positions(err error) []decl.Range {
+	var rs []decl.Range
+	for _, p := range sheet.Positions(err) {
+		rs = append(rs, decl.Range{Path: p.Path, Start: p.Line, End: p.Line})
+	}
+	return rs
+}
 ```
 
-```go
-// walkthrough/sheets/step11/corpus_test.go: evaluate's declaration
-	Outputs: []decl.Output{
-		{
-			Pattern:     "values.txt",
-			Description: "Each cell's value, one per line, in cell order.",
-			Inputs: decl.InputsFunc(func(in fs.FS, path string) ([]decl.Range, error) {
-				cells, err := fs.Glob(in, "sheet/*")
-				if err != nil {
-					return nil, err
-				}
-				rs := make([]decl.Range, len(cells))
-				for i, c := range cells {
-					rs[i] = decl.Range{Path: c} // 0, 0: the whole file
-				}
-				return rs, nil
-			}),
-		},
-	},
-```
+`evaluate`'s `values.txt` states `Cells`, and `format`'s `formulas.txt`
+states `Formulas`. Every `error.txt` states `decl.FromPositions`, and
+`calc`'s `stdout.txt` and `stderr.txt` state `decl.AllInputs`.
 
-`format`'s `formulas.txt` maps to its formula cells only. `parse`'s,
-`resolve`'s and `calc`'s `error.txt` state `Inputs: decl.FromPositions`, and
-`calc`'s `stdout.txt` and `stderr.txt` state `Inputs: decl.AllInputs`.
-
-A bytes lift's product declarations are output declarations too, so each has
-`Inputs`. `import`'s map receives each product file's path as its pattern
-matches it, such as `sheet/B1`, and gives the CSV lines that cell's field
-came from (proposed):
-
-```go
-// walkthrough/sheets/step11/sheetcorpus/types.go: Import's declarations
-	Outputs: []decl.Output{
-		{
-			Pattern:     "error.txt",
-			Description: "The line the importer can't read, and why.",
-			Inputs:      decl.FromPositions,
-		},
-	},
-	Product: []decl.Output{
-		{
-			Pattern:     "sheet/*",
-			Description: "One file per cell, as a sheet's in/sheet/ holds them.",
-			Inputs: decl.InputsFunc(func(in fs.FS, path string) ([]decl.Range, error) {
-				csv, first, last, err := sheet.FieldLines(in, path) // the CSV's path, and the lines of the cell's field
-				if err != nil {
-					return nil, err
-				}
-				return []decl.Range{{Path: csv, Start: first, End: last}}, nil
-			}),
-		},
-	},
-```
+A bytes lift's product declarations are output declarations too. `import`'s
+`Product`, `sheet/*`, states `Field`, which receives each product file's
+path as the pattern matches it, such as `sheet/B1`, and gives the lines of
+the CSV that cell's field spans, through the toy's `sheet.FieldLines`. A
+field spans more than one line when it is quoted and holds a newline. Steps
+3 to 10 map at the grain the toy knows by then: step 10's `Export` maps each
+product file to the whole CSV.
 
 ### How the files change
 
-Every cell that ran gains an `inputs` file. The archives shown in steps 3 to
-10 are as their own step leaves them. Their examples carry `inputs` from this
-step on, and the next update writes them (proposed). `hypercase.json`
-records, for each output declaration, whether it maps its files with
-`Inputs`, takes its ranges from `Positions`, or states `AllInputs`.
+Every cell that ran has an `inputs` file, `out/<column>/inputs`, and the
+same under a variant's prefix, as the archives of steps 3 to 10 show. It
+holds, for each of the cell's output files, the archive sections and lines
+the file's declaration maps it to. The update writes it with the cell, and
+a normal run compares it byte for byte, as any golden. `hypercase.json`
+records what each output declaration states in `Inputs` (step 5).
 
 `testdata/sheet/twice.txtar`, with its `cycle` variant's `calc`, `evaluate`
 and `parse` cells, and its other variants, left out. A range into a path the
@@ -3501,86 +3763,170 @@ error.txt
 rejected S201
 ```
 
-Past a bytes lift, ranges point at the product. In
-`testdata/csv/prices.txtar`, `evaluate`'s `inputs` is:
+Past a bytes lift, ranges point at the product.
+`testdata/csv/wrapped.txtar` is a CSV whose second field the export wrapped
+onto a second line:
 
+<!-- source: walkthrough/sheets/step11/testdata/csv/wrapped.txtar -->
 ```
-values.txt
-  via/import/sheet/A1
-  via/import/sheet/B1
-  via/import/sheet/C1
-```
-
-and `import`'s own `out/import/inputs`, with no files of its own to list,
-maps each product file, named by its section, to the CSV line its field came
-from (proposed):
-
-```
+A price and a formula the export wrapped onto a second line, in a quoted field.
+-- in/csv/wrapped.csv --
+4,"=A1*
+2"
+-- properties --
+malformed
+-- via/import/sheet/A1 --
+4
+-- via/import/sheet/B1 --
+=A1*
+2
+-- out/calc/error.txt --
+B1: more than one line
+  sheet/B1:2: 2
+-- out/calc/inputs --
+error.txt
+  via/import/sheet/B1:2-2
+-- out/calc/outcome --
+rejected S101
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/import/inputs --
 via/import/sheet/A1
-  in/csv/prices.csv:1-1
+  in/csv/wrapped.csv:1-1
 via/import/sheet/B1
-  in/csv/prices.csv:1-1
-via/import/sheet/C1
-  in/csv/prices.csv:1-1
+  in/csv/wrapped.csv:1-2
+-- out/import/outcome --
+accepted
+-- out/parse/error.txt --
+B1: more than one line
+  sheet/B1:2: 2
+-- out/parse/inputs --
+error.txt
+  via/import/sheet/B1:2-2
+-- out/parse/outcome --
+rejected S101
+-- out/resolve/outcome --
+blocked parse
 ```
+
+`parse`'s and `calc`'s `error.txt` point at line 2 of the product's
+`sheet/B1`, `via/import/sheet/B1:2-2`. `import`'s own `out/import/inputs`,
+with no files of its own to list, maps each product file, named by its
+section, to the CSV lines its field spans: `B1`'s spans lines 1 and 2. The
+cells blocked at `parse` have no `inputs`.
 
 **The `inputs` format** (proposed).
 
-- For each output file of the cell, in path order: a line holding the
-  file's path, then one line per range, indented two spaces. A bytes lift's
-  product files follow its own files, each named by its section.
+- For each output file of the cell, in path order, bytewise: a line holding
+  the file's path, then one line per range, indented two spaces. A bytes
+  lift's product file is named by its section below the case's prefix,
+  `via/<lift>/<path>`.
 - A range is its archive section and its lines, `in/sheet/A1:1-1`.
   A whole file is its section alone, `in/sheet/A1`. `AllInputs` is
   `all inputs`.
-- Ranges are sorted by section, then by first line, then by last. A repeated
-  range appears once, and overlapping or adjacent ranges in one section are
-  merged.
-- An output file with no ranges is its path line alone. So is an `error.txt`
-  whose error has no position.
+- Ranges are sorted by section, then by first line, then by last. A
+  repeated range appears once, overlapping or adjacent line ranges in one
+  section are merged, and a whole section absorbs its line ranges.
+- An output file with no ranges is its path line alone. So is an
+  `error.txt` whose error has no position, and a panic's `error.txt`, which
+  has no error for `Positions` to read.
+- A path or a section that isn't plain is written as a Go string literal,
+  `"like this"`. A name is plain when it is printable ASCII, holds no colon,
+  double quote or backslash, neither starts nor ends with a space, doesn't
+  start with a hyphen, and isn't `all inputs`.
 - A cell that ran and wrote no output files has an empty `inputs`.
 - Every line ends with a newline.
 
 ### Rules
 
-- Each output declaration has `Inputs`. A map is a
+- Each output declaration states `Inputs`. A map is a
   `func(in fs.FS, path string) ([]Range, error)`, given as
-  `decl.InputsFunc`, which receives the cell's input view and works per
-  output file. It is required, with `AllInputs` as the explicit escape,
-  which the report shows as such.
-- `Range{Path, Start, End}` uses 1-based inclusive lines in the cell's input
-  view, and `0, 0` means the whole file. The project may supply
-  `Positions func(err error) []Range`, which finds an error's positions.
+  `decl.InputsFunc`. It works per output file, and receives the cell's input
+  view, the one `RenderError` receives; for a bytes lift's own
+  declarations, its `Product` included, that is the lift's input view. It
+  is called for each file of each run of the cell, so it is a function of
+  its arguments alone. `AllInputs` is the explicit escape, which the cell's
+  `inputs` and the registry show as such. There is no default.
+- Only a declaration whose pattern is exactly `error.txt` states
+  `FromPositions`, and never one in a `Product`. One whose pattern matches
+  `error.txt` states no `InputsFunc`, so an `error.txt` states
+  `FromPositions` or `AllInputs`. Registration refuses the others.
+- A declaration that states nothing fails the run, naming it and what it
+  can state, as a missing description does (step 3). So does
+  `FromPositions` in a project with no `Positions`: every package that
+  registers such a declaration, owned or used, supplies
+  `Positions func(err error) []Range`, which finds where an error points.
+  The cells still run and the update writes their outputs. It writes no
+  `inputs` for a cell with a file of such a declaration, and leaves one
+  the cell has as it is; every other cell gets its own.
+- `Range{Path, Start, End}` uses lines counted from 1, `End` included, in
+  the cell's input view, and `0, 0` means the whole file.
 - A cell has one input view: its case's inputs, with a variant's overlay and
   deletions applied; past a bytes lift, that lift's product, and past
-  several, the last one's. A range outside it is bad, and fails the cell
-  (proposed).
-  The framework maps each range through the overlay to archive sections.
-- Each `error.txt` declaration, a suite's or a lift's, states where its
-  ranges come from: `Positions`, through `decl.FromPositions`, or
-  `AllInputs`. One that states neither fails the run. There is no default.
-- An error or a panic in `Inputs` fails the cell, and the update writes
-  nothing for that cell.
-- Ranges are committed per cell as `out/<column>/inputs`, and the same under
-  a variant's prefix, compared byte for byte. A frozen cell without `inputs`
-  gains it on update, as with `outcome` at step 8; an update never changes
-  or removes an `inputs` the cell has.
-- So the report stays a pure function of repository files, and range changes
-  show in pull-request diffs. The accepted cost is line-shift churn in edited
-  sections.
+  several, the last one's. A range that names no lines of it is bad: a path
+  that isn't a clean slash path, that the view lacks, or that is a
+  directory; a negative line; one of `Start` and `End` 0 and not the other;
+  an `End` before its `Start`, or past the file's last line.
+- The framework maps each range to the section a normal run reads the file
+  from: `in/<path>`; a variant's own file, even one equal to the base's, at
+  `variant/<name>/in/<path>`; a transform's own file at
+  `transform/<name>/in/<path>`, and one it inherits at `in/<path>`; past a
+  bytes lift, `via/<lift>/<path>` below the case's prefix.
 - A range through a `via/` product stops at the product's lines (proposed):
   it names a `via/<lift>/…` section, and is not followed back through the
   lift's own `inputs`.
-- The report shows each changed output beside its input lines, ranks ranges
-  that changed alone fourth, and includes corpus-check findings (#18).
-- This is the last code step, because requiring `Inputs` is source-breaking
-  for every project.
+- A bad range, an error or a panic in an `InputsFunc`, and a panic in
+  `Positions` fail the cell. The failure names the file, what gave its
+  ranges and the range, and says what to fix, and the update writes nothing
+  for that cell. When the cell is a bytes lift's, the fault is the owner's
+  verdict on the lift's cell, as is anything else that keeps that cell from
+  being written (step 10). In the owner's update, every cell past the lift
+  fails and is not written either. A normal run reads what the lift's cell
+  commits: where the archive holds it, the cells past the lift run on the
+  committed product, and where it doesn't, as for a case no update has
+  written, they fail on the files they lack. A package that only uses the
+  lift judges its cell under a bare Project, whose `Positions` finds
+  nothing, so a `Positions` that panics holds nothing back there, and that
+  package's update writes the cells past the lift.
+- A cell with any file that can't be judged, such as an output no
+  declaration matches, has its `inputs` neither compared nor written.
+- A frozen cell without `inputs` gains it on update, as with `outcome` at
+  step 8, when its other files match today's run; an update never changes
+  or removes an `inputs` the cell has. So an edit that shifts lines a
+  frozen cell maps fails that cell until a person deletes its files.
+  Whole-file ranges never shift.
+- An `inputs` beside a skipped or blocked cell is an orphan, as any output
+  the run no longer produces is (step 3), until a person removes it.
+- `hypercase strip` removes `inputs` with its column, keeps it with a
+  frozen cell, and removes it under `-frozen`. Stripping a bytes lift's
+  column removes its `via/` sections, which other cells' committed `inputs`
+  still name, until the update rewrites both.
+- The registry records, for each output and product declaration,
+  `"inputs"`: `"func"`, `"positions"`, `"all"`, or `"none"` for one that
+  states nothing; and `"positions"`, whether the project supplies
+  `Positions`. The root-package check compares what each of a lift's
+  declarations states across the packages that own or use it, among its
+  outputs and `productFiles` (step 10).
+- So the report stays a pure function of repository files, and range
+  changes show in pull-request diffs. The accepted cost is line-shift churn
+  in edited sections.
+- The report lists `inputs` among a cell's files, and diffs it as any other
+  (step 9). Showing each changed output beside its input lines, and ranking
+  a change to ranges alone, is #18.
+- Requiring `Inputs` breaks every project's declarations, which is why it
+  comes last of the steps that change them.
 
 ### What can now be seen
 
-- Each changed output beside the input lines it came from. A changed
-  `values.txt` shows the sheet's cells beside it.
+- Which input lines each output came from, in the archive beside it, and in
+  a pull request's diff when they move. A changed `values.txt` has the cells
+  it depends on beside it.
 - Which overlay a variant's output depends on: `cycle`'s `resolve` error
   points at `variant/cycle/in/sheet/B1`, the line the variant changed.
+- Through a bytes lift, which CSV lines each cell came from: `wrapped`'s
+  `B1` spans lines 1 and 2 of the CSV.
 - Where a declaration gives no map, and says so: `calc`'s stdout reads
   `all inputs`.
 

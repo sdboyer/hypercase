@@ -28,16 +28,24 @@ The root package, ., owns parse, resolve and evaluate, and ./b uses parse for ou
 evaluate 1
 -- in/outline/out/values.txt --
 outline 1
+-- out/evaluate/inputs --
+values.txt
+  in/evaluate/out/values.txt
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
 evaluate 1
+-- out/outline/inputs --
+values.txt
+  in/outline/out/values.txt
 -- out/outline/outcome --
 accepted
 -- out/outline/values.txt --
 outline 1
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 $ go test  # ladder-a
@@ -103,6 +111,8 @@ $ go test  # ladder-a
           A1: not a number
         Fix the code, or state the property on the case and in parse's Rejects.
         out/parse/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/parse/inputs has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/parse/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.

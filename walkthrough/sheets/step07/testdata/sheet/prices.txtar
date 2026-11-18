@@ -5,10 +5,18 @@ Two prices and their total.
 6
 -- in/sheet/C1 --
 =A1+B1
+-- out/calc/inputs --
+stdout.txt
+  all inputs
 -- out/calc/outcome --
 accepted
 -- out/calc/stdout.txt --
 4,6,10
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+  in/sheet/B1
+  in/sheet/C1
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
@@ -17,10 +25,15 @@ B1 6
 C1 10
 -- out/format/formulas.txt --
 C1 =A1 + B1
+-- out/format/inputs --
+formulas.txt
+  in/sheet/C1
 -- out/format/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 -- transform/looped/in/sheet/A1 --
@@ -28,6 +41,9 @@ accepted
 -- transform/looped/out/calc/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/calc/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/calc/outcome --
 rejected
 -- transform/looped/out/evaluate/outcome --
@@ -35,13 +51,21 @@ blocked resolve
 -- transform/looped/out/format/formulas.txt --
 A1 =A1
 C1 =A1 + B1
+-- transform/looped/out/format/inputs --
+formulas.txt
+  in/sheet/C1
+  transform/looped/in/sheet/A1
 -- transform/looped/out/format/outcome --
 accepted
+-- transform/looped/out/parse/inputs --
 -- transform/looped/out/parse/outcome --
 accepted
 -- transform/looped/out/resolve/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/resolve/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/resolve/outcome --
 rejected
 -- transform/renamed/in/sheet/A2 --
@@ -54,11 +78,19 @@ rejected
 sheet/A1
 sheet/B1
 sheet/C1
+-- transform/renamed/out/calc/inputs --
+stdout.txt
+  all inputs
 -- transform/renamed/out/calc/outcome --
 accepted
 -- transform/renamed/out/calc/stdout.txt --
 ,,
 4,6,10
+-- transform/renamed/out/evaluate/inputs --
+values.txt
+  transform/renamed/in/sheet/A2
+  transform/renamed/in/sheet/B2
+  transform/renamed/in/sheet/C2
 -- transform/renamed/out/evaluate/outcome --
 accepted
 -- transform/renamed/out/evaluate/values.txt --
@@ -67,9 +99,14 @@ B2 6
 C2 10
 -- transform/renamed/out/format/formulas.txt --
 C2 =A2 + B2
+-- transform/renamed/out/format/inputs --
+formulas.txt
+  transform/renamed/in/sheet/C2
 -- transform/renamed/out/format/outcome --
 accepted
+-- transform/renamed/out/parse/inputs --
 -- transform/renamed/out/parse/outcome --
 accepted
+-- transform/renamed/out/resolve/inputs --
 -- transform/renamed/out/resolve/outcome --
 accepted

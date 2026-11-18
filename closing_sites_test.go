@@ -616,6 +616,13 @@ var messageSites = map[string][]messageSite{
 		{"Errorf", "the lift %s's product, %s, is shaped as a corpus type, and the package registers no such corpus type. Register the corpus type, whose input view the lift's product is, or make the product a stage, a type that isn't a named fs.FS wrapper.", "a lift's product shaped as a corpus type the package doesn't register"},
 		{"Log", "No case runs until the registrations agree.", "that no case runs until the registrations agree"},
 	},
+	"runner.checkStatements": {
+		{"Errorf", "the %s %s declares the output %s with no Inputs. State where its files come from: decl.FromPositions, which takes its ranges from where the error points, through the project's Positions, or decl.AllInputs.", "an error.txt declared with no Inputs"},
+		{"Errorf", "the %s %s declares the output %s with no Inputs, and the pattern matches %s. State decl.AllInputs, or change the pattern so it doesn't match %s and declare %s on its own, with decl.FromPositions or decl.AllInputs, and the rest with a decl.InputsFunc or decl.AllInputs.", "an output declared with no Inputs whose pattern matches error.txt"},
+		{"Errorf", "the %s %s declares the output %s with no Inputs. State where its files come from: a decl.InputsFunc, which maps each file to the lines of the input view it comes from, or decl.AllInputs.", "an output declared with no Inputs"},
+		{"Errorf", "the lift %s declares the product file %s with no Inputs. State where its files come from: a decl.InputsFunc, which maps each file to the lines of the lift's input view it comes from, or decl.AllInputs.", "a lift's product file declared with no Inputs"},
+		{"Errorf", "the project has no Positions, and %s %s decl.FromPositions, which takes error.txt's ranges from it. Give the decl.Project its Positions, which finds where an error points, or state decl.AllInputs in place of decl.FromPositions.", "declarations that state FromPositions in a project with no Positions"},
+	},
 	"runner.checkTransformRelations": {
 		{"Errorf", "the package owns the transform %s, of the corpus type %s, and registers no such corpus type. Register the corpus type, which lists the transform in its Transforms.", "an owned transform of a corpus type the package doesn't register"},
 		{"Errorf", "the package owns the transform %s, and the corpus type %s lists no transform of that name. List the transform in the type's Transforms, or remove it from hypercase.Own.", "an owned transform its corpus type doesn't list"},

@@ -5,6 +5,8 @@ $ go test  # rejects
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to put them in place.
     script/unwritten: A1 rounds wrongly, and nothing has run the update since the gap was stated.
         echo: Does what the case's do/ tree says.
+        out/echo/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/values.txt has no golden.
@@ -54,6 +56,11 @@ echo b.txt should say a. Waits on sheets#7.
 a
 -- out/echo/b.txt --
 b
+-- out/echo/inputs --
+a.txt
+  in/do/out/a.txt
+b.txt
+  in/do/out/b.txt
 -- out/echo/outcome --
 accepted
 $ cat testdata/script/unwritten.txtar
@@ -62,6 +69,9 @@ A1 rounds wrongly, and nothing has run the update since the gap was stated.
 A1 0.3333
 -- gaps --
 echo A1 rounds to 0.33. Waits on sheets#6.
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --

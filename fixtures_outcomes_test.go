@@ -30,7 +30,7 @@ func steeredCodes(err error) []string {
 	return nil
 }
 
-var projectCodes = decl.Project{UpdateVar: fixtureUpdate, Codes: steeredCodes}
+var projectCodes = decl.Project{UpdateVar: fixtureUpdate, Codes: steeredCodes, Positions: steeredPositions}
 
 // steeredClassifier is a classifier its cases steer, through the input
 // view's cl/ tree:

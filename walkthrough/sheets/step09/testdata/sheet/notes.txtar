@@ -8,6 +8,9 @@ malformed
 -- out/calc/error.txt --
 notes: not a cell name
   sheet/notes
+-- out/calc/inputs --
+error.txt
+  in/sheet/notes
 -- out/calc/outcome --
 rejected S101
 -- out/evaluate/outcome --
@@ -17,6 +20,9 @@ blocked parse
 -- out/parse/error.txt --
 notes: not a cell name
   sheet/notes
+-- out/parse/inputs --
+error.txt
+  in/sheet/notes
 -- out/parse/outcome --
 rejected S101
 -- out/resolve/outcome --

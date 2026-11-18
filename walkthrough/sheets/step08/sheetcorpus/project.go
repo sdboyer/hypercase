@@ -15,6 +15,7 @@ import (
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
+	Positions:   positions,
 	Codes: func(err error) []string {
 		var e *sheet.Error
 		if errors.As(err, &e) {

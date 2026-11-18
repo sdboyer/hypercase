@@ -92,8 +92,8 @@ $ edit testdata/export/prices.txtar  # a dropped bytes lift's product
 $ edit testdata/export/prices.txtar  # an output list no longer produces
 $ edit b/testdata/checks/old.txt  # a findings file no check writes
 $ hypercase strip
-testdata/export/prices.txtar: removed 36 sections
-testdata/script/plain.txtar: removed 12 sections
+testdata/export/prices.txtar: removed 51 sections
+testdata/script/plain.txtar: removed 20 sections
 Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
 # the update, run until a pass changes nothing; that pass:
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a

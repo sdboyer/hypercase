@@ -84,6 +84,17 @@ func claimsAlone(t *testing.T) []claimAlone {
 			values = append(values, reflect.ValueOf("x"))
 		case f.Type.Kind() == reflect.Bool:
 			values = append(values, reflect.ValueOf(true))
+		case f.Name == "OnlyAdds":
+			// The sections of the framework's files the upgrade adds:
+			// each alone, and all of them.
+			var all []string
+			for _, p := range ranFiles {
+				values = append(values, reflect.ValueOf([]string{"x/" + p}))
+				all = append(all, "x/"+p)
+			}
+			if len(all) > 1 {
+				values = append(values, reflect.ValueOf(all))
+			}
 		default:
 			t.Fatalf("a closing's claims hold %s, a %s, which claimsAlone can't set", f.Name, f.Type)
 		}

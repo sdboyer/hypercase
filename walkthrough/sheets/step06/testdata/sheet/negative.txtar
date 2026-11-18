@@ -7,6 +7,9 @@ calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/calc/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/calc/outcome --
 rejected
 -- out/evaluate/outcome --
@@ -16,6 +19,9 @@ blocked parse
 -- out/parse/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/parse/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/parse/outcome --
 rejected
 -- out/resolve/outcome --

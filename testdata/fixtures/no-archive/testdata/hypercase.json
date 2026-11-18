@@ -1,9 +1,10 @@
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
   "codes": false,
+  "positions": true,
   "issueLinks": [],
   "properties": [
     {
@@ -39,11 +40,13 @@
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "Why the lift rejects the case."
+          "description": "Why the lift rejects the case.",
+          "inputs": "positions"
         },
         {
           "pattern": "stderr.txt",
-          "description": "What the lift writes to stderr."
+          "description": "What the lift writes to stderr.",
+          "inputs": "all"
         }
       ],
       "productFiles": [],

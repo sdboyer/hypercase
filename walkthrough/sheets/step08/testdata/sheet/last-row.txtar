@@ -6,18 +6,28 @@ circular
 -- out/calc/error.txt --
 A1048576 -> A1048576: cycle
   sheet/A1048576:1: =A1048576
+-- out/calc/inputs --
+error.txt
+  in/sheet/A1048576:1-1
 -- out/calc/outcome --
 rejected S201
 -- out/evaluate/outcome --
 blocked resolve
 -- out/format/formulas.txt --
 A1048576 =A1048576
+-- out/format/inputs --
+formulas.txt
+  in/sheet/A1048576
 -- out/format/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
 -- out/resolve/error.txt --
 A1048576 -> A1048576: cycle
   sheet/A1048576:1: =A1048576
+-- out/resolve/inputs --
+error.txt
+  in/sheet/A1048576:1-1
 -- out/resolve/outcome --
 rejected S201

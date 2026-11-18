@@ -73,6 +73,7 @@ func TestChain(t *testing.T) {
 		"via/import/evaluate/out/values.txt":    "a1 3\nb1 6\n",
 		"via/import/quote/B1":                   "=A1*2\n",
 		"out/import/outcome":                    "accepted\n",
+		"out/import/inputs":                     "via/import/evaluate/out/values.txt\n  in/import/out/evaluate/out/values.txt\nvia/import/quote/A1\n  in/import/out/quote/A1\nvia/import/quote/B1\n  in/import/out/quote/B1\n",
 		"out/evaluate/values.txt":               "a1 3\nb1 6\n",
 		"variant/unclosed/out/import/error.txt": "import: line 1: unclosed quote\n",
 		"variant/unclosed/out/import/outcome":   "rejected\n",
@@ -97,6 +98,9 @@ func TestChain(t *testing.T) {
 		"via/import/names/error.txt": "not an error\n",
 		"via/import/names/outcome":   "not an outcome\n",
 		"out/list/files.txt":         "3 files\ninputs/x \"a tree named inputs\\n\"\nnames/error.txt \"not an error\\n\"\nnames/outcome \"not an outcome\\n\"\n",
+		// A product tree named inputs is no cell's inputs file, which maps it.
+		"out/import/inputs": "via/import/inputs/x\n  in/import/out/inputs/x\nvia/import/names/error.txt\n  in/import/out/names/error.txt\nvia/import/names/outcome\n  in/import/out/names/outcome\n",
+		"out/list/inputs":   "files.txt\n  via/import/inputs/x\n  via/import/names/error.txt\n  via/import/names/outcome\n",
 	})
 	s.hasSections("testdata/export/empty.txtar", map[string]string{
 		"out/import/outcome": "accepted\n",
@@ -105,7 +109,7 @@ func TestChain(t *testing.T) {
 	s.hasSections("testdata/hypercase.json", map[string]string{})
 	reg := string(s.read("testdata/hypercase.json"))
 	for _, want := range []string{
-		`"format": 7,`,
+		`"format": 8,`,
 		"\"name\": \"import\",\n      \"description\": \"Imports the export as a script, as its import/ tree says.\",\n      \"input\": \"github.com/sdboyer/hypercase_test.Export\",\n      \"product\": \"github.com/sdboyer/hypercase_test.Script\",\n      \"owned\": true,\n      \"bytes\": true,",
 		"\"productFiles\": [\n        {\n          \"pattern\": \"evaluate/*\",",
 		"\"rejects\": [\n        \"unterminated\"\n      ]",
@@ -615,11 +619,12 @@ func TestChainProbeAsUpdate(t *testing.T) {
 	s.passes(s.update("chain"))
 	s.same(prices, clean)
 
-	s.edit(prices, "import now makes evaluate/probe, and evaluate's cells have no values.txt", func(a *archive.Archive) {
+	s.edit(prices, "import now makes evaluate/probe, and evaluate's cells have no values.txt or inputs", func(a *archive.Archive) {
 		insert("in/import/out/evaluate/probe", "the new reason\n", "in/import/out/quote/")(a)
-		drop("out/evaluate/values.txt")(a)
-		drop("variant/doubled/out/evaluate/values.txt")(a)
-		drop("transform/louder/out/evaluate/values.txt")(a)
+		for _, tree := range []string{"", "variant/doubled/", "transform/louder/"} {
+			drop(tree + "out/evaluate/values.txt")(a)
+			drop(tree + "out/evaluate/inputs")(a)
+		}
 	})
 	s.passes(s.update("chain"))
 	s.hasSections(prices, map[string]string{"out/evaluate/outcome": "skipped the new reason\n", "via/import/evaluate/probe": "the new reason\n"})
@@ -650,8 +655,9 @@ func TestChainOutcomeAsUpdate(t *testing.T) {
 	const reruns = "it reruns import, whose outcome and product a normal run reads from the archive"
 	clean := s.read(names)
 
-	s.edit(names, "import's committed outcome is stale, and import now makes a script with a cycle, which the export states", func(a *archive.Archive) {
+	s.edit(names, "import's committed outcome is stale, import now makes a script with a cycle, which the export states, and evaluate's inputs, which its blocked cell won't have, is deleted", func(a *archive.Archive) {
 		set("out/import/outcome", "rejected\n")(a)
+		drop("out/evaluate/inputs")(a)
 		insert("properties", "circular\n", "in/")(a)
 		insert("in/import/out/resolve/error", "A1 -> A1: cycle\n", "out/")(a)
 	})
@@ -1363,7 +1369,7 @@ func TestUpdateUnreadableUntested(t *testing.T) {
 	s.fails(s.update("ladder-a-paths"), check)
 	s.remove("b/testdata/hypercase.json", "delete b's registry, which no update writes")
 	s.passes(s.update("ladder-a-paths"))
-	s.fails(s.normal("ladder-a-paths"), "testdata/script/x.txtar: no registry claims out/evaluate/outcome and out/evaluate/values.txt: no column named evaluate runs over the corpus script.")
+	s.fails(s.normal("ladder-a-paths"), "testdata/script/x.txtar: no registry claims out/evaluate/inputs, out/evaluate/outcome and out/evaluate/values.txt: no column named evaluate runs over the corpus script.")
 	s.edit("testdata/script/x.txtar", "delete ./b's cells, which no package writes", drop("out/evaluate/"))
 	s.passes(s.normal("ladder-a-paths"))
 	s.passes(s.update("ladder-a-paths"))
@@ -1578,8 +1584,10 @@ func TestChainSharedProjects(t *testing.T) {
 		// its rejection, and passes.
 		s.edit(prices, "projectRender no longer panics, and the cells' orphans are deleted by hand", func(a *archive.Archive) {
 			drop("in/render/panic")(a)
-			for _, col := range []string{"out/evaluate/values.txt", "out/list/files.txt", "transform/louder/out/evaluate/values.txt", "transform/louder/out/list/files.txt"} {
-				drop(col)(a)
+			for _, tree := range []string{"", "transform/louder/"} {
+				for _, f := range []string{"parse/inputs", "resolve/inputs", "evaluate/values.txt", "evaluate/inputs", "list/files.txt", "list/inputs"} {
+					drop(tree + "out/" + f)(a)
+				}
 			}
 		})
 		for _, r := range s.parallel(childRun{"", "chain-a-render", true}, childRun{"b", "chain-b", true}) {
@@ -1647,13 +1655,14 @@ func TestChainLiftEntries(t *testing.T) {
 		s.passes(rs[0])
 		s.fails(rs[1], "The cell of the lift import, on list's path, has a problem, which that cell reports, in the package that owns it.")
 		s.hasSections(quoted, map[string]string{"out/import/outcome": "rejected\n"}, "out/list/", "out/evaluate/")
-		s.fails(s.normal("chain-a"), breakage+"outputs:\n  outputs:\n    .: error.txt \"Why the importer rejects the export.\"\n    ./b: none"+fix)
+		s.fails(s.normal("chain-a"), breakage+"outputs:\n  outputs:\n    .: error.txt \"Why the importer rejects the export.\" (inputs: positions)\n    ./b: none"+fix)
 		s.done()
 	})
 
-	// Each field of b's entry, changed in its registry by hand, then two
-	// at once, and an ordinary lift's. The module's update rewrites the
-	// stale registry.
+	// Each field of b's entry, changed in its registry by hand, outputs and
+	// productFiles each by a declaration's description or presence and by
+	// what one states in Inputs, then two at once, and an ordinary lift's.
+	// The module's update rewrites the stale registry.
 	t.Run("each field", func(t *testing.T) {
 		t.Parallel()
 		s := newSandbox(t, "chain-shared")
@@ -1677,6 +1686,11 @@ func TestChainLiftEntries(t *testing.T) {
 			return s.normal("chain-a")
 		}
 		description := func(l *registry.Lift) { l.Description = "Imports the export." }
+		// products shows import's product declarations, the first, evaluate/*,
+		// stating first.
+		products := func(first string) string {
+			return "evaluate/* \"What evaluate does, as a script's evaluate/ tree says.\" (inputs: " + first + "), evaluate/out/* \"An output evaluate returns.\" (inputs: func), inputs/* \"A tree named as a cell's inputs file is.\" (inputs: func), names/* \"Files named as a cell's own files are.\" (inputs: func), parse/* \"What parse does, as a script's parse/ tree says.\" (inputs: func), quote/* \"What a renderer of errors quotes.\" (inputs: func), resolve/* \"What resolve does, as a script's resolve/ tree says.\" (inputs: func)"
+		}
 		for _, tt := range []struct {
 			field  string
 			change func(l *registry.Lift)
@@ -1686,8 +1700,10 @@ func TestChainLiftEntries(t *testing.T) {
 			{"input", func(l *registry.Lift) { l.Input = "github.com/sdboyer/hypercase_test.Grid" }, "input:\n  .: github.com/sdboyer/hypercase_test.Export\n  ./b: github.com/sdboyer/hypercase_test.Grid"},
 			{"product", func(l *registry.Lift) { l.Product = "*github.com/sdboyer/hypercase_test.Parsed" }, "product:\n  .: github.com/sdboyer/hypercase_test.Script\n  ./b: *github.com/sdboyer/hypercase_test.Parsed"},
 			{"bytes", func(l *registry.Lift) { l.Bytes = false }, "bytes:\n  .: true\n  ./b: false"},
-			{"outputs", func(l *registry.Lift) { l.Outputs[0].Description = "Why." }, "outputs:\n  .: error.txt \"Why the importer rejects the export.\"\n  ./b: error.txt \"Why.\""},
-			{"productFiles", func(l *registry.Lift) { l.ProductFiles = l.ProductFiles[:1] }, "productFiles:\n  .: evaluate/* \"What evaluate does, as a script's evaluate/ tree says.\", evaluate/out/* \"An output evaluate returns.\", inputs/* \"A tree named as a cell's inputs file is.\", names/* \"Files named as a cell's own files are.\", parse/* \"What parse does, as a script's parse/ tree says.\", quote/* \"What a renderer of errors quotes.\", resolve/* \"What resolve does, as a script's resolve/ tree says.\"\n  ./b: evaluate/* \"What evaluate does, as a script's evaluate/ tree says.\""},
+			{"outputs", func(l *registry.Lift) { l.Outputs[0].Description = "Why." }, "outputs:\n  .: error.txt \"Why the importer rejects the export.\" (inputs: positions)\n  ./b: error.txt \"Why.\" (inputs: positions)"},
+			{"outputs", func(l *registry.Lift) { l.Outputs[0].Inputs = registry.InputsAll }, "outputs:\n  .: error.txt \"Why the importer rejects the export.\" (inputs: positions)\n  ./b: error.txt \"Why the importer rejects the export.\" (inputs: all)"},
+			{"productFiles", func(l *registry.Lift) { l.ProductFiles = l.ProductFiles[:1] }, "productFiles:\n  .: " + products("func") + "\n  ./b: evaluate/* \"What evaluate does, as a script's evaluate/ tree says.\" (inputs: func)"},
+			{"productFiles", func(l *registry.Lift) { l.ProductFiles[0].Inputs = registry.InputsAll }, "productFiles:\n  .: " + products("func") + "\n  ./b: " + products("all")},
 			{"rejects", func(l *registry.Lift) { l.Rejects = nil }, "rejects:\n  .: unterminated\n  ./b: none"},
 		} {
 			r := edit("import", "b's registry records another "+tt.field+" for import", tt.change)

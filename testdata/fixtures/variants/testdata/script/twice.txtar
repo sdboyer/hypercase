@@ -11,6 +11,7 @@ A1 -> B1 -> A1: cycle
 The do/ tree's output is gone, so echo prints nothing.
 -- variant/blank/delete --
 do/out/values.txt
+-- variant/blank/out/echo/inputs --
 -- variant/blank/out/echo/outcome --
 accepted
 -- variant/more/about --

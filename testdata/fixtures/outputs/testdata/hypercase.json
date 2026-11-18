@@ -1,9 +1,10 @@
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
   "codes": false,
+  "positions": true,
   "issueLinks": [],
   "properties": [],
   "types": [
@@ -32,15 +33,18 @@
       "outputs": [
         {
           "pattern": "?.txt",
-          "description": "A file named with one letter."
+          "description": "A file named with one letter.",
+          "inputs": "func"
         },
         {
           "pattern": "a.txt",
-          "description": "The file a."
+          "description": "The file a.",
+          "inputs": "func"
         },
         {
           "pattern": "values.txt",
-          "description": "The values."
+          "description": "The values.",
+          "inputs": "func"
         }
       ],
       "rejects": [],

@@ -71,6 +71,9 @@ func init() {
 		register, ok = stripRegistrations[name]
 	}
 	if !ok {
+		register, ok = inputsRegistrations[name]
+	}
+	if !ok {
 		panic("selftest: no registration named " + name)
 	}
 	register()

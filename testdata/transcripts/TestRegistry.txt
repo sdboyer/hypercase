@@ -6,11 +6,12 @@ $ go test  # echo
 PASS
 $ cat testdata/hypercase.json
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
   "codes": false,
+  "positions": true,
   "issueLinks": [],
   "properties": [],
   "types": [
@@ -39,31 +40,38 @@ $ cat testdata/hypercase.json
       "outputs": [
         {
           "pattern": "?.txt",
-          "description": "A file the case's instructions name with one letter."
+          "description": "A file the case's instructions name with one letter.",
+          "inputs": "func"
         },
         {
           "pattern": "archive.txt",
-          "description": "The archive's name, as the run received it."
+          "description": "The archive's name, as the run received it.",
+          "inputs": "func"
         },
         {
           "pattern": "dir.txt",
-          "description": "The path of a temp dir the run made."
+          "description": "The path of a temp dir the run made.",
+          "inputs": "func"
         },
         {
           "pattern": "error.txt",
-          "description": "The error the case's instructions give."
+          "description": "The error the case's instructions give.",
+          "inputs": "positions"
         },
         {
           "pattern": "stderr.txt",
-          "description": "What the case's instructions write to stderr."
+          "description": "What the case's instructions write to stderr.",
+          "inputs": "func"
         },
         {
           "pattern": "stdout.txt",
-          "description": "What the case's instructions write to stdout."
+          "description": "What the case's instructions write to stdout.",
+          "inputs": "func"
         },
         {
           "pattern": "values.txt",
-          "description": "The values the case's instructions give."
+          "description": "The values the case's instructions give.",
+          "inputs": "func"
         }
       ],
       "rejects": [],
@@ -93,31 +101,38 @@ $ go test  # echo-shout
         +       "outputs": [
         +         {
         +           "pattern": "?.txt",
-        +           "description": "A file the case's instructions name with one letter."
+        +           "description": "A file the case's instructions name with one letter.",
+        +           "inputs": "func"
         +         },
         +         {
         +           "pattern": "archive.txt",
-        +           "description": "The archive's name, as the run received it."
+        +           "description": "The archive's name, as the run received it.",
+        +           "inputs": "func"
         +         },
         +         {
         +           "pattern": "dir.txt",
-        +           "description": "The path of a temp dir the run made."
+        +           "description": "The path of a temp dir the run made.",
+        +           "inputs": "func"
         +         },
         +         {
         +           "pattern": "error.txt",
-        +           "description": "The error the case's instructions give."
+        +           "description": "The error the case's instructions give.",
+        +           "inputs": "positions"
         +         },
         +         {
         +           "pattern": "stderr.txt",
-        +           "description": "What the case's instructions write to stderr."
+        +           "description": "What the case's instructions write to stderr.",
+        +           "inputs": "func"
         +         },
         +         {
         +           "pattern": "stdout.txt",
-        +           "description": "What the case's instructions write to stdout."
+        +           "description": "What the case's instructions write to stdout.",
+        +           "inputs": "func"
         +         },
         +         {
         +           "pattern": "values.txt",
-        +           "description": "The values the case's instructions give."
+        +           "description": "The values the case's instructions give.",
+        +           "inputs": "func"
         +         }
         +       ],
         +       "rejects": [],
@@ -128,6 +143,8 @@ $ go test  # echo-shout
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
     script/twice: A1 is twice B1.
         shout: Does what the case's shout/ tree says.
+        out/shout/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/shout/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
 --- FAIL: TestCorpus

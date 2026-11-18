@@ -32,9 +32,9 @@ $ rm b/x_test.go  # remove the excluded file
 $ edit b/corpus_test.go  # restore b's tests
 $ edit b/testdata/hypercase.json  # a registry from a later hypercase
 $ go test  # pkg-a
-    b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format 7.
+    b/testdata/hypercase.json can't be read: it holds format 9, and this hypercase reads format 8.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.
-    testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
+    testdata/script/twice.txtar: no registry claims out/shout/inputs, out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.
         If a column should write them, register the column. If not, run hypercase strip -root . -column shout at the module root. It removes shout's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/script

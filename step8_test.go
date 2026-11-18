@@ -204,7 +204,7 @@ func TestFrozenOutcome(t *testing.T) {
 	const negative = "testdata/script/negative.txtar"
 	before := s.read(negative)
 	s.edit(negative, "drop the frozen cell's outcome, as before outcomes were written", drop("out/echo/outcome"))
-	s.fails(s.normal("rejects"), "script/negative: A1 is a negative number, which the code wrongly rejects.\n    echo: Does what the case's do/ tree says.\n    The cell is frozen by its known gap, gaps line 1: \"echo A negative number is valid, and evaluates to itself. Waits on sheets#3.\"\n    Its committed files match the run, and it has no out/echo/outcome, which every cell has.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to add it. The update adds the outcome and changes nothing else.")
+	s.fails(s.normal("rejects"), "script/negative: A1 is a negative number, which the code wrongly rejects.\n    echo: Does what the case's do/ tree says.\n    The cell is frozen by its known gap, gaps line 1: \"echo A negative number is valid, and evaluates to itself. Waits on sheets#3.\"\n    Its committed files match the run, and it has no out/echo/outcome, which every cell that ran has.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to add it. The update adds the outcome and changes nothing else.")
 	s.passes(s.update("rejects"))
 	s.same(negative, before)
 
@@ -216,7 +216,7 @@ func TestFrozenOutcome(t *testing.T) {
 	want := "Its committed files record today's behavior, and the run now produces different ones:\n    out/echo/error.txt differs (-committed +got):"
 	r := s.normal("rejects")
 	s.fails(r, want)
-	s.lacks(r, "which every cell has")
+	s.lacks(r, "which every cell that ran has")
 	s.fails(s.update("rejects"), want)
 	s.same(negative, edited)
 
@@ -232,11 +232,11 @@ func TestFrozenOutcome(t *testing.T) {
 	undeclared := "out/echo/zz.undeclared is not declared.\n    Declare it in echo's Outputs, with a description, or fix the code. An update writes nothing for this cell."
 	r = s.update("rejects")
 	s.fails(r, undeclared)
-	s.lacks(r, "which every cell has")
+	s.lacks(r, "which every cell that ran has")
 	s.same(negative, edited)
 	r = s.normal("rejects")
 	s.fails(r, undeclared)
-	s.lacks(r, "which every cell has")
+	s.lacks(r, "which every cell that ran has")
 	s.done()
 }
 
@@ -293,8 +293,8 @@ func TestFrozenVariantOutcome(t *testing.T) {
 		drop("transform/looped/out/echo/outcome")(a)
 	})
 	s.fails(s.normal("check-gaps"),
-		"script/loop/variant/neg: A1 is a negative number, which the code wrongly rejects.\n    echo: Does what the case's do/ tree says.\n    The cell is frozen by its known gap, variant/neg/gaps line 1: \"echo A negative number is valid, and evaluates to itself. Waits on sheets#3.\"\n    Its committed files match the run, and it has no variant/neg/out/echo/outcome, which every cell has.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to add it. The update adds the outcome and changes nothing else.",
-		"script/loop/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.\n    echo: Does what the case's do/ tree says.\n    The cell is frozen by its known gap, gaps line 1: \"transform/looped echo A cycle's error starts with the cell where it starts. Waits on sheets#4.\"\n    Its committed files match the run, and it has no transform/looped/out/echo/outcome, which every cell has.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to add it. The update adds the outcome and changes nothing else.")
+		"script/loop/variant/neg: A1 is a negative number, which the code wrongly rejects.\n    echo: Does what the case's do/ tree says.\n    The cell is frozen by its known gap, variant/neg/gaps line 1: \"echo A negative number is valid, and evaluates to itself. Waits on sheets#3.\"\n    Its committed files match the run, and it has no variant/neg/out/echo/outcome, which every cell that ran has.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to add it. The update adds the outcome and changes nothing else.",
+		"script/loop/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.\n    echo: Does what the case's do/ tree says.\n    The cell is frozen by its known gap, gaps line 1: \"transform/looped echo A cycle's error starts with the cell where it starts. Waits on sheets#4.\"\n    Its committed files match the run, and it has no transform/looped/out/echo/outcome, which every cell that ran has.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to add it. The update adds the outcome and changes nothing else.")
 	s.passes(s.update("check-gaps"))
 	s.same(loop, before)
 	s.passes(s.normal("check-gaps"))

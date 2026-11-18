@@ -1,9 +1,10 @@
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step10",
   "rootPackage": true,
   "codes": true,
+  "positions": true,
   "issueLinks": [
     {
       "pattern": "sheets#(\\d+)",
@@ -92,13 +93,15 @@
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "The line the importer can't read, and why."
+          "description": "The line the importer can't read, and why.",
+          "inputs": "positions"
         }
       ],
       "productFiles": [
         {
           "pattern": "sheet/*",
-          "description": "One file per cell, as a sheet's in/sheet/ holds them."
+          "description": "One file per cell, as a sheet's in/sheet/ holds them.",
+          "inputs": "func"
         }
       ],
       "rejects": [
@@ -133,7 +136,8 @@
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "The cell that is neither a number nor a formula."
+          "description": "The cell that is neither a number nor a formula.",
+          "inputs": "positions"
         }
       ],
       "productFiles": [],
@@ -170,7 +174,8 @@
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "The cycle, or the reference to a missing cell."
+          "description": "The cycle, or the reference to a missing cell.",
+          "inputs": "positions"
         }
       ],
       "productFiles": [],
@@ -209,7 +214,8 @@
       "outputs": [
         {
           "pattern": "values.txt",
-          "description": "Each cell's value, one per line, in cell order."
+          "description": "Each cell's value, one per line, in cell order.",
+          "inputs": "func"
         }
       ],
       "rejects": [],

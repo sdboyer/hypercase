@@ -3,16 +3,25 @@ pick picks the script.
 A1 6
 -- in/walk/out/values.txt --
 A1 6
+-- out/format/inputs --
+trail.txt
+values.txt
+  in/format/out/values.txt
 -- out/format/outcome --
 accepted
 -- out/format/trail.txt --
 unpick
 -- out/format/values.txt --
 A1 6
+-- out/pick/inputs --
 -- out/pick/outcome --
 accepted
+-- out/unpick/inputs --
 -- out/unpick/outcome --
 accepted
+-- out/walk/inputs --
+values.txt
+  in/walk/out/values.txt
 -- out/walk/outcome --
 accepted
 -- out/walk/values.txt --

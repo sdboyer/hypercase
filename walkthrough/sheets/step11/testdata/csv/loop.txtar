@@ -1,0 +1,50 @@
+A1 and B1 refer to each other, exported as CSV.
+-- in/csv/loop.csv --
+=B1,=A1
+-- properties --
+circular
+-- via/import/sheet/A1 --
+=B1
+-- via/import/sheet/B1 --
+=A1
+-- out/calc/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1
+  sheet/B1:1: =A1
+-- out/calc/inputs --
+error.txt
+  via/import/sheet/A1:1-1
+  via/import/sheet/B1:1-1
+-- out/calc/outcome --
+rejected S201
+-- out/evaluate/outcome --
+blocked resolve
+-- out/format/formulas.txt --
+A1 =B1
+B1 =A1
+-- out/format/inputs --
+formulas.txt
+  via/import/sheet/A1
+  via/import/sheet/B1
+-- out/format/outcome --
+accepted
+-- out/import/inputs --
+via/import/sheet/A1
+  in/csv/loop.csv:1-1
+via/import/sheet/B1
+  in/csv/loop.csv:1-1
+-- out/import/outcome --
+accepted
+-- out/parse/inputs --
+-- out/parse/outcome --
+accepted
+-- out/resolve/error.txt --
+A1 -> B1 -> A1: cycle
+  sheet/A1:1: =B1
+  sheet/B1:1: =A1
+-- out/resolve/inputs --
+error.txt
+  via/import/sheet/A1:1-1
+  via/import/sheet/B1:1-1
+-- out/resolve/outcome --
+rejected S201

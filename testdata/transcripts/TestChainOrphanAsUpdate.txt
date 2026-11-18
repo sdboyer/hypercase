@@ -104,6 +104,10 @@ $ go test  # chain
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/inputs differs (-golden +got):
+        - values.txt
+        -   via/import/evaluate/out/values.txt
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
         out/evaluate/values.txt is an output the run no longer produces.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Its run may still write the file: delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
@@ -118,6 +122,12 @@ $ go test  # chain
         + 2 files
           quote/A1 "3\n"
           quote/B1 "=A1*2\n"
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
+        out/list/inputs differs (-golden +got):
+          files.txt
+        -   via/import/evaluate/out/values.txt
+            via/import/quote/A1
+            via/import/quote/B1
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".

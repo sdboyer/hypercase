@@ -37,6 +37,10 @@ A1: unexpected "-"
 A1 -3
 -- out/echo/error.txt --
 A1: unexpected "-"
+-- out/echo/inputs --
+error.txt
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 rejected
 -- out/echo/values.txt --

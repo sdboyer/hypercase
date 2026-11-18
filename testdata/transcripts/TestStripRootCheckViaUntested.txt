@@ -94,39 +94,39 @@ $ go test  # strip-a
     testdata/export/prices.txtar: no registry claims via/parse/quote/A1 and variant/doubled/via/parse/quote/A1: no bytes lift named parse runs over the corpus export.
         If a bytes lift should write them, register it. If not, first settle whether parse is a bytes lift, on which the registries differ, as the check's failures on them say, then run the check again: until they agree, it can't tell whether gaps line 1 and variant/doubled/gaps line 1, which mark cells of theirs, keep strip from removing them.
     testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
-          export/prices evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-        + export/prices evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [outcome values.txt]
-          export/prices import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
-          export/prices list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        + export/prices list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt outcome]
-          export/prices parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-          export/prices resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-          export/prices/transform/louder evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-        + export/prices/transform/louder evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [outcome values.txt]
-          export/prices/transform/louder import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
-          export/prices/transform/louder list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        + export/prices/transform/louder list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt outcome]
-          export/prices/transform/louder parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-          export/prices/transform/louder resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-          export/prices/variant/doubled evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-        + export/prices/variant/doubled evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [outcome values.txt]
-          export/prices/variant/doubled import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
-          export/prices/variant/doubled list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        + export/prices/variant/doubled list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt outcome]
-          export/prices/variant/doubled parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-          export/prices/variant/doubled resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-          script/plain evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-        + script/plain evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [outcome values.txt]
-          script/plain list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        + script/plain list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt outcome]
-          script/plain parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-          script/plain resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-          script/plain/variant/more evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-        + script/plain/variant/more evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [outcome values.txt]
-          script/plain/variant/more list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        + script/plain/variant/more list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt outcome]
-          script/plain/variant/more parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-          script/plain/variant/more resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          export/prices evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+        + export/prices evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [inputs outcome values.txt]
+          export/prices import: accepted; the lift import of ., rejecting [unterminated]; states []; files [inputs outcome]
+          export/prices list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        + export/prices list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt inputs outcome]
+          export/prices parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+          export/prices resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+          export/prices/transform/louder evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+        + export/prices/transform/louder evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [inputs outcome values.txt]
+          export/prices/transform/louder import: accepted; the lift import of ., rejecting [unterminated]; states []; files [inputs outcome]
+          export/prices/transform/louder list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        + export/prices/transform/louder list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt inputs outcome]
+          export/prices/transform/louder parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+          export/prices/transform/louder resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+          export/prices/variant/doubled evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+        + export/prices/variant/doubled evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [inputs outcome values.txt]
+          export/prices/variant/doubled import: accepted; the lift import of ., rejecting [unterminated]; states []; files [inputs outcome]
+          export/prices/variant/doubled list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        + export/prices/variant/doubled list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt inputs outcome]
+          export/prices/variant/doubled parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+          export/prices/variant/doubled resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+          script/plain evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+        + script/plain evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [inputs outcome values.txt]
+          script/plain list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        + script/plain list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt inputs outcome]
+          script/plain parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+          script/plain resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+          script/plain/variant/more evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+        + script/plain/variant/more evaluate: accepted; the suite evaluate of ./c, rejecting []; states []; files [inputs outcome values.txt]
+          script/plain/variant/more list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        + script/plain/variant/more list: accepted; the suite list of ./c, rejecting []; states []; files [files.txt inputs outcome]
+          script/plain/variant/more parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+          script/plain/variant/more resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
     what ran, in order:
         import ran
@@ -168,10 +168,10 @@ $ go test  # strip-a
 FAIL
 [exit 1]
 $ hypercase strip -column parse
-testdata/export/prices.txtar: removed 1 section
+testdata/export/prices.txtar: removed 2 sections
 testdata/export/prices.txtar: left the cell parse, frozen by its known gap, gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells
 testdata/export/prices.txtar: left the cell variant/doubled/parse, frozen by its known gap, variant/doubled/gaps line 1; hypercase strip -column parse -frozen strips it, and parse's other frozen cells
-testdata/script/plain.txtar: removed 2 sections
+testdata/script/plain.txtar: removed 4 sections
 Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
 $ rm c/testdata/hypercase.json  # delete c's registry, as its failure says
 $ go test  # strip-a
@@ -179,37 +179,43 @@ $ go test  # strip-a
         If a bytes lift should write them, register it. If not, run hypercase strip -root . -column parse at the module root. It removes parse's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         parse: Parses the script, as its parse/ tree says.
+        transform/louder/out/parse/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         transform/louder/out/parse/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/plain: A script, not an export, which evaluate and list run on directly.
         parse: Parses the script, as its parse/ tree says.
+        out/parse/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/parse/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/plain/variant/more: The script evaluates to a second value too.
         parse: Parses the script, as its parse/ tree says.
+        variant/more/out/parse/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         variant/more/out/parse/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
-          export/prices/transform/louder evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-          export/prices/transform/louder import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
-          export/prices/transform/louder list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        - export/prices/transform/louder parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+          export/prices/transform/louder evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+          export/prices/transform/louder import: accepted; the lift import of ., rejecting [unterminated]; states []; files [inputs outcome]
+          export/prices/transform/louder list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        - export/prices/transform/louder parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
         + export/prices/transform/louder parse: no outcome; the lift parse of ., rejecting [malformed]; states []; files []
-          export/prices/transform/louder resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-          export/prices/variant/doubled evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-          export/prices/variant/doubled import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
+          export/prices/transform/louder resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+          export/prices/variant/doubled evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+          export/prices/variant/doubled import: accepted; the lift import of ., rejecting [unterminated]; states []; files [inputs outcome]
           ...
-          export/prices/variant/doubled resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-          script/plain evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-          script/plain list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        - script/plain parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+          export/prices/variant/doubled resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+          script/plain evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+          script/plain list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        - script/plain parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
         + script/plain parse: no outcome; the lift parse of ., rejecting [malformed]; states []; files []
-          script/plain resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-          script/plain/variant/more evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-          script/plain/variant/more list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        - script/plain/variant/more parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
+          script/plain resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+          script/plain/variant/more evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+          script/plain/variant/more list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        - script/plain/variant/more parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
         + script/plain/variant/more parse: no outcome; the lift parse of ., rejecting [malformed]; states []; files []
-          script/plain/variant/more resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          script/plain/variant/more resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
     what ran, in order:
         import ran

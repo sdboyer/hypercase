@@ -165,7 +165,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b-plain
 FAIL
 [exit 1]
 $ go test  # strip-a-plain
-    testdata/export/prices.txtar: no registry claims transform/louder/in/import/out/evaluate/out/values.txt, transform/louder/via/import/evaluate/out/values.txt, transform/louder/via/import/quote/A1, transform/louder/via/import/quote/B1, transform/louder/out/evaluate/outcome, transform/louder/out/evaluate/values.txt, transform/louder/out/import/outcome, transform/louder/out/list/files.txt, transform/louder/out/list/outcome, transform/louder/out/parse/outcome and transform/louder/out/resolve/outcome: no corpus type of testdata/export/ lists a transform named louder.
+    testdata/export/prices.txtar: no registry claims transform/louder/in/import/out/evaluate/out/values.txt, transform/louder/via/import/evaluate/out/values.txt, transform/louder/via/import/quote/A1, transform/louder/via/import/quote/B1, transform/louder/out/evaluate/inputs, transform/louder/out/evaluate/outcome, transform/louder/out/evaluate/values.txt, transform/louder/out/import/inputs, transform/louder/out/import/outcome, transform/louder/out/list/files.txt, transform/louder/out/list/inputs, transform/louder/out/list/outcome, transform/louder/out/parse/inputs, transform/louder/out/parse/outcome, transform/louder/out/resolve/inputs and transform/louder/out/resolve/outcome: no corpus type of testdata/export/ lists a transform named louder.
         If a transform should make the variant, list it in its corpus type's Transforms. If not, run hypercase strip -root . -transform louder at the module root. It removes the sections under transform/louder/ from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     the corpus check cells can't read its cells: testdata/export/prices.txtar holds transform/louder, and no corpus type of testdata/export/ lists a transform named louder
         Fix what the message names. No check runs, and an update writes no findings.
@@ -202,7 +202,7 @@ $ go test  # strip-a-plain
 FAIL
 [exit 1]
 $ hypercase strip -root . -transform louder
-testdata/export/prices.txtar: removed 11 sections
+testdata/export/prices.txtar: removed 16 sections
 Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
 # the update, run until a pass changes nothing; that pass:
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a-plain

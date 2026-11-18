@@ -3,6 +3,9 @@ A1 holds one, and looped's variant puts it on a cycle.
 A1 one
 -- gaps --
 transform/looped echo A cycle's error starts with the cell where it starts. Waits on sheets#4.
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --
@@ -15,6 +18,10 @@ unexpected "-" in A1
 echo A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- variant/neg/out/echo/error.txt --
 unexpected "-" in A1
+-- variant/neg/out/echo/inputs --
+error.txt
+values.txt
+  in/do/out/values.txt
 -- variant/neg/out/echo/outcome --
 rejected
 -- variant/neg/out/echo/values.txt --
@@ -25,12 +32,19 @@ A1 -> A1: cycle
 A1 -> A1: cycle
 -- transform/looped/out/echo/error.txt --
 A1 -> A1: cycle
+-- transform/looped/out/echo/inputs --
+error.txt
+values.txt
+  in/do/out/values.txt
 -- transform/looped/out/echo/outcome --
 rejected
 -- transform/looped/out/echo/values.txt --
 A1 one
 -- transform/upper/in/do/out/values.txt --
 A1 ONE
+-- transform/upper/out/echo/inputs --
+values.txt
+  transform/upper/in/do/out/values.txt
 -- transform/upper/out/echo/outcome --
 accepted
 -- transform/upper/out/echo/values.txt --

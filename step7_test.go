@@ -77,6 +77,7 @@ func TestVariants(t *testing.T) {
 		"variant/cycle/out/echo/values.txt": "a1 six\n",
 		"variant/more/out/echo/b.txt":       "b1 three\n",
 		"variant/more/out/echo/values.txt":  "a1 six\n",
+		"variant/blank/out/echo/inputs":     "",
 		"variant/blank/out/echo/outcome":    "accepted\n",
 	}, "variant/blank/out/")
 	s.passes(s.normal("variants"))
@@ -176,7 +177,7 @@ func TestVariantsShared(t *testing.T) {
 	})
 	s.passes(s.update("variants"))
 	s.passes(s.run("b", "variants-b", true))
-	s.hasSections(twice, map[string]string{"variant/cycle/out/shout/values.txt": "A1 CYCLE\n"}, "out/shout/", "variant/more/out/shout/")
+	s.hasSections(twice, map[string]string{"variant/cycle/out/shout/values.txt": "A1 CYCLE\n", "out/shout/inputs": "", "variant/more/out/shout/inputs": ""}, "out/shout/", "variant/more/out/shout/")
 	s.passes(s.normal("variants"))
 	s.passes(s.run("b", "variants-b", false))
 	s.done()
@@ -406,6 +407,10 @@ func TestTransformLifts(t *testing.T) {
 	s.hasSections(twice, map[string]string{
 		"variant/bad/out/parse/error.txt":        "A1: not a number\n",
 		"transform/looped/out/resolve/error.txt": "A1 -> A1: cycle\n",
+		"out/parse/inputs":                       "",
+		"out/resolve/inputs":                     "",
+		"transform/upper/out/parse/inputs":       "",
+		"transform/upper/out/resolve/inputs":     "",
 	}, "transform/upper/out/", "out/")
 	s.passes(s.normal("tr-ladder"))
 	s.done()
@@ -569,7 +574,7 @@ func TestTransformJennyFrozen(t *testing.T) {
 	// A person deletes echo's frozen files alone. The root package's
 	// normal run fails on the cell, and b's update, which fails on its own
 	// frozen cell, leaves echo's unwritten too.
-	echoMissing := "echo: Does what the case's do/ tree says.\n    transform/upper/out/echo/outcome has no golden.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.\n    transform/upper/out/echo/values.txt has no golden."
+	echoMissing := "echo: Does what the case's do/ tree says.\n    transform/upper/out/echo/inputs has no golden.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.\n    transform/upper/out/echo/outcome has no golden.\n    Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.\n    transform/upper/out/echo/values.txt has no golden."
 	frozenBoth := s.read(twice)
 	s.edit(twice, "delete upper's frozen cell of echo", drop("transform/upper/out/echo/"))
 	s.fails(s.normal("tr-jenny"), echoMissing)

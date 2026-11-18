@@ -12,6 +12,9 @@ malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
   sheet/D1:1: total
+-- out/calc/inputs --
+error.txt
+  in/sheet/D1:1-1
 -- out/calc/outcome --
 rejected S101
 -- out/evaluate/outcome --
@@ -21,6 +24,9 @@ blocked parse
 -- out/parse/error.txt --
 D1: not a number or a formula: "total"
   sheet/D1:1: total
+-- out/parse/inputs --
+error.txt
+  in/sheet/D1:1-1
 -- out/parse/outcome --
 rejected S101
 -- out/resolve/outcome --

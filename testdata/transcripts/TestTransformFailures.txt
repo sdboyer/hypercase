@@ -124,6 +124,9 @@ poke fails on the base.
 x
 -- in/tr/error --
 the base is too big
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --
@@ -133,6 +136,9 @@ poke makes the base, unchanged.
 -- in/do/out/values.txt --
 x
 -- in/tr/same --
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --
@@ -143,6 +149,9 @@ poke's probe says no, with a reason.
 x
 -- in/tr/probe --
 the base is too small
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --

@@ -81,7 +81,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a-paths
         --- PASS: TestCorpus/checks/paths
 PASS
 $ go test  # ladder-a-paths
-    testdata/script/x.txtar: no registry claims out/parse2/outcome: no column named parse2 runs over the corpus script.
+    testdata/script/x.txtar: no registry claims out/parse2/inputs and out/parse2/outcome: no column named parse2 runs over the corpus script.
         If a column should write them, register the column. If not, run hypercase strip -root . -column parse2 at the module root. It removes parse2's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     what ran, in order:
         parse ran on x

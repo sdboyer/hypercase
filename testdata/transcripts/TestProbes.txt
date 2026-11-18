@@ -14,6 +14,8 @@ $ go test  # probe
         Fix the probe. A panic is never an expected error.
         out/echo/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/echo/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     stack of the panic: [stack]
@@ -81,6 +83,8 @@ probe overflow
 A1 6
 -- out/echo/error.txt --
 probe overflow
+-- out/echo/inputs --
+error.txt
 -- out/echo/outcome --
 panicked
 $ edit testdata/script/panics.txtar  # mark the cell as a known gap

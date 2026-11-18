@@ -142,9 +142,9 @@ $ go test ./b  # strip-b
 FAIL
 [exit 1]
 $ hypercase strip
-testdata/export/prices.txtar: removed 29 sections
+testdata/export/prices.txtar: removed 43 sections
 testdata/export/prices.txtar: left the cell list, frozen by its known gap, gaps line 1; hypercase strip -column list -frozen strips it, and list's other frozen cells
-testdata/script/plain.txtar: removed 12 sections
+testdata/script/plain.txtar: removed 20 sections
 Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
 # the update, run until a pass changes nothing; that pass:
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
@@ -301,8 +301,8 @@ $ go test ./b  # strip-b
 FAIL
 [exit 1]
 $ hypercase strip -frozen
-testdata/export/prices.txtar: removed 31 sections
-testdata/script/plain.txtar: removed 12 sections
+testdata/export/prices.txtar: removed 46 sections
+testdata/script/plain.txtar: removed 20 sections
 Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
 # the update, run until a pass changes nothing; that pass:
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a

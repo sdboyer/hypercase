@@ -5,6 +5,7 @@ import "github.com/sdboyer/hypercase/decl"
 
 var Project = decl.Project{
 	UpdateVar: "SHEETS_UPDATE_GOLDEN",
+	Positions: positions,
 }
 
 var Circular = decl.Property{

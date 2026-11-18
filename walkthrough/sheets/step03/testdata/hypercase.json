@@ -1,9 +1,10 @@
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step03",
   "rootPackage": true,
   "codes": false,
+  "positions": false,
   "issueLinks": [],
   "properties": [],
   "types": [],
@@ -25,7 +26,8 @@
       "outputs": [
         {
           "pattern": "values.txt",
-          "description": "Each cell's value, one per line, in cell order."
+          "description": "Each cell's value, one per line, in cell order.",
+          "inputs": "func"
         }
       ],
       "rejects": [],

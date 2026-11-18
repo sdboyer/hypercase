@@ -88,32 +88,39 @@ $ go test  # bytes-product-nodesc
                 "productFiles": [
                   {
         -           "pattern": "evaluate/*",
-        -           "description": "What evaluate does, as a script's evaluate/ tree says."
+        -           "description": "What evaluate does, as a script's evaluate/ tree says.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "evaluate/out/*",
-        -           "description": "An output evaluate returns."
+        -           "description": "An output evaluate returns.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "inputs/*",
-        -           "description": "A tree named as a cell's inputs file is."
+        -           "description": "A tree named as a cell's inputs file is.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "names/*",
-        -           "description": "Files named as a cell's own files are."
+        -           "description": "Files named as a cell's own files are.",
+        -           "inputs": "func"
         -         },
         -         {
                     "pattern": "parse/*",
-        -           "description": "What parse does, as a script's parse/ tree says."
+        -           "description": "What parse does, as a script's parse/ tree says.",
+        +           "description": " ",
+                    "inputs": "func"
         -         },
         -         {
         -           "pattern": "quote/*",
-        -           "description": "What a renderer of errors quotes."
+        -           "description": "What a renderer of errors quotes.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "resolve/*",
-        -           "description": "What resolve does, as a script's resolve/ tree says."
-        +           "description": " "
+        -           "description": "What resolve does, as a script's resolve/ tree says.",
+        -           "inputs": "func"
                   }
                 ],
                 "rejects": [
@@ -146,11 +153,13 @@ $ go test  # bytes-product-nodesc
         -       "outputs": [
         -         {
         -           "pattern": "error.txt",
-        -           "description": "Why the lift rejects the case."
+        -           "description": "Why the lift rejects the case.",
+        -           "inputs": "positions"
         -         },
         -         {
         -           "pattern": "stderr.txt",
-        -           "description": "What the lift writes to stderr."
+        -           "description": "What the lift writes to stderr.",
+        -           "inputs": "all"
         -         }
         -       ],
         -       "productFiles": [],
@@ -187,11 +196,13 @@ $ go test  # bytes-product-nodesc
         -       "outputs": [
         -         {
         -           "pattern": "error.txt",
-        -           "description": "Why the lift rejects the case."
+        -           "description": "Why the lift rejects the case.",
+        -           "inputs": "positions"
         -         },
         -         {
         -           "pattern": "stderr.txt",
-        -           "description": "What the lift writes to stderr."
+        -           "description": "What the lift writes to stderr.",
+        -           "inputs": "all"
         -         }
         -       ],
         -       "productFiles": [],
@@ -230,27 +241,18 @@ $ go test  # bytes-product-nodesc
         -       "outputs": [
         -         {
         -           "pattern": "?.txt",
-        -           "description": "A file the case's instructions name with one letter."
+        -           "description": "A file the case's instructions name with one letter.",
+        -           "inputs": "func"
         -         },
         -         {
         -           "pattern": "archive.txt",
-        -           "description": "The archive's name, as the run received it."
-        -         },
-        -         {
-        -           "pattern": "dir.txt",
-        -           "description": "The path of a temp dir the run made."
-        -         },
-        -         {
-        -           "pattern": "error.txt",
-        -           "description": "The error the case's instructions give."
-        -         },
-        -         {
-        -           "pattern": "stderr.txt",
-        -           "description": "What the case's instructions write to stderr."
-          ... (45 more lines of diff)
+        -           "description": "The archive's name, as the run received it.",
+          ... (64 more lines of diff)
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
     export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
         import: Imports the export as a script, as its import/ tree says.
+        out/import/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/import/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     export/looped: import makes a script with a cycle, which resolve rejects, and the export states.
@@ -276,6 +278,8 @@ $ go test  # bytes-product-nodesc
     export/prices/variant/unclosed: An unclosed quote, which the importer rejects.
         import: Imports the export as a script, as its import/ tree says.
         variant/unclosed/out/import/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        variant/unclosed/out/import/inputs has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         variant/unclosed/out/import/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.

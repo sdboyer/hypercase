@@ -11,10 +11,12 @@ import (
 	"github.com/sdboyer/jenny"
 )
 
-// An Output mirrors decl.Output.
+// An Output mirrors decl.Output. Its Inputs holds the declaration's
+// decl.Inputs, opaquely, since erase can't import decl.
 type Output struct {
 	Pattern     string
 	Description string
+	Inputs      any
 }
 
 // A Property mirrors decl.Property.

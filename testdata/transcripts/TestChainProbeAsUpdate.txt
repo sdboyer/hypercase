@@ -109,11 +109,23 @@ $ go test  # chain
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... skips evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and evaluate's probe says the case isn't for it: the script says evaluate is not for it
         It writes the outcome "skipped the script says evaluate is not for it", not this one.
+        out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... skips evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and evaluate's probe says the case isn't for it: the script says evaluate is not for it
+        If the suite should run on the case, fix the probe. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has the committed outcome "rejected", in out/import/outcome.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... skips evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and evaluate's probe says the case isn't for it: the script says evaluate is not for it
         If the suite should run on the case, fix the probe. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         import: Imports the export as a script, as its import/ tree says.
+        out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe
+        +   in/import/out/evaluate/probe
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         out/import/outcome differs (-golden +got):
         - rejected
         + accepted
@@ -128,28 +140,52 @@ $ go test  # chain
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
+        out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         parse: Parses the script, as its parse/ tree says.
         out/parse/outcome differs (-golden +got):
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs parse: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
+        out/parse/inputs is recorded, and the cell is blocked: the lift import, on parse's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs parse: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         resolve: Resolves the parsed script, as its resolve/ tree says.
         out/resolve/outcome differs (-golden +got):
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
+        out/resolve/inputs is recorded, and the cell is blocked: the lift import, on resolve's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: parse is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: resolve is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/doubled: The prices doubled. The rest of the export is the base's.
         import: Imports the export as a script, as its import/ tree says.
+        variant/doubled/out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            variant/doubled/in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe
+        +   in/import/out/evaluate/probe
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         variant/doubled/via/import/evaluate/probe has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         import: Imports the export as a script, as its import/ tree says.
+        transform/louder/out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            transform/louder/in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe
+        +   in/import/out/evaluate/probe
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         transform/louder/via/import/evaluate/probe has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     what ran, in order:
@@ -248,6 +284,8 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/inputs is recorded, and evaluate's probe says the case isn't for it: the script says evaluate is not for it
+        If the suite should run on the case, fix the probe. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it: the script says evaluate is not for it
         If the suite should run on the case, fix the probe. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
@@ -256,10 +294,14 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/prices/variant/unclosed: resolve is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/variant/doubled: The prices doubled. The rest of the export is the base's.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        variant/doubled/out/evaluate/inputs is recorded, and evaluate's probe says the case isn't for it: the script says evaluate is not for it
+        If the suite should run on the case, fix the probe. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         variant/doubled/out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it: the script says evaluate is not for it
         If the suite should run on the case, fix the probe. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        transform/louder/out/evaluate/inputs is recorded, and evaluate's probe says the case isn't for it: the script says evaluate is not for it
+        If the suite should run on the case, fix the probe. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it: the script says evaluate is not for it
         If the suite should run on the case, fix the probe. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     what ran, in order:
@@ -361,10 +403,21 @@ $ go test  # chain
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and evaluate's probe panics: the probe gives up. Fix the probe. It writes the outcome "panicked", not this one, and the panic in error.txt.
+        out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and evaluate's probe panics: the probe gives up. Fix the probe.
         out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has the committed outcome "rejected", in out/import/outcome.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and evaluate's probe panics: the probe gives up. Fix the probe.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         import: Imports the export as a script, as its import/ tree says.
+        out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe-panic
+        +   in/import/out/evaluate/probe-panic
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         out/import/outcome differs (-golden +got):
         - rejected
         + accepted
@@ -379,28 +432,52 @@ $ go test  # chain
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
+        out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         parse: Parses the script, as its parse/ tree says.
         out/parse/outcome differs (-golden +got):
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs parse: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
+        out/parse/inputs is recorded, and the cell is blocked: the lift import, on parse's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs parse: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         resolve: Resolves the parsed script, as its resolve/ tree says.
         out/resolve/outcome differs (-golden +got):
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
+        out/resolve/inputs is recorded, and the cell is blocked: the lift import, on resolve's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: parse is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: resolve is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/doubled: The prices doubled. The rest of the export is the base's.
         import: Imports the export as a script, as its import/ tree says.
+        variant/doubled/out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            variant/doubled/in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe-panic
+        +   in/import/out/evaluate/probe-panic
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         variant/doubled/via/import/evaluate/probe-panic has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         import: Imports the export as a script, as its import/ tree says.
+        transform/louder/out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            transform/louder/in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe-panic
+        +   in/import/out/evaluate/probe-panic
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         transform/louder/via/import/evaluate/probe-panic has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     what ran, in order:
@@ -621,10 +698,21 @@ $ go test  # chain
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and evaluate's probe says the case isn't for it, and gives no reason. Fix the probe. It writes nothing for the cell.
+        out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and evaluate's probe says the case isn't for it, and gives no reason. Fix the probe.
         out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has the committed outcome "rejected", in out/import/outcome.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and evaluate's probe says the case isn't for it, and gives no reason. Fix the probe.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         import: Imports the export as a script, as its import/ tree says.
+        out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe
+        +   in/import/out/evaluate/probe
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         out/import/outcome differs (-golden +got):
         - rejected
         + accepted
@@ -639,28 +727,52 @@ $ go test  # chain
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
+        out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         parse: Parses the script, as its parse/ tree says.
         out/parse/outcome differs (-golden +got):
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs parse: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
+        out/parse/inputs is recorded, and the cell is blocked: the lift import, on parse's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs parse: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         resolve: Resolves the parsed script, as its resolve/ tree says.
         out/resolve/outcome differs (-golden +got):
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
+        out/resolve/inputs is recorded, and the cell is blocked: the lift import, on resolve's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: parse is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: resolve is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/doubled: The prices doubled. The rest of the export is the base's.
         import: Imports the export as a script, as its import/ tree says.
+        variant/doubled/out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            variant/doubled/in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe
+        +   in/import/out/evaluate/probe
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         variant/doubled/via/import/evaluate/probe has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         import: Imports the export as a script, as its import/ tree says.
+        transform/louder/out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            transform/louder/in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe
+        +   in/import/out/evaluate/probe
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         transform/louder/via/import/evaluate/probe has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     what ran, in order:
@@ -872,10 +984,21 @@ $ go test  # chain
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and evaluate's probe says the case isn't for it, with a reason an outcome can't hold: "one\ntwo" can't be held in an outcome: it is one line, not empty, with no space at either end. Fix the probe. It writes nothing for the cell.
+        out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and evaluate's probe says the case isn't for it, with a reason an outcome can't hold: "one\ntwo" can't be held in an outcome: it is one line, not empty, with no space at either end. Fix the probe.
         out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has the committed outcome "rejected", in out/import/outcome.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... fails evaluate: it reruns import, whose outcome and product a normal run reads from the archive, and evaluate's probe says the case isn't for it, with a reason an outcome can't hold: "one\ntwo" can't be held in an outcome: it is one line, not empty, with no space at either end. Fix the probe.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         import: Imports the export as a script, as its import/ tree says.
+        out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe
+        +   in/import/out/evaluate/probe
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         out/import/outcome differs (-golden +got):
         - rejected
         + accepted
@@ -890,28 +1013,52 @@ $ go test  # chain
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
+        out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         parse: Parses the script, as its parse/ tree says.
         out/parse/outcome differs (-golden +got):
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs parse: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
+        out/parse/inputs is recorded, and the cell is blocked: the lift import, on parse's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs parse: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         resolve: Resolves the parsed script, as its resolve/ tree says.
         out/resolve/outcome differs (-golden +got):
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
+        out/resolve/inputs is recorded, and the cell is blocked: the lift import, on resolve's path, has the committed outcome "rejected", in out/import/outcome.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs resolve: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: parse is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: resolve is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/doubled: The prices doubled. The rest of the export is the base's.
         import: Imports the export as a script, as its import/ tree says.
+        variant/doubled/out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            variant/doubled/in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe
+        +   in/import/out/evaluate/probe
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         variant/doubled/via/import/evaluate/probe has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         import: Imports the export as a script, as its import/ tree says.
+        transform/louder/out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            transform/louder/in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe
+        +   in/import/out/evaluate/probe
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         transform/louder/via/import/evaluate/probe has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     what ran, in order:
@@ -1121,6 +1268,8 @@ $ go test  # chain
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
         evaluate's probe said the case isn't for it, with a reason an outcome can't hold: "one\ntwo" can't be held in an outcome: it is one line, not empty, with no space at either end.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
+        out/evaluate/inputs is recorded, and evaluate's probe says the case isn't for it, with a reason an outcome can't hold: "one\ntwo" can't be held in an outcome: it is one line, not empty, with no space at either end.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
         out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it, with a reason an outcome can't hold: "one\ntwo" can't be held in an outcome: it is one line, not empty, with no space at either end.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
@@ -1136,6 +1285,13 @@ $ go test  # chain
         + evaluate/probe "one\ntwo\n"
           quote/A1 "3\n"
           quote/B1 "=A1*2\n"
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
+        out/list/inputs differs (-golden +got):
+          files.txt
+            via/import/evaluate/out/values.txt
+        +   via/import/evaluate/probe
+            via/import/quote/A1
+            via/import/quote/B1
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
@@ -1340,6 +1496,8 @@ $ go test  # chain
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
         evaluate's probe said the case isn't for it, and gave no reason.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
+        out/evaluate/inputs is recorded, and evaluate's probe says the case isn't for it, and gives no reason.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         import: Imports the export as a script, as its import/ tree says.
         via/import/evaluate/probe is a file of import's committed product, which this run of import doesn't make.
@@ -1353,6 +1511,13 @@ $ go test  # chain
         + evaluate/probe "\n"
           quote/A1 "3\n"
           quote/B1 "=A1*2\n"
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
+        out/list/inputs differs (-golden +got):
+          files.txt
+            via/import/evaluate/out/values.txt
+        +   via/import/evaluate/probe
+            via/import/quote/A1
+            via/import/quote/B1
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
@@ -1558,6 +1723,17 @@ $ go test  # chain
         evaluate's probe said the case isn't for it, with a reason an outcome can't hold: "one\ntwo" can't be held in an outcome: it is one line, not empty, with no space at either end.
         Fix the probe. An update writes nothing for this cell.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
+        import: Imports the export as a script, as its import/ tree says.
+        out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe
+        +   in/import/out/evaluate/probe
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+    export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         list: Lists the files of the script's input view, with their bytes.
         out/list/files.txt differs (-golden +got):
         - 3 files
@@ -1567,16 +1743,41 @@ $ go test  # chain
           quote/A1 "3\n"
           quote/B1 "=A1*2\n"
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        out/list/inputs differs (-golden +got):
+          files.txt
+            via/import/evaluate/out/values.txt
+        +   via/import/evaluate/probe
+            via/import/quote/A1
+            via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: parse is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: resolve is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/doubled: The prices doubled. The rest of the export is the base's.
         import: Imports the export as a script, as its import/ tree says.
+        variant/doubled/out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            variant/doubled/in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe
+        +   in/import/out/evaluate/probe
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         variant/doubled/via/import/evaluate/probe has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         import: Imports the export as a script, as its import/ tree says.
+        transform/louder/out/import/inputs differs (-golden +got):
+          via/import/evaluate/out/values.txt
+            transform/louder/in/import/out/evaluate/out/values.txt
+        + via/import/evaluate/probe
+        +   in/import/out/evaluate/probe
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         transform/louder/via/import/evaluate/probe has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     what ran, in order:
@@ -1640,7 +1841,7 @@ $ go test  # chain
             --- SKIP: TestCorpus/export/names/transform/louder
         --- FAIL: TestCorpus/export/prices
             --- FAIL: TestCorpus/export/prices/evaluate
-            --- PASS: TestCorpus/export/prices/import
+            --- FAIL: TestCorpus/export/prices/import
             --- FAIL: TestCorpus/export/prices/list
             --- PASS: TestCorpus/export/prices/parse
             --- PASS: TestCorpus/export/prices/resolve
@@ -1683,6 +1884,8 @@ $ go test  # chain
         - accepted
         + skipped a stale reason
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it reruns import, whose outcome and product a normal run reads from the archive. What it writes for the cell, if anything, is its run's.
+        out/evaluate/inputs is recorded, and evaluate's probe says the case isn't for it: a stale reason
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
         out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it: a stale reason
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it reruns import, whose outcome and product a normal run reads from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
@@ -1698,6 +1901,13 @@ $ go test  # chain
         + evaluate/probe "a stale reason\n"
           quote/A1 "3\n"
           quote/B1 "=A1*2\n"
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
+        out/list/inputs differs (-golden +got):
+          files.txt
+            via/import/evaluate/out/values.txt
+        +   via/import/evaluate/probe
+            via/import/quote/A1
+            via/import/quote/B1
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs list on another value than this run: it reruns import, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
@@ -1892,7 +2102,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
             --- PASS: TestCorpus/script/plain/parse
             --- PASS: TestCorpus/script/plain/resolve
 PASS
-$ edit testdata/export/prices.txtar  # import now makes evaluate/probe, and evaluate's cells have no values.txt
+$ edit testdata/export/prices.txtar  # import now makes evaluate/probe, and evaluate's cells have no values.txt or inputs
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
     export/empty/transform/louder: louder declines the base: the export makes no output of evaluate

@@ -66,7 +66,7 @@ var Parse = decl.Lift[Sheet, *sheet.Parsed]{
 	Name:        "parse",
 	Description: "Parses every cell.",
 	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The cell that is neither a number nor a formula."},
+		{Pattern: "error.txt", Description: "The cell that is neither a number nor a formula.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{Malformed},
 	Run: func(archive string, in Sheet, stderr io.Writer) (*sheet.Parsed, error) {
@@ -78,7 +78,7 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 	Name:        "resolve",
 	Description: "Orders the cells so that each comes after the cells it refers to.",
 	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The cycle, or the reference to a missing cell."},
+		{Pattern: "error.txt", Description: "The cycle, or the reference to a missing cell.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{Circular, Dangling},
 	Run: func(archive string, p *sheet.Parsed, stderr io.Writer) (*sheet.Graph, error) {

@@ -1,0 +1,35 @@
+A cell kept as a directory of files, which no cell is.
+-- in/sheet/A1/note --
+the first price
+-- in/sheet/A1/value --
+1
+-- in/sheet/B1 --
+=A1*2
+-- properties --
+malformed
+-- out/calc/error.txt --
+A1: a directory, not a cell
+  sheet/A1/note
+  sheet/A1/value
+-- out/calc/inputs --
+error.txt
+  in/sheet/A1/note
+  in/sheet/A1/value
+-- out/calc/outcome --
+rejected S101
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/parse/error.txt --
+A1: a directory, not a cell
+  sheet/A1/note
+  sheet/A1/value
+-- out/parse/inputs --
+error.txt
+  in/sheet/A1/note
+  in/sheet/A1/value
+-- out/parse/outcome --
+rejected S101
+-- out/resolve/outcome --
+blocked parse

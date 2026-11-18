@@ -5,10 +5,16 @@ A1 6
 A1 SIX!
 -- gaps --
 shout A1 is SIX, not SIX!. Waits on sheets#11.
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --
 A1 6
+-- out/shout/inputs --
+values.txt
+  in/shout/out/values.txt
 -- out/shout/outcome --
 accepted
 -- out/shout/values.txt --

@@ -46,6 +46,8 @@ import (
 //	import/coded          a *codedError, with the code it holds, less its
 //	                      final newline, which decl.Reject marks
 //	import/panic          panicked with, less its final newline
+//	import/ranges/<path>  read by importedFrom, as steeredRanges reads it,
+//	                      in place of its own map of the product's <path>
 //
 // An import/ tree with more than one of error, fail and coded returns
 // their errors joined, with errors.Join, in that order. An export whose
@@ -65,6 +67,7 @@ func (e *codedError) Error() string { return "an error with the code " + e.code 
 
 var projectCodesAs = decl.Project{
 	UpdateVar: fixtureUpdate,
+	Positions: steeredPositions,
 	Codes: func(err error) []string {
 		var c *codedError
 		if errors.As(err, &c) {
@@ -149,23 +152,63 @@ func steerImport(name string, in fs.FS) (jenny.Files, error) {
 	return append(out, faulty...), nil
 }
 
-var (
-	importOutputs = []decl.Output{{Pattern: "error.txt", Description: "Why the importer rejects the export."}}
-	importProduct = []decl.Output{
-		{Pattern: "parse/*", Description: "What parse does, as a script's parse/ tree says."},
-		{Pattern: "resolve/*", Description: "What resolve does, as a script's resolve/ tree says."},
-		{Pattern: "evaluate/*", Description: "What evaluate does, as a script's evaluate/ tree says."},
-		{Pattern: "evaluate/out/*", Description: "An output evaluate returns."},
-		{Pattern: "quote/*", Description: "What a renderer of errors quotes."},
-		{Pattern: "names/*", Description: "Files named as a cell's own files are."},
-		{Pattern: "inputs/*", Description: "A tree named as a cell's inputs file is."},
+// importProduct declares the product files of the bytes lift whose jenny
+// steerImport steers as name: each comes from the instruction that makes
+// it, as importedFrom maps it.
+func importProduct(name string) []decl.Output {
+	in := importedFrom(name)
+	return []decl.Output{
+		{Pattern: "parse/*", Description: "What parse does, as a script's parse/ tree says.", Inputs: in},
+		{Pattern: "resolve/*", Description: "What resolve does, as a script's resolve/ tree says.", Inputs: in},
+		{Pattern: "evaluate/*", Description: "What evaluate does, as a script's evaluate/ tree says.", Inputs: in},
+		{Pattern: "evaluate/out/*", Description: "An output evaluate returns.", Inputs: in},
+		{Pattern: "quote/*", Description: "What a renderer of errors quotes.", Inputs: in},
+		{Pattern: "names/*", Description: "Files named as a cell's own files are.", Inputs: in},
+		{Pattern: "inputs/*", Description: "A tree named as a cell's inputs file is.", Inputs: in},
 	}
+}
+
+// importedFrom maps a product file of the bytes lift whose jenny
+// steerImport steers as name to the instruction of its input view that
+// makes it, whole: <name>/out/<path>. The other instructions make files no
+// archive holds, so no product of them is mapped. Where the view holds
+// <name>/ranges/<path>, it maps <path> as steeredRanges reads that file
+// instead.
+func importedFrom(name string) decl.InputsFunc {
+	return func(in fs.FS, p string) ([]decl.Range, error) {
+		if rs, ok, err := steeredRanges(in, name+"/ranges/"+p); ok {
+			return rs, err
+		}
+		from := name + "/out/" + p
+		if _, err := fs.Stat(in, from); err != nil {
+			return nil, nil
+		}
+		return []decl.Range{{Path: from}}, nil
+	}
+}
+
+// wholeView maps a file to every file of the input view, whole: what list
+// lists.
+var wholeView = decl.InputsFunc(func(in fs.FS, _ string) ([]decl.Range, error) {
+	paths, err := archive.Paths(in)
+	if err != nil {
+		return nil, err
+	}
+	var rs []decl.Range
+	for _, p := range paths {
+		rs = append(rs, decl.Range{Path: p})
+	}
+	return rs, nil
+})
+
+var (
+	importOutputs = []decl.Output{{Pattern: "error.txt", Description: "Why the importer rejects the export.", Inputs: decl.FromPositions}}
 
 	importLift = decl.Lift[Export, Script]{
 		Name:        "import",
 		Description: "Imports the export as a script, as its import/ tree says.",
 		Outputs:     importOutputs,
-		Product:     importProduct,
+		Product:     importProduct("import"),
 		Rejects:     []decl.Property{unterminated},
 		Jenny: jenny.For[Export]().New("import", func(in Export) (jenny.Files, error) {
 			return steerImport("import", in)
@@ -190,7 +233,7 @@ var (
 		Name:        "repack",
 		Description: "Repacks the unpacked export as a script, as its repack/ tree says.",
 		Outputs:     importOutputs,
-		Product:     importProduct,
+		Product:     importProduct("repack"),
 		Jenny: jenny.For[*Unpacked]().New("repack", func(in *Unpacked) (jenny.Files, error) {
 			return steerImport("repack", in.view)
 		}),
@@ -211,8 +254,8 @@ var (
 	exportGrid = decl.Lift[Grid, Export]{
 		Name:        "export",
 		Description: "Exports the grid, as its export/ tree says.",
-		Outputs:     []decl.Output{{Pattern: "error.txt", Description: "Why the exporter rejects the grid."}},
-		Product:     []decl.Output{{Pattern: "import/out/quote/*", Description: "What import makes as its product's quote/ tree."}},
+		Outputs:     []decl.Output{{Pattern: "error.txt", Description: "Why the exporter rejects the grid.", Inputs: decl.FromPositions}},
+		Product:     []decl.Output{{Pattern: "import/out/quote/*", Description: "What import makes as its product's quote/ tree.", Inputs: importedFrom("export")}},
 		Rejects:     []decl.Property{unterminated},
 		Jenny: jenny.For[Grid]().New("export", func(in Grid) (jenny.Files, error) {
 			return steerImport("export", in)
@@ -223,7 +266,7 @@ var (
 	list = hypercase.Suite[Script]{
 		Name:        "list",
 		Description: "Lists the files of the script's input view, with their bytes.",
-		Outputs:     []decl.Output{{Pattern: "files.txt", Description: "How many files the view holds, then each one's path and bytes, quoted."}},
+		Outputs:     []decl.Output{{Pattern: "files.txt", Description: "How many files the view holds, then each one's path and bytes, quoted.", Inputs: wholeView}},
 		Run: func(t testing.TB, _ string, in Script, _, _ io.Writer) ([]hypercase.File, error) {
 			paths, err := archive.Paths(in)
 			if err != nil {
@@ -377,7 +420,7 @@ var chainRegistrations = map[string]func(){
 	// Refusals.
 	"bytes-run": func() {
 		hypercase.Register(project, scriptType, plainExportType, own(decl.Lift[Export, Script]{
-			Name: "import", Description: "Imports the export.", Product: importProduct,
+			Name: "import", Description: "Imports the export.", Product: importProduct("import"),
 			Run: func(_ string, in Export, _ io.Writer) (Script, error) { return Script{in.FS}, nil },
 		}))
 	},
@@ -403,22 +446,22 @@ var chainRegistrations = map[string]func(){
 	},
 	"bytes-product-flat": func() {
 		l := importLift
-		l.Product = []decl.Output{{Pattern: "*", Description: "A file."}}
+		l.Product = []decl.Output{{Pattern: "*", Description: "A file.", Inputs: importedFrom("import")}}
 		hypercase.Register(project, scriptType, plainExportType, unterminated, own(l))
 	},
 	"bytes-product-params": func() {
 		l := importLift
-		l.Product = []decl.Output{{Pattern: "params/*", Description: "A parameter."}}
+		l.Product = []decl.Output{{Pattern: "params/*", Description: "A parameter.", Inputs: importedFrom("import")}}
 		hypercase.Register(project, scriptType, plainExportType, unterminated, own(l))
 	},
 	"bytes-product-pattern": func() {
 		l := importLift
-		l.Product = []decl.Output{{Pattern: "parse/[", Description: "A broken pattern."}}
+		l.Product = []decl.Output{{Pattern: "parse/[", Description: "A broken pattern.", Inputs: importedFrom("import")}}
 		hypercase.Register(project, scriptType, plainExportType, unterminated, own(l))
 	},
 	"stage-product": func() {
 		l := parse
-		l.Product = importProduct
+		l.Product = importProduct("import")
 		hypercase.Register(project, scriptType, malformed, own(l))
 	},
 	// bytes-unregistered registers no corpus type of import's product.
@@ -427,7 +470,7 @@ var chainRegistrations = map[string]func(){
 	},
 	"bytes-product-nodesc": func() {
 		l := importLift
-		l.Product = []decl.Output{{Pattern: "parse/*", Description: " "}}
+		l.Product = []decl.Output{{Pattern: "parse/*", Description: " ", Inputs: importedFrom("import")}}
 		hypercase.Register(project, rootPkg, scriptType, plainExportType, unterminated, own(l))
 	},
 }

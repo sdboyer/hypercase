@@ -1,9 +1,10 @@
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
   "codes": false,
+  "positions": true,
   "issueLinks": [],
   "properties": [
     {
@@ -68,37 +69,45 @@
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "Why the importer rejects the export."
+          "description": "Why the importer rejects the export.",
+          "inputs": "positions"
         }
       ],
       "productFiles": [
         {
           "pattern": "evaluate/*",
-          "description": "What evaluate does, as a script's evaluate/ tree says."
+          "description": "What evaluate does, as a script's evaluate/ tree says.",
+          "inputs": "func"
         },
         {
           "pattern": "evaluate/out/*",
-          "description": "An output evaluate returns."
+          "description": "An output evaluate returns.",
+          "inputs": "func"
         },
         {
           "pattern": "inputs/*",
-          "description": "A tree named as a cell's inputs file is."
+          "description": "A tree named as a cell's inputs file is.",
+          "inputs": "func"
         },
         {
           "pattern": "names/*",
-          "description": "Files named as a cell's own files are."
+          "description": "Files named as a cell's own files are.",
+          "inputs": "func"
         },
         {
           "pattern": "parse/*",
-          "description": "What parse does, as a script's parse/ tree says."
+          "description": "What parse does, as a script's parse/ tree says.",
+          "inputs": "func"
         },
         {
           "pattern": "quote/*",
-          "description": "What a renderer of errors quotes."
+          "description": "What a renderer of errors quotes.",
+          "inputs": "func"
         },
         {
           "pattern": "resolve/*",
-          "description": "What resolve does, as a script's resolve/ tree says."
+          "description": "What resolve does, as a script's resolve/ tree says.",
+          "inputs": "func"
         }
       ],
       "rejects": [
@@ -131,11 +140,13 @@
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "Why the lift rejects the case."
+          "description": "Why the lift rejects the case.",
+          "inputs": "positions"
         },
         {
           "pattern": "stderr.txt",
-          "description": "What the lift writes to stderr."
+          "description": "What the lift writes to stderr.",
+          "inputs": "all"
         }
       ],
       "productFiles": [],
@@ -172,11 +183,13 @@
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "Why the lift rejects the case."
+          "description": "Why the lift rejects the case.",
+          "inputs": "positions"
         },
         {
           "pattern": "stderr.txt",
-          "description": "What the lift writes to stderr."
+          "description": "What the lift writes to stderr.",
+          "inputs": "all"
         }
       ],
       "productFiles": [],
@@ -215,31 +228,38 @@
       "outputs": [
         {
           "pattern": "?.txt",
-          "description": "A file the case's instructions name with one letter."
+          "description": "A file the case's instructions name with one letter.",
+          "inputs": "func"
         },
         {
           "pattern": "archive.txt",
-          "description": "The archive's name, as the run received it."
+          "description": "The archive's name, as the run received it.",
+          "inputs": "func"
         },
         {
           "pattern": "dir.txt",
-          "description": "The path of a temp dir the run made."
+          "description": "The path of a temp dir the run made.",
+          "inputs": "func"
         },
         {
           "pattern": "error.txt",
-          "description": "The error the case's instructions give."
+          "description": "The error the case's instructions give.",
+          "inputs": "positions"
         },
         {
           "pattern": "stderr.txt",
-          "description": "What the case's instructions write to stderr."
+          "description": "What the case's instructions write to stderr.",
+          "inputs": "func"
         },
         {
           "pattern": "stdout.txt",
-          "description": "What the case's instructions write to stdout."
+          "description": "What the case's instructions write to stdout.",
+          "inputs": "func"
         },
         {
           "pattern": "values.txt",
-          "description": "The values the case's instructions give."
+          "description": "The values the case's instructions give.",
+          "inputs": "func"
         }
       ],
       "rejects": [],
@@ -268,7 +288,8 @@
       "outputs": [
         {
           "pattern": "files.txt",
-          "description": "How many files the view holds, then each one's path and bytes, quoted."
+          "description": "How many files the view holds, then each one's path and bytes, quoted.",
+          "inputs": "func"
         }
       ],
       "rejects": [],

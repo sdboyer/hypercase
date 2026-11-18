@@ -15,6 +15,9 @@ $ cat testdata/script/twice.txtar
 A1 is twice B1, which echo prints in words.
 -- in/do/out/values.txt --
 a1 six
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --
@@ -27,6 +30,10 @@ circular
 A1 -> B1 -> A1: cycle
 -- variant/cycle/out/echo/error.txt --
 A1 -> B1 -> A1: cycle
+-- variant/cycle/out/echo/inputs --
+error.txt
+values.txt
+  in/do/out/values.txt
 -- variant/cycle/out/echo/outcome --
 rejected
 -- variant/cycle/out/echo/values.txt --
@@ -35,6 +42,7 @@ a1 six
 The do/ tree's output is gone, so echo prints nothing.
 -- variant/blank/delete --
 do/out/values.txt
+-- variant/blank/out/echo/inputs --
 -- variant/blank/out/echo/outcome --
 accepted
 -- variant/more/about --
@@ -43,6 +51,11 @@ The do/ tree gains a second output.
 b1 three
 -- variant/more/out/echo/b.txt --
 b1 three
+-- variant/more/out/echo/inputs --
+b.txt
+  variant/more/in/do/out/b.txt
+values.txt
+  in/do/out/values.txt
 -- variant/more/out/echo/outcome --
 accepted
 -- variant/more/out/echo/values.txt --

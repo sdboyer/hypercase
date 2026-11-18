@@ -68,9 +68,11 @@ func Format(p *Parsed) []byte {
 }
 
 // Parse reads and parses every cell of the sheet in fsys. A file system with
-// no sheet/ holds an empty sheet. Parse fails with S101 on the first problem
-// it meets, taking the cells in cell order, then whatever under sheet/ is not
-// named for a cell, by name.
+// no sheet/ holds an empty sheet. Parse reads everything under sheet/ before
+// it parses a cell, so an error reading a file or a directory comes before
+// any cell's problem. Then it fails with S101 on the first problem it meets,
+// taking the cells in cell order, then whatever under sheet/ is not named
+// for a cell, by name.
 func Parse(fsys fs.FS) (*Parsed, error) {
 	files, err := readCells(fsys)
 	if err != nil {
@@ -139,6 +141,10 @@ type cellFile struct {
 	name, path string
 	data       []byte
 	dir        bool
+	// files are a directory's files, by path, in fs.WalkDir's order: each
+	// directory's entries sorted by name, with a subdirectory's files where
+	// its name falls, so sheet/A1/a/b comes before sheet/A1/a-b.
+	files []string
 }
 
 // readCells reads every entry under sheet/, in cell order.
@@ -153,10 +159,18 @@ func readCells(fsys fs.FS) ([]cellFile, error) {
 	files := make([]cellFile, 0, len(entries))
 	for _, e := range entries {
 		f := cellFile{name: e.Name(), path: "sheet/" + e.Name(), dir: e.IsDir()}
-		if !f.dir {
-			if f.data, err = fs.ReadFile(fsys, f.path); err != nil {
-				return nil, err
-			}
+		if f.dir {
+			err = fs.WalkDir(fsys, f.path, func(p string, d fs.DirEntry, err error) error {
+				if err == nil && !d.IsDir() {
+					f.files = append(f.files, p)
+				}
+				return err
+			})
+		} else {
+			f.data, err = fs.ReadFile(fsys, f.path)
+		}
+		if err != nil {
+			return nil, err
 		}
 		files = append(files, f)
 	}
@@ -173,12 +187,26 @@ func sortFiles(files []cellFile) {
 func checkFile(f cellFile) (pos, error) {
 	p, ok := parseName(f.name)
 	if !ok {
-		return pos{}, newError(codeMalformed, []Position{{Path: f.path}}, "%s: not a cell name", f.name)
+		return pos{}, newError(codeMalformed, f.whole(""), "%s: not a cell name", f.name)
 	}
 	if f.dir {
-		return pos{}, newError(codeMalformed, []Position{{Cell: f.name, Path: f.path}}, "%s: a directory, not a cell", f.name)
+		return pos{}, newError(codeMalformed, f.whole(f.name), "%s: a directory, not a cell", f.name)
 	}
 	return p, nil
+}
+
+// whole gives the positions of an error about the file as a whole, for the
+// named cell, or "": the file, or, since a position is a file's, each file
+// of a directory.
+func (f cellFile) whole(cell string) []Position {
+	if !f.dir {
+		return []Position{{Cell: cell, Path: f.path}}
+	}
+	at := make([]Position, len(f.files))
+	for i, p := range f.files {
+		at[i] = Position{Cell: cell, Path: p}
+	}
+	return at
 }
 
 func parseFiles(files []cellFile) (*Parsed, error) {
@@ -215,6 +243,9 @@ func parseCell(f cellFile) (*cell, error) {
 	toks := lex(text)
 	var bad error
 	switch {
+	case len(f.data) == 0:
+		// An empty file has no line to point at.
+		return nil, newError(codeMalformed, []Position{{Cell: c.name, Path: c.path}}, "%s: not a number or a formula: %q", c.name, text)
 	case len(toks) == 0 || toks[0].kind == tWord || toks[0].kind == tRef:
 		return nil, newError(codeMalformed, c.at(), "%s: not a number or a formula: %q", c.name, text)
 	case toks[0].kind != tNumber:

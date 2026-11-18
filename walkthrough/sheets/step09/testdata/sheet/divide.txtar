@@ -5,12 +5,22 @@ A1 divides B1 by C1, which is zero.
 1
 -- in/sheet/C1 --
 0
+-- out/calc/inputs --
+stderr.txt
+  all inputs
+stdout.txt
+  all inputs
 -- out/calc/outcome --
 accepted
 -- out/calc/stderr.txt --
 A1: divides by zero
 -- out/calc/stdout.txt --
 #DIV/0!,1,0
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+  in/sheet/B1
+  in/sheet/C1
 -- out/evaluate/outcome --
 accepted div-zero
 -- out/evaluate/values.txt --
@@ -19,10 +29,15 @@ B1 1
 C1 0
 -- out/format/formulas.txt --
 A1 =B1 / C1
+-- out/format/inputs --
+formulas.txt
+  in/sheet/A1
 -- out/format/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 -- transform/looped/in/sheet/A1 --
@@ -30,19 +45,29 @@ accepted
 -- transform/looped/out/calc/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/calc/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/calc/outcome --
 rejected S201
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
 A1 =A1
+-- transform/looped/out/format/inputs --
+formulas.txt
+  transform/looped/in/sheet/A1
 -- transform/looped/out/format/outcome --
 accepted
+-- transform/looped/out/parse/inputs --
 -- transform/looped/out/parse/outcome --
 accepted
 -- transform/looped/out/resolve/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/resolve/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/resolve/outcome --
 rejected S201
 -- transform/renamed/in/sheet/A2 --
@@ -55,6 +80,11 @@ rejected S201
 sheet/A1
 sheet/B1
 sheet/C1
+-- transform/renamed/out/calc/inputs --
+stderr.txt
+  all inputs
+stdout.txt
+  all inputs
 -- transform/renamed/out/calc/outcome --
 accepted
 -- transform/renamed/out/calc/stderr.txt --
@@ -62,6 +92,11 @@ A2: divides by zero
 -- transform/renamed/out/calc/stdout.txt --
 ,,
 #DIV/0!,1,0
+-- transform/renamed/out/evaluate/inputs --
+values.txt
+  transform/renamed/in/sheet/A2
+  transform/renamed/in/sheet/B2
+  transform/renamed/in/sheet/C2
 -- transform/renamed/out/evaluate/outcome --
 accepted div-zero
 -- transform/renamed/out/evaluate/values.txt --
@@ -70,9 +105,14 @@ B2 1
 C2 0
 -- transform/renamed/out/format/formulas.txt --
 A2 =B2 / C2
+-- transform/renamed/out/format/inputs --
+formulas.txt
+  transform/renamed/in/sheet/A2
 -- transform/renamed/out/format/outcome --
 accepted
+-- transform/renamed/out/parse/inputs --
 -- transform/renamed/out/parse/outcome --
 accepted
+-- transform/renamed/out/resolve/inputs --
 -- transform/renamed/out/resolve/outcome --
 accepted

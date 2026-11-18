@@ -351,17 +351,17 @@ $ go test  # strip-a
     testdata/ holds no symbolic links: testdata/script is one.
         Remove it, or replace it with a copy of what it names, if it names anything.
     testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
-          export/prices/variant/doubled list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-          export/prices/variant/doubled parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-          export/prices/variant/doubled resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-        - script/plain evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-        - script/plain list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        - script/plain parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-        - script/plain resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-        - script/plain/variant/more evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-        - script/plain/variant/more list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        - script/plain/variant/more parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-        - script/plain/variant/more resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          export/prices/variant/doubled list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+          export/prices/variant/doubled parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+          export/prices/variant/doubled resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+        - script/plain evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+        - script/plain list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        - script/plain parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+        - script/plain resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+        - script/plain/variant/more evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+        - script/plain/variant/more list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        - script/plain/variant/more parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+        - script/plain/variant/more resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
     what ran, in order:
         import ran

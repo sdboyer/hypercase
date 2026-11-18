@@ -55,10 +55,20 @@ a1 3
 3
 -- via/import/quote/B1 --
 =A1*2
+-- out/evaluate/inputs --
+values.txt
+  via/import/evaluate/out/values.txt
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
 a1 3
+-- out/import/inputs --
+via/import/evaluate/out/values.txt
+  in/import/out/evaluate/out/values.txt
+via/import/quote/A1
+  in/import/out/quote/A1
+via/import/quote/B1
+  in/import/out/quote/B1
 -- out/import/outcome --
 accepted
 -- out/list/files.txt --
@@ -66,10 +76,17 @@ accepted
 evaluate/out/values.txt "a1 3\n"
 quote/A1 "3\n"
 quote/B1 "=A1*2\n"
+-- out/list/inputs --
+files.txt
+  via/import/evaluate/out/values.txt
+  via/import/quote/A1
+  via/import/quote/B1
 -- out/list/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 -- transform/louder/in/import/out/evaluate/out/values.txt --
@@ -80,10 +97,20 @@ A1 3
 3
 -- transform/louder/via/import/quote/B1 --
 =A1*2
+-- transform/louder/out/evaluate/inputs --
+values.txt
+  transform/louder/via/import/evaluate/out/values.txt
 -- transform/louder/out/evaluate/outcome --
 accepted
 -- transform/louder/out/evaluate/values.txt --
 A1 3
+-- transform/louder/out/import/inputs --
+via/import/evaluate/out/values.txt
+  transform/louder/in/import/out/evaluate/out/values.txt
+via/import/quote/A1
+  in/import/out/quote/A1
+via/import/quote/B1
+  in/import/out/quote/B1
 -- transform/louder/out/import/outcome --
 accepted
 -- transform/louder/out/list/files.txt --
@@ -91,10 +118,17 @@ accepted
 evaluate/out/values.txt "A1 3\n"
 quote/A1 "3\n"
 quote/B1 "=A1*2\n"
+-- transform/louder/out/list/inputs --
+files.txt
+  transform/louder/via/import/evaluate/out/values.txt
+  transform/louder/via/import/quote/A1
+  transform/louder/via/import/quote/B1
 -- transform/louder/out/list/outcome --
 accepted
+-- transform/louder/out/parse/inputs --
 -- transform/louder/out/parse/outcome --
 accepted
+-- transform/louder/out/resolve/inputs --
 -- transform/louder/out/resolve/outcome --
 accepted
 $ go test  # chain-a
@@ -204,6 +238,8 @@ $ go test ./b  # chain-b
         - accepted
         + blocked import
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
+        out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
         out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, out/import/outcome, which a normal run reads.
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose quote/ tree list shows.
@@ -213,6 +249,8 @@ $ go test ./b  # chain-b
         + blocked import
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
+        out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
     what ran, in order:
         parse ran on prices
@@ -235,10 +273,24 @@ $ edit testdata/export/prices.txtar  # import no longer makes quote/B1
 $ go test  # chain-a
     export/prices: One export of prices: import makes a script whose quote/ tree list shows.
         import: Imports the export as a script, as its import/ tree says.
+        out/import/inputs differs (-golden +got):
+            in/import/out/evaluate/out/values.txt
+          via/import/quote/A1
+            in/import/out/quote/A1
+        - via/import/quote/B1
+        -   in/import/out/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         via/import/quote/B1 is a file of import's committed product, which this run of import doesn't make.
         If it should, fix import's jenny. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         import: Imports the export as a script, as its import/ tree says.
+        transform/louder/out/import/inputs differs (-golden +got):
+            transform/louder/in/import/out/evaluate/out/values.txt
+          via/import/quote/A1
+            in/import/out/quote/A1
+        - via/import/quote/B1
+        -   in/import/out/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         transform/louder/via/import/quote/B1 is a file of import's committed product, which this run of import doesn't make.
         If it should, fix import's jenny. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
     what ran, in order:
@@ -310,10 +362,15 @@ PASS
   3
 - -- via/import/quote/B1 --
 - =A1*2
-  -- out/evaluate/outcome --
-  accepted
-  -- out/evaluate/values.txt --
+  -- out/evaluate/inputs --
+  values.txt
+    via/import/evaluate/out/values.txt
   ...
+    in/import/out/evaluate/out/values.txt
+  via/import/quote/A1
+    in/import/out/quote/A1
+- via/import/quote/B1
+-   in/import/out/quote/B1
   -- out/import/outcome --
   accepted
   -- out/list/files.txt --
@@ -322,19 +379,29 @@ PASS
   evaluate/out/values.txt "a1 3\n"
   quote/A1 "3\n"
 - quote/B1 "=A1*2\n"
+  -- out/list/inputs --
+  files.txt
+    via/import/evaluate/out/values.txt
+    via/import/quote/A1
+-   via/import/quote/B1
   -- out/list/outcome --
   accepted
-  -- out/parse/outcome --
+  -- out/parse/inputs --
   ...
   A1 3
   -- transform/louder/via/import/quote/A1 --
   3
 - -- transform/louder/via/import/quote/B1 --
 - =A1*2
-  -- transform/louder/out/evaluate/outcome --
-  accepted
-  -- transform/louder/out/evaluate/values.txt --
+  -- transform/louder/out/evaluate/inputs --
+  values.txt
+    transform/louder/via/import/evaluate/out/values.txt
   ...
+    transform/louder/in/import/out/evaluate/out/values.txt
+  via/import/quote/A1
+    in/import/out/quote/A1
+- via/import/quote/B1
+-   in/import/out/quote/B1
   -- transform/louder/out/import/outcome --
   accepted
   -- transform/louder/out/list/files.txt --
@@ -343,9 +410,14 @@ PASS
   evaluate/out/values.txt "A1 3\n"
   quote/A1 "3\n"
 - quote/B1 "=A1*2\n"
+  -- transform/louder/out/list/inputs --
+  files.txt
+    transform/louder/via/import/evaluate/out/values.txt
+    transform/louder/via/import/quote/A1
+-   transform/louder/via/import/quote/B1
   -- transform/louder/out/list/outcome --
   accepted
-  -- transform/louder/out/parse/outcome --
+  -- transform/louder/out/parse/inputs --
 
 $ go test  # chain-a
     what ran, in order:

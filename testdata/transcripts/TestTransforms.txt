@@ -25,6 +25,9 @@ $ cat testdata/script/twice.txtar
 echo prints a1 six.
 -- in/do/out/values.txt --
 a1 six
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --
@@ -35,12 +38,19 @@ A1 -> A1: cycle
 A1 -> A1: cycle
 -- transform/looped/out/echo/error.txt --
 A1 -> A1: cycle
+-- transform/looped/out/echo/inputs --
+error.txt
+values.txt
+  in/do/out/values.txt
 -- transform/looped/out/echo/outcome --
 rejected
 -- transform/looped/out/echo/values.txt --
 a1 six
 -- transform/upper/in/do/out/values.txt --
 A1 SIX
+-- transform/upper/out/echo/inputs --
+values.txt
+  transform/upper/in/do/out/values.txt
 -- transform/upper/out/echo/outcome --
 accepted
 -- transform/upper/out/echo/values.txt --
@@ -55,6 +65,10 @@ partial
 circular
 -- out/echo/error.txt --
 A1 -> A1: cycle
+-- out/echo/inputs --
+error.txt
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 rejected
 -- out/echo/values.txt --
@@ -63,6 +77,10 @@ partial
 PARTIAL
 -- transform/upper/out/echo/error.txt --
 A1 -> A1: cycle
+-- transform/upper/out/echo/inputs --
+error.txt
+values.txt
+  transform/upper/in/do/out/values.txt
 -- transform/upper/out/echo/outcome --
 rejected
 -- transform/upper/out/echo/values.txt --
@@ -73,17 +91,21 @@ A case that states malformed, which no transform gives or keeps.
 x
 -- properties --
 malformed
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --
 x
 $ cat testdata/hypercase.json
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
   "codes": false,
+  "positions": true,
   "issueLinks": [],
   "properties": [
     {
@@ -147,31 +169,38 @@ $ cat testdata/hypercase.json
       "outputs": [
         {
           "pattern": "?.txt",
-          "description": "A file the case's instructions name with one letter."
+          "description": "A file the case's instructions name with one letter.",
+          "inputs": "func"
         },
         {
           "pattern": "archive.txt",
-          "description": "The archive's name, as the run received it."
+          "description": "The archive's name, as the run received it.",
+          "inputs": "func"
         },
         {
           "pattern": "dir.txt",
-          "description": "The path of a temp dir the run made."
+          "description": "The path of a temp dir the run made.",
+          "inputs": "func"
         },
         {
           "pattern": "error.txt",
-          "description": "The error the case's instructions give."
+          "description": "The error the case's instructions give.",
+          "inputs": "positions"
         },
         {
           "pattern": "stderr.txt",
-          "description": "What the case's instructions write to stderr."
+          "description": "What the case's instructions write to stderr.",
+          "inputs": "func"
         },
         {
           "pattern": "stdout.txt",
-          "description": "What the case's instructions write to stdout."
+          "description": "What the case's instructions write to stdout.",
+          "inputs": "func"
         },
         {
           "pattern": "values.txt",
-          "description": "The values the case's instructions give."
+          "description": "The values the case's instructions give.",
+          "inputs": "func"
         }
       ],
       "rejects": [

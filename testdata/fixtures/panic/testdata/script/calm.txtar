@@ -1,6 +1,9 @@
 A sheet the code handles, beside one it panics on.
 -- in/do/out/values.txt --
 A1 6
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --

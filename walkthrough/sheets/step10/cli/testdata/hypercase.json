@@ -1,9 +1,10 @@
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step10",
   "rootPackage": false,
   "codes": true,
+  "positions": true,
   "issueLinks": [
     {
       "pattern": "sheets#(\\d+)",
@@ -80,13 +81,15 @@
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "The line the importer can't read, and why."
+          "description": "The line the importer can't read, and why.",
+          "inputs": "positions"
         }
       ],
       "productFiles": [
         {
           "pattern": "sheet/*",
-          "description": "One file per cell, as a sheet's in/sheet/ holds them."
+          "description": "One file per cell, as a sheet's in/sheet/ holds them.",
+          "inputs": "func"
         }
       ],
       "rejects": [
@@ -120,15 +123,18 @@
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "Why calc failed."
+          "description": "Why calc failed.",
+          "inputs": "positions"
         },
         {
           "pattern": "stderr.txt",
-          "description": "A warning for each cell that divides by zero."
+          "description": "A warning for each cell that divides by zero.",
+          "inputs": "all"
         },
         {
           "pattern": "stdout.txt",
-          "description": "The sheet's values as CSV, one row per line."
+          "description": "The sheet's values as CSV, one row per line.",
+          "inputs": "all"
         }
       ],
       "rejects": [

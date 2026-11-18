@@ -19,7 +19,7 @@ func rawSteered(name, tree string) hypercase.Suite[fs.FS] {
 		Name:        name,
 		Description: "Does what the case's " + tree + "/ tree says.",
 		Corpus:      "script",
-		Outputs:     steeredOutputs,
+		Outputs:     steeredOutputs(tree),
 		Run: func(t testing.TB, archiveName string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
 			return runSteered(t, archiveName, tree, in, stdout, stderr)
 		},
@@ -63,9 +63,9 @@ var rawRegistrations = map[string]func(){
 	},
 	"raw-narrow": func() {
 		hypercase.Register(project, rootPkg, withOutputs(rawEcho,
-			decl.Output{Pattern: "values.txt", Description: "The values."},
-			decl.Output{Pattern: "?.txt", Description: "A file named with one letter."},
-			decl.Output{Pattern: "a.txt", Description: "The file a."},
+			decl.Output{Pattern: "values.txt", Description: "The values.", Inputs: steeredInputs("do")},
+			decl.Output{Pattern: "?.txt", Description: "A file named with one letter.", Inputs: steeredInputs("do")},
+			decl.Output{Pattern: "a.txt", Description: "The file a.", Inputs: steeredInputs("do")},
 		))
 	},
 	"raw-pkg-a": func() { hypercase.Register(project, rootPkg, rawEcho) },

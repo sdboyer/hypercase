@@ -3,10 +3,16 @@ A1 is twice B1, which both columns print.
 A1 6
 -- in/shout/out/values.txt --
 A1 SIX
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --
 A1 6
+-- out/shout/inputs --
+values.txt
+  in/shout/out/values.txt
 -- out/shout/outcome --
 accepted
 -- out/shout/values.txt --

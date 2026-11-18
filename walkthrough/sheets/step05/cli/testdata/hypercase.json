@@ -1,9 +1,10 @@
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": false,
   "codes": false,
+  "positions": true,
   "issueLinks": [],
   "properties": [
     {
@@ -38,15 +39,18 @@
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "Why calc failed."
+          "description": "Why calc failed.",
+          "inputs": "positions"
         },
         {
           "pattern": "stderr.txt",
-          "description": "A warning for each cell that divides by zero."
+          "description": "A warning for each cell that divides by zero.",
+          "inputs": "all"
         },
         {
           "pattern": "stdout.txt",
-          "description": "The sheet's values as CSV, one row per line."
+          "description": "The sheet's values as CSV, one row per line.",
+          "inputs": "all"
         }
       ],
       "rejects": [

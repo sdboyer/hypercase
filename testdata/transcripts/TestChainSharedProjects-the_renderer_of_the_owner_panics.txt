@@ -87,19 +87,27 @@ FAIL
 $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # chain-b
     export/prices: One export of prices: import makes a script whose quote/ tree list shows.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, failed on the case.
         If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/prices: One export of prices: import makes a script whose quote/ tree list shows.
         list: Lists the files of the script's input view, with their bytes.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, failed on the case.
         If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        transform/louder/out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, failed on the case.
+        If the cell should run, fix the lift or louder's jenny, which makes the variant. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, failed on the case.
         If the cell should run, fix the lift or louder's jenny, which makes the variant. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         list: Lists the files of the script's input view, with their bytes.
         transform/louder/out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, failed on the case.
+        If the cell should run, fix the lift or louder's jenny, which makes the variant. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/louder/out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, failed on the case.
         If the cell should run, fix the lift or louder's jenny, which makes the variant. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     what ran, in order:
         import ran

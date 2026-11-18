@@ -203,7 +203,7 @@ FAIL
 $ edit testdata/export/prices.txtar  # restore it
 $ go test  # chain-norejects
     testdata/hypercase.json differs from what the package registers (-committed +registered):
-                    "description": "What resolve does, as a script's resolve/ tree says."
+                    "inputs": "func"
                   }
                 ],
         -       "rejects": [

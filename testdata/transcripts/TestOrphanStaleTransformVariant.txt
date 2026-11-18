@@ -39,6 +39,10 @@ $ go test  # tr-ladder-eval
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
     script/twice/transform/upper: Uppercases every file under do/out/.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        transform/upper/out/evaluate/inputs differs (-golden +got):
+        - values.txt
+        -   in/evaluate/out/values.txt
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate on another value than this run: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
         transform/upper/out/evaluate/values.txt is an output the run no longer produces.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate on another value than this run: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Its run may still write the file: delete nothing by hand before it has run.
     what ran, in order:

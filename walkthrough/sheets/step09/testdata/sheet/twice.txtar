@@ -3,10 +3,17 @@ A1 is twice B1.
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/calc/inputs --
+stdout.txt
+  all inputs
 -- out/calc/outcome --
 accepted
 -- out/calc/stdout.txt --
 6,3
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+  in/sheet/B1
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
@@ -14,10 +21,15 @@ A1 6
 B1 3
 -- out/format/formulas.txt --
 A1 =B1 * 2
+-- out/format/inputs --
+formulas.txt
+  in/sheet/A1
 -- out/format/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 -- variant/cycle/about --
@@ -30,6 +42,10 @@ circular
 A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1*2
   sheet/B1:1: =A1
+-- variant/cycle/out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
+  variant/cycle/in/sheet/B1:1-1
 -- variant/cycle/out/calc/outcome --
 rejected S201
 -- variant/cycle/out/evaluate/outcome --
@@ -37,14 +53,23 @@ blocked resolve
 -- variant/cycle/out/format/formulas.txt --
 A1 =B1 * 2
 B1 =A1
+-- variant/cycle/out/format/inputs --
+formulas.txt
+  in/sheet/A1
+  variant/cycle/in/sheet/B1
 -- variant/cycle/out/format/outcome --
 accepted
+-- variant/cycle/out/parse/inputs --
 -- variant/cycle/out/parse/outcome --
 accepted
 -- variant/cycle/out/resolve/error.txt --
 A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1*2
   sheet/B1:1: =A1
+-- variant/cycle/out/resolve/inputs --
+error.txt
+  in/sheet/A1:1-1
+  variant/cycle/in/sheet/B1:1-1
 -- variant/cycle/out/resolve/outcome --
 rejected S201
 -- variant/missing/about --
@@ -56,19 +81,29 @@ sheet/B1
 -- variant/missing/out/calc/error.txt --
 A1: B1 doesn't exist
   sheet/A1:1: =B1*2
+-- variant/missing/out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- variant/missing/out/calc/outcome --
 rejected S202
 -- variant/missing/out/evaluate/outcome --
 blocked resolve
 -- variant/missing/out/format/formulas.txt --
 A1 =B1 * 2
+-- variant/missing/out/format/inputs --
+formulas.txt
+  in/sheet/A1
 -- variant/missing/out/format/outcome --
 accepted
+-- variant/missing/out/parse/inputs --
 -- variant/missing/out/parse/outcome --
 accepted
 -- variant/missing/out/resolve/error.txt --
 A1: B1 doesn't exist
   sheet/A1:1: =B1*2
+-- variant/missing/out/resolve/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- variant/missing/out/resolve/outcome --
 rejected S202
 -- transform/looped/in/sheet/A1 --
@@ -76,19 +111,29 @@ rejected S202
 -- transform/looped/out/calc/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/calc/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/calc/outcome --
 rejected S201
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
 A1 =A1
+-- transform/looped/out/format/inputs --
+formulas.txt
+  transform/looped/in/sheet/A1
 -- transform/looped/out/format/outcome --
 accepted
+-- transform/looped/out/parse/inputs --
 -- transform/looped/out/parse/outcome --
 accepted
 -- transform/looped/out/resolve/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/resolve/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/resolve/outcome --
 rejected S201
 -- transform/renamed/in/sheet/A2 --
@@ -98,11 +143,18 @@ rejected S201
 -- transform/renamed/delete --
 sheet/A1
 sheet/B1
+-- transform/renamed/out/calc/inputs --
+stdout.txt
+  all inputs
 -- transform/renamed/out/calc/outcome --
 accepted
 -- transform/renamed/out/calc/stdout.txt --
 ,
 6,3
+-- transform/renamed/out/evaluate/inputs --
+values.txt
+  transform/renamed/in/sheet/A2
+  transform/renamed/in/sheet/B2
 -- transform/renamed/out/evaluate/outcome --
 accepted
 -- transform/renamed/out/evaluate/values.txt --
@@ -110,9 +162,14 @@ A2 6
 B2 3
 -- transform/renamed/out/format/formulas.txt --
 A2 =B2 * 2
+-- transform/renamed/out/format/inputs --
+formulas.txt
+  transform/renamed/in/sheet/A2
 -- transform/renamed/out/format/outcome --
 accepted
+-- transform/renamed/out/parse/inputs --
 -- transform/renamed/out/parse/outcome --
 accepted
+-- transform/renamed/out/resolve/inputs --
 -- transform/renamed/out/resolve/outcome --
 accepted
