@@ -55,11 +55,15 @@ ul.files { list-style: none; margin: 4px 0 0 20px; padding: 0; color: var(--mute
 summary { cursor: pointer; }
 .stat .add { color: var(--appeared); }
 .stat .del { color: var(--changed); }
-pre.diff, pre.ranges { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
-pre.diff span, pre.ranges span { display: block; padding: 0 8px; white-space: pre; }
-pre.diff .add, pre.ranges .add { background: var(--add); }
-pre.diff .del, pre.ranges .del { background: var(--del); }
-pre.diff .skip, pre.diff .unaligned { color: var(--muted); }
+pre.diff, pre.ranges, pre.lines { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
+pre.diff span, pre.ranges span, pre.lines span { display: block; padding: 0 8px; white-space: pre; }
+pre.diff .add, pre.ranges .add, pre.lines .add { background: var(--add); }
+pre.diff .del, pre.ranges .del, pre.lines .del { background: var(--del); }
+pre.diff .skip, pre.diff .unaligned, pre.lines .skip { color: var(--muted); }
+details.inputs { margin: 2px 0 6px; }
+details.inputs > summary, .excerpt { color: var(--muted); }
+.excerpt { margin: 4px 0 0 16px; overflow-wrap: anywhere; }
+.map { margin: 4px 0 0 16px; }
 .props { margin-left: 6px; }
 .prop { display: inline-block; margin: 0 4px 0 0; padding: 0 6px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); }
 .prop.kept { border-style: dashed; }
@@ -107,9 +111,15 @@ ul.outputs { padding-left: 18px; }
 <div class="line"><span class="case">sheet/div</span> <span class="col">calc</span> <span class="outcome s-accepted">accepted</span> <span class="arrow">to</span> <span class="outcome s-rejected">rejected S202</span></div>
 <ul class="files">
 <li class="added"><details><summary><code>error.txt</code> added <span class="stat"><span class="add">+1</span> <span class="del">-0</span></span></summary>
-<pre class="diff"><span class="add">&#43; C1: division by zero</span></pre></details></li>
+<pre class="diff"><span class="add">&#43; C1: division by zero</span></pre></details>
+<details class="inputs"><summary>input lines</summary>
+<p class="map">At <span class="rev">06a4c82fe0b829abc19ab37bddb4aeacc5033a5c</span>: no ranges.</p>
+</details></li>
 <li class="removed"><details><summary><code>stdout.txt</code> removed <span class="stat"><span class="add">+0</span> <span class="del">-1</span></span></summary>
-<pre class="diff"><span class="del">- 1,0,#DIV/0!</span></pre></details></li>
+<pre class="diff"><span class="del">- 1,0,#DIV/0!</span></pre></details>
+<details class="inputs"><summary>input lines</summary>
+<p class="map">At <span class="rev">2abf6b865192402abefcb3c6f17d1e082cd6f5c9</span>: no ranges.</p>
+</details></li>
 </ul>
 </li>
 <li class="change outcome-changed">
@@ -122,21 +132,30 @@ ul.outputs { padding-left: 18px; }
 <div class="line"><span class="case">sheet/ratio</span> <span class="col">calc</span> <span class="outcome s-accepted">accepted</span></div>
 <ul class="files">
 <li class="added"><details><summary><code>stdout.txt</code> added <span class="stat"><span class="add">+1</span> <span class="del">-0</span></span></summary>
-<pre class="diff"><span class="add">&#43; 0.25,1,4</span></pre></details></li>
+<pre class="diff"><span class="add">&#43; 0.25,1,4</span></pre></details>
+<details class="inputs"><summary>input lines</summary>
+<p class="map">At <span class="rev">06a4c82fe0b829abc19ab37bddb4aeacc5033a5c</span>: no ranges.</p>
+</details></li>
 </ul>
 </li>
 <li class="change appeared">
 <div class="line"><span class="case">sheet/ratio</span> <span class="col">evaluate</span> <span class="outcome s-accepted">accepted</span></div>
 <ul class="files">
 <li class="added"><details><summary><code>values.txt</code> added <span class="stat"><span class="add">+3</span> <span class="del">-0</span></span></summary>
-<pre class="diff"><span class="add">&#43; A1 0.25</span><span class="add">&#43; B1 1</span><span class="add">&#43; C1 4</span></pre></details></li>
+<pre class="diff"><span class="add">&#43; A1 0.25</span><span class="add">&#43; B1 1</span><span class="add">&#43; C1 4</span></pre></details>
+<details class="inputs"><summary>input lines</summary>
+<p class="map">At <span class="rev">06a4c82fe0b829abc19ab37bddb4aeacc5033a5c</span>: no ranges.</p>
+</details></li>
 </ul>
 </li>
 <li class="change appeared">
 <div class="line"><span class="case">sheet/ratio</span> <span class="col">format</span> <span class="outcome s-accepted">accepted</span></div>
 <ul class="files">
 <li class="added"><details><summary><code>formulas.txt</code> added <span class="stat"><span class="add">+1</span> <span class="del">-0</span></span></summary>
-<pre class="diff"><span class="add">&#43; A1 =B1 / C1</span></pre></details></li>
+<pre class="diff"><span class="add">&#43; A1 =B1 / C1</span></pre></details>
+<details class="inputs"><summary>input lines</summary>
+<p class="map">At <span class="rev">06a4c82fe0b829abc19ab37bddb4aeacc5033a5c</span>: no ranges.</p>
+</details></li>
 </ul>
 </li>
 <li class="change appeared">
@@ -161,28 +180,40 @@ ul.outputs { padding-left: 18px; }
 <div class="line"><span class="case">sheet/loop</span> <span class="col">calc</span> <span class="outcome s-rejected">rejected S201</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span></div>
 <ul class="files">
 <li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
-<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details></li>
+<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details>
+<details class="inputs"><summary>input lines</summary>
+<p class="map">At <span class="rev">06a4c82fe0b829abc19ab37bddb4aeacc5033a5c</span>: no ranges.</p>
+</details></li>
 </ul>
 </li>
 <li class="change bytes-changed">
 <div class="line"><span class="case">sheet/loop</span> <span class="col">resolve</span> <span class="outcome s-rejected">rejected S201</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span></div>
 <ul class="files">
 <li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
-<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details></li>
+<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details>
+<details class="inputs"><summary>input lines</summary>
+<p class="map">At <span class="rev">06a4c82fe0b829abc19ab37bddb4aeacc5033a5c</span>: no ranges.</p>
+</details></li>
 </ul>
 </li>
 <li class="change bytes-changed">
 <div class="line"><span class="case">sheet/twice/variant/cycle</span> <span class="col">calc</span> <span class="outcome s-rejected">rejected S201</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span></div>
 <ul class="files">
 <li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
-<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1*2</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details></li>
+<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1*2</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details>
+<details class="inputs"><summary>input lines</summary>
+<p class="map">At <span class="rev">06a4c82fe0b829abc19ab37bddb4aeacc5033a5c</span>: no ranges.</p>
+</details></li>
 </ul>
 </li>
 <li class="change bytes-changed">
 <div class="line"><span class="case">sheet/twice/variant/cycle</span> <span class="col">resolve</span> <span class="outcome s-rejected">rejected S201</span> <span class="props"><span class="prop" title="Some cell&#39;s formula refers back to itself, directly or through other cells.">circular</span></span></div>
 <ul class="files">
 <li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
-<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1*2</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details></li>
+<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1*2</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details>
+<details class="inputs"><summary>input lines</summary>
+<p class="map">At <span class="rev">06a4c82fe0b829abc19ab37bddb4aeacc5033a5c</span>: no ranges.</p>
+</details></li>
 </ul>
 </li>
 </ul>

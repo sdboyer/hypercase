@@ -108,8 +108,8 @@ func TestRangesRank(t *testing.T) {
 		},
 		{
 			name: "a changed file's ranges, less the lines both maps hold",
-			a:    head + inputs("stdout.txt\n  in/sheet/A1:1-1\n  in/sheet/B1\n") + accepted("1"),
-			b:    head + inputs("stdout.txt\n  in/sheet/A1:1-1\n  in/sheet/C1\n") + accepted("2"),
+			a:    head + "-- in/sheet/B1 --\n2\n-- in/sheet/C1 --\n3\n" + inputs("stdout.txt\n  in/sheet/A1:1-1\n  in/sheet/B1\n") + accepted("1"),
+			b:    head + "-- in/sheet/B1 --\n2\n-- in/sheet/C1 --\n3\n" + inputs("stdout.txt\n  in/sheet/A1:1-1\n  in/sheet/C1\n") + accepted("2"),
 			want: "bytes changed\n  sheet/x calc: accepted\n    stdout.txt changed\n      - in/sheet/B1\n      + in/sheet/C1\n",
 		},
 		{
@@ -256,10 +256,10 @@ func TestRangesPage(t *testing.T) {
 	holds(t, "the changes", changes, `<h3 class="rank ranges-changed">ranges changed <span class="count">1</span></h3>`)
 	holds(t, "r calc's change", change(t, page, "sheet/r", "calc"),
 		`<li class="ranges-changed"><code>stdout.txt</code> ranges changed`+"\n"+
-			`<pre class="ranges"><span class="del">- in/sheet/A1</span><span class="add">&#43; in/sheet/A1:1-1</span></pre></li>`)
+			`<pre class="ranges"><span class="del">- in/sheet/A1</span><span class="add">&#43; in/sheet/A1:1-1</span></pre>`+"\n"+`<details class="inputs">`)
 	holds(t, "s calc's change", change(t, page, "sheet/s", "calc"),
 		`<pre class="diff"><span class="del">- 1</span><span class="add">&#43; 2</span></pre></details>`+"\n"+
-			`<pre class="ranges"><span class="del">- in/sheet/A1</span><span class="add">&#43; all inputs</span></pre></li>`)
+			`<pre class="ranges"><span class="del">- in/sheet/A1</span><span class="add">&#43; all inputs</span></pre>`+"\n"+`<details class="inputs">`)
 	_, cells := matrixRow(t, page, "sheet", "sheet/r")
 	holds(t, "r's calc", cells[0], `class="cell s-accepted ranges-changed"`, `<span class="badge">ranges changed</span>`)
 	lacks(t, "the page", page, "<code>inputs</code>")

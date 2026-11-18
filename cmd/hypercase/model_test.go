@@ -256,7 +256,7 @@ func TestPageDiffs(t *testing.T) {
 	page := ok(t, g, "step09", "report", a, b)
 	holds(t, "loop calc's change", change(t, page, "sheet/loop", "calc"),
 		`<li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>`+"\n"+
-			`<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details></li>`)
+			`<pre class="diff"><span class="del">- A1 -&gt; B1 -&gt; A1: cycle</span><span class="add">&#43; cycle: A1 -&gt; B1 -&gt; A1</span><span class="ctx">    sheet/A1:1: =B1</span><span class="ctx">    sheet/B1:1: =A1</span></pre></details>`+"\n")
 	holds(t, "div calc's change", change(t, page, "sheet/div", "calc"),
 		`<code>error.txt</code> added <span class="stat"><span class="add">+1</span> <span class="del">-0</span></span></summary>`+"\n"+
 			`<pre class="diff"><span class="add">&#43; C1: division by zero</span></pre>`,
@@ -461,7 +461,7 @@ func TestPageProducts(t *testing.T) {
 
 	holds(t, "x import's change", change(t, page, "csv/x", "import"),
 		`<li class="changed"><details><summary><code>via/import/sheet/A1</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>`+"\n"+
-			`<pre class="diff"><span class="del">- 4</span><span class="add">&#43; 5</span></pre></details></li>`)
+			`<pre class="diff"><span class="del">- 4</span><span class="add">&#43; 5</span></pre></details>`+"\n")
 	lacks(t, "the changes", section(t, page, `<section id="changes">`, "</section>"), `<span class="case">csv/x</span> <span class="col">calc</span>`)
 
 	only := ` <span class="badge">only at ` + c[0] + `</span>`

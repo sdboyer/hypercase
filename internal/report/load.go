@@ -39,17 +39,28 @@ type snapshot struct {
 	props   map[string]string // property → description
 	// transforms holds each corpus's transforms, by name.
 	transforms map[string]map[string]registry.Transform // corpus → transform → its declaration
+	// owned holds the transforms over each corpus that some registry owns,
+	// whose package writes their variants' own inputs.
+	owned map[string]map[string]bool
 	// bytesLifts holds the names of the bytes lifts any registry declares
 	// over each corpus, whose cells commit a product under via/<lift>/.
 	bytesLifts map[string]map[string]bool
 	cases      map[caseKey]*caseAt
 	cells      map[cellKey]*cellAt
 	gaps       map[cellKey]string // the text of the gaps line that marks a cell
-	problems   []Problem
+	// sections holds each archive's sections, by their whole names, which
+	// a range names.
+	sections map[archiveKey]map[string][]byte
+	problems []Problem
 	// leftOut holds the cells whose product the report leaves out: those
 	// with a via/<lift>/ section whose lift no registry declares as a
 	// bytes lift over the corpus.
 	leftOut map[cellKey]bool
+}
+
+// An archiveKey names an archive: its corpus, and its name.
+type archiveKey struct {
+	corpus, archive string
 }
 
 // A column is one that the registries claim: a suite, or a lift its
@@ -273,11 +284,13 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 		columns:    map[string]*column{},
 		props:      map[string]string{},
 		transforms: map[string]map[string]registry.Transform{},
+		owned:      map[string]map[string]bool{},
 		bytesLifts: map[string]map[string]bool{},
 		leftOut:    map[cellKey]bool{},
 		cases:      map[caseKey]*caseAt{},
 		cells:      map[cellKey]*cellAt{},
 		gaps:       map[cellKey]string{},
+		sections:   map[archiveKey]map[string][]byte{},
 	}
 	for _, f := range regs {
 		s.format = max(s.format, f.reg.Format)
@@ -305,11 +318,13 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 			}
 			if s.transforms[ty.Dir] == nil {
 				s.transforms[ty.Dir] = map[string]registry.Transform{}
+				s.owned[ty.Dir] = map[string]bool{}
 			}
 			for _, tr := range ty.Transforms {
 				if _, ok := s.transforms[ty.Dir][tr.Name]; !ok {
 					s.transforms[ty.Dir][tr.Name] = tr
 				}
+				s.owned[ty.Dir][tr.Name] = s.owned[ty.Dir][tr.Name] || tr.Owned
 			}
 		}
 		claim := func(name, description string, outputs []registry.Output, classifier *registry.Classifier, corpora []string) {
@@ -429,12 +444,13 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 		}
 		return c
 	}
-	seen := map[string]bool{}
+	sections := map[string][]byte{}
+	s.sections[archiveKey{corpus: corpus, archive: name}] = sections
 	for _, sec := range a.Sections {
-		if seen[sec.Name] {
+		if _, seen := sections[sec.Name]; seen {
 			return problem(sec.Name, 0, "the section appears twice")
 		}
-		seen[sec.Name] = true
+		sections[sec.Name] = sec.Data
 		kind, vname, rest := archive.SplitCase(sec.Name)
 		k := baseKey
 		if kind != "" {
@@ -628,10 +644,11 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 // disagrees with the cell, at a revision whose cells commit inputs files:
 // a cell that ran and has none; one beside a cell that didn't run, whose
 // maps the report shows none of; and, in one the report reads, each file
-// it maps that the cell lacks, and each of the cell's files it doesn't
-// map. A product's files are mapped as via/<column>/<path>, except where
-// the report leaves the product out, whose files it doesn't compare. p is
-// the archive's path.
+// it maps that the cell lacks, each of the cell's files it doesn't map,
+// and each range that names a section the archive doesn't hold, or lines
+// past its last. A product's files are mapped as via/<column>/<path>,
+// except where the report leaves the product out, whose files it doesn't
+// compare. p is the archive's path.
 func (s *snapshot) checkInputs(p string, ck cellKey, c *cellAt) {
 	dir := p + ", " + ck.c.prefix() + archive.Out + "/" + ck.column + "/"
 	switch {
@@ -655,9 +672,15 @@ func (s *snapshot) checkInputs(p string, ck cellKey, c *cellAt) {
 	for f := range c.product {
 		files[via+f] = true
 	}
+	sections := s.sections[archiveKey{corpus: ck.c.corpus, archive: ck.c.archive}]
 	for _, f := range slices.Sorted(maps.Keys(c.inputs.maps)) {
 		if !files[f] && !(s.leftOut[ck] && strings.HasPrefix(f, via)) {
 			s.problem(dir+revmap.Name, fmt.Sprintf("the inputs file maps %s, and the cell has no such file.", f))
+		}
+		for _, r := range c.inputs.maps[f].Ranges {
+			if why := badRange(r, sections); why != "" {
+				s.problem(dir+revmap.Name, fmt.Sprintf("the inputs file maps %s to %s, and %s, so the report shows no lines of the range.", f, r, why))
+			}
 		}
 	}
 	for _, f := range slices.Sorted(maps.Keys(files)) {

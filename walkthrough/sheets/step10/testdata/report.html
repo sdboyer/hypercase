@@ -55,11 +55,15 @@ ul.files { list-style: none; margin: 4px 0 0 20px; padding: 0; color: var(--mute
 summary { cursor: pointer; }
 .stat .add { color: var(--appeared); }
 .stat .del { color: var(--changed); }
-pre.diff, pre.ranges { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
-pre.diff span, pre.ranges span { display: block; padding: 0 8px; white-space: pre; }
-pre.diff .add, pre.ranges .add { background: var(--add); }
-pre.diff .del, pre.ranges .del { background: var(--del); }
-pre.diff .skip, pre.diff .unaligned { color: var(--muted); }
+pre.diff, pre.ranges, pre.lines { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
+pre.diff span, pre.ranges span, pre.lines span { display: block; padding: 0 8px; white-space: pre; }
+pre.diff .add, pre.ranges .add, pre.lines .add { background: var(--add); }
+pre.diff .del, pre.ranges .del, pre.lines .del { background: var(--del); }
+pre.diff .skip, pre.diff .unaligned, pre.lines .skip { color: var(--muted); }
+details.inputs { margin: 2px 0 6px; }
+details.inputs > summary, .excerpt { color: var(--muted); }
+.excerpt { margin: 4px 0 0 16px; overflow-wrap: anywhere; }
+.map { margin: 4px 0 0 16px; }
 .props { margin-left: 6px; }
 .prop { display: inline-block; margin: 0 4px 0 0; padding: 0 6px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); }
 .prop.kept { border-style: dashed; }
@@ -168,14 +172,22 @@ ul.outputs { padding-left: 18px; }
 <div class="line"><span class="case">sheet/notes</span> <span class="col">calc</span> <span class="outcome s-rejected">rejected S101</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
 <ul class="files">
 <li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
-<pre class="diff"><span class="del">- notes: not a cell name</span><span class="add">&#43; notes: not the name of a cell</span><span class="ctx">    sheet/notes</span></pre></details></li>
+<pre class="diff"><span class="del">- notes: not a cell name</span><span class="add">&#43; notes: not the name of a cell</span><span class="ctx">    sheet/notes</span></pre></details>
+<details class="inputs"><summary>input lines</summary>
+<div class="excerpt"><code>in/sheet/notes</code> at <span class="rev">HEAD</span>
+<pre class="lines"><span class="ctx">   1  remember the milk</span></pre></div>
+</details></li>
 </ul>
 </li>
 <li class="change bytes-changed">
 <div class="line"><span class="case">sheet/notes</span> <span class="col">parse</span> <span class="outcome s-rejected">rejected S101</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
 <ul class="files">
 <li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
-<pre class="diff"><span class="del">- notes: not a cell name</span><span class="add">&#43; notes: not the name of a cell</span><span class="ctx">    sheet/notes</span></pre></details></li>
+<pre class="diff"><span class="del">- notes: not a cell name</span><span class="add">&#43; notes: not the name of a cell</span><span class="ctx">    sheet/notes</span></pre></details>
+<details class="inputs"><summary>input lines</summary>
+<div class="excerpt"><code>in/sheet/notes</code> at <span class="rev">HEAD</span>
+<pre class="lines"><span class="ctx">   1  remember the milk</span></pre></div>
+</details></li>
 </ul>
 </li>
 </ul>

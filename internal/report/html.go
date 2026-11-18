@@ -12,11 +12,10 @@ import (
 // WriteHTML writes the report as one static HTML page, which loads
 // nothing: its style sheet is inline, and it has no scripts. It holds the
 // problems the report found, the ranked changes with each changed file's
-// line diff and what changed in its reverse map, then the matrix of each
-// corpus at B, each case with the
-// properties it states and each known gap on the cell it marks, then the
-// descriptions of what the registries declare. Text that names an issue
-// links to it.
+// line diff, what changed in its reverse map and the input lines it comes
+// from, then the matrix of each corpus at B, each case with the properties
+// it states and each known gap on the cell it marks, then the descriptions
+// of what the registries declare. Text that names an issue links to it.
 func (r *Report) WriteHTML(w io.Writer) error {
 	return page.Execute(w, r)
 }
@@ -122,6 +121,38 @@ func rangeClass(l RangeLine) string {
 	return "add"
 }
 
+// excerptClass returns the class that styles a line of an excerpt: as a
+// diff line's, by whose ranges hold it, where both revisions' do, and as
+// the line that stands for lines left out.
+func excerptClass(l ExcerptLine) string {
+	switch {
+	case l.N == 0:
+		return "skip"
+	case l.Mark == "-":
+		return "del"
+	case l.Mark == "+":
+		return "add"
+	}
+	return "ctx"
+}
+
+// excerptText returns a line of an excerpt as the page shows it: its mark,
+// where it has one, its number, and its text.
+func excerptText(l ExcerptLine) string {
+	if l.N == 0 {
+		return "  ..."
+	}
+	mark := ""
+	if l.Mark != "" {
+		mark = l.Mark + " "
+	}
+	text := fmt.Sprintf("%s%4d  %s", mark, l.N, l.Text)
+	if l.NoNewline {
+		text += fmt.Sprintf("\n%s%4s  \\ no final newline", mark, "")
+	}
+	return text
+}
+
 var page = template.Must(template.New("page").Funcs(template.FuncMap{
 	"groups":        groups,
 	"problemGroups": problemGroups,
@@ -135,6 +166,8 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
 	"rangesOnly":    func(f FileChange) bool { return f.How == RangesOnly },
 	"rangeClass":    rangeClass,
 	"rangeText":     func(l RangeLine) string { return string(l.Kind) + " " + l.Text },
+	"excerptClass":  excerptClass,
+	"excerptText":   excerptText,
 }).Parse(pageTemplate))
 
 const pageTemplate = `<!doctype html>
@@ -187,6 +220,26 @@ const pageTemplate = `<!doctype html>
 <pre class="diff">{{range .Diff}}<span class="{{diffClass .}}">{{diffText .}}</span>{{end}}</pre></details>{{end}}
 {{- if .Ranges}}
 <pre class="ranges">{{range .Ranges}}<span class="{{rangeClass .}}">{{rangeText .}}</span>{{end}}</pre>
+{{- end}}
+{{- with .Inputs}}
+<details class="inputs"><summary>input lines</summary>
+{{- range .Maps}}{{with .}}{{if .All}}
+<p class="map">At <span class="rev">{{.At}}</span>: all inputs.</p>
+{{- else if not .Ranges}}
+<p class="map">At <span class="rev">{{.At}}</span>: no ranges.</p>
+{{- end}}{{end}}{{end}}
+{{- range .Excerpts}}
+<div class="excerpt"><code>{{.Section}}</code> at {{range $i, $r := .At}}{{if $i}} and {{end}}<span class="rev">{{$r}}</span>{{end}}
+<pre class="lines">{{range .Lines}}<span class="{{excerptClass .}}">{{excerptText .}}</span>{{end}}</pre>
+{{- if .Note}}
+<p class="note">{{.Note}}</p>
+{{- end}}
+{{- if .Diff}}
+<details><summary><code>{{.Section}}</code> changed <span class="stat">{{if .Unaligned}}partly unaligned{{else}}<span class="add">+{{.Added}}</span> <span class="del">-{{.Removed}}</span>{{end}}</span></summary>
+<pre class="diff">{{range .Diff}}<span class="{{diffClass .}}">{{diffText .}}</span>{{end}}</pre></details>
+{{- end}}</div>
+{{- end}}
+</details>
 {{- end}}</li>
 {{- end}}
 </ul>
@@ -338,11 +391,15 @@ ul.files { list-style: none; margin: 4px 0 0 20px; padding: 0; color: var(--mute
 summary { cursor: pointer; }
 .stat .add { color: var(--appeared); }
 .stat .del { color: var(--changed); }
-pre.diff, pre.ranges { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
-pre.diff span, pre.ranges span { display: block; padding: 0 8px; white-space: pre; }
-pre.diff .add, pre.ranges .add { background: var(--add); }
-pre.diff .del, pre.ranges .del { background: var(--del); }
-pre.diff .skip, pre.diff .unaligned { color: var(--muted); }
+pre.diff, pre.ranges, pre.lines { margin: 4px 0 8px; padding: 6px 0; overflow-x: auto; color: var(--fg); background: var(--head); border-radius: 4px; }
+pre.diff span, pre.ranges span, pre.lines span { display: block; padding: 0 8px; white-space: pre; }
+pre.diff .add, pre.ranges .add, pre.lines .add { background: var(--add); }
+pre.diff .del, pre.ranges .del, pre.lines .del { background: var(--del); }
+pre.diff .skip, pre.diff .unaligned, pre.lines .skip { color: var(--muted); }
+details.inputs { margin: 2px 0 6px; }
+details.inputs > summary, .excerpt { color: var(--muted); }
+.excerpt { margin: 4px 0 0 16px; overflow-wrap: anywhere; }
+.map { margin: 4px 0 0 16px; }
 .props { margin-left: 6px; }
 .prop { display: inline-block; margin: 0 4px 0 0; padding: 0 6px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); }
 .prop.kept { border-style: dashed; }

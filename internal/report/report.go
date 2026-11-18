@@ -6,12 +6,12 @@
 // outcome file does. It ranks the changes: changed outcomes first, then
 // cells that appeared, then cells that disappeared, then cells whose files
 // changed under the same outcome, then cells whose inputs file alone
-// changed, each with a line diff of its files and what changed in their
-// reverse maps. It
-// shows the matrix of each corpus at the second revision, each case with
-// the properties it states and each known gap on the cell it marks, linked
-// to its issue; the descriptions of what the registries and archives
-// declare; and the problems it found, where it doesn't pick.
+// changed, each with a line diff of its files, what changed in their
+// reverse maps, and the input lines they come from. It shows the matrix of
+// each corpus at the second revision, each case with the properties it
+// states and each known gap on the cell it marks, linked to its issue; the
+// descriptions of what the registries and archives declare; and the
+// problems it found, where it doesn't pick.
 package report
 
 import (
@@ -148,6 +148,10 @@ type FileChange struct {
 	// revisions map it: the lines of the map at A that B's lacks, then
 	// those of B's that A's lacks.
 	Ranges []RangeLine
+	// Inputs are the input lines the file comes from, or nil where the
+	// page shows none: where no revision it shows maps the file, or each
+	// range it maps names lines the archive doesn't hold.
+	Inputs *Inputs
 }
 
 // RangesOnly is how a file changed whose bytes are the same at both
@@ -333,7 +337,7 @@ func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 		default:
 			ch.Rank, ch.Before, ch.After = BytesChanged, ca.line, cb.line
 		}
-		ch.Files = fileChanges(ca, cb, k.column, !a.leftOut[k] && !b.leftOut[k])
+		ch.Files = fileChanges([2]*snapshot{a, b}, k, !a.leftOut[k] && !b.leftOut[k])
 		if ch.Rank == BytesChanged && !slices.ContainsFunc(ch.Files, func(f FileChange) bool { return f.How != RangesOnly }) {
 			if !a.ranges || !b.ranges || inputsEqual(ca.inputs, cb.inputs) {
 				continue
@@ -361,27 +365,31 @@ func inputsEqual(a, b *inputsAt) bool {
 
 // fileChanges returns a cell's files, other than its outcome and its inputs
 // file, that differ between two revisions, or whose reverse maps alone
-// do, by path, then its product's, by path, each with its diff, when
-// products says to compare them. Either cell may be nil.
-func fileChanges(a, b *cellAt, column string, products bool) []FileChange {
-	var fa, fb, pa, pb map[string][]byte
-	if a != nil {
-		fa, pa = a.files, a.product
-	}
-	if b != nil {
-		fb, pb = b.files, b.product
+// do, by path, then its product's, by path, each with its diff and its
+// input lines, when products says to compare them. snaps are the
+// revisions, either of which may lack the cell.
+func fileChanges(snaps [2]*snapshot, k cellKey, products bool) []FileChange {
+	cells := [2]*cellAt{snaps[0].cells[k], snaps[1].cells[k]}
+	var files, product [2]map[string][]byte
+	for i, c := range cells {
+		if c != nil {
+			files[i], product[i] = c.files, c.product
+		}
 	}
 	if !products {
-		pa, pb = nil, nil
+		product = [2]map[string][]byte{}
 	}
-	return append(changedFiles(a, b, fa, fb, ""), changedFiles(a, b, pa, pb, archive.Via+"/"+column+"/")...)
+	return append(changedFiles(snaps, cells, k, files, ""), changedFiles(snaps, cells, k, product, archive.Via+"/"+k.column+"/")...)
 }
 
 // changedFiles returns the files that differ between two revisions' sets
 // of a cell's files, or whose reverse maps alone do, by path, each with
-// its diff and what changed in its map, and each path after the prefix,
-// which is also the path its map is under. Either cell may be nil.
-func changedFiles(ca, cb *cellAt, fa, fb map[string][]byte, prefix string) []FileChange {
+// its diff, what changed in its map and its input lines, and each path
+// after the prefix, which is also the path its map is under. Either cell
+// may be nil.
+func changedFiles(snaps [2]*snapshot, cells [2]*cellAt, k cellKey, set [2]map[string][]byte, prefix string) []FileChange {
+	ca, cb := cells[0], cells[1]
+	fa, fb := set[0], set[1]
 	paths := map[string]bool{}
 	for p := range fa {
 		paths[p] = true
@@ -406,22 +414,13 @@ func changedFiles(ca, cb *cellAt, fa, fb map[string][]byte, prefix string) []Fil
 			fc.How = "changed"
 		case len(fc.Ranges) > 0:
 			fc.How = RangesOnly
-			out = append(out, fc)
-			continue
 		default:
 			continue
 		}
-		fc.Diff, _ = diff.Diff(da, db)
-		for _, l := range fc.Diff {
-			switch l.Kind {
-			case '+':
-				fc.Added++
-			case '-':
-				fc.Removed++
-			case diff.Unaligned:
-				fc.Unaligned = true
-			}
+		if fc.How != RangesOnly {
+			fc.Diff, fc.Added, fc.Removed, fc.Unaligned = lineDiff(da, db)
 		}
+		fc.Inputs = inputsOf(snaps, cells, k, fc, [2]bool{inA, inB})
 		out = append(out, fc)
 	}
 	return out

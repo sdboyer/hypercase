@@ -51,7 +51,10 @@ func TestChangeClosedGap(t *testing.T) {
 		Column: "parse",
 		Before: "rejected S101",
 		After:  "accepted",
-		Files:  []FileChange{{Path: "error.txt", How: "removed", Diff: []diff.Line{{Kind: '-', Text: `A1: unexpected "-"`}}, Removed: 1}},
+		Files: []FileChange{{
+			Path: "error.txt", How: "removed", Diff: []diff.Line{{Kind: '-', Text: `A1: unexpected "-"`}}, Removed: 1,
+			Inputs: &Inputs{Maps: [2]*Map{{At: "a"}}},
+		}},
 	}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("the changes are\n\t%+v\nwhere today they are\n\t%+v\nthe change of outcome of negative's parse cell, with no gap (#51). If #51 is fixed, make this test show A's line, marked as closed.", got, want)
