@@ -2733,8 +2733,9 @@ S202
   included, one path from each corpus it runs over, each corpus once and
   in their order, or whose path names the column itself, a lift the
   registry doesn't list or one lift twice, or names a lift for a suite
-  over the raw input view. The root-package check fails on such a
-  registry too. Where the package has a `_test.go` file, both say to run
+  over the raw input view. So does one that records an output's or a
+  product file's `"inputs"` as no declaration registration takes would
+  (step 11). The root-package check fails on such a registry too. Where the package has a `_test.go` file, both say to run
   the update, which writes its registry; where it has none, both say to
   delete the registry, which no update writes.
 - A check reads the cells as they are committed when it runs. The module's
