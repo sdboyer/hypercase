@@ -4055,10 +4055,11 @@ of `via/import/sheet/B1` at `<a>`, and line 2 of `via/import/sheet/A1` at
   `findings changed`, after the problems and before the ranks, it lists
   each check whose findings differ, by its package's directory and its
   name: each finding only at `<a>`, marked `-`, then each only at `<b>`,
-  marked `+`, each quoted where it holds a carriage return or another
-  control character. The page adds the check's description, from `<b>`,
-  or from `<a>` where `<b>` lists none. A listed check with no findings
-  file, or with something other than a regular file in its place, a
+  marked `+`, each quoted where it holds an ASCII control character other
+  than a tab, such as a carriage return. The page adds the check's
+  description, from `<b>`, or from `<a>` where `<b>` lists none. A listed
+  check with no findings file, or with something other than a regular file
+  in its place, a
   findings file not as an update writes it, and, from format 9, any other
   file under `testdata/checks/` are problems at their revision, and the
   check shows no change there.
