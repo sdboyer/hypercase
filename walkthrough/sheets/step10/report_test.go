@@ -40,7 +40,8 @@ import (
 // before each commit rewrites what the toy's code writes, so each revision
 // holds what the code writes for it either way. The test makes a cell of the
 // copy stale, as such a copy can find it, to show that main's update
-// rewrites it.
+// rewrites it. After a strip, the copy can hold none of that cell's
+// sections, and the test then adds the one it makes stale.
 func TestReport(t *testing.T) {
 	update := updating(t)
 	hypercase := buildHypercase(t)

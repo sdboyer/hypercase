@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -1616,40 +1617,67 @@ func TestStripToys(t *testing.T) {
 }
 
 // TestStripToysReportFirst: on a copy of the walkthrough's toy module, with
-// each of its corpus roots stripped and its committed reports removed, the
-// report tests, run alone in the update, write back every report as it was.
-// A report test copies its corpus root as it finds it, and in the update of
-// the whole module, the other packages over the root write their sections
-// back while it runs. Run first, it finds none of them written (#74).
+// each of its corpus roots stripped, the report tests, run in the update
+// before the packages that write prices' calc sections back, write every
+// report as it was. A report test copies its corpus root as it finds it,
+// and in the update of the whole module, the other packages over the root
+// write their sections back while it runs (#74). The report tests run
+// twice, each time with the committed reports removed: first alone, with
+// every corpus stripped, then after the update of their own packages
+// alone, as go test ./... can order them, where prices.txtar holds its own
+// package's sections and none of calc's, which each root's cli package
+// writes.
 func TestStripToysReportFirst(t *testing.T) {
 	t.Parallel()
 	dir, goCmd := toyCopy(t)
 	want := tree(t, dir)
 	stripToy(t, dir, recordedRoots(t, dir, want))
-	var reports []string
+	var reports, pkgs []string
 	for _, p := range slices.Sorted(maps.Keys(want)) {
 		if strings.HasSuffix(p, "/testdata/report.txt") || strings.HasSuffix(p, "/testdata/report.html") {
 			reports = append(reports, p)
-			if err := os.Remove(filepath.Join(dir, filepath.FromSlash(p))); err != nil {
-				t.Fatal(err)
+			if pkg, _, _ := strings.Cut(p, "/testdata/"); !slices.Contains(pkgs, "./"+pkg) {
+				pkgs = append(pkgs, "./"+pkg)
 			}
 		}
 	}
 	if len(reports) == 0 {
 		t.Fatal("the toy commits no report")
 	}
-
-	goCmd([]string{sheetsVar + "=1"}, "test", "-count=1", "-run=^TestReport$", "./...")
-	got := tree(t, dir)
-	for _, p := range reports {
-		g, ok := got[p]
-		switch {
-		case !ok:
-			t.Errorf("the report tests didn't write %s", p)
-		case g != want[p]:
-			t.Errorf("%s differs (-want +got):\n%s", p, diff.Lines([]byte(want[p]), []byte(g)))
+	update := []string{sheetsVar + "=1"}
+	reportsFirst := func(state string) {
+		t.Helper()
+		for _, p := range reports {
+			if err := os.Remove(filepath.Join(dir, filepath.FromSlash(p))); err != nil {
+				t.Fatal(err)
+			}
+		}
+		goCmd(update, append([]string{"test", "-count=1", "-run=^TestReport$"}, pkgs...)...)
+		got := tree(t, dir)
+		for _, p := range reports {
+			g, ok := got[p]
+			switch {
+			case !ok:
+				t.Errorf("%s, the report tests didn't write %s", state, p)
+			case g != want[p]:
+				t.Errorf("%s, %s differs (-want +got):\n%s", state, p, diff.Lines([]byte(want[p]), []byte(g)))
+			}
 		}
 	}
+
+	reportsFirst("With every corpus stripped")
+	goCmd(update, append([]string{"test", "-count=1", "-run=^TestCorpus$"}, pkgs...)...)
+	files := tree(t, dir)
+	for _, pkg := range pkgs {
+		p := path.Join(pkg, "testdata", "sheet", "prices.txtar")
+		a := archive.Parse([]byte(files[p]))
+		_, own := a.Section("out/evaluate/outcome")
+		_, calc := a.Section("out/calc/outcome")
+		if !own || calc {
+			t.Fatalf("after the update of %s alone, %s holds out/evaluate/outcome: %t, and out/calc/outcome: %t, where the report tests are to find the first and not the second", strings.Join(pkgs, " "), p, own, calc)
+		}
+	}
+	reportsFirst("After the update of the report tests' own packages alone")
 }
 
 // toyCopy copies the walkthrough's toy module, and returns the toy's
