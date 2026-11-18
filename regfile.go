@@ -82,6 +82,9 @@ func (r *runner) ownRegistry() registry.Registry {
 		}
 		g.Suites = append(g.Suites, s)
 	}
+	for _, c := range r.checks {
+		g.Checks = append(g.Checks, registry.Check{Name: c.Name, Description: c.Description})
+	}
 	return g
 }
 

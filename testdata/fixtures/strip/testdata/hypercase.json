@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 9,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -199,5 +199,11 @@
       ]
     }
   ],
-  "suites": []
+  "suites": [],
+  "checks": [
+    {
+      "name": "cells",
+      "description": "Lists every cell, with its outcome, its column's entry, its case's properties and its files."
+    }
+  ]
 }

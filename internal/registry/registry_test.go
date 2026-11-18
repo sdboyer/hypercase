@@ -30,9 +30,10 @@ const olderData = `{"format": 1, "updateVar": "X", "corpusRoot": "step05", "root
 // marshaled; one of another format, older or newer, is a FormatError that
 // names it; and what is no registry is refused as none. Marshal sorts a
 // column's paths by corpus, and keeps each path's lifts in their order,
-// the nearest to the column first, writing none as []. A registry the
-// update couldn't have written is refused: one whose paths it couldn't
-// have planned, or that records an Inputs registration refuses.
+// the nearest to the column first, writing none as [], and sorts the
+// corpus checks by name. A registry the update couldn't have written is
+// refused: one whose paths it couldn't have planned, that records an
+// Inputs registration refuses, or that lists a corpus check twice.
 func TestParse(t *testing.T) {
 	now := parseNow()
 	got, err := Parse(now.Marshal())
@@ -45,6 +46,9 @@ func TestParse(t *testing.T) {
 	// Marshal sorts the transforms by name, and their properties.
 	if trs := got.Types[0].Transforms; trs[0].Name != "looped" || !slices.Equal(trs[1].Keeps, []string{"circular", "dangling"}) || trs[0].Keeps == nil {
 		t.Errorf("the transforms are written as %+v", trs)
+	}
+	if want := []Check{{Name: "codes", Description: "Lists the codes."}, {Name: "rejected", Description: "Lists the rejected cells."}}; !slices.Equal(got.Checks, want) {
+		t.Errorf("the corpus checks are written as %+v, want %+v", got.Checks, want)
 	}
 	wantPaths := []Path{{Corpus: "csv", Lifts: []string{"resolve", "parse", "import"}}, {Corpus: "sheet", Lifts: []string{"resolve", "parse"}}}
 	if ps := got.Suites[1].Paths; !reflect.DeepEqual(ps, wantPaths) {
@@ -131,6 +135,7 @@ func parseNow() Registry {
 			{Name: "import", Corpora: []string{"csv"}, Paths: []Path{{Corpus: "csv"}}, Bytes: true,
 				ProductFiles: []Output{{Pattern: "*", Description: "A file.", Inputs: InputsFunc}}},
 		},
+		Checks: []Check{{Name: "rejected", Description: "Lists the rejected cells."}, {Name: "codes", Description: "Lists the codes."}},
 	}
 }
 
@@ -163,6 +168,7 @@ var byHand = []struct {
 	{func(r *Registry) { r.Lifts[0].ProductFiles[0] = Output{Pattern: "error.txt", Inputs: InputsPositions} }, `the lift import declares the product file error.txt with inputs "positions", where only an output whose pattern is error.txt takes its ranges from Positions`},
 	{func(r *Registry) { r.Suites[1].Outputs[0].Inputs = InputsFunc }, `the suite evaluate declares the output e* with inputs "func", and the pattern matches error.txt, where error.txt's ranges come from Positions or the whole input view, never from a function`},
 	{func(r *Registry) { r.Lifts[1].Outputs[0].Inputs = InputsFunc }, `the lift parse declares the output error.txt with inputs "func", and the pattern matches error.txt,`},
+	{func(r *Registry) { r.Checks = append(r.Checks, Check{Name: "codes", Description: "Lists them again."}) }, "the registry lists the corpus check codes twice, where each corpus check a package registers has a name of its own"},
 }
 
 // TestParseAny: a registry of each format from Oldest to Format reads in
@@ -206,6 +212,14 @@ func TestParseAny(t *testing.T) {
 	v7 = strings.Replace(v7, `"corpora": ["sheet"], "outputs": []`, `"corpora": ["sheet"], "paths": [{"corpus": "sheet", "lifts": []}], "outputs": [{"pattern": "error.txt", "description": "Why it fails."}]`, 1)
 	v7 = strings.Replace(v7, `"productFiles": []`, `"productFiles": [{"pattern": "sheet/*", "description": "A cell."}]`, 1)
 	v7 = strings.Replace(v7, `"consumes": "io/fs.FS", "corpora": ["sheet"],`, `"consumes": "io/fs.FS", "corpora": ["sheet"], "paths": [{"corpus": "sheet", "lifts": []}],`, 1)
+	// A format 8 registry, whose output declarations say what their Inputs
+	// state, and which says whether the project supplies Positions, but
+	// lists no corpus checks.
+	v8 := strings.Replace(v7, `"format": 7`, `"format": 8`, 1)
+	v8 = strings.Replace(v8, `"rootPackage": true,`, `"rootPackage": true, "positions": false,`, 1)
+	v8 = strings.Replace(v8, `"description": "Why it fails."}`, `"description": "Why it fails.", "inputs": "all"}`, 1)
+	v8 = strings.Replace(v8, `"description": "A cell."}`, `"description": "A cell.", "inputs": "func"}`, 1)
+	v8 = strings.Replace(v8, `"description": "What it prints."}`, `"description": "What it prints.", "inputs": "all"}`, 1)
 	for _, tt := range []struct {
 		data              string
 		format            int
@@ -216,6 +230,7 @@ func TestParseAny(t *testing.T) {
 		{v5, 5, 1, 1},
 		{v6, 6, 1, 1},
 		{v7, 7, 1, 1},
+		{v8, 8, 1, 1},
 	} {
 		g, err := ParseAny([]byte(tt.data))
 		if err != nil {
@@ -232,8 +247,9 @@ func TestParseAny(t *testing.T) {
 			len(g.Lifts) != tt.lifts || slices.ContainsFunc(g.Lifts, func(l Lift) bool { return l.Bytes }) ||
 			tt.format < 6 && slices.ContainsFunc(g.Lifts, func(l Lift) bool { return l.ProductFiles != nil }) ||
 			tt.format < 7 && (g.Suites[0].Paths != nil || slices.ContainsFunc(g.Lifts, func(l Lift) bool { return l.Paths != nil })) ||
-			tt.format == 7 && (len(g.Suites[0].Paths) != 1 || len(outputs) != 2) ||
-			g.Positions || slices.ContainsFunc(append(outputs, g.Suites[0].Outputs...), func(o Output) bool { return o.Inputs != "" }) {
+			tt.format >= 7 && (len(g.Suites[0].Paths) != 1 || len(outputs) != 2) ||
+			g.Positions || slices.ContainsFunc(append(outputs, g.Suites[0].Outputs...), func(o Output) bool { return (o.Inputs != "") != (tt.format >= 8) }) ||
+			g.Checks != nil {
 			t.Errorf("format %d reads as %+v", tt.format, g)
 		}
 		if _, err := Parse([]byte(tt.data)); !errors.As(err, new(*FormatError)) {
@@ -243,8 +259,9 @@ func TestParseAny(t *testing.T) {
 	now := Registry{CorpusRoot: ".", Codes: true, Positions: true, Suites: []Suite{{Name: "evaluate", Classifier: &Classifier{Name: "div-zero", Description: "Divides by zero."},
 		Corpora: []string{"csv"}, Paths: []Path{{Corpus: "csv", Lifts: []string{"import"}}},
 		Outputs: []Output{{Pattern: "error.txt", Description: "Why it fails.", Inputs: InputsPositions}}}},
-		Lifts: []Lift{{Name: "import", Bytes: true, ProductFiles: []Output{{Pattern: "sheet/*", Description: "A cell.", Inputs: InputsFunc}}, Corpora: []string{"csv"}, Paths: []Path{{Corpus: "csv"}}}}}
-	if g, err := ParseAny(now.Marshal()); err != nil || !bytes.Equal(g.Marshal(), now.Marshal()) {
+		Lifts:  []Lift{{Name: "import", Bytes: true, ProductFiles: []Output{{Pattern: "sheet/*", Description: "A cell.", Inputs: InputsFunc}}, Corpora: []string{"csv"}, Paths: []Path{{Corpus: "csv"}}}},
+		Checks: []Check{{Name: "codes", Description: "Lists the codes."}}}
+	if g, err := ParseAny(now.Marshal()); err != nil || !bytes.Equal(g.Marshal(), now.Marshal()) || len(g.Checks) != 1 {
 		t.Errorf("format %d: got %+v, %v", Format, g, err)
 	}
 
@@ -261,6 +278,7 @@ func TestParseAny(t *testing.T) {
 		{strings.Replace(v7, `"description": "A cell."}`, `"description": "A cell.", "inputs": "func"}`, 1), "it is not a registry: it holds format 7, and lifts[].productFiles[].inputs, which format 8 added"},
 		{strings.Replace(v7, `"rootPackage": true,`, `"rootPackage": true, "positions": false,`, 1), "it is not a registry: it holds format 7, and positions, which format 8 added"},
 		{strings.Replace(v7, `"description": "What it prints."}`, `"description": "What it prints.", "inputs": "all"}`, 1), "it is not a registry: it holds format 7, and suites[].outputs[].inputs, which format 8 added"},
+		{strings.Replace(v8, `"rootPackage": true,`, `"rootPackage": true, "checks": [],`, 1), "it is not a registry: it holds format 8, and checks, which format 9 added"},
 		{strings.Replace(v4, `"rejects": ["circular"]}`, `"rejects": ["circular"], "later": 1}`, 1), `it is not a registry: json: unknown field "later"`},
 		// Registration has refused a second column of one name, and
 		// listed each corpus a column runs over once, since format 3.
@@ -390,6 +408,7 @@ var frozenKeys = map[int]string{
 	6: "8296bfb2da3b7ab45e4e249079e81a8f51cc23de8fb2a204e4632029c3e662e4",
 	7: "10ed6d7e887c1f6afc455f8de8f6cbdc4c1184ee7e34ba900faced74b4fbcd3f",
 	8: "814db4c29a8ee83244465ac6dcda61e31eb7609e36400a01c96c9b71e740790e",
+	9: "ca550388eaeffc7e48d45af5036c875b605122fe53c7a1edf9abcf166e1e9fb6",
 }
 
 // TestFormatKeys: testdata/keys-<N>.txt holds the key paths of a registry

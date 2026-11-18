@@ -23,7 +23,7 @@ import (
 
 // Format is the version of what a registry holds. It changes on any change
 // to that.
-const Format = 8
+const Format = 9
 
 // Name is a registry's file name, in its package's testdata/ directory.
 const Name = "hypercase.json"
@@ -54,6 +54,10 @@ type Registry struct {
 	Types      []Type      `json:"types"`
 	Lifts      []Lift      `json:"lifts"`
 	Suites     []Suite     `json:"suites"`
+	// Checks are the corpus checks the package registers, sorted by name.
+	// It is nil in a registry of a format before ChecksFormat, which
+	// records none.
+	Checks []Check `json:"checks"`
 }
 
 // An IssueLink is one of the project's link patterns: a regular expression,
@@ -180,6 +184,12 @@ type Path struct {
 	Lifts []string `json:"lifts"`
 }
 
+// A Check is a corpus check the package registers.
+type Check struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 // A Classifier is a suite's classifier.
 type Classifier struct {
 	Name        string `json:"name"`
@@ -283,6 +293,7 @@ func (r Registry) Marshal() []byte {
 		suites[i] = s
 	}
 	r.Suites = suites
+	r.Checks = sorted(r.Checks, func(c Check) string { return c.Name })
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
@@ -326,8 +337,9 @@ func (e *FormatError) Error() string {
 // own, a column runs over each of its corpora once, and its paths are one
 // from each, in their order, and name only lifts the registry lists, each
 // once, never the column itself, and none for a suite over the raw input
-// view; and each output declaration records one of the statements of
-// Inputs, in a place registration admits it.
+// view; each output declaration records one of the statements of Inputs,
+// in a place registration admits it; and it lists each corpus check under
+// a name of its own.
 func Parse(data []byte) (*Registry, error) {
 	var head struct {
 		Format int `json:"format"`
@@ -355,8 +367,8 @@ func Parse(data []byte) (*Registry, error) {
 // oldest format whose registries it holds of: from that format on, the
 // update couldn't have written a registry the check refuses. Registration
 // has refused a second column, or lift, of one name since format 3, and
-// planned a column over each corpus once. Format 7 added the paths, and
-// format 8 the statements of Inputs.
+// planned a column over each corpus once. Format 7 added the paths,
+// format 8 the statements of Inputs, and format 9 the corpus checks.
 var parseChecks = []struct {
 	format int
 	check  func(*Registry) error
@@ -365,6 +377,7 @@ var parseChecks = []struct {
 	{3, (*Registry).checkCorpora},
 	{7, (*Registry).checkPaths},
 	{8, (*Registry).checkInputs},
+	{9, (*Registry).checkCheckNames},
 }
 
 // check reports the first of parseChecks that holds of the registry's
@@ -478,6 +491,17 @@ func (r *Registry) checkCorpora() error {
 	return nil
 }
 
+// checkCheckNames reports the first corpus check the registry lists
+// twice: registration refuses a second check of one name in a package.
+func (r *Registry) checkCheckNames() error {
+	for i, c := range r.Checks {
+		if slices.ContainsFunc(r.Checks[:i], func(o Check) bool { return o.Name == c.Name }) {
+			return fmt.Errorf("the registry lists the corpus check %s twice, where each corpus check a package registers has a name of its own", c.Name)
+		}
+	}
+	return nil
+}
+
 // checkPaths reports the first column, suite or lift, owned or used,
 // whose paths the update couldn't have written.
 func (r *Registry) checkPaths() error {
@@ -565,16 +589,21 @@ const OutcomeFormat = 5
 // supplies Positions.
 const InputsFormat = 8
 
+// ChecksFormat is the first format version whose registries list the
+// corpus checks their packages register. Before it, a reader finds a
+// check's findings only by their files' names.
+const ChecksFormat = 9
+
 // added is what each format version added to the one before it, by the
 // key that holds it, which a registry of an older format doesn't hold.
 // Format 4 added each corpus type's transforms, format 5 whether the
 // project supplies Codes and each suite's classifier, format 6 whether
 // each lift is a bytes lift and its product's declarations, format 7 each
-// lift's and suite's path from each of its corpora, and format 8 whether
-// the project supplies Positions and what each output declaration's
-// Inputs states. None changed what an earlier key holds. Each format's
-// keys are in testdata/keys-<N>.txt, which TestFormatKeys checks the table
-// against.
+// lift's and suite's path from each of its corpora, format 8 whether the
+// project supplies Positions and what each output declaration's Inputs
+// states, and format 9 the corpus checks the package registers. None
+// changed what an earlier key holds. Each format's keys are in
+// testdata/keys-<N>.txt, which TestFormatKeys checks the table against.
 var added = []struct {
 	format int
 	key    string
@@ -615,11 +644,13 @@ var added = []struct {
 	{8, "suites[].outputs[].inputs", func(p presence) bool {
 		return slices.ContainsFunc(p.Suites, func(s suitePresence) bool { return holdsInputs(s.Outputs) })
 	}},
+	{9, "checks", func(p presence) bool { return p.Checks != nil }},
 }
 
 // presence records which keys that a later format added a registry
 // holds. A key given as null is held.
 type presence struct {
+	Checks    json.RawMessage `json:"checks"`
 	Codes     json.RawMessage `json:"codes"`
 	Positions json.RawMessage `json:"positions"`
 	Types     []typePresence  `json:"types"`

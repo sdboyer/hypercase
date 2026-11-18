@@ -109,7 +109,7 @@ func TestChain(t *testing.T) {
 	s.hasSections("testdata/hypercase.json", map[string]string{})
 	reg := string(s.read("testdata/hypercase.json"))
 	for _, want := range []string{
-		`"format": 8,`,
+		`"format": 9,`,
 		"\"name\": \"import\",\n      \"description\": \"Imports the export as a script, as its import/ tree says.\",\n      \"input\": \"github.com/sdboyer/hypercase_test.Export\",\n      \"product\": \"github.com/sdboyer/hypercase_test.Script\",\n      \"owned\": true,\n      \"bytes\": true,",
 		"\"productFiles\": [\n        {\n          \"pattern\": \"evaluate/*\",",
 		"\"rejects\": [\n        \"unterminated\"\n      ]",

@@ -23,7 +23,7 @@ FAIL
 [exit 1]
 $ cat testdata/hypercase.json
 {
-  "format": 8,
+  "format": 9,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
@@ -101,5 +101,6 @@ $ cat testdata/hypercase.json
       ],
       "classifier": null
     }
-  ]
+  ],
+  "checks": []
 }

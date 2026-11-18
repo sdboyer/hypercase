@@ -1073,13 +1073,13 @@ from each, its outputs, each with what its `Inputs` states, and what it
 rejects. Step 11 explains `positions` and `inputs`. Its `types` and
 `lifts` stay empty until step 6, as do the `lifts` of `evaluate`'s path,
 and `issueLinks` until step 9. `codes`, whether the project supplies
-`Codes`, stays `false`, and `evaluate`'s `classifier` stays `null`, until
-step 8:
+`Codes`, stays `false`, `evaluate`'s `classifier` stays `null`, and
+`checks`, the package's corpus checks, stays empty, until step 8:
 
 <!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 8,
+  "format": 9,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
@@ -1135,7 +1135,8 @@ step 8:
       ],
       "classifier": null
     }
-  ]
+  ],
+  "checks": []
 }
 ```
 
@@ -1179,17 +1180,17 @@ step 8:
 - Everything a package registers is registered when the package is
   initialized, before any test runs: properties, corpus types, lifts,
   suites, transforms, the root-package check and corpus checks (step 8).
-  Its registry lists all but the corpus checks. A test function runs what
-  was registered, and registers nothing. So the registry and the orphan
-  checks don't depend on `-run`.
+  Its registry lists them all. A test function runs what was registered,
+  and registers nothing. So the registry and the orphan checks don't
+  depend on `-run`.
 - A refusal at registration, such as two properties with one name, panics
   during package initialization with the message the framework would
   otherwise print. So it doesn't depend on `-run` either.
 
 **The registry.** It is each package's `testdata/hypercase.json`.
 
-- It lists everything the package registers but its corpus checks
-  (step 8), each with its description, and for each column the type it
+- It lists everything the package registers, its corpus checks (step 8)
+  included, each with its description, and for each column the type it
   consumes, the corpora it runs over, its path from each (step 6), its
   declared outputs, each with what its `Inputs` states (step 11), and the
   properties it rejects. It records the package's corpus root, whether
@@ -2694,9 +2695,10 @@ S202
 
 - A corpus check has a name, a description and a `Run` over every cell, and
   is registered when its package is initialized, given to `Register` or to
-  `Own`. The package that registers it owns it, and no registry lists it.
-  A test function runs it: `hypercase.Test` runs each as the subtest
-  `checks/<name>` (proposed).
+  `Own`. The package that registers it owns it, and its registry lists it
+  under `checks`, by its name, with its description. A test function runs
+  it: `hypercase.Test` runs each as the subtest `checks/<name>`
+  (proposed).
 - A cell, as a check sees it, exposes its committed outcome, its committed
   sections, its column's registry entry, its case's stated properties and
   its known gap. `hypercase.Cell` holds (proposed) `Type`, `Archive`,
@@ -2898,7 +2900,8 @@ the same outcome.
   format that holds what a later format added is refused too, and so is
   one its format's update couldn't have written, as a check refuses one of
   today's (step 8): by its names and corpora at every format, its paths
-  from format 7, and its `"inputs"` from format 8.
+  from format 7, its `"inputs"` from format 8, and its `checks` from
+  format 9.
 - A cell exists at a revision when its `outcome` file does, from registry
   format 5 on. A changed cell takes the first of these ranks that applies:
   outcome changed, at both revisions; appeared, at `<b>` only; disappeared,
