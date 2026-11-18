@@ -678,52 +678,105 @@ func TestRootCheckLinks(t *testing.T) {
 	s.done()
 }
 
-// TestUpdateLinks: an update writes nothing when the walk the
-// root-package check runs finds a symbolic link under the corpus root's
-// testdata/. Every write there would go through it, outside the corpus
-// root or in the link's place, and the check runs in normal runs alone. So
-// the update refuses at its start, whatever the link names and whether or
-// not it has an archive to write, with the check's reason, and leaves the
-// corpus root and the link's target as they were, with no lock file in
-// either. With the link replaced, the update writes the archive.
+// TestUpdateLinks: an update writes nothing when its walk finds a
+// symbolic link under the corpus root's testdata/. Every write there would
+// go through it, outside the corpus root or in the link's place, and the
+// root-package check runs in normal runs alone. So the update refuses at
+// its start, the root package's and another's alike, whatever the link
+// names and whatever the update has to write: an archive, the root
+// package's registry, or nothing. It fails with the check's reason, and
+// leaves the corpus root and the link's target as they were, with no lock
+// file in either. With the link replaced, each update writes what it has
+// to.
 func TestUpdateLinks(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "strip")
 	s.settle(stripModule...)
-	settled := s.read(prices)
-	stale := archive.Parse(settled)
-	move("out/parse/outcome", "out/import/")(stale)
+	const reg = "testdata/hypercase.json"
+	settled, settledReg := s.read(prices), s.read(reg)
+	staleA, staleB := archive.Parse(settled), archive.Parse(settled)
+	move("out/parse/outcome", "out/import/")(staleA)
+	set("out/evaluate/values.txt", "a1 0\nb1 0\n")(staleB)
+	type file struct {
+		data []byte
+		why  string
+	}
+	var (
+		archiveA  = file{staleA.Format(), "parse's outcome, out of its place, where the root package's update puts it back"}
+		archiveB  = file{staleB.Format(), "evaluate's values, wrong, which ./b's update writes again"}
+		archiveOK = file{settled, "the archive as the updates leave it"}
+		regStale  = file{append(slices.Clone(settledReg), '\n'), "the root package's registry, with a blank line its update removes"}
+		regOK     = file{settledReg, "the root package's registry as its update leaves it"}
+		a, b      = childRun{"", "strip-a", true}, childRun{"b", "strip-b", true}
+	)
+	put := func(rel string, f file) {
+		if !bytes.Equal(s.read(rel), f.data) {
+			s.write(rel, f.data, f.why)
+		}
+	}
 	s.remove("testdata/.hypercase.lock", "the lock, which the update takes to write an archive")
 	const fix = ", so the update wrote nothing.\nRemove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again."
 	for _, l := range []struct {
 		rel, target string
-		write       bool // whether the update has an archive to write
+		update      childRun
+		archive     file // prices, as the update reads it
+		registry    file // the root package's registry
 		why         string
 	}{
-		{"testdata/export", "", true, "testdata/ holds no symbolic links: testdata/export is one"},
-		{prices, "", true, "testdata/ holds no symbolic links: " + prices + " is one"},
-		{"testdata", "", true, "testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none"},
-		{"testdata/export", "", false, "testdata/ holds no symbolic links: testdata/export is one"},
-		{"testdata/export", "../shared/missing", true, "testdata/ holds no symbolic links: testdata/export is one"},
+		{"testdata/export", "", a, archiveA, regOK, "testdata/ holds no symbolic links: testdata/export is one"},
+		{prices, "", a, archiveA, regOK, "testdata/ holds no symbolic links: " + prices + " is one"},
+		{"testdata", "", a, archiveA, regOK, "testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none"},
+		{"testdata/export", "", a, archiveOK, regOK, "testdata/ holds no symbolic links: testdata/export is one"},
+		{"testdata/export", "../shared/missing", a, archiveA, regOK, "testdata/ holds no symbolic links: testdata/export is one"},
+		{"testdata", "", a, archiveOK, regStale, "testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none"},
+		{"testdata/export", "", b, archiveB, regOK, "testdata/ holds no symbolic links: testdata/export is one"},
 	} {
-		if l.write {
-			s.write(prices, stale.Format(), "parse's outcome, out of its place, where the update puts it back")
-		} else {
-			s.write(prices, settled, "the archive as the update leaves it, so it has nothing to write")
-		}
+		put(prices, l.archive)
+		put(reg, l.registry)
 		before := s.snapshot()
 		s.link(l.rel, l.target)
-		s.fails(s.update("strip-a"), l.why+fix)
+		s.fails(s.run(l.update.pkg, l.update.registration, true), l.why+fix)
 		if fi, err := os.Lstat(s.path(l.rel)); err != nil || fi.Mode()&fs.ModeSymlink == 0 {
 			t.Errorf("%s is no symbolic link after the update, which wrote in its place", l.rel)
 		}
 		s.unlink(l.rel)
 		s.unchanged(before)
 	}
-	s.write(prices, stale.Format(), "parse's outcome, out of its place, where the update puts it back")
+	put(prices, archiveA)
+	put(reg, regStale)
 	s.passes(s.update("strip-a"))
 	s.same(prices, settled)
+	s.same(reg, settledReg)
+	put(prices, archiveB)
+	s.passes(s.run(b.pkg, b.registration, true))
+	s.same(prices, settled)
 	s.passes(s.normal("strip-a"))
+	s.done()
+}
+
+// TestUpdateLinkOtherRoot: a registry in a package with no tests, c,
+// records another corpus root, testdata/export, a corpus's directory of
+// the module-root corpus. The root-package check leaves that directory to
+// that root's check, which no package runs (#58), so a normal run passes
+// with a symbolic link in place of an archive there. The update's walk
+// skips no other corpus root, so the update refuses the link and writes
+// nothing, where it would write the archive in the link's place.
+func TestUpdateLinkOtherRoot(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	s.settle(stripModule...)
+	s.write("c/testdata/hypercase.json", registry.Registry{CorpusRoot: "testdata/export"}.Marshal(), "a registry of another corpus root, testdata/export, in a package with no tests")
+	s.edit(prices, "parse's outcome, out of its place, where the update puts it back", move("out/parse/outcome", "out/import/"))
+	s.remove("testdata/.hypercase.lock", "the lock, which the update takes to write an archive")
+	before := s.snapshot()
+	s.link(prices, "")
+	s.passes(s.normal("strip-a"))
+	s.fails(s.update("strip-a"), "testdata/ holds no symbolic links: "+prices+" is one, so the update wrote nothing.\nRemove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.")
+	if fi, err := os.Lstat(s.path(prices)); err != nil || fi.Mode()&fs.ModeSymlink == 0 {
+		t.Errorf("%s is no symbolic link after the update, which wrote in its place", prices)
+	}
+	s.unlink(prices)
+	s.unchanged(before)
 	s.done()
 }
 
@@ -759,7 +812,8 @@ func TestUpdateUnreadTestdata(t *testing.T) {
 // and the check agree: neither refuses a symbolic link in it. A normal
 // run passes, and the update writes the archive in the link's place. The
 // directory's cells run all the same, which is today's behavior: the
-// check and strip should read such a directory, or a run should not.
+// check and strip should read such a directory, or a run should not
+// (#58).
 func TestUpdateLinkNestedModule(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "strip")

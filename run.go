@@ -67,33 +67,26 @@ func Test(t *testing.T) {
 }
 
 // refuseLinks reports whether the update refuses to run, and fails it
-// when it does: when the walk the root-package check runs finds a symbolic
-// link under the corpus root's testdata/, testdata/ itself included, or
-// can't finish. Every write the update makes there, the lock's included,
-// would go through such a link, and the check runs in normal runs alone,
-// so it runs before the update writes anything. A link made while the
-// update runs is left to the next normal run's check.
+// when it does: when a walk of the corpus root's testdata/, as the
+// root-package check walks it but into other corpus roots too, finds a
+// symbolic link there, testdata/ itself included, or can't finish. Every
+// write the update makes there, the lock's included, would go through such
+// a link, and the check runs in normal runs alone, so the update walks
+// before it writes anything. A link made while the update runs is left to
+// the next normal run's check.
+//
+// The check leaves another corpus root to that root's check. A registry
+// that records one, in a package no test runs as well, would hide its
+// directory from a walk that skipped it, while the update writes there,
+// and a link under another corpus root's testdata/ breaks that root's
+// rule anyway.
 func (r *runner) refuseLinks(t *testing.T) bool {
 	t.Helper()
 	td := filepath.Join(r.corpusRoot, "testdata")
 	if _, err := os.Lstat(td); errors.Is(err, fs.ErrNotExist) {
 		return false
 	}
-	// The corpus roots other registries record, which the walk skips, as
-	// the check's does. A registry that can't be read is the check's to
-	// report.
-	found, _ := registry.Find(r.moduleRoot)
-	others := map[string]bool{}
-	for _, f := range found {
-		data, err := os.ReadFile(f.Path)
-		if err != nil {
-			continue
-		}
-		if h, err := registry.Peek(data); err == nil && h.CorpusRoot != r.rootRel {
-			others[filepath.Join(r.moduleRoot, filepath.FromSlash(h.CorpusRoot))] = true
-		}
-	}
-	links, err := walk.Testdata(td, others, func(string, fs.DirEntry) {})
+	links, err := walk.Testdata(td, nil, func(string, fs.DirEntry) {})
 	switch {
 	case err != nil:
 		t.Errorf("reading %s: %v, so the update wrote nothing.\nFix what failed, then run %s again.", r.rel(td), err, r.updateCmd())

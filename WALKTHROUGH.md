@@ -1155,13 +1155,14 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 - At the re-read, a package compares the hand-written sections its cells ran
   on with those it re-read. On a difference it writes nothing to that
   archive and fails, saying to run the update again.
-- Before it takes the lock or writes anything, an update runs the walk of
-  the root-package check (below), which runs in normal runs alone. On a
-  symbolic link under `testdata/`, `testdata/` itself included, which
-  would take a write there through it, the update writes nothing and
-  fails, naming the link in the check's words. So it does when the walk
-  can't read a directory. A link made while the update runs is left to
-  the next normal run's check.
+- The root-package check (below) runs in normal runs alone, so an update
+  walks the corpus root's `testdata/` for symbolic links itself, before it
+  takes the lock or writes anything. Its walk skips a nested module, as
+  the check's does, but not another corpus root. On a link there,
+  `testdata/` itself included, which would take a write through it, the
+  update writes nothing and fails, naming the link in the check's words.
+  So it does when the walk can't read a directory. A link made while the
+  update runs is left to the next normal run's check.
 - A temp file left by a killed write, beside an archive, a registry or a
   findings file, fails the run, naming it.
 - An update is the whole module's. A per-package update is not supported.

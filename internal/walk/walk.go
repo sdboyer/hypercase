@@ -1,8 +1,9 @@
 // Package walk walks a corpus root's testdata/ as the root-package check,
-// hypercase strip and an update read it, so the three find the same files
-// and refuse the same symbolic links, in the same words, and tells by its
-// path which file is an archive of the corpus root, so the check and strip
-// agree on which archives strip strips. It doesn't import testing.
+// hypercase strip and an update read it. The check and strip find the same
+// files and refuse the same symbolic links, and an update refuses those
+// and any under another corpus root, all in the same words. It tells by
+// its path which file is an archive of the corpus root, so the check and
+// strip agree on which archives strip strips. It doesn't import testing.
 package walk
 
 import (
