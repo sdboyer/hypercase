@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -15,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/sdboyer/hypercase/internal/diff"
+	"golang.org/x/mod/module"
 )
 
 // The self-tests run hypercase on fixtures, small archives under
@@ -485,11 +487,17 @@ func (s *sandbox) same(rel string, before []byte) {
 	}
 }
 
-// done compares the transcript with its golden.
+// done compares the transcript with its golden. The golden is named from
+// the test, and a module zip can't hold a file whose path
+// module.CheckFilePath refuses, so a test whose golden would be one fails
+// before the golden is read or written.
 func (s *sandbox) done() {
 	s.t.Helper()
-	name := strings.ReplaceAll(s.t.Name(), "/", "-") + ".txt"
-	golden := filepath.Join("testdata", "transcripts", name)
+	rel := path.Join("testdata", "transcripts", strings.ReplaceAll(s.t.Name(), "/", "-")+".txt")
+	if err := module.CheckFilePath(rel); err != nil {
+		s.t.Fatalf("%s can't be in a module zip: %v.\nA transcript is named from its test: rename the subtest, %s.", rel, ruleError(err), s.t.Name())
+	}
+	golden := filepath.FromSlash(rel)
 	got := []byte(s.transcript.String())
 	if os.Getenv(transcriptsVar) == "1" {
 		if err := os.MkdirAll(filepath.Dir(golden), 0o755); err != nil {
