@@ -27,7 +27,7 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 	Name:        "evaluate",
 	Description: "Evaluates every cell of the sheet.",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
 	},
 	Run: func(t testing.TB, archive string, g *sheet.Graph, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		return []hypercase.File{{Path: "values.txt", Data: g.Evaluate().Format()}}, nil

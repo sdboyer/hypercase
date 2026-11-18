@@ -8,7 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -20,7 +20,7 @@ import (
 
 // The fixtures' declarations. The child registers one set, chosen by name.
 
-var project = decl.Project{UpdateVar: fixtureUpdate}
+var project = decl.Project{UpdateVar: fixtureUpdate, Positions: steeredPositions}
 
 var rootPkg = hypercase.RootPackage()
 
@@ -67,25 +67,91 @@ var (
 //	                       during the run would
 //	<tree>/probe           read by withProbe's probe, and ignored by the run
 //	<tree>/probe-panic     read by withProbe's probe, and ignored by the run
+//
+// Each output file comes from the instructions that make it, as
+// steeredInputs maps it, and error.txt from where its error points, as
+// steeredPositions finds it.
 func steered[T ~struct{ fs.FS }](name, tree string) hypercase.Suite[T] {
 	return hypercase.Suite[T]{
 		Name:        name,
 		Description: "Does what the case's " + tree + "/ tree says.",
-		Outputs:     steeredOutputs,
+		Outputs:     steeredOutputs(tree),
 		Run: func(t testing.TB, archiveName string, in T, stdout, stderr io.Writer) ([]hypercase.File, error) {
 			return runSteered(t, archiveName, tree, struct{ fs.FS }(in).FS, stdout, stderr)
 		},
 	}
 }
 
-var steeredOutputs = []decl.Output{
-	{Pattern: "values.txt", Description: "The values the case's instructions give."},
-	{Pattern: "?.txt", Description: "A file the case's instructions name with one letter."},
-	{Pattern: "dir.txt", Description: "The path of a temp dir the run made."},
-	{Pattern: "archive.txt", Description: "The archive's name, as the run received it."},
-	{Pattern: "error.txt", Description: "The error the case's instructions give."},
-	{Pattern: "stdout.txt", Description: "What the case's instructions write to stdout."},
-	{Pattern: "stderr.txt", Description: "What the case's instructions write to stderr."},
+// steeredOutputs are the output declarations of a suite that follows the
+// case's <tree>/ tree.
+func steeredOutputs(tree string) []decl.Output {
+	in := steeredInputs(tree)
+	return []decl.Output{
+		{Pattern: "values.txt", Description: "The values the case's instructions give.", Inputs: in},
+		{Pattern: "?.txt", Description: "A file the case's instructions name with one letter.", Inputs: in},
+		{Pattern: "dir.txt", Description: "The path of a temp dir the run made.", Inputs: in},
+		{Pattern: "archive.txt", Description: "The archive's name, as the run received it.", Inputs: in},
+		{Pattern: "error.txt", Description: "The error the case's instructions give.", Inputs: decl.FromPositions},
+		{Pattern: "stdout.txt", Description: "What the case's instructions write to stdout.", Inputs: in},
+		{Pattern: "stderr.txt", Description: "What the case's instructions write to stderr.", Inputs: in},
+	}
+}
+
+// steeredKinds are the kinds of instruction under <tree>/ that make the
+// output file below them: <tree>/<kind>/<path> makes <path>.
+var steeredKinds = []string{"out", "nonl", "crlf", "extranl", "marker", "twice"}
+
+// steeredInputs maps a file a steered suite returns to the instructions
+// under <tree>/ that make it, each whole: <tree>/<kind>/<path> for a
+// kind that makes <path>, and <tree>/stdout, <tree>/stderr,
+// <tree>/tempdir and <tree>/archive for stdout.txt, stderr.txt, dir.txt
+// and archive.txt.
+func steeredInputs(tree string) decl.InputsFunc {
+	return func(in fs.FS, p string) ([]decl.Range, error) {
+		var from []string
+		for _, kind := range steeredKinds {
+			from = append(from, tree+"/"+kind+"/"+p)
+		}
+		switch p {
+		case "stdout.txt":
+			from = append(from, tree+"/stdout")
+		case "stderr.txt":
+			from = append(from, tree+"/stderr")
+		case "dir.txt":
+			from = append(from, tree+"/tempdir")
+		case "archive.txt":
+			from = append(from, tree+"/archive")
+		}
+		var rs []decl.Range
+		for _, f := range from {
+			if _, err := fs.Stat(in, f); err == nil {
+				rs = append(rs, decl.Range{Path: f})
+			}
+		}
+		return rs, nil
+	}
+}
+
+// steeredPositions is the fixtures' Positions: each line of an error's
+// text of the form "at <start> <end> <path>" is a range of the lines from
+// start to end of the file at path, the rest of the line.
+func steeredPositions(err error) []decl.Range {
+	var rs []decl.Range
+	for _, line := range strings.Split(err.Error(), "\n") {
+		rest, ok := strings.CutPrefix(line, "at ")
+		if !ok {
+			continue
+		}
+		start, rest, _ := strings.Cut(rest, " ")
+		end, p, _ := strings.Cut(rest, " ")
+		s, err1 := strconv.Atoi(start)
+		e, err2 := strconv.Atoi(end)
+		if err1 != nil || err2 != nil {
+			continue
+		}
+		rs = append(rs, decl.Range{Path: p, Start: s, End: e})
+	}
+	return rs
 }
 
 var (
@@ -300,31 +366,31 @@ var registrations = map[string]func(){
 		hypercase.Register(project, rootPkg, circular, scriptType, own(withRejects(echo, circular)))
 	},
 	"nested": func() {
-		hypercase.Register(project, rootPkg, scriptType, own(withOutputs(echo, append(slices.Clone(steeredOutputs),
-			decl.Output{Pattern: "*/*", Description: "A file one directory down."})...)))
+		hypercase.Register(project, rootPkg, scriptType, own(withOutputs(echo, append(steeredOutputs("do"),
+			decl.Output{Pattern: "*/*", Description: "A file one directory down.", Inputs: steeredInputs("do")})...)))
 	},
 	// unwritable can make each of outputs()'s problems: a.txt matches two
 	// declarations, and its RenderError is steered.
 	"unwritable": func() {
-		hypercase.Register(projectRender, rootPkg, scriptType, own(withOutputs(echo, append(slices.Clone(steeredOutputs),
-			decl.Output{Pattern: "a.txt", Description: "The file a, which ?.txt matches too."},
-			decl.Output{Pattern: "*/*", Description: "A file one directory down."})...)))
+		hypercase.Register(projectRender, rootPkg, scriptType, own(withOutputs(echo, append(steeredOutputs("do"),
+			decl.Output{Pattern: "a.txt", Description: "The file a, which ?.txt matches too.", Inputs: steeredInputs("do")},
+			decl.Output{Pattern: "*/*", Description: "A file one directory down.", Inputs: steeredInputs("do")})...)))
 	},
 	"narrow": func() {
 		hypercase.Register(project, rootPkg, scriptType, own(withOutputs(echo,
-			decl.Output{Pattern: "values.txt", Description: "The values."},
-			decl.Output{Pattern: "?.txt", Description: "A file named with one letter."},
-			decl.Output{Pattern: "a.txt", Description: "The file a."},
+			decl.Output{Pattern: "values.txt", Description: "The values.", Inputs: steeredInputs("do")},
+			decl.Output{Pattern: "?.txt", Description: "A file named with one letter.", Inputs: steeredInputs("do")},
+			decl.Output{Pattern: "a.txt", Description: "The file a.", Inputs: steeredInputs("do")},
 		)))
 	},
 	"output-nodesc": func() {
-		hypercase.Register(project, rootPkg, scriptType, own(withOutputs(echo, decl.Output{Pattern: "values.txt", Description: "\n"})))
+		hypercase.Register(project, rootPkg, scriptType, own(withOutputs(echo, decl.Output{Pattern: "values.txt", Description: "\n", Inputs: steeredInputs("do")})))
 	},
 	"bad-pattern": func() {
-		hypercase.Register(project, scriptType, own(withOutputs(echo, decl.Output{Pattern: "values[.txt", Description: "The values."})))
+		hypercase.Register(project, scriptType, own(withOutputs(echo, decl.Output{Pattern: "values[.txt", Description: "The values.", Inputs: steeredInputs("do")})))
 	},
 	"bad-pattern-path": func() {
-		hypercase.Register(project, scriptType, own(withOutputs(echo, decl.Output{Pattern: "../values.txt", Description: "The values."})))
+		hypercase.Register(project, scriptType, own(withOutputs(echo, decl.Output{Pattern: "../values.txt", Description: "The values.", Inputs: steeredInputs("do")})))
 	},
 	"corpus-set":        func() { hypercase.Register(project, scriptType, own(withCorpus(echo, "script"))) },
 	"bad-dir":           func() { hypercase.Register(project, decl.Type[Script]{Dir: "Script", Description: "A script."}) },

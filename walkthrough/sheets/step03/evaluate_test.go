@@ -21,7 +21,7 @@ var evaluate = hypercase.Suite[fs.FS]{
 	Description: "Evaluates every cell of the sheet.",
 	Corpus:      "sheet",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
 	},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		values, err := sheet.Eval(in) // the cells under sheet/

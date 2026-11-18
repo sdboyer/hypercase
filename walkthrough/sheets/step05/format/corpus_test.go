@@ -28,8 +28,8 @@ var format = hypercase.Suite[fs.FS]{
 		return "", true
 	},
 	Outputs: []decl.Output{
-		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order."},
-		{Pattern: "error.txt", Description: "Why the sheet doesn't parse."},
+		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order.", Inputs: sheetcorpus.Formulas},
+		{Pattern: "error.txt", Description: "Why the sheet doesn't parse.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {

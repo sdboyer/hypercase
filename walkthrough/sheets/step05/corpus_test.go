@@ -28,8 +28,8 @@ var evaluate = hypercase.Suite[fs.FS]{
 	Description: "Evaluates every cell of the sheet.",
 	Corpus:      "sheet",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
-		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
+		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {

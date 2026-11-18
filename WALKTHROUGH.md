@@ -278,7 +278,7 @@ var evaluate = hypercase.Suite[fs.FS]{
 	Description: "Evaluates every cell of the sheet.",
 	Corpus:      "sheet",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
 	},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		values, err := sheet.Eval(in) // the cells under sheet/
@@ -291,6 +291,10 @@ var evaluate = hypercase.Suite[fs.FS]{
 
 func TestCorpus(t *testing.T) { hypercase.Test(t) }
 ```
+
+Each output declaration also states `Inputs`: where in the case's input view
+its files come from. Step 11 explains it, and the steps before it show it
+without comment.
 
 ### How the files change
 
@@ -626,8 +630,8 @@ var evaluate = hypercase.Suite[fs.FS]{
 	Description: "Evaluates every cell of the sheet.",
 	Corpus:      "sheet",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
-		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
+		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{sheetcorpus.Circular},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
@@ -857,8 +861,8 @@ var evaluate = hypercase.Suite[fs.FS]{
 	Description: "Evaluates every cell of the sheet.",
 	Corpus:      "sheet",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
-		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
+		{Pattern: "error.txt", Description: "Why the sheet can't be evaluated.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
@@ -893,8 +897,8 @@ var format = hypercase.Suite[fs.FS]{
 		return "", true
 	},
 	Outputs: []decl.Output{
-		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order."},
-		{Pattern: "error.txt", Description: "Why the sheet doesn't parse."},
+		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order.", Inputs: sheetcorpus.Formulas},
+		{Pattern: "error.txt", Description: "Why the sheet doesn't parse.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
@@ -926,9 +930,9 @@ var calc = hypercase.Suite[fs.FS]{
 	Description: "Runs the calc command on the sheet.",
 	Corpus:      "sheet",
 	Outputs: []decl.Output{
-		{Pattern: "stdout.txt", Description: "The sheet's values as CSV, one row per line."},
-		{Pattern: "stderr.txt", Description: "A warning for each cell that divides by zero."},
-		{Pattern: "error.txt", Description: "Why calc failed."},
+		{Pattern: "stdout.txt", Description: "The sheet's values as CSV, one row per line.", Inputs: decl.AllInputs},
+		{Pattern: "stderr.txt", Description: "A warning for each cell that divides by zero.", Inputs: decl.AllInputs},
+		{Pattern: "error.txt", Description: "Why calc failed.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{sheetcorpus.Malformed, sheetcorpus.Circular, sheetcorpus.Dangling},
 	Run: func(t testing.TB, archive string, in fs.FS, stdout, stderr io.Writer) ([]hypercase.File, error) {
@@ -1319,7 +1323,7 @@ var Parse = decl.Lift[Sheet, *sheet.Parsed]{
 	Name:        "parse",
 	Description: "Parses every cell.",
 	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The cell that is neither a number nor a formula."},
+		{Pattern: "error.txt", Description: "The cell that is neither a number nor a formula.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{Malformed},
 	Run: func(archive string, in Sheet, stderr io.Writer) (*sheet.Parsed, error) {
@@ -1331,7 +1335,7 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 	Name:        "resolve",
 	Description: "Orders the cells so that each comes after the cells it refers to.",
 	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The cycle, or the reference to a missing cell."},
+		{Pattern: "error.txt", Description: "The cycle, or the reference to a missing cell.", Inputs: decl.FromPositions},
 	},
 	Rejects: []decl.Property{Circular, Dangling},
 	Run: func(archive string, p *sheet.Parsed, stderr io.Writer) (*sheet.Graph, error) {
@@ -1348,6 +1352,7 @@ var Resolve = decl.Lift[*sheet.Parsed, *sheet.Graph]{
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
+	Positions:   positions,
 }
 
 // renderError writes the error's text, then quotes each line it points at. A
@@ -1389,7 +1394,7 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 	Name:        "evaluate",
 	Description: "Evaluates every cell of the sheet.",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
 	},
 	Run: func(t testing.TB, archive string, g *sheet.Graph, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		return []hypercase.File{{Path: "values.txt", Data: g.Evaluate().Format()}}, nil
@@ -1424,7 +1429,7 @@ var format = hypercase.Suite[*sheet.Parsed]{
 		return "", true
 	},
 	Outputs: []decl.Output{
-		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order."},
+		{Pattern: "formulas.txt", Description: "Each formula cell and its formula, in cell order.", Inputs: sheetcorpus.Formulas},
 	},
 	Run: func(t testing.TB, archive string, p *sheet.Parsed, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		return []hypercase.File{{Path: "formulas.txt", Data: sheet.Format(p)}}, nil
@@ -2236,6 +2241,7 @@ classifier reads.
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
+	Positions:   positions,
 	Codes: func(err error) []string {
 		var e *sheet.Error
 		if errors.As(err, &e) {
@@ -2268,7 +2274,7 @@ var evaluate = hypercase.Suite[*sheet.Graph]{
 	Name:        "evaluate",
 	Description: "Evaluates every cell of the sheet.",
 	Outputs: []decl.Output{
-		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order."},
+		{Pattern: "values.txt", Description: "Each cell's value, one per line, in cell order.", Inputs: sheetcorpus.Cells},
 	},
 	Run: func(t testing.TB, archive string, g *sheet.Graph, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		return []hypercase.File{{Path: "values.txt", Data: g.Evaluate().Format()}}, nil
@@ -2607,6 +2613,7 @@ regular expression and a URL template.
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
+	Positions:   positions,
 	Codes: func(err error) []string {
 		var e *sheet.Error
 		if errors.As(err, &e) {
@@ -2913,10 +2920,10 @@ var Import = decl.Lift[CSV, Sheet]{
 	Name:        "import",
 	Description: "Turns each CSV field into a cell: row 1, field 2 is B1.",
 	Outputs: []decl.Output{
-		{Pattern: "error.txt", Description: "The line the importer can't read, and why."},
+		{Pattern: "error.txt", Description: "The line the importer can't read, and why.", Inputs: decl.FromPositions},
 	},
 	Product: []decl.Output{
-		{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them."},
+		{Pattern: "sheet/*", Description: "One file per cell, as a sheet's in/sheet/ holds them.", Inputs: Export},
 	},
 	Rejects: []decl.Property{Unterminated, StrayQuote, OutOfRange},
 	Jenny: jenny.For[CSV]().New("import", func(in CSV) (jenny.Files, error) {

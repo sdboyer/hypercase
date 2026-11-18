@@ -14,6 +14,7 @@ import (
 var Project = decl.Project{
 	UpdateVar:   "SHEETS_UPDATE_GOLDEN",
 	RenderError: renderError,
+	Positions:   positions,
 }
 
 // renderError writes the error's text, then quotes each line it points at. A

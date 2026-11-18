@@ -394,11 +394,12 @@ func topologyTree(kinds string, from, j int) string {
 }
 
 func topologyBytes[In topologyValue, Out ~struct{ fs.FS }](kinds string, k int) decl.Lift[In, Out] {
+	in := importedFrom(fmt.Sprintf("l%d", k))
 	var product []decl.Output
 	for j := k + 1; j <= len(kinds); j++ {
-		product = append(product, decl.Output{Pattern: topologyTree(kinds, k, j) + "*", Description: fmt.Sprintf("What l%d does, as its tree says.", j)})
+		product = append(product, decl.Output{Pattern: topologyTree(kinds, k, j) + "*", Description: fmt.Sprintf("What l%d does, as its tree says.", j), Inputs: in})
 	}
-	product = append(product, decl.Output{Pattern: topologyTree(kinds, k, len(kinds)+1) + "*", Description: "The data list lists."})
+	product = append(product, decl.Output{Pattern: topologyTree(kinds, k, len(kinds)+1) + "*", Description: "The data list lists.", Inputs: in})
 	return topologyBytesOf[In, Out](k, product)
 }
 
@@ -409,7 +410,7 @@ func topologyBytesOf[In topologyValue, Out ~struct{ fs.FS }](k int, product []de
 	return decl.Lift[In, Out]{
 		Name:        name,
 		Description: fmt.Sprintf("Makes its input view's %s/out/ tree its product, as its %s/ tree says.", name, name),
-		Outputs:     []decl.Output{{Pattern: "error.txt", Description: "Why the lift rejects the case."}},
+		Outputs:     []decl.Output{{Pattern: "error.txt", Description: "Why the lift rejects the case.", Inputs: decl.FromPositions}},
 		Product:     product,
 		Rejects:     []decl.Property{topologyProperty(k)},
 		Jenny: jenny.For[In]().New(name, func(in In) (jenny.Files, error) {
@@ -460,7 +461,7 @@ func topologySuite[T topologyValue]() hypercase.Suite[T] {
 	return hypercase.Suite[T]{
 		Name:        "list",
 		Description: "Lists the files of the input view the chain ends in, with their bytes.",
-		Outputs:     []decl.Output{{Pattern: "files.txt", Description: "How many files the view holds, then each one's path and bytes, quoted."}},
+		Outputs:     []decl.Output{{Pattern: "files.txt", Description: "How many files the view holds, then each one's path and bytes, quoted.", Inputs: wholeView}},
 		Run: func(t testing.TB, _ string, in T, _, _ io.Writer) ([]hypercase.File, error) {
 			view := in.topologyView()
 			paths, err := archive.Paths(view)
@@ -1287,7 +1288,7 @@ func TestTopologyUsedPathLeft(t *testing.T) {
 var cycleRegistrations = func() map[string]func() {
 	l2 := topologyStage[Top0](2, func(v fs.FS) *Top2N { return &Top2N{v} })
 	l3 := topologyStage[*Top2N](3, func(v fs.FS) *Top3N { return &Top3N{v} })
-	l1 := topologyBytesOf[*Top3N, Top1B](1, []decl.Output{{Pattern: "data/*", Description: "The data list lists."}})
+	l1 := topologyBytesOf[*Top3N, Top1B](1, []decl.Output{{Pattern: "data/*", Description: "The data list lists.", Inputs: importedFrom("l1")}})
 	l2b := renamed(topologyStage[Top1B](2, func(v fs.FS) *Top2N { return &Top2N{v} }), "l2b")
 	register := func(items ...any) func() {
 		return func() {
@@ -1581,17 +1582,20 @@ func (br branching) paths(pkg byte, i int) []registry.Path {
 
 // column is the branching's column at index i in branchCols.
 func (br branching) column(i int) any {
-	product := func(k int) []decl.Output {
+	// product is the product of the bytes lift at position j, which holds
+	// the tree of the stage at position k.
+	product := func(j, k int) []decl.Output {
+		in := importedFrom(fmt.Sprintf("l%d", j))
 		return []decl.Output{
-			{Pattern: fmt.Sprintf("l%d/*", k), Description: fmt.Sprintf("What l%d does, as its tree says.", k)},
-			{Pattern: "data/*", Description: "The data a list lists."},
+			{Pattern: fmt.Sprintf("l%d/*", k), Description: fmt.Sprintf("What l%d does, as its tree says.", k), Inputs: in},
+			{Pattern: "data/*", Description: "The data a list lists.", Inputs: in},
 		}
 	}
 	switch i {
 	case 0:
-		return topologyBytesOf[Top0, Top1B](1, product(3))
+		return topologyBytesOf[Top0, Top1B](1, product(1, 3))
 	case 1:
-		return topologyBytesOf[Top0, Top2B](2, product(4))
+		return topologyBytesOf[Top0, Top2B](2, product(2, 4))
 	case 2:
 		return topologyStage[Top1B](3, func(v fs.FS) *Top3N { return &Top3N{v} })
 	case 3:

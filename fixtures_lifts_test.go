@@ -51,9 +51,12 @@ var runLog []string
 
 func logRun(format string, args ...any) { runLog = append(runLog, fmt.Sprintf(format, args...)) }
 
+// liftOutputs are the output declarations of the lifts steerLift steers:
+// error.txt comes from where the error points, and stderr.txt, which
+// <lift>/stderr and <lift>/archive steer, from the whole input view.
 var liftOutputs = []decl.Output{
-	{Pattern: "error.txt", Description: "Why the lift rejects the case."},
-	{Pattern: "stderr.txt", Description: "What the lift writes to stderr."},
+	{Pattern: "error.txt", Description: "Why the lift rejects the case.", Inputs: decl.FromPositions},
+	{Pattern: "stderr.txt", Description: "What the lift writes to stderr.", Inputs: decl.AllInputs},
 }
 
 func steerLift(name, archiveName string, in fs.FS, stderr io.Writer) error {
@@ -135,7 +138,7 @@ func staged[T any](name, tree string, view func(T) fs.FS) hypercase.Suite[T] {
 	return hypercase.Suite[T]{
 		Name:        name,
 		Description: "Does what the case's " + tree + "/ tree says, from the stage it consumes.",
-		Outputs:     steeredOutputs,
+		Outputs:     steeredOutputs(tree),
 		Probe: func(in T) (string, bool) {
 			logRun("%s's probe ran", name)
 			return steeredProbe(view(in), tree)
@@ -207,7 +210,7 @@ var (
 // the value it receives.
 func withTrail(s hypercase.Suite[*Parsed]) hypercase.Suite[*Parsed] {
 	run := s.Run
-	s.Outputs = append(slices.Clone(s.Outputs), decl.Output{Pattern: "trail.txt", Description: "The trail of the parsed script, as the suite received it."})
+	s.Outputs = append(slices.Clone(s.Outputs), decl.Output{Pattern: "trail.txt", Description: "The trail of the parsed script, as the suite received it.", Inputs: mapsNothing})
 	s.Run = func(t testing.TB, archiveName string, p *Parsed, stdout, stderr io.Writer) ([]hypercase.File, error) {
 		files, err := run(t, archiveName, p, stdout, stderr)
 		return append(files, hypercase.File{Path: "trail.txt", Data: []byte(strings.Join(p.trail, " ") + "\n")}), err
@@ -229,6 +232,7 @@ func logged[T any](s hypercase.Suite[T]) hypercase.Suite[T] {
 // render/panic is panicked with, and render/nonl leaves off the newline.
 var projectRender = decl.Project{
 	UpdateVar: fixtureUpdate,
+	Positions: steeredPositions,
 	RenderError: func(in fs.FS, err error) []byte {
 		if data, e := fs.ReadFile(in, "render/panic"); e == nil {
 			panic(strings.TrimSuffix(string(data), "\n"))
@@ -336,7 +340,7 @@ var liftRegistrations = map[string]func(){
 	},
 	"lift-bad-output": func() {
 		l := parse
-		l.Outputs = []decl.Output{{Pattern: "values.txt", Description: "The values."}}
+		l.Outputs = []decl.Output{{Pattern: "values.txt", Description: "The values.", Inputs: decl.AllInputs}}
 		hypercase.Register(project, scriptType, own(l))
 	},
 	"lift-bad-name": func() {
@@ -386,7 +390,7 @@ var liftRegistrations = map[string]func(){
 	"lift-nodesc": func() {
 		l := parse
 		l.Description = ""
-		l.Outputs = []decl.Output{{Pattern: "error.txt", Description: " "}, {Pattern: "stderr.txt", Description: "What it writes."}}
+		l.Outputs = []decl.Output{{Pattern: "error.txt", Description: " ", Inputs: decl.FromPositions}, {Pattern: "stderr.txt", Description: "What it writes.", Inputs: decl.AllInputs}}
 		hypercase.Register(project, rootPkg, malformed, decl.Type[Script]{Dir: "script"}, own(l, calc))
 	},
 }
