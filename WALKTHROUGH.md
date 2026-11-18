@@ -2895,7 +2895,10 @@ the same outcome.
   naming the revision, the registry and its format: for a newer format,
   saying to run the report from that revision's hypercase, and for one
   older than 3, that no hypercase's report reads it. A registry of an older
-  format that holds what a later format added is refused too.
+  format that holds what a later format added is refused too, and so is
+  one its format's update couldn't have written, as a check refuses one of
+  today's (step 8): by its names and corpora at every format, its paths
+  from format 7, and its `"inputs"` from format 8.
 - A cell exists at a revision when its `outcome` file does, from registry
   format 5 on. A changed cell takes the first of these ranks that applies:
   outcome changed, at both revisions; appeared, at `<b>` only; disappeared,

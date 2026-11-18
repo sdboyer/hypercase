@@ -53,8 +53,8 @@ func moduleRegistry() registry.Registry {
 		IssueLinks: []registry.IssueLink{{Pattern: `sheets#(\d+)`, URL: sheetsLink}},
 		Properties: []registry.Property{{Name: "circular", Description: "A loop."}},
 		Suites: []registry.Suite{
-			{Name: "calc", Description: "Runs calc.", Consumes: registry.RawInput, Corpora: []string{"sheet"}},
-			{Name: "evaluate", Description: "Evaluates.", Consumes: registry.RawInput, Corpora: []string{"sheet"}},
+			{Name: "calc", Description: "Runs calc.", Consumes: registry.RawInput, Corpora: []string{"sheet"}, Paths: []registry.Path{{Corpus: "sheet"}}},
+			{Name: "evaluate", Description: "Evaluates.", Consumes: registry.RawInput, Corpora: []string{"sheet"}, Paths: []registry.Path{{Corpus: "sheet"}}},
 		},
 	}
 }
