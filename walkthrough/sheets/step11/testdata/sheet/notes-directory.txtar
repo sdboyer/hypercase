@@ -1,0 +1,29 @@
+Notes kept beside the cells, in a directory that is not a cell.
+-- in/sheet/A1 --
+1
+-- in/sheet/notes/milk --
+remember the milk
+-- properties --
+malformed
+-- out/calc/error.txt --
+notes: not a cell name
+  sheet/notes/milk
+-- out/calc/inputs --
+error.txt
+  in/sheet/notes/milk
+-- out/calc/outcome --
+rejected S101
+-- out/evaluate/outcome --
+blocked parse
+-- out/format/outcome --
+blocked parse
+-- out/parse/error.txt --
+notes: not a cell name
+  sheet/notes/milk
+-- out/parse/inputs --
+error.txt
+  in/sheet/notes/milk
+-- out/parse/outcome --
+rejected S101
+-- out/resolve/outcome --
+blocked parse

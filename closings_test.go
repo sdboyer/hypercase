@@ -2033,13 +2033,16 @@ func (j *judge) unowned(ur hypercase.Observed) bool {
 	return kind == archive.Transform && !j.u.owners[name]
 }
 
-// frozenOnPath reports whether a bytes lift on a cell's path has a frozen
-// cell in the update, in any package: the archive then keeps the lift's
-// committed product, which a range past it names, and the cell's view is
-// what the lift made.
+// frozenOnPath reports whether the last bytes lift on a cell's path, the
+// one whose product the cell's ranges name, has a frozen cell in the
+// update, in any package: the archive then keeps the lift's committed
+// product, and the cell's view is what the lift made.
 func (j *judge) frozenOnPath(ur hypercase.Observed) bool {
+	if len(ur.Path) == 0 {
+		return false
+	}
 	for k, o := range j.u.cells {
-		if k.c == ur.Case && k.prefix == ur.Prefix && slices.Contains(ur.Path, k.col) && o.Frozen {
+		if k.c == ur.Case && k.prefix == ur.Prefix && k.col == ur.Path[0] && o.Frozen {
 			return true
 		}
 	}

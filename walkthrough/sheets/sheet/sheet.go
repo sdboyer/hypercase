@@ -139,6 +139,7 @@ type cellFile struct {
 	name, path string
 	data       []byte
 	dir        bool
+	files      []string // a directory's files, by path, in lexical order
 }
 
 // readCells reads every entry under sheet/, in cell order.
@@ -153,10 +154,18 @@ func readCells(fsys fs.FS) ([]cellFile, error) {
 	files := make([]cellFile, 0, len(entries))
 	for _, e := range entries {
 		f := cellFile{name: e.Name(), path: "sheet/" + e.Name(), dir: e.IsDir()}
-		if !f.dir {
-			if f.data, err = fs.ReadFile(fsys, f.path); err != nil {
-				return nil, err
-			}
+		if f.dir {
+			err = fs.WalkDir(fsys, f.path, func(p string, d fs.DirEntry, err error) error {
+				if err == nil && !d.IsDir() {
+					f.files = append(f.files, p)
+				}
+				return err
+			})
+		} else {
+			f.data, err = fs.ReadFile(fsys, f.path)
+		}
+		if err != nil {
+			return nil, err
 		}
 		files = append(files, f)
 	}
@@ -173,12 +182,26 @@ func sortFiles(files []cellFile) {
 func checkFile(f cellFile) (pos, error) {
 	p, ok := parseName(f.name)
 	if !ok {
-		return pos{}, newError(codeMalformed, []Position{{Path: f.path}}, "%s: not a cell name", f.name)
+		return pos{}, newError(codeMalformed, f.whole(""), "%s: not a cell name", f.name)
 	}
 	if f.dir {
-		return pos{}, newError(codeMalformed, []Position{{Cell: f.name, Path: f.path}}, "%s: a directory, not a cell", f.name)
+		return pos{}, newError(codeMalformed, f.whole(f.name), "%s: a directory, not a cell", f.name)
 	}
 	return p, nil
+}
+
+// whole gives the positions of an error about the file as a whole, for the
+// named cell, or "": the file, or, since a position is a file's, each file
+// of a directory.
+func (f cellFile) whole(cell string) []Position {
+	if !f.dir {
+		return []Position{{Cell: cell, Path: f.path}}
+	}
+	at := make([]Position, len(f.files))
+	for i, p := range f.files {
+		at[i] = Position{Cell: cell, Path: p}
+	}
+	return at
 }
 
 func parseFiles(files []cellFile) (*Parsed, error) {

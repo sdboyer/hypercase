@@ -26,3 +26,7 @@ bytes changed
     error.txt changed
   sheet/notes parse: rejected S101
     error.txt changed
+  sheet/notes-directory calc: rejected S101
+    error.txt changed
+  sheet/notes-directory parse: rejected S101
+    error.txt changed

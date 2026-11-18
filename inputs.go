@@ -183,7 +183,7 @@ func baseOrigin(view fs.FS) *origin {
 // overlay. A hand-written variant's are its in/ sections' paths, a file
 // that holds the base's bytes among them, and so are a transform's whose
 // inputs a normal run reads.
-func overlayOrigin[V any](view fs.FS, prefix string, overlay map[string]V) *origin {
+func overlayOrigin(view fs.FS, prefix string, overlay map[string][]byte) *origin {
 	own := map[string]bool{}
 	for p := range overlay {
 		own[p] = true

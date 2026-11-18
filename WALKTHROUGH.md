@@ -3880,9 +3880,15 @@ cells blocked at `parse` have no `inputs`.
 - A bad range, an error or a panic in an `InputsFunc`, and a panic in
   `Positions` fail the cell. The failure names the file, what gave its
   ranges and the range, and says what to fix, and the update writes nothing
-  for that cell. When the cell is a bytes lift's, every cell past the lift
-  fails and is not written either, as for anything else that keeps the
-  lift's cell from being written (step 10).
+  for that cell. When the cell is a bytes lift's, it is the owner's verdict,
+  as for anything else that keeps the lift's cell from being written (step
+  10). In the owner's update, every cell past the lift fails and is not
+  written either. A normal run reads what the lift's cell commits, so the
+  cells past it run on the committed product, and only the lift's cell
+  fails. A package that only uses the lift judges its cell under a bare
+  Project, whose `Positions` finds nothing, so a `Positions` that panics
+  holds nothing back there, and that package's update writes the cells past
+  the lift.
 - A cell with any file that can't be judged, such as an output no
   declaration matches, has its `inputs` neither compared nor written.
 - A frozen cell without `inputs` gains it on update, as with `outcome` at

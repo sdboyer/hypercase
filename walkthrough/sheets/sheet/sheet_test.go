@@ -1,6 +1,7 @@
 package sheet_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -12,8 +13,14 @@ import (
 )
 
 // describe renders an error as its code, its message and its positions, or as
-// "plain: <message>" when it is not an *Error.
-func describe(err error) string {
+// "plain: <message>" when it is not an *Error. Every error a test describes
+// is about the file system it names, fsys, and describe fails the test on a
+// position that names no lines of it. A project maps a position to a range
+// of a hypercase cell's input view, which the framework refuses unless it
+// names a file the view holds, never a directory or a missing path, as a
+// whole, line 0, or at a line the file has.
+func describe(t *testing.T, fsys fs.FS, err error) string {
+	t.Helper()
 	if err == nil {
 		return "<nil>"
 	}
@@ -23,9 +30,39 @@ func describe(err error) string {
 	}
 	s := e.Code + " " + e.Error()
 	for _, p := range e.Positions {
+		if why := outside(fsys, p); why != "" {
+			t.Errorf("%q has the position %s:%d, which %s", err, p.Path, p.Line, why)
+		}
 		s += fmt.Sprintf(" @%s %s:%d", p.Cell, p.Path, p.Line)
 	}
 	return s
+}
+
+// outside says how a position names no lines of fsys, or "" when it names
+// some.
+func outside(fsys fs.FS, p sheet.Position) string {
+	if !fs.ValidPath(p.Path) {
+		return "is no valid path"
+	}
+	info, err := fs.Stat(fsys, p.Path)
+	switch {
+	case err != nil:
+		return "names no file"
+	case info.IsDir():
+		return "names a directory"
+	}
+	data, err := fs.ReadFile(fsys, p.Path)
+	if err != nil {
+		return "names a file that can't be read: " + err.Error()
+	}
+	n := bytes.Count(data, []byte("\n"))
+	if len(data) > 0 && data[len(data)-1] != '\n' {
+		n++
+	}
+	if p.Line < 0 || p.Line > n {
+		return fmt.Sprintf("is past the file's last line, %d", n)
+	}
+	return ""
 }
 
 // sheetFS lays cells out as a sheet's files.
@@ -138,11 +175,11 @@ func TestParseErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := sheet.Parse(sheetFS(tt.cells))
-			if got := describe(err); got != tt.want {
+			if got := describe(t, sheetFS(tt.cells), err); got != tt.want {
 				t.Errorf("Parse:\ngot  %s\nwant %s", got, tt.want)
 			}
 			_, err = sheet.EvalCells(tt.cells)
-			if got := describe(err); got != tt.want {
+			if got := describe(t, sheetFS(tt.cells), err); got != tt.want {
 				t.Errorf("EvalCells:\ngot  %s\nwant %s", got, tt.want)
 			}
 		})
@@ -157,14 +194,17 @@ func TestParseFS(t *testing.T) {
 	}{
 		{"no sheet", fstest.MapFS{"other/A1": {Data: []byte("1")}}, ""},
 		{"other trees ignored", fstest.MapFS{"sheet/A1": {Data: []byte("=1")}, "csv/x.csv": {}}, "A1"},
-		{"directory", fstest.MapFS{"sheet/A1/x": {Data: []byte("1")}}, `S101 A1: a directory, not a cell @A1 sheet/A1:0`},
-		{"directory not named for a cell", fstest.MapFS{"sheet/notes/x": {}}, `S101 notes: not a cell name @ sheet/notes:0`},
+		{"directory", fstest.MapFS{"sheet/A1/x": {Data: []byte("1")}}, `S101 A1: a directory, not a cell @A1 sheet/A1/x:0`},
+		{"directory of files and directories", fstest.MapFS{"sheet/A1/y/z": {}, "sheet/A1/x": {}, "sheet/A1/w/v": {}},
+			`S101 A1: a directory, not a cell @A1 sheet/A1/w/v:0 @A1 sheet/A1/x:0 @A1 sheet/A1/y/z:0`},
+		{"empty directory", fstest.MapFS{"sheet/A1": {Mode: fs.ModeDir}}, `S101 A1: a directory, not a cell`},
+		{"directory not named for a cell", fstest.MapFS{"sheet/notes/x": {}}, `S101 notes: not a cell name @ sheet/notes/x:0`},
 		{"sheet is a file", fstest.MapFS{"sheet": {Data: []byte("1")}}, `plain: readdir sheet: not implemented`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p, err := sheet.Parse(tt.fsys)
-			got := describe(err)
+			got := describe(t, tt.fsys, err)
 			if err == nil {
 				got = strings.Join(p.Formulas(), " ")
 			}
@@ -207,15 +247,15 @@ func TestResolve(t *testing.T) {
 				t.Fatal(err)
 			}
 			g, err := sheet.Resolve(p)
-			got := describe(err)
+			got := describe(t, sheetFS(tt.cells), err)
 			if err == nil {
 				got = strings.Join(g.Order(), " ")
 			}
 			if got != tt.want {
 				t.Errorf("got  %s\nwant %s", got, tt.want)
 			}
-			if _, err := sheet.EvalCells(tt.cells); err != nil && describe(err) != tt.want {
-				t.Errorf("EvalCells: got %s, want %s", describe(err), tt.want)
+			if _, err := sheet.EvalCells(tt.cells); err != nil && describe(t, sheetFS(tt.cells), err) != tt.want {
+				t.Errorf("EvalCells: got %s, want %s", describe(t, sheetFS(tt.cells), err), tt.want)
 			}
 		})
 	}
@@ -326,7 +366,7 @@ func TestCalc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var stdout, stderr strings.Builder
 			err := sheet.Calc(sheetFS(tt.cells), &stdout, &stderr)
-			if got := describe(err); got != tt.err {
+			if got := describe(t, sheetFS(tt.cells), err); got != tt.err {
 				t.Errorf("error: got %s, want %s", got, tt.err)
 			}
 			if got := stdout.String(); got != tt.stdout {
@@ -345,11 +385,11 @@ func (failWriter) Write([]byte) (int, error) { return 0, errors.New("disk full")
 
 func TestCalcWriteErrors(t *testing.T) {
 	cells := sheetFS(map[string]string{"A1": "=1/0"})
-	if err := sheet.Calc(cells, failWriter{}, &strings.Builder{}); describe(err) != "plain: disk full" {
-		t.Errorf("stdout: got %s", describe(err))
+	if err := sheet.Calc(cells, failWriter{}, &strings.Builder{}); describe(t, cells, err) != "plain: disk full" {
+		t.Errorf("stdout: got %s", describe(t, cells, err))
 	}
-	if err := sheet.Calc(cells, &strings.Builder{}, failWriter{}); describe(err) != "plain: disk full" {
-		t.Errorf("stderr: got %s", describe(err))
+	if err := sheet.Calc(cells, &strings.Builder{}, failWriter{}); describe(t, cells, err) != "plain: disk full" {
+		t.Errorf("stderr: got %s", describe(t, cells, err))
 	}
 }
 
@@ -413,7 +453,7 @@ func TestImportCSV(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			in := fstest.MapFS{"csv/in.csv": {Data: []byte(tt.csv)}}
 			cells, err := sheet.ImportCSV(in, "csv/in.csv")
-			got := describe(err)
+			got := describe(t, in, err)
 			if err == nil {
 				got = cellsOf(t, cells)
 			}
@@ -469,7 +509,7 @@ func TestFieldLines(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			in := fstest.MapFS{"csv/in.csv": {Data: []byte(tt.csv)}}
 			first, last, err := sheet.FieldLines(in, "csv/in.csv", tt.cell)
-			got := describe(err)
+			got := describe(t, in, err)
 			if err == nil {
 				got = fmt.Sprintf("%d-%d", first, last)
 			}
@@ -557,7 +597,7 @@ func TestMoveDown(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			moved, err := sheet.MoveDown(sheetFS(tt.cells))
-			got := describe(err)
+			got := describe(t, sheetFS(tt.cells), err)
 			if err == nil {
 				got = cellsOf(t, moved)
 			}
@@ -595,6 +635,7 @@ func TestMovable(t *testing.T) {
 				t.Errorf("got %q, %v; want %q, %v", why, ok, tt.why, tt.why == "")
 			}
 			_, err := sheet.MoveDown(tt.fsys)
+			describe(t, tt.fsys, err) // for its check of the positions
 			switch {
 			case !ok && (err == nil || err.Error() != why):
 				t.Errorf("Movable declined with %q, and MoveDown gave %v", why, err)
@@ -643,7 +684,7 @@ func TestLoop(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			looped, err := sheet.Loop(sheetFS(tt.cells))
-			got := describe(err)
+			got := describe(t, sheetFS(tt.cells), err)
 			if err == nil {
 				got = cellsOf(t, looped)
 			}
@@ -679,6 +720,7 @@ func TestLoopable(t *testing.T) {
 				t.Errorf("got %q, %v; want %q, %v", why, ok, tt.why, tt.why == "")
 			}
 			_, err := sheet.Loop(tt.fsys)
+			describe(t, tt.fsys, err) // for its check of the positions
 			switch {
 			case !ok && (err == nil || err.Error() != why):
 				t.Errorf("Loopable declined with %q, and Loop gave %v", why, err)
@@ -700,7 +742,7 @@ func TestLoopResolves(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = sheet.Resolve(p)
-	if got, want := describe(err), "S201 A1 -> A1: cycle @A1 sheet/A1:1"; got != want {
+	if got, want := describe(t, looped, err), "S201 A1 -> A1: cycle @A1 sheet/A1:1"; got != want {
 		t.Errorf("got %s, want %s", got, want)
 	}
 }

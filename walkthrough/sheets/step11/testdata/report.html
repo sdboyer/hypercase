@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>hypercase report: fb0f9fcb3a6863bc18f7c006aa4c0eece3d320f3 to HEAD</title>
+<title>hypercase report: e31b6290606ec7950bfe27a7625d2f6b184f06b7 to HEAD</title>
 <style>
 :root {
   color-scheme: light dark;
@@ -94,7 +94,7 @@ ul.outputs { padding-left: 18px; }
 <body>
 <header>
 <h1>hypercase report</h1>
-<p class="revs"><span class="rev">fb0f9fcb3a6863bc18f7c006aa4c0eece3d320f3</span> <code>fb0f9fcb3a68</code> to <span class="rev">HEAD</span> <code>b88704864ba7</code>, over the corpus root <code>step11</code></p>
+<p class="revs"><span class="rev">e31b6290606ec7950bfe27a7625d2f6b184f06b7</span> <code>e31b6290606e</code> to <span class="rev">HEAD</span> <code>2a6fdadfb7a4</code>, over the corpus root <code>step11</code></p>
 </header>
 <main>
 <section id="changes">
@@ -168,7 +168,7 @@ ul.outputs { padding-left: 18px; }
 <div class="line"><span class="case">sheet/blank</span> <span class="col">resolve</span> <span class="outcome s-blocked">blocked parse</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
 </li>
 </ul>
-<h3 class="rank bytes-changed">bytes changed <span class="count">2</span></h3>
+<h3 class="rank bytes-changed">bytes changed <span class="count">4</span></h3>
 <ul class="changes">
 <li class="change bytes-changed">
 <div class="line"><span class="case">sheet/notes</span> <span class="col">calc</span> <span class="outcome s-rejected">rejected S101</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
@@ -182,6 +182,20 @@ ul.outputs { padding-left: 18px; }
 <ul class="files">
 <li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
 <pre class="diff"><span class="del">- notes: not a cell name</span><span class="add">&#43; notes: not the name of a cell</span><span class="ctx">    sheet/notes</span></pre></details></li>
+</ul>
+</li>
+<li class="change bytes-changed">
+<div class="line"><span class="case">sheet/notes-directory</span> <span class="col">calc</span> <span class="outcome s-rejected">rejected S101</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
+<ul class="files">
+<li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
+<pre class="diff"><span class="del">- notes: not a cell name</span><span class="add">&#43; notes: not the name of a cell</span><span class="ctx">    sheet/notes/milk</span></pre></details></li>
+</ul>
+</li>
+<li class="change bytes-changed">
+<div class="line"><span class="case">sheet/notes-directory</span> <span class="col">parse</span> <span class="outcome s-rejected">rejected S101</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span></div>
+<ul class="files">
+<li class="changed"><details><summary><code>error.txt</code> changed <span class="stat"><span class="add">+1</span> <span class="del">-1</span></span></summary>
+<pre class="diff"><span class="del">- notes: not a cell name</span><span class="add">&#43; notes: not the name of a cell</span><span class="ctx">    sheet/notes/milk</span></pre></details></li>
 </ul>
 </li>
 </ul>
@@ -262,6 +276,14 @@ ul.outputs { padding-left: 18px; }
 <tr><th scope="col">case</th><th scope="col" title="Runs the calc command on the sheet.">calc</th><th scope="col" title="Evaluates every cell of the sheet.">evaluate</th><th scope="col" title="Prints each formula back in canonical form.">format</th><th scope="col" title="Parses every cell.">parse</th><th scope="col" title="Orders the cells so that each comes after the cells it refers to.">resolve</th></tr>
 </thead>
 <tbody>
+<tr>
+<th scope="row"><span class="case">sheet/directory</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span><div class="desc">A cell kept as a directory of files, which no cell is.</div></th>
+<td class="cell s-rejected"><span class="outcome">rejected S101</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked parse</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked parse</span></td>
+<td class="cell s-rejected"><span class="outcome">rejected S101</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked parse</span></td>
+</tr>
 <tr>
 <th scope="row"><span class="case">sheet/divide</span><div class="desc">A1 divides B1 by C1, which is zero.</div></th>
 <td class="cell s-accepted outcome-changed"><span class="outcome">accepted warned</span> <span class="badge">outcome changed</span></td>
@@ -383,6 +405,14 @@ ul.outputs { padding-left: 18px; }
 <td class="cell s-blocked"><span class="outcome">blocked parse</span></td>
 </tr>
 <tr>
+<th scope="row"><span class="case">sheet/notes-directory</span> <span class="props"><span class="prop" title="Some cell holds neither a number nor a formula.">malformed</span></span><div class="desc">Notes kept beside the cells, in a directory that is not a cell.</div></th>
+<td class="cell s-rejected bytes-changed"><span class="outcome">rejected S101</span> <span class="badge">bytes changed</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked parse</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked parse</span></td>
+<td class="cell s-rejected bytes-changed"><span class="outcome">rejected S101</span> <span class="badge">bytes changed</span></td>
+<td class="cell s-blocked"><span class="outcome">blocked parse</span></td>
+</tr>
+<tr>
 <th scope="row"><span class="case">sheet/prices</span><div class="desc">Two prices and their total.</div></th>
 <td class="cell s-accepted"><span class="outcome">accepted</span></td>
 <td class="cell s-accepted"><span class="outcome">accepted</span></td>
@@ -489,7 +519,7 @@ ul.outputs { padding-left: 18px; }
 <dt>looped</dt><dd>The first cell in cell order, row by row then column by column, replaced by a reference to itself, so the sheet has a cycle.<p>Gives <span class="prop">circular</span>.</p></dd>
 <dt>renamed</dt><dd>Every cell moved one row down, A1 to A2, with every reference rewritten to the moved cell.<p>Keeps <span class="prop">circular</span>, <span class="prop">dangling</span>.</p></dd>
 </dl>
-<h4>Cases only at <span class="rev">fb0f9fcb3a6863bc18f7c006aa4c0eece3d320f3</span></h4>
+<h4>Cases only at <span class="rev">e31b6290606ec7950bfe27a7625d2f6b184f06b7</span></h4>
 <dl class="cases">
 <dt><span class="case">sheet/blank</span></dt><dd>A1 is a cell file with nothing in it.</dd>
 </dl>
