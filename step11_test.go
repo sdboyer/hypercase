@@ -1,10 +1,24 @@
 package hypercase_test
 
 import (
+	"bytes"
+	"cmp"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"testing/fstest"
 
+	"github.com/sdboyer/hypercase"
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/decl"
+	"github.com/sdboyer/hypercase/internal/revmap"
 )
 
 // TestInputsRefusals: registration refuses what an output declaration's
@@ -303,6 +317,247 @@ func TestInputsPositionsOfAnotherPackage(t *testing.T) {
 		"out/list/outcome":     "blocked import\n",
 	})
 	s.done()
+}
+
+// TestInputsPositionsReadTheView: Positions receives the cell's input
+// view, and can read it to turn where an error points into a path in the
+// view. Here the error names its file by an absolute path, under the root
+// that the view's file loader/root names, and a variant that moves the root
+// overlays a root of its own, which its cell's Positions reads.
+func TestInputsPositionsReadTheView(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "basic")
+	const rooted = "testdata/script/rooted.txtar"
+	s.write(rooted, []byte("The error names its file by an absolute path, under the root the view names.\n-- in/do/error --\nA1 -> A1: cycle\nat 2 2 /sheets@v1/do/error\n-- in/loader/root --\n/sheets@v1\n-- properties --\ncircular\n-- variant/moved/about --\nThe root moves, and the error names its file under the new one.\n-- variant/moved/properties --\ncircular\n-- variant/moved/in/do/error --\nA1 -> A1: cycle\nat 1 2 /sheets@v2/do/error\n-- variant/moved/in/loader/root --\n/sheets@v2\n"), "a case whose error names its file under the root its view names")
+	s.passes(s.update("rejects"))
+	s.hasSections(rooted, map[string]string{
+		"out/echo/inputs":               "error.txt\n  in/do/error:2-2\n",
+		"variant/moved/out/echo/inputs": "error.txt\n  variant/moved/in/do/error:1-2\n",
+	})
+	s.passes(s.normal("rejects"))
+	s.done()
+}
+
+// TestInputsPositionsView: Positions receives the cell's input view, the
+// one RenderError receives, at every cell of the chain, variant and
+// transform fixtures. It runs each under recordingViews, in an update and
+// then a normal run, and requires the calls of Positions and the cells
+// whose error.txt takes its ranges from Positions to match one to one:
+// each cell has a call whose error, rendered on the view the call
+// received, is the cell's error.txt, and whose view is the cell's input
+// view, as its Observed records them. It doesn't check RenderError's view:
+// TestChainRenderError finds RenderError alone receiving another view past
+// a bytes lift, and at a variant's or a transform's cells no test does
+// (#77). Among the cells it checks are a base's, a hand-written variant's,
+// a transform's variant's, one past a bytes lift, and a bytes lift's own.
+func TestInputsPositionsView(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	checked := map[string]bool{}
+	t.Run("fixtures", func(t *testing.T) {
+		for _, fixture := range []string{"chain", "variants", "transforms"} {
+			t.Run(fixture, func(t *testing.T) {
+				t.Parallel()
+				s := newSandbox(t, fixture)
+				dir := t.TempDir()
+				for _, run := range []string{"update", "normal"} {
+					hooks, observed := filepath.Join(dir, run+"-hooks.jsonl"), filepath.Join(dir, run+"-observed.jsonl")
+					env := []string{hooksEnv + "=" + hooks, observeEnv + "=" + observed}
+					if run == "update" {
+						env = append(env, fixtureUpdate+"=1")
+					}
+					r := s.execRaw("", fixture, env)
+					if !r.ok() {
+						t.Fatalf("the %s run failed:\n%s", run, s.shown(r))
+					}
+					var cells []hypercase.Observed
+					for _, o := range readObserved(t, observed) {
+						if o.Record == "cell" && positioned(t, o) {
+							cells = append(cells, o)
+						}
+					}
+					uncalled, unclaimed := unmatched(readViewRecords(t, hooks), cells)
+					for _, o := range uncalled {
+						t.Errorf("in the %s run, %s: no call of Positions received the cell's error.txt and input view", run, cellName(o))
+					}
+					for _, rec := range unclaimed {
+						t.Errorf("the %s run called Positions on the error %q, on the view %.12s, which no cell checked has with that error.txt", run, rec.Error, rec.Positions)
+					}
+					mu.Lock()
+					for _, o := range cells {
+						for _, k := range viewKinds(o) {
+							checked[k] = true
+						}
+					}
+					mu.Unlock()
+				}
+			})
+		}
+	})
+	for _, k := range []string{"a base's", "a hand-written variant's", "a transform's variant's", "one past a bytes lift", "a bytes lift's own"} {
+		if !checked[k] {
+			t.Errorf("no cell checked is %s", k)
+		}
+	}
+}
+
+// unmatched matches the calls of Positions the records give to the cells,
+// each to one with its rendered error.txt and its input view's digest. It
+// gives the cells left with no call of their own, in order of package,
+// case, prefix and column, the order the cells take the calls in; and the
+// records of the calls no cell takes, in order of what they rendered, then
+// of their view.
+func unmatched(records []viewRecord, cells []hypercase.Observed) (uncalled []hypercase.Observed, unclaimed []viewRecord) {
+	type call struct{ rendered, view string }
+	calls := map[call]int{}
+	for _, rec := range records {
+		calls[call{rec.Rendered, rec.Positions}]++
+	}
+	cells = slices.Clone(cells)
+	slices.SortFunc(cells, func(a, b hypercase.Observed) int {
+		return cmp.Or(strings.Compare(a.Pkg, b.Pkg), strings.Compare(a.Case, b.Case), strings.Compare(a.Prefix, b.Prefix), strings.Compare(a.Column, b.Column))
+	})
+	for _, o := range cells {
+		c := call{o.Files["error.txt"], viewDigest(o.View)}
+		if calls[c] == 0 {
+			uncalled = append(uncalled, o)
+			continue
+		}
+		calls[c]--
+	}
+	records = slices.Clone(records)
+	slices.SortStableFunc(records, func(a, b viewRecord) int {
+		return cmp.Or(strings.Compare(a.Rendered, b.Rendered), strings.Compare(a.Positions, b.Positions))
+	})
+	for _, rec := range records {
+		if c := (call{rec.Rendered, rec.Positions}); calls[c] > 0 {
+			unclaimed = append(unclaimed, rec)
+			calls[c]--
+		}
+	}
+	return uncalled, unclaimed
+}
+
+// cellName names a cell by its Observed, in a message.
+func cellName(o hypercase.Observed) string {
+	return fmt.Sprintf("%s %s%s, in the package %s", o.Case, o.Prefix, o.Column, o.Pkg)
+}
+
+// TestUnmatched: of two cells with one error.txt on one view, and one
+// call of Positions on them, the second, in order of case, takes no call;
+// and a call on another view is taken by no cell.
+func TestUnmatched(t *testing.T) {
+	t.Parallel()
+	view, other := map[string]string{"do/error": "boom\n"}, map[string]string{"do/error": "boom\n", "do/x": "x\n"}
+	cell := func(c string) hypercase.Observed {
+		return hypercase.Observed{Pkg: ".", Case: c, Column: "echo", Files: map[string]string{"error.txt": "boom\n"}, View: view}
+	}
+	records := []viewRecord{
+		{Error: "boom", Rendered: "boom\n", Positions: viewDigest(view)},
+		{Error: "boom", Rendered: "boom\n", Positions: viewDigest(other)},
+	}
+	uncalled, unclaimed := unmatched(records, []hypercase.Observed{cell("script/b"), cell("script/a")})
+	if len(uncalled) != 1 || uncalled[0].Case != "script/b" {
+		t.Errorf("the cells with no call are %v, want script/b's alone", uncalled)
+	}
+	if want := records[1:2]; !slices.Equal(unclaimed, want) {
+		t.Errorf("the calls no cell takes are %v, want %v", unclaimed, want)
+	}
+}
+
+// TestRecordingViews: recordingViews records each call of Positions with
+// the error, the error rendered on the view the call received, by the
+// project's RenderError or, where the project has none, as the framework
+// renders it, and a digest of that view; and it refuses a project with no
+// Positions.
+func TestRecordingViews(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	finds := func(fs.FS, error) []decl.Range { return nil }
+	view := fstest.MapFS{"do/a": {Data: []byte("a\n")}}
+	for _, tt := range []struct {
+		name   string
+		render func(fs.FS, error) []byte
+		want   string
+	}{
+		{"framework", nil, "boom\n"},
+		{"project", func(in fs.FS, err error) []byte {
+			data, _ := fs.ReadFile(in, "do/a")
+			return []byte(err.Error() + " on " + string(data))
+		}, "boom on a\n"},
+	} {
+		path := filepath.Join(dir, tt.name+".jsonl")
+		recordingViews(decl.Project{Positions: finds, RenderError: tt.render}, path).Positions(view, errors.New("boom"))
+		if got, want := readViewRecords(t, path), []viewRecord{{Error: "boom", Rendered: tt.want, Positions: digestOf(view)}}; !slices.Equal(got, want) {
+			t.Errorf("with the %s's rendering, recordingViews recorded %+v, want %+v", tt.name, got, want)
+		}
+	}
+
+	defer func() {
+		if recover() == nil {
+			t.Error("recordingViews took a project with no Positions")
+		}
+	}()
+	recordingViews(decl.Project{}, filepath.Join(dir, "none.jsonl"))
+}
+
+// positioned reports whether a cell's Observed records a call of
+// Positions: the cell has an error.txt, which no panic gave it, and an
+// inputs file, which doesn't map error.txt to all inputs.
+func positioned(t *testing.T, o hypercase.Observed) bool {
+	t.Helper()
+	inputs, ok := o.Files["inputs"]
+	if _, has := o.Files["error.txt"]; !has || !ok || o.Files["outcome"] == archive.Panicked+"\n" {
+		return false
+	}
+	files, err := revmap.Parse([]byte(inputs))
+	if err != nil {
+		t.Fatalf("%s %s%s: its inputs file: %v", o.Case, o.Prefix, o.Column, err)
+	}
+	i := slices.IndexFunc(files, func(f revmap.File) bool { return f.Path == "error.txt" })
+	return i >= 0 && !files[i].All
+}
+
+// viewKinds names the kinds of input view a cell's Observed records, as
+// TestInputsPositionsView requires some cell of each.
+func viewKinds(o hypercase.Observed) []string {
+	var kinds []string
+	switch {
+	case strings.HasPrefix(o.Prefix, "variant/"):
+		kinds = append(kinds, "a hand-written variant's")
+	case strings.HasPrefix(o.Prefix, "transform/"):
+		kinds = append(kinds, "a transform's variant's")
+	case len(o.Path) == 0 && !o.Via:
+		kinds = append(kinds, "a base's")
+	}
+	if len(o.Path) > 0 {
+		kinds = append(kinds, "one past a bytes lift")
+	}
+	if o.Via {
+		kinds = append(kinds, "a bytes lift's own")
+	}
+	return kinds
+}
+
+// readViewRecords reads what recordingViews wrote to the file at path.
+func readViewRecords(t *testing.T, path string) []viewRecord {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []viewRecord
+	for line := range bytes.Lines(data) {
+		var rec viewRecord
+		if err := json.Unmarshal(line, &rec); err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, rec)
+	}
+	return out
 }
 
 // TestInputsClash: a column's output under inputs/ is one no archive can

@@ -387,7 +387,7 @@ func (r *runner) mapInputs(ns *notes, c *aCase, col *column, from *origin, files
 				break
 			}
 			says, fix = fmt.Sprintf("The project's Positions, on %s's error,", col.name), closing{"Fix Positions.", claims{Nothing: true}}
-			p := call(func(*called) { ranges = r.positions(out.err) })
+			p := call(func(*called) { ranges = r.positions(from.view, out.err) })
 			if p.panicked {
 				ns.add(aboutFault, fmt.Sprintf("The project's Positions panicked on %s's error: %v", col.name, p.panicValue), fix)
 				fault = true
