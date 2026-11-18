@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -15,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/sdboyer/hypercase/internal/diff"
+	"golang.org/x/mod/module"
 )
 
 // The self-tests run hypercase on fixtures, small archives under
@@ -248,12 +250,9 @@ func (s *sandbox) shown(r rawResult) string {
 	return out
 }
 
-// execRaw runs the child, as exec does, and returns what it left, its
-// output as the child wrote it, for a caller that shows it only on a
-// failure.
-func (s *sandbox) execRaw(pkg, registration string, extra []string, args ...string) rawResult {
-	cmd := exec.Command(os.Args[0], append([]string{"-test.run=^TestCorpus$", "-test.v", "-test.count=1"}, args...)...)
-	cmd.Dir = filepath.Join(s.dir, pkg)
+// childEnv is this process's environment for a child, less what would
+// steer it: the self-tests' and the updates' variables, GOFLAGS and PWD.
+func childEnv() []string {
 	var env []string
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
@@ -261,6 +260,16 @@ func (s *sandbox) execRaw(pkg, registration string, extra []string, args ...stri
 			env = append(env, kv)
 		}
 	}
+	return env
+}
+
+// execRaw runs the child, as exec does, and returns what it left, its
+// output as the child wrote it, for a caller that shows it only on a
+// failure.
+func (s *sandbox) execRaw(pkg, registration string, extra []string, args ...string) rawResult {
+	cmd := exec.Command(os.Args[0], append([]string{"-test.run=^TestCorpus$", "-test.v", "-test.count=1"}, args...)...)
+	cmd.Dir = filepath.Join(s.dir, pkg)
+	env := childEnv()
 	env = append(env, fixtureEnv+"="+registration)
 	env = append(env, extra...)
 	cmd.Env = env
@@ -488,11 +497,17 @@ func (s *sandbox) same(rel string, before []byte) {
 	}
 }
 
-// done compares the transcript with its golden.
+// done compares the transcript with its golden. The golden is named from
+// the test, and a module zip can't hold a file whose path
+// module.CheckFilePath refuses, so a test whose golden would be one fails
+// before the golden is read or written.
 func (s *sandbox) done() {
 	s.t.Helper()
-	name := strings.ReplaceAll(s.t.Name(), "/", "-") + ".txt"
-	golden := filepath.Join("testdata", "transcripts", name)
+	rel := path.Join("testdata", "transcripts", strings.ReplaceAll(s.t.Name(), "/", "-")+".txt")
+	if err := module.CheckFilePath(rel); err != nil {
+		s.t.Fatalf("%s can't be in a module zip: %v.\nA transcript is named from its test: rename the subtest, %s.", rel, ruleError(err), s.t.Name())
+	}
+	golden := filepath.FromSlash(rel)
 	got := []byte(s.transcript.String())
 	if os.Getenv(transcriptsVar) == "1" {
 		if err := os.MkdirAll(filepath.Dir(golden), 0o755); err != nil {

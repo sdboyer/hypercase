@@ -1534,7 +1534,7 @@ func TestChainSharedProjects(t *testing.T) {
 
 	// b's renderer panics on import's error, and import's owner's doesn't:
 	// the update writes import's cell, and b's cells past it.
-	t.Run("the user's renderer panics", func(t *testing.T) {
+	t.Run("the renderer of the user panics", func(t *testing.T) {
 		t.Parallel()
 		s := newSandbox(t, "chain-shared")
 		const quoted = "testdata/export/quoted.txtar"
@@ -1557,7 +1557,7 @@ func TestChainSharedProjects(t *testing.T) {
 	// update writes import's cell, whose committed outcome stays accepted,
 	// and b's update writes its cells past import as blocked by it, which
 	// b's normal run then contradicts, reading the committed outcome.
-	t.Run("the owner's renderer panics", func(t *testing.T) {
+	t.Run("the renderer of the owner panics", func(t *testing.T) {
 		t.Parallel()
 		s := newSandbox(t, "chain-shared")
 		const prices = "testdata/export/prices.txtar"
@@ -1603,7 +1603,7 @@ func TestChainSharedProjects(t *testing.T) {
 	// can't hold of another: no Project's update writes import's cell on
 	// either, so b's update holds the cells past it back, as the owner's
 	// does.
-	t.Run("a fault or a product an archive can't hold", func(t *testing.T) {
+	t.Run("a fault or a product an archive cannot hold", func(t *testing.T) {
 		t.Parallel()
 		s := newSandbox(t, "chain-shared")
 		for _, r := range s.parallel(childRun{"", "chain-a", true}, childRun{"b", "chain-b", true}) {
