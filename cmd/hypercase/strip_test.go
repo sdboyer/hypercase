@@ -709,7 +709,8 @@ func liftsRegistry() string {
 // of another format. Where they disagree, which the root-package check
 // fails on, one saying it is a bytes lift is enough to leave it. A
 // registry that names the corpus root and can't be read fails strip, and
-// nothing is written.
+// nothing is written: one that isn't a registry, and one whose paths
+// don't follow its corpora.
 func TestStripFrozenVia(t *testing.T) {
 	t.Parallel()
 	twice := resolveViaTwice()
@@ -757,6 +758,12 @@ func TestStripFrozenVia(t *testing.T) {
 	files := with(stripModule(), map[string]string{"testdata/hypercase.json": strings.Replace(lifts, "{\n", "{\n  \"nope\": 1,\n", 1), "testdata/sheet/twice.txtar": twice})
 	top := writeTree(t, files)
 	stripFails(t, top, "", 1, []string{"-column", "resolve"}, "hypercase strip: testdata/hypercase.json can't be read as a registry: it is not a registry: json: unknown field \"nope\". So strip can't tell which of the columns it registers are bytes lifts. Nothing was removed.\nFix the file or delete it, then run hypercase strip -column resolve again.\n")
+	sameTree(t, top, files)
+
+	noPaths := string(registry.Registry{UpdateVar: sheetsVar, CorpusRoot: ".", Lifts: []registry.Lift{{Name: "resolve", Corpora: []string{"sheet"}}}}.Marshal())
+	files = with(stripModule(), map[string]string{"testdata/hypercase.json": noPaths, "testdata/sheet/twice.txtar": twice})
+	top = writeTree(t, files)
+	stripFails(t, top, "", 1, []string{"-column", "resolve"}, "hypercase strip: testdata/hypercase.json can't be read as a registry: the lift resolve runs over testdata/sheet/, and has paths from none, where a registry gives each column one path from each corpus it runs over, in the same order. So strip can't tell which of the columns it registers are bytes lifts. Nothing was removed.\nFix the file or delete it, then run hypercase strip -column resolve again.\n")
 	sameTree(t, top, files)
 }
 

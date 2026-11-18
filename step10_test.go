@@ -1315,6 +1315,48 @@ func TestChainRootCheckUsedUnowned(t *testing.T) {
 	s.done()
 }
 
+// TestUpdateMalformedPaths: over the strip fixture, the registries of
+// both packages give parse, which . owns and ./b uses, no path from
+// export, as edited by hand, so neither can be read. The update walks for
+// symbolic links before it writes anything, the package's own registry
+// included, and before a corpus check reads a registry, so with a link in
+// place of testdata/export it refuses the link and leaves both registries
+// as they were. Without the link, the root package's update rewrites its
+// own registry, and its corpus check cells can't read ./b's, which only
+// ./b's update rewrites. Then every run passes.
+func TestUpdateMalformedPaths(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "strip")
+	s.settle(stripModule...)
+	const regA, regB = "testdata/hypercase.json", "b/testdata/hypercase.json"
+	cleanA, cleanB := s.read(regA), s.read(regB)
+	for _, reg := range []string{regA, regB} {
+		g, err := registry.Parse(s.read(reg))
+		if err != nil {
+			t.Fatal(err)
+		}
+		l := &g.Lifts[slices.IndexFunc(g.Lifts, func(l registry.Lift) bool { return l.Name == "parse" })]
+		l.Paths = slices.DeleteFunc(l.Paths, func(p registry.Path) bool { return p.Corpus == "export" })
+		s.write(reg, g.Marshal(), "drop parse's path from export, by hand")
+	}
+	const why = "the lift parse runs over testdata/export/ and testdata/script/, and has paths from testdata/script/, where a registry gives each column one path from each corpus it runs over, in the same order"
+	s.remove("testdata/.hypercase.lock", "the lock, which the update takes to write an archive")
+	before := s.snapshot()
+	s.link("testdata/export", "")
+	s.fails(s.update("strip-a"), "testdata/ holds no symbolic links: testdata/export is one, so the update wrote nothing.\nRemove it, or replace it with a copy of what it names, if it names anything, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... again.")
+	s.unlink("testdata/export")
+	s.unchanged(before)
+
+	s.fails(s.update("strip-a"), "the corpus check cells can't read its cells: b/testdata/hypercase.json can't be read: "+why+".\nRun FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it. No check runs, and an update writes no findings.")
+	s.same(regA, cleanA)
+	s.passes(s.run("b", "strip-b", true))
+	s.same(regB, cleanB)
+	s.passes(s.update("strip-a"))
+	s.passes(s.normal("strip-a"))
+	s.passes(s.run("b", "strip-b", false))
+	s.done()
+}
+
 // TestChainRootCheck: the root-package check claims via/<lift>/ for each
 // bytes lift over the corpus, and reports any other via/ section, naming
 // the archive and the section.
