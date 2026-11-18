@@ -559,14 +559,14 @@ var liftFields = []struct {
 }
 
 // outputsEntry shows a registry's output declarations: each pattern, with
-// its description.
+// its description and what its Inputs states.
 func outputsEntry(outs []registry.Output) string {
 	if len(outs) == 0 {
 		return "none"
 	}
 	var es []string
 	for _, o := range outs {
-		es = append(es, fmt.Sprintf("%s %q", o.Pattern, o.Description))
+		es = append(es, fmt.Sprintf("%s %q (inputs: %s)", o.Pattern, o.Description, o.Inputs))
 	}
 	return strings.Join(es, ", ")
 }

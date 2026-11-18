@@ -1029,21 +1029,24 @@ skipped no formulas
 
 The root package's registry, `step05/testdata/hypercase.json`, holds the
 update variable, the corpus root, that the package runs the root-package
-check, the properties it registers, and `evaluate`: the type it consumes,
-`io/fs.FS`, its corpora, its path from each, its outputs and what it
-rejects. Its `types` and `lifts` stay empty until step 6, as do the
-`lifts` of `evaluate`'s path, and `issueLinks` until step 9. `codes`,
-whether the project supplies `Codes`, stays `false`, and `evaluate`'s
-`classifier` stays `null`, until step 8:
+check, that the project supplies `Positions`, the properties it registers,
+and `evaluate`: the type it consumes, `io/fs.FS`, its corpora, its path
+from each, its outputs, each with what its `Inputs` states, and what it
+rejects. Step 11 explains `positions` and `inputs`. Its `types` and
+`lifts` stay empty until step 6, as do the `lifts` of `evaluate`'s path,
+and `issueLinks` until step 9. `codes`, whether the project supplies
+`Codes`, stays `false`, and `evaluate`'s `classifier` stays `null`, until
+step 8:
 
 <!-- source: walkthrough/sheets/step05/testdata/hypercase.json -->
 ```json
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "SHEETS_UPDATE_GOLDEN",
   "corpusRoot": "step05",
   "rootPackage": true,
   "codes": false,
+  "positions": true,
   "issueLinks": [],
   "properties": [
     {
@@ -1078,11 +1081,13 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
       "outputs": [
         {
           "pattern": "error.txt",
-          "description": "Why the sheet can't be evaluated."
+          "description": "Why the sheet can't be evaluated.",
+          "inputs": "positions"
         },
         {
           "pattern": "values.txt",
-          "description": "Each cell's value, one per line, in cell order."
+          "description": "Each cell's value, one per line, in cell order.",
+          "inputs": "func"
         }
       ],
       "rejects": [
@@ -1148,8 +1153,10 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
 - It lists everything the package registers but its corpus checks
   (step 8), each with its description, and for each column the type it
   consumes, the corpora it runs over, its path from each (step 6), its
-  declared outputs and the properties it rejects. It records the package's
-  corpus root, and whether the package runs the root-package check.
+  declared outputs, each with what its `Inputs` states (step 11), and the
+  properties it rejects. It records the package's corpus root, whether
+  the project supplies `Positions` (step 11), and whether the package runs
+  the root-package check.
 - It records the name of the project's update variable, for a tool to print
   the update command. No tool reads it yet.
 - It carries a format version, which changes on any change to what the

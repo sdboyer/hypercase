@@ -23,6 +23,7 @@ func (r *runner) ownRegistry() registry.Registry {
 		CorpusRoot:  r.rootRel,
 		RootPackage: r.rootPackage,
 		Codes:       r.codes != nil,
+		Positions:   r.positions != nil,
 	}
 	for _, l := range r.issueLinks {
 		g.IssueLinks = append(g.IssueLinks, registry.IssueLink{Pattern: l.Pattern, URL: l.URL})
@@ -87,9 +88,18 @@ func (r *runner) ownRegistry() registry.Registry {
 func registryOutputs(os []decl.Output) []registry.Output {
 	var out []registry.Output
 	for _, o := range os {
-		out = append(out, registry.Output{Pattern: o.Pattern, Description: o.Description})
+		out = append(out, registry.Output{Pattern: o.Pattern, Description: o.Description, Inputs: recordedInputs[stated(o.Inputs)]})
 	}
 	return out
+}
+
+// recordedInputs is what a registry records of each statement an Inputs
+// makes. Registration refuses statesOther.
+var recordedInputs = map[statement]string{
+	statesNone:      registry.InputsNone,
+	statesFunc:      registry.InputsFunc,
+	statesAll:       registry.InputsAll,
+	statesPositions: registry.InputsPositions,
 }
 
 func propertyNames(ps []decl.Property) []string {

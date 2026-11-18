@@ -105,7 +105,7 @@ func TestChain(t *testing.T) {
 	s.hasSections("testdata/hypercase.json", map[string]string{})
 	reg := string(s.read("testdata/hypercase.json"))
 	for _, want := range []string{
-		`"format": 7,`,
+		`"format": 8,`,
 		"\"name\": \"import\",\n      \"description\": \"Imports the export as a script, as its import/ tree says.\",\n      \"input\": \"github.com/sdboyer/hypercase_test.Export\",\n      \"product\": \"github.com/sdboyer/hypercase_test.Script\",\n      \"owned\": true,\n      \"bytes\": true,",
 		"\"productFiles\": [\n        {\n          \"pattern\": \"evaluate/*\",",
 		"\"rejects\": [\n        \"unterminated\"\n      ]",
@@ -1647,13 +1647,14 @@ func TestChainLiftEntries(t *testing.T) {
 		s.passes(rs[0])
 		s.fails(rs[1], "The cell of the lift import, on list's path, has a problem, which that cell reports, in the package that owns it.")
 		s.hasSections(quoted, map[string]string{"out/import/outcome": "rejected\n"}, "out/list/", "out/evaluate/")
-		s.fails(s.normal("chain-a"), breakage+"outputs:\n  outputs:\n    .: error.txt \"Why the importer rejects the export.\"\n    ./b: none"+fix)
+		s.fails(s.normal("chain-a"), breakage+"outputs:\n  outputs:\n    .: error.txt \"Why the importer rejects the export.\" (inputs: positions)\n    ./b: none"+fix)
 		s.done()
 	})
 
-	// Each field of b's entry, changed in its registry by hand, then two
-	// at once, and an ordinary lift's. The module's update rewrites the
-	// stale registry.
+	// Each field of b's entry, changed in its registry by hand, outputs and
+	// productFiles each by a declaration's description or presence and by
+	// what one states in Inputs, then two at once, and an ordinary lift's.
+	// The module's update rewrites the stale registry.
 	t.Run("each field", func(t *testing.T) {
 		t.Parallel()
 		s := newSandbox(t, "chain-shared")
@@ -1677,6 +1678,11 @@ func TestChainLiftEntries(t *testing.T) {
 			return s.normal("chain-a")
 		}
 		description := func(l *registry.Lift) { l.Description = "Imports the export." }
+		// products shows import's product declarations, the first, evaluate/*,
+		// stating first.
+		products := func(first string) string {
+			return "evaluate/* \"What evaluate does, as a script's evaluate/ tree says.\" (inputs: " + first + "), evaluate/out/* \"An output evaluate returns.\" (inputs: func), inputs/* \"A tree named as a cell's inputs file is.\" (inputs: func), names/* \"Files named as a cell's own files are.\" (inputs: func), parse/* \"What parse does, as a script's parse/ tree says.\" (inputs: func), quote/* \"What a renderer of errors quotes.\" (inputs: func), resolve/* \"What resolve does, as a script's resolve/ tree says.\" (inputs: func)"
+		}
 		for _, tt := range []struct {
 			field  string
 			change func(l *registry.Lift)
@@ -1686,8 +1692,10 @@ func TestChainLiftEntries(t *testing.T) {
 			{"input", func(l *registry.Lift) { l.Input = "github.com/sdboyer/hypercase_test.Grid" }, "input:\n  .: github.com/sdboyer/hypercase_test.Export\n  ./b: github.com/sdboyer/hypercase_test.Grid"},
 			{"product", func(l *registry.Lift) { l.Product = "*github.com/sdboyer/hypercase_test.Parsed" }, "product:\n  .: github.com/sdboyer/hypercase_test.Script\n  ./b: *github.com/sdboyer/hypercase_test.Parsed"},
 			{"bytes", func(l *registry.Lift) { l.Bytes = false }, "bytes:\n  .: true\n  ./b: false"},
-			{"outputs", func(l *registry.Lift) { l.Outputs[0].Description = "Why." }, "outputs:\n  .: error.txt \"Why the importer rejects the export.\"\n  ./b: error.txt \"Why.\""},
-			{"productFiles", func(l *registry.Lift) { l.ProductFiles = l.ProductFiles[:1] }, "productFiles:\n  .: evaluate/* \"What evaluate does, as a script's evaluate/ tree says.\", evaluate/out/* \"An output evaluate returns.\", inputs/* \"A tree named as a cell's inputs file is.\", names/* \"Files named as a cell's own files are.\", parse/* \"What parse does, as a script's parse/ tree says.\", quote/* \"What a renderer of errors quotes.\", resolve/* \"What resolve does, as a script's resolve/ tree says.\"\n  ./b: evaluate/* \"What evaluate does, as a script's evaluate/ tree says.\""},
+			{"outputs", func(l *registry.Lift) { l.Outputs[0].Description = "Why." }, "outputs:\n  .: error.txt \"Why the importer rejects the export.\" (inputs: positions)\n  ./b: error.txt \"Why.\" (inputs: positions)"},
+			{"outputs", func(l *registry.Lift) { l.Outputs[0].Inputs = registry.InputsAll }, "outputs:\n  .: error.txt \"Why the importer rejects the export.\" (inputs: positions)\n  ./b: error.txt \"Why the importer rejects the export.\" (inputs: all)"},
+			{"productFiles", func(l *registry.Lift) { l.ProductFiles = l.ProductFiles[:1] }, "productFiles:\n  .: " + products("func") + "\n  ./b: evaluate/* \"What evaluate does, as a script's evaluate/ tree says.\" (inputs: func)"},
+			{"productFiles", func(l *registry.Lift) { l.ProductFiles[0].Inputs = registry.InputsAll }, "productFiles:\n  .: " + products("func") + "\n  ./b: " + products("all")},
 			{"rejects", func(l *registry.Lift) { l.Rejects = nil }, "rejects:\n  .: unterminated\n  ./b: none"},
 		} {
 			r := edit("import", "b's registry records another "+tt.field+" for import", tt.change)

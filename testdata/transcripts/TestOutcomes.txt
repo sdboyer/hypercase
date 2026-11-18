@@ -57,11 +57,12 @@ codes S1
 rejected S1; saw-error
 $ cat testdata/hypercase.json
 {
-  "format": 7,
+  "format": 8,
   "updateVar": "FIXTURE_UPDATE_GOLDEN",
   "corpusRoot": ".",
   "rootPackage": true,
   "codes": true,
+  "positions": true,
   "issueLinks": [],
   "properties": [
     {
@@ -95,31 +96,38 @@ $ cat testdata/hypercase.json
       "outputs": [
         {
           "pattern": "?.txt",
-          "description": "A file the case's instructions name with one letter."
+          "description": "A file the case's instructions name with one letter.",
+          "inputs": "func"
         },
         {
           "pattern": "archive.txt",
-          "description": "The archive's name, as the run received it."
+          "description": "The archive's name, as the run received it.",
+          "inputs": "func"
         },
         {
           "pattern": "dir.txt",
-          "description": "The path of a temp dir the run made."
+          "description": "The path of a temp dir the run made.",
+          "inputs": "func"
         },
         {
           "pattern": "error.txt",
-          "description": "The error the case's instructions give."
+          "description": "The error the case's instructions give.",
+          "inputs": "positions"
         },
         {
           "pattern": "stderr.txt",
-          "description": "What the case's instructions write to stderr."
+          "description": "What the case's instructions write to stderr.",
+          "inputs": "func"
         },
         {
           "pattern": "stdout.txt",
-          "description": "What the case's instructions write to stdout."
+          "description": "What the case's instructions write to stdout.",
+          "inputs": "func"
         },
         {
           "pattern": "values.txt",
-          "description": "The values the case's instructions give."
+          "description": "The values the case's instructions give.",
+          "inputs": "func"
         }
       ],
       "rejects": [

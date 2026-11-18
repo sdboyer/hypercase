@@ -173,8 +173,35 @@ $ edit b/testdata/hypercase.json  # b's registry records another outputs for imp
 $ go test  # chain-a
     the registries that own or use the lift import differ in outputs:
           outputs:
-            .: error.txt "Why the importer rejects the export."
-            ./b: error.txt "Why."
+            .: error.txt "Why the importer rejects the export." (inputs: positions)
+            ./b: error.txt "Why." (inputs: positions)
+        Every package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration. If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ edit b/testdata/hypercase.json  # b's registry records another outputs for import
+$ go test  # chain-a
+    the registries that own or use the lift import differ in outputs:
+          outputs:
+            .: error.txt "Why the importer rejects the export." (inputs: positions)
+            ./b: error.txt "Why the importer rejects the export." (inputs: all)
         Every package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration. If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
     what ran, in order:
         import ran
@@ -200,8 +227,35 @@ $ edit b/testdata/hypercase.json  # b's registry records another productFiles fo
 $ go test  # chain-a
     the registries that own or use the lift import differ in productFiles:
           productFiles:
-            .: evaluate/* "What evaluate does, as a script's evaluate/ tree says.", evaluate/out/* "An output evaluate returns.", inputs/* "A tree named as a cell's inputs file is.", names/* "Files named as a cell's own files are.", parse/* "What parse does, as a script's parse/ tree says.", quote/* "What a renderer of errors quotes.", resolve/* "What resolve does, as a script's resolve/ tree says."
-            ./b: evaluate/* "What evaluate does, as a script's evaluate/ tree says."
+            .: evaluate/* "What evaluate does, as a script's evaluate/ tree says." (inputs: func), evaluate/out/* "An output evaluate returns." (inputs: func), inputs/* "A tree named as a cell's inputs file is." (inputs: func), names/* "Files named as a cell's own files are." (inputs: func), parse/* "What parse does, as a script's parse/ tree says." (inputs: func), quote/* "What a renderer of errors quotes." (inputs: func), resolve/* "What resolve does, as a script's resolve/ tree says." (inputs: func)
+            ./b: evaluate/* "What evaluate does, as a script's evaluate/ tree says." (inputs: func)
+        Every package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration. If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+    what ran, in order:
+        import ran
+        parse ran on prices
+        resolve ran on prices
+        import ran
+        parse ran on prices
+        resolve ran on prices
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/export
+        --- PASS: TestCorpus/export/prices
+            --- PASS: TestCorpus/export/prices/import
+            --- PASS: TestCorpus/export/prices/parse
+            --- PASS: TestCorpus/export/prices/resolve
+            --- PASS: TestCorpus/export/prices/transform/louder
+                --- PASS: TestCorpus/export/prices/transform/louder/import
+                --- PASS: TestCorpus/export/prices/transform/louder/parse
+                --- PASS: TestCorpus/export/prices/transform/louder/resolve
+    --- PASS: TestCorpus/script
+FAIL
+[exit 1]
+$ edit b/testdata/hypercase.json  # b's registry records another productFiles for import
+$ go test  # chain-a
+    the registries that own or use the lift import differ in productFiles:
+          productFiles:
+            .: evaluate/* "What evaluate does, as a script's evaluate/ tree says." (inputs: func), evaluate/out/* "An output evaluate returns." (inputs: func), inputs/* "A tree named as a cell's inputs file is." (inputs: func), names/* "Files named as a cell's own files are." (inputs: func), parse/* "What parse does, as a script's parse/ tree says." (inputs: func), quote/* "What a renderer of errors quotes." (inputs: func), resolve/* "What resolve does, as a script's resolve/ tree says." (inputs: func)
+            ./b: evaluate/* "What evaluate does, as a script's evaluate/ tree says." (inputs: all), evaluate/out/* "An output evaluate returns." (inputs: func), inputs/* "A tree named as a cell's inputs file is." (inputs: func), names/* "Files named as a cell's own files are." (inputs: func), parse/* "What parse does, as a script's parse/ tree says." (inputs: func), quote/* "What a renderer of errors quotes." (inputs: func), resolve/* "What resolve does, as a script's resolve/ tree says." (inputs: func)
         Every package that owns or uses a lift registers one declaration of it: a package that only uses a bytes lift tells by its own declaration whether an update writes the lift's cell, and so the cells past it. Declare the lift once, in a package the others import, and register that declaration. If they register one declaration already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
     what ran, in order:
         import ran

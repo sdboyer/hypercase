@@ -92,13 +92,13 @@ $ edit step09/testdata/export/prices.txtar  # a removed column's outcome
 $ go test  # strip-a
     testdata/hypercase.json differs from what the package registers (-committed +registered):
           {
-            "format": 7,
+            "format": 8,
             "updateVar": "FIXTURE_UPDATE_GOLDEN",
         -   "corpusRoot": "step09",
         +   "corpusRoot": ".",
             "rootPackage": true,
             "codes": false,
-            "issueLinks": [],
+            "positions": true,
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
     no registry records a root-package check for the module-root corpus, so nothing reports what no column there owns.
         Register hypercase.RootPackage() in one package over it, then run FIXTURE_UPDATE_GOLDEN=1 go test ./... to record it in the package's registry.
