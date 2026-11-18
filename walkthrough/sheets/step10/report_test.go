@@ -87,9 +87,12 @@ var change = []edit{
 
 // stale makes a cell of the copy differ from what the code writes for it, as
 // a copy taken in the module's update can find a cell the update has yet to
-// rewrite: it puts a line before whatever prices' calc stdout.txt holds. The
-// update before main's commit rewrites it, so the report shows no change in
-// it.
+// rewrite: it puts a line before whatever prices' calc stdout.txt holds. In
+// the update after a strip, the copy can be taken before step10/cli, the
+// package that writes the section, has written it back, so where the copy
+// has no such section, stale adds it in its place, holding that line alone.
+// The update before main's commit rewrites it, so the report shows no change
+// in it.
 func stale(t *testing.T, repo string) {
 	t.Helper()
 	const section = "out/calc/stdout.txt"
@@ -101,10 +104,11 @@ func stale(t *testing.T, repo string) {
 	a := archive.Parse(data)
 	i := slices.IndexFunc(a.Sections, func(s archive.Section) bool { return s.Name == section })
 	if i < 0 {
-		t.Fatalf("%s has no section %s to make stale", p, section)
+		a.Sections = append(a.Sections, archive.Section{Name: section})
+		i = len(a.Sections) - 1
 	}
 	a.Sections[i].Data = append([]byte("stale\n"), a.Sections[i].Data...)
-	if err := archive.Write(p, a); err != nil {
+	if err := archive.Write(p, a.Place()); err != nil {
 		t.Fatal(err)
 	}
 }
