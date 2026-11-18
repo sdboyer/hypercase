@@ -1336,7 +1336,10 @@ func TestStripLinks(t *testing.T) {
 // strip again names -root where it was given. Away from the module root
 // with no -root, strip run again finds the corpus root only by a registry
 // in testdata/, so the line also says to name the root with -root if
-// there is none. A link in place of the corpus root's testdata/, which a
+// there is none, and with -root it doesn't. Outside any module, a
+// registry is no help, and the line doesn't name -root: strip run again
+// once the link is gone says what is. A link in place of the corpus
+// root's testdata/, which a
 // registry read first names, fails it the same way, before it reads
 // another registry.
 func TestStripTestdataLink(t *testing.T) {
@@ -1350,6 +1353,7 @@ func TestStripTestdataLink(t *testing.T) {
 		{"testdata", "", nil, "hypercase strip again."},
 		{"testdata", "", []string{"-root", "."}, "hypercase strip -root . again."},
 		{"step09/testdata", "step09", nil, "hypercase strip again." + more},
+		{"step09/testdata", "step09", []string{"-root", "."}, "hypercase strip -root . again."},
 		{"step09/testdata", "", []string{"-root", "step09"}, "hypercase strip -root step09 again."},
 		{"a/b/c/testdata", "a/b/c", nil, "hypercase strip again." + more},
 		{"testdata", "a/b/c", nil, "hypercase strip -root ../../.. again."},
@@ -1373,6 +1377,15 @@ func TestStripTestdataLink(t *testing.T) {
 			})
 		}
 	}
+	t.Run("testdata naming a directory, in no module", func(t *testing.T) {
+		files := map[string]string{"testdata/sheet/twice.txtar": twiceFull}
+		top := writeTree(t, files)
+		linkIn(t, top, "testdata", "")
+		stripFails(t, top, "", 1, nil, "hypercase strip: testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none. Nothing was removed.\nRemove it, or replace it with a copy of what it names, if it names anything, then run hypercase strip again.\n")
+		unlinkIn(t, top, "testdata")
+		sameTree(t, top, files)
+		stripFails(t, top, "", 1, nil, "hypercase strip: finding the module root failed: no go.mod in ", ".\nRun strip inside a Go module, or name the corpus root with -root, relative to the current directory or by an absolute path.\n")
+	})
 }
 
 // TestStripRootPastLink: with -root, the testdata/ strip reads first is
@@ -1393,7 +1406,7 @@ func TestStripRootPastLink(t *testing.T) {
 	for _, tt := range []struct {
 		names, target string
 		registry      string // the module root's registry, if not the fixture's
-		out           string // what strip prints, or, when it fails, how its stderr starts
+		out           string // what strip prints, or, when it fails, what its stderr holds
 		want          map[string]string
 	}{
 		{names: "a directory", out: stripped + nextLine},
@@ -1421,8 +1434,11 @@ func TestStripRootPastLink(t *testing.T) {
 				stripOK(t, top, "", tt.out, "-root", "step09")
 				want = with(files, map[string]string{"step09/testdata/sheet/twice.txtar": twiceHand, "step09/testdata/hypercase.json": ""})
 			}
-			if fi, err := os.Lstat(filepath.Join(top, "testdata")); err != nil || fi.Mode()&os.ModeSymlink == 0 {
-				t.Errorf("testdata is no symbolic link after strip: %v", err)
+			switch fi, err := os.Lstat(filepath.Join(top, "testdata")); {
+			case err != nil:
+				t.Errorf("testdata is gone after strip: %v", err)
+			case fi.Mode()&os.ModeSymlink == 0:
+				t.Errorf("testdata is no symbolic link after strip")
 			}
 			unlinkIn(t, top, "testdata")
 			sameTree(t, top, with(want, tt.want))

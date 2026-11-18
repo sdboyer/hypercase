@@ -478,14 +478,14 @@ Its `.gitignore` names the corpus root's lock, which an update takes
   anything, it fails when the `testdata/` it reads first is a symbolic
   link: `-root`'s, or else the current directory's. Its line that says to
   run strip again then gives `-root` where it was given, naming the same
-  directory, and, away from the module root with no `-root`, says to name
-  the root with `-root` if the current directory then holds no registry.
-  Otherwise, a line that says to run strip again gives the command, with
-  `-root` unless strip ran at the module root on the module-root corpus
-  and the registry there, if there is one, records that corpus: a strip
-  may remove the registry that named the root, and one that names another
-  root would find that one. A path a shell would read as other than itself
-  is quoted.
+  directory, and, inside a module, away from its root, with no `-root`,
+  says to name the root with `-root` if the current directory then holds
+  no registry. Otherwise, a line that says to run strip again gives the
+  command, with `-root` unless strip ran at the module root on the
+  module-root corpus and the registry there, if there is one, records that
+  corpus: a strip may remove the registry that named the root, and one
+  that names another root would find that one. A path a shell would read
+  as other than itself is quoted.
 - It leaves frozen cells (step 4) in place and lists them, and `-frozen`
   strips those too. A frozen cell's line gives the command that strips
   it: `-column` with its column, and `-transform` for a cell of a
@@ -499,9 +499,10 @@ Its `.gitignore` names the corpus root's lock, which an update takes
   corpus type declares. It doesn't reach into a nested module or another
   corpus root under `testdata/`, and a symbolic link where it reaches,
   `testdata/` itself included, fails it before it removes anything. It
-  reads any other package's `testdata/`, for a registry and findings,
-  through a link in its place, the current directory's under `-root`
-  included. Its last line is the update to run next.
+  reads any other package's `testdata/` through a link in its place, the
+  current directory's under `-root` included, and removes a registry
+  there that records the root, and the package's findings file, through
+  the link (#57). Its last line is the update to run next.
 - Stripping and then updating, repeated until an update changes nothing,
   reaches what updating the hand-written sections alone reaches, frozen
   cells excepted: a known state.

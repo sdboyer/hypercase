@@ -133,12 +133,13 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	link := filepath.Join(first, "testdata")
 	if fi, err := os.Lstat(link); err == nil && fi.Mode()&fs.ModeSymlink != 0 {
 		reason, it := walk.LinkReason(link, []string{link}, func(p string) string { return root.Rel(first, p) })
-		// Run again with no -root away from the module root, strip finds
-		// the corpus root only by a registry in testdata/, which the fix
-		// may leave out.
+		// Run again with no -root inside a module, away from its root,
+		// strip finds the corpus root only by a registry in testdata/,
+		// which the fix may leave out. Outside a module, a registry is no
+		// help, and strip run again says what is.
 		more := ""
 		if given == "" {
-			if mod, err := root.Module(dir); err != nil || mod != dir {
+			if mod, err := root.Module(dir); err == nil && mod != dir {
 				more = " If the current directory then holds no registry, testdata/" + registry.Name + ", name the corpus root with -root, relative to the current directory or by an absolute path."
 			}
 		}

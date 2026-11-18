@@ -83,10 +83,12 @@
 // anything, strip fails when the testdata/ it reads first is a symbolic
 // link: -root's, or else the current directory's. Its line that says to run
 // strip again then gives -root where it was given, naming the same
-// directory, and, away from the module root with no -root, says to name the
-// root with -root if the current directory then holds no registry. Strip
-// reads any other package's testdata/, for a registry and findings, through
-// a link in its place, the current directory's under -root included.
+// directory, and, inside a module, away from its root, with no -root, says
+// to name the root with -root if the current directory then holds no
+// registry. Strip reads any other package's testdata/ through a link in its
+// place, the current directory's under -root included, and removes a
+// registry there that records the corpus root, and the package's findings
+// file, through the link (#57).
 package main
 
 import (
