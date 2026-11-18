@@ -51,11 +51,13 @@ var (
 // projectNoPositions is project with no Positions.
 var projectNoPositions = decl.Project{UpdateVar: fixtureUpdate}
 
-// A viewRecord is what recordingViews records of one call of Positions: a
-// digest of the view it received, and of the view the RenderError call
-// before it received, with the bytes that call rendered, which are a
-// cell's error.txt; both "" where no RenderError call came before it.
+// A viewRecord is what recordingViews records of one call of Positions:
+// the error's text, a digest of the view it received, and of the view the
+// RenderError call before it received, with the bytes that call rendered,
+// which are a cell's error.txt; both "" where no RenderError call came
+// before it.
 type viewRecord struct {
+	Error       string `json:"error"`
 	Positions   string `json:"positions"`
 	RenderError string `json:"renderError"`
 	Rendered    string `json:"rendered"`
@@ -85,14 +87,14 @@ func recordingViews(p decl.Project, path string) decl.Project {
 		if render != nil {
 			out = render(in, err)
 		}
-		r := rendering{digestOf(in), string(out)}
+		r, id := rendering{digestOf(in), string(out)}, goroutineID()
 		mu.Lock()
 		defer mu.Unlock()
-		last[goroutineID()] = r
+		last[id] = r
 		return out
 	}
 	p.Positions = func(in fs.FS, err error) []decl.Range {
-		rec := viewRecord{Positions: digestOf(in)}
+		rec := viewRecord{Error: err.Error(), Positions: digestOf(in)}
 		id := goroutineID()
 		func() {
 			mu.Lock()
