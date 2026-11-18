@@ -1,0 +1,106 @@
+$ edit b/corpus_test.go  # ./b is a package with tests
+$ edit testdata/top0/base.txtar  # a base at Top0
+$ edit testdata/top1/base.txtar  # a base at Top1B
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # cycle-b
+    what ran, in order:
+        l2 ran on base
+        l3 ran on base
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/top1
+        --- PASS: TestCorpus/top1/base
+            --- PASS: TestCorpus/top1/base/l2b
+            --- PASS: TestCorpus/top1/base/list
+PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # cycle-a
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        l2 ran on base
+        l3 ran on base
+        l1 ran
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/top0
+        --- PASS: TestCorpus/top0/base
+            --- PASS: TestCorpus/top0/base/l1
+            --- PASS: TestCorpus/top0/base/l2
+            --- PASS: TestCorpus/top0/base/l3
+PASS
+$ go test  # cycle-a
+    the lift l3 is used by ./b on the path testdata/top1/ → l2b → l3, and ., which owns it, doesn't run it over testdata/top1/, so no package writes its cells of that corpus's cases, which ./b's cells past it are built through.
+        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs l3 over testdata/top1/ by that path, or ./b doesn't reach l3 from testdata/top1/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+    what ran, in order:
+        l2 ran on base
+        l3 ran on base
+        l1 ran
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/top0
+        --- PASS: TestCorpus/top0/base
+            --- PASS: TestCorpus/top0/base/l1
+            --- PASS: TestCorpus/top0/base/l2
+            --- PASS: TestCorpus/top0/base/l3
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # cycle-a-l2b
+    from the corpus type hypercase_test.Top0, of testdata/top0/, *hypercase_test.Top3N, which the lift l1 consumes, is reached through the cycle l3, l1, l2b, so by more than one path:
+          hypercase_test.Top0 → l2 → *hypercase_test.Top2N → l3 → *hypercase_test.Top3N
+        There must be exactly one path to each type a column consumes. Remove a lift, or give the paths distinct product types.
+    from the corpus type hypercase_test.Top0, of testdata/top0/, *hypercase_test.Top2N, which the lift l3 consumes, is reached through the cycle l3, l1, l2b, so by more than one path:
+          hypercase_test.Top0 → l2 → *hypercase_test.Top2N
+        There must be exactly one path to each type a column consumes. Remove a lift, or give the paths distinct product types.
+    from the corpus type hypercase_test.Top0, of testdata/top0/, hypercase_test.Top1B, which the lift l2b consumes, is reached through the cycle l3, l1, l2b, so by more than one path:
+          hypercase_test.Top0 → l2 → *hypercase_test.Top2N → l3 → *hypercase_test.Top3N → l1 → hypercase_test.Top1B
+        There must be exactly one path to each type a column consumes. Remove a lift, or give the paths distinct product types.
+    from the corpus type hypercase_test.Top1B, of testdata/top1/, *hypercase_test.Top3N, which the lift l1 consumes, is reached through the cycle l2b, l3, l1, so by more than one path:
+          hypercase_test.Top1B → l2b → *hypercase_test.Top2N → l3 → *hypercase_test.Top3N
+        There must be exactly one path to each type a column consumes. Remove a lift, or give the paths distinct product types.
+    from the corpus type hypercase_test.Top1B, of testdata/top1/, *hypercase_test.Top2N, which the lift l3 consumes, is reached through the cycle l2b, l3, l1, so by more than one path:
+          hypercase_test.Top1B → l2b → *hypercase_test.Top2N
+        There must be exactly one path to each type a column consumes. Remove a lift, or give the paths distinct product types.
+    from the corpus type hypercase_test.Top1B, of testdata/top1/, hypercase_test.Top1B, which the lift l2b consumes, is reached through the cycle l2b, l3, l1, so by more than one path:
+          hypercase_test.Top1B
+        There must be exactly one path to each type a column consumes. Remove a lift, or give the paths distinct product types.
+    No case runs until each type a column consumes is reached by one path.
+--- FAIL: TestCorpus
+FAIL
+[exit 1]
+$ edit testdata/top0/base.txtar  # delete l1's cells, which no package writes now
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # cycle-a-l2b-no-l1
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        l2 ran on base
+        l3 ran on base
+        l2 ran on base
+        l3 ran on base
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/top0
+        --- PASS: TestCorpus/top0/base
+            --- PASS: TestCorpus/top0/base/l2
+            --- PASS: TestCorpus/top0/base/l3
+    --- PASS: TestCorpus/top1
+        --- PASS: TestCorpus/top1/base
+            --- PASS: TestCorpus/top1/base/l3
+PASS
+$ go test  # cycle-a-l2b-no-l1
+    what ran, in order:
+        l2 ran on base
+        l3 ran on base
+        l2 ran on base
+        l3 ran on base
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/top0
+        --- PASS: TestCorpus/top0/base
+            --- PASS: TestCorpus/top0/base/l2
+            --- PASS: TestCorpus/top0/base/l3
+    --- PASS: TestCorpus/top1
+        --- PASS: TestCorpus/top1/base
+            --- PASS: TestCorpus/top1/base/l3
+PASS
+$ go test ./b  # cycle-b
+    what ran, in order:
+        l2 ran on base
+        l3 ran on base
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/top1
+        --- PASS: TestCorpus/top1/base
+            --- PASS: TestCorpus/top1/base/l2b
+            --- PASS: TestCorpus/top1/base/list
+PASS

@@ -64,7 +64,9 @@ func TestRootCheckLifts(t *testing.T) {
 // states the two ways the conflict ends, and applying either makes every
 // run pass: ./b reaches resolve by .'s path, using parse in place of
 // parse2, or . by ./b's, using parse2 in place of parse, and the cells of
-// the copy given up, which no package writes then, are deleted.
+// the copy given up, which no package writes then, are deleted. Until
+// they are, the root-package check fails on them, as sections no registry
+// claims.
 func TestRootCheckUsedPath(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
@@ -86,14 +88,17 @@ func TestRootCheckUsedPath(t *testing.T) {
 				t.Errorf("the paths check finds no cell built otherwise than the cell past it")
 			}
 			r := s.normal("ladder-a-paths")
-			s.fails(r, "the lift resolve is used by ./b on the path testdata/script/ → parse2 → resolve, and ., which owns it, runs it on the path testdata/script/ → parse → resolve, so no package writes the cells of resolve that ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either ./b reaches resolve from testdata/script/ by .'s path, or . by ./b's. If they reach it alike already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
+			s.fails(r, "the lift resolve is used by ./b on the path testdata/script/ → parse2 → resolve, and ., which owns it, runs it on the path testdata/script/ → parse → resolve, so no package writes the cells of resolve that ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either ./b reaches resolve from testdata/script/ by .'s path, or . by ./b's. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If they reach it alike already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
 			if n := strings.Count(string(r.out), " is used by "); n != 1 {
 				t.Errorf("the root-package check fails %d times on lifts used otherwise than their owner reaches them, and should fail once", n)
 			}
 			s.passes(s.run("b", "ladder-b-producer", false))
 
-			s.edit("testdata/script/x.txtar", "delete the cells no package writes now", drop(tt.drop))
 			s.passes(s.run("b", tt.b, true))
+			s.passes(s.update(tt.a))
+			col := strings.TrimSuffix(strings.TrimPrefix(tt.drop, "out/"), "/")
+			s.fails(s.normal(tt.a), "testdata/script/x.txtar: no registry claims "+tt.drop+"outcome: no column named "+col+" runs over the corpus script.")
+			s.edit("testdata/script/x.txtar", "delete the cells no package writes now", drop(tt.drop))
 			s.passes(s.update(tt.a))
 			s.cat("testdata/checks/paths.txt")
 			s.passes(s.normal(tt.a))

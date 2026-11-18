@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"maps"
 	"path"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"slices"
@@ -870,16 +871,18 @@ func usedPathTopologies() []topology {
 	return out
 }
 
-// usesOwned reports whether a and b each start at or before the first
-// column they own, and each lift a package uses has an owner that starts
-// at or before it.
+// usesOwned reports whether each package starts at or before the first
+// column it owns, listc for c, and each lift a package uses has an owner
+// that starts at or before it.
 func (tp topology) usesOwned() bool {
-	for _, p := range []byte("ab") {
-		if tp.start(p) > strings.IndexByte(tp.owners, p)+1 {
+	for _, p := range tp.pkgs() {
+		first := strings.IndexByte(tp.owners, p) + 1
+		if p == 'c' {
+			first = len(tp.kinds) + 1
+		}
+		if tp.start(p) > first {
 			return false
 		}
-	}
-	for _, p := range tp.pkgs() {
 		for k := tp.start(p); k < tp.last(p); k++ {
 			if o := tp.owners[k-1]; o != p && tp.start(o) > k {
 				return false
@@ -928,11 +931,12 @@ func thirdPackageCandidates() []topology {
 }
 
 // thirdPackageTopologies are thirdPackageCandidates, one for each
-// signature c's lifts give, as usedSignature words it, which is all the
-// root-package check reads to judge c's uses: it compares each use with
-// the lift's owner's entry alone. So two topologies that give c one
-// signature give c the same failures, as TestThirdPackageSignatures
-// checks of refusals, and what a and b do, the topologies without c vary.
+// signature c's lifts give, as usedSignature words it. The pruning rests
+// on usedPaths reading no more of c's uses than the signature holds: it
+// compares each use with the lift's owner's entry alone. No run checks
+// the root-package check over the candidates it drops, and
+// TestThirdPackageSignatures checks refusals, the oracle, alone. What a
+// and b do, the topologies without c vary.
 func thirdPackageTopologies() []topology {
 	var out []topology
 	seen := map[string]bool{}
@@ -946,9 +950,11 @@ func thirdPackageTopologies() []topology {
 }
 
 // TestThirdPackageSignatures: of thirdPackageCandidates, those that give
-// c one signature, as usedSignature words it, give c the same refusals,
-// so thirdPackageTopologies, which keeps one of them, drops none of c's
-// verdicts.
+// c one signature, as usedSignature words it, get the same refusals for c
+// from refusals, the oracle: the oracle reads no more of c's uses than
+// the signature holds. It runs no package, so it checks the oracle
+// against itself, and not the root-package check over the candidates
+// thirdPackageTopologies drops.
 func TestThirdPackageSignatures(t *testing.T) {
 	t.Parallel()
 	byUser := func(tp topology, user string) []usedRefusal {
@@ -1143,8 +1149,13 @@ type pathTopology interface {
 // check fails exactly where refusals, worked out from the topology alone,
 // says: the failures name the users, owners, corpora, lifts and paths it
 // gives, each once. Every other run of a topology it accepts passes. In
-// one it refuses, the user's run can fail too, where it reads the
-// committed outcome of a bytes lift's cell that no package writes.
+// one it refuses, a package's run may fail in its cells too, each a cell
+// of a case of a corpus refusals gives the package, past a lift refusals
+// gives it from that corpus, whose cell of the case no package writes:
+// the run reads the lift's committed outcome. A run fails in nothing
+// else, but the root package's, where the root-package check fails on
+// used lifts, and a package's run other than the root package's that
+// fails, fails in such a cell.
 func TestTopologyPaths(t *testing.T) {
 	t.Parallel()
 	var tps []pathTopology
@@ -1183,16 +1194,46 @@ func TestTopologyPaths(t *testing.T) {
 			s, g := tp.sandbox(t)
 			want := tp.refusals()
 			sortRefusals(want)
-			for i, r := range g.runAll(s, false, "") {
+			dir := t.TempDir()
+			for i, r := range g.runAll(s, false, filepath.Join(dir, "normal")) {
+				user := "."
+				if g.pkgs[i].pkg != "" {
+					user = "./" + g.pkgs[i].pkg
+				}
 				switch {
-				case i == 0 && len(want) > 0:
-					if r.ok() {
-						t.Errorf("the root-package check accepts the topology, and should refuse\n%s", refusalLines(want))
-					} else if got := usedFailures(t, string(r.out)); !slices.Equal(got, want) {
+				case len(want) == 0:
+					if !r.ok() {
+						t.Errorf("the run of %s failed:\n%s", user, s.shown(r))
+					}
+					continue
+				case i == 0 && r.ok():
+					t.Errorf("the root-package check accepts the topology, and should refuse\n%s", refusalLines(want))
+				case i == 0:
+					if got := usedFailures(t, string(r.out)); !slices.Equal(got, want) {
 						t.Errorf("the root-package check refuses\n%s\nand should refuse\n%s\n%s", refusalLines(got), refusalLines(want), s.shown(r))
 					}
-				case !r.ok() && len(want) == 0:
-					t.Errorf("the run of %q failed:\n%s", g.pkgs[i].pkg, s.shown(r))
+				}
+				if r.ok() {
+					continue
+				}
+				failed := map[string]bool{}
+				for _, o := range readObserved(t, filepath.Join(dir, fmt.Sprintf("normal-%d.jsonl", i))) {
+					if o.Record != "cell" || !o.Failed {
+						continue
+					}
+					failed["TestCorpus/"+o.Case+"/"+o.Column] = true
+					corpus, _, _ := strings.Cut(o.Case, "/")
+					if !slices.ContainsFunc(want, func(w usedRefusal) bool {
+						return w.user == user && w.corpus == corpus && slices.Contains(o.Path, w.lift)
+					}) {
+						t.Errorf("%s's cell %s of %s failed, past the bytes lifts %v, of which refusals gives it none from testdata/%s/:\n%s", user, o.Column, o.Case, o.Path, corpus, s.shown(r))
+					}
+				}
+				if i > 0 && len(failed) == 0 {
+					t.Errorf("the run of %s failed in none of its cells:\n%s", user, s.shown(r))
+				}
+				if test, msg, ok := failureOutside(string(r.out), failed, i == 0); ok {
+					t.Errorf("the run of %s fails in %s, which is none of its failed cells, and not on a used lift: %s\n%s", user, test, msg, s.shown(r))
 				}
 			}
 			tp.checkPaths(t, s)
@@ -1219,7 +1260,7 @@ func TestTopologyUsedPathLeft(t *testing.T) {
 	}
 	s, _ := tp.sandbox(t)
 	r := s.normal(tp.registration('a'))
-	s.fails(r, "the lift l2 is used by ./c on the path testdata/top0/ → l1 → l2, and ., which owns it, doesn't run it over testdata/top0/, so no package writes its cells of that corpus's cases, which ./c's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs l2 over testdata/top0/ by that path, or ./c doesn't reach l2 from testdata/top0/. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
+	s.fails(r, "the lift l2 is used by ./c on the path testdata/top0/ → l1 → l2, and ., which owns it, doesn't run it over testdata/top0/, so no package writes its cells of that corpus's cases, which ./c's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs l2 over testdata/top0/ by that path, or ./c doesn't reach l2 from testdata/top0/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
 	if n := strings.Count(r.out, " is used by "); n != 1 {
 		t.Errorf("the root-package check fails %d times on used lifts, and should fail once", n)
 	}
@@ -1236,6 +1277,80 @@ func TestTopologyUsedPathLeft(t *testing.T) {
 	}
 	left.checkPaths(t, s)
 	s.done()
+}
+
+// cycleRegistrations are TestUsedPathWayClosesCycle's: . owns the stages
+// l2, from Top0, and l3, from l2's product, and the bytes lift l1, from
+// l3's product to Top1B, and ./b starts from Top1B, owns l2b, a stage from
+// Top1B to l2's product, and list, over l3's, and uses l3. cycle-a-l2b
+// has . use l2b too, and cycle-a-l2b-no-l1 also gives up l1.
+var cycleRegistrations = func() map[string]func() {
+	l2 := topologyStage[Top0](2, func(v fs.FS) *Top2N { return &Top2N{v} })
+	l3 := topologyStage[*Top2N](3, func(v fs.FS) *Top3N { return &Top3N{v} })
+	l1 := topologyBytesOf[*Top3N, Top1B](1, []decl.Output{{Pattern: "data/*", Description: "The data list lists."}})
+	l2b := renamed(topologyStage[Top1B](2, func(v fs.FS) *Top2N { return &Top2N{v} }), "l2b")
+	register := func(items ...any) func() {
+		return func() {
+			hypercase.Register(append(items, project, topologyType(1), topologyProperty(1), topologyProperty(2), topologyProperty(3))...)
+		}
+	}
+	return map[string]func(){
+		"cycle-a":           register(rootPkg, topologyTop0, own(l2, l3, l1)),
+		"cycle-b":           register(own(l2b, topologySuite[*Top3N]()), hypercase.Use(l3)),
+		"cycle-a-l2b":       register(rootPkg, topologyTop0, own(l2, l3, l1), hypercase.Use(l2b)),
+		"cycle-a-l2b-no-l1": register(rootPkg, topologyTop0, own(l2, l3), hypercase.Use(l2b)),
+	}
+}()
+
+// TestUsedPathWayClosesCycle: over cycleRegistrations, . doesn't run l3
+// over testdata/top1/, which ./b reaches it from through l2b, and the
+// root-package check fails once, saying so, and that making a way true
+// may need other registrations to change. Taking the first way alone, .
+// using l2b to run l3 over testdata/top1/ as ./b does, closes the cycle
+// l3, l1, l2b, which the update refuses. Giving up l1 too, and deleting
+// its cells, which no package writes then, makes every run pass.
+func TestUsedPathWayClosesCycle(t *testing.T) {
+	t.Parallel()
+	s := newSandbox(t, "")
+	s.write("b/corpus_test.go", []byte(packageTestFile), "./b is a package with tests")
+	s.write("testdata/top0/base.txtar", []byte("A case for l2, l3 and l1.\n-- in/l1/out/data/A1 --\n1\n"), "a base at Top0")
+	s.write("testdata/top1/base.txtar", []byte("A case for l2b.\n-- in/data/A1 --\n1\n"), "a base at Top1B")
+	s.passes(s.run("b", "cycle-b", true))
+	s.passes(s.update("cycle-a"))
+	r := s.normal("cycle-a")
+	s.fails(r, "the lift l3 is used by ./b on the path testdata/top1/ → l2b → l3, and ., which owns it, doesn't run it over testdata/top1/, so no package writes its cells of that corpus's cases, which ./b's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs l3 over testdata/top1/ by that path, or ./b doesn't reach l3 from testdata/top1/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.")
+	if n := strings.Count(r.out, " is used by "); n != 1 {
+		t.Errorf("the root-package check fails %d times on used lifts, and should fail once", n)
+	}
+	s.fails(s.update("cycle-a-l2b"), "which the lift l1 consumes, is reached through the cycle l3, l1, l2b, so by more than one path")
+	s.edit("testdata/top0/base.txtar", "delete l1's cells, which no package writes now", seq(drop("out/l1/"), drop("via/l1/")))
+	s.passes(s.update("cycle-a-l2b-no-l1"))
+	s.passes(s.normal("cycle-a-l2b-no-l1"))
+	s.passes(s.run("b", "cycle-b", false))
+	s.done()
+}
+
+// messageHead matches the first line of a test's message, as go test -v
+// prints it, and gives the message.
+var messageHead = regexp.MustCompile(`^\s*\w+\.go:\d+: (.*)$`)
+
+// failureOutside returns the first message of a run's output, out, that a
+// test gives other than the failed cells, which cells names, and the test
+// that gives it. It passes over the harness's log of what ran, and, where
+// root is set, the root-package check's failures on used lifts.
+func failureOutside(out string, cells map[string]bool, root bool) (test, msg string, ok bool) {
+	for _, line := range strings.Split(out, "\n") {
+		if f := strings.Fields(line); len(f) == 3 && (f[0]+" "+f[1] == "=== RUN" || f[0]+" "+f[1] == "=== CONT" || f[0]+" "+f[1] == "=== NAME") {
+			test = f[2]
+			continue
+		}
+		m := messageHead.FindStringSubmatch(line)
+		if m == nil || cells[test] || m[1] == "what ran, in order:" || root && strings.Contains(m[1], " is used by ") {
+			continue
+		}
+		return test, m[1], true
+	}
+	return "", "", false
 }
 
 // refusalLines shows refusals, one to a line.

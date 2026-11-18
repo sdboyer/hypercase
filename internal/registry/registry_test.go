@@ -90,6 +90,9 @@ func TestParse(t *testing.T) {
 		}, "the lift resolve runs over testdata/sheet/ twice, where a registry lists each corpus a column runs over once"},
 		{func(r *Registry) { r.Suites[0].Paths[0].Lifts = []string{"parse"} }, "the suite calc consumes the raw input view, and its path from testdata/sheet/ names parse, where a suite over the raw input view passes through no lift"},
 		{func(r *Registry) { r.Suites[1].Paths[1].Lifts = []string{"resolve", "parse", "parse"} }, "the suite evaluate's path from testdata/sheet/ names parse twice, where a column's path names each lift before it once"},
+		{func(r *Registry) { r.Lifts = append(r.Lifts, r.Lifts[2]) }, "the registry lists the lift resolve twice, where each suite and lift a package registers, owned or used, has a name of its own"},
+		{func(r *Registry) { r.Suites = append(r.Suites, r.Suites[0]) }, "the registry lists the suite calc twice, where each suite and lift a package registers, owned or used, has a name of its own"},
+		{func(r *Registry) { r.Suites[0].Name = "parse" }, "the registry lists a suite and a lift named parse, where each suite and lift a package registers, owned or used, has a name of its own"},
 	} {
 		r, err := Parse(now.Marshal())
 		if err != nil {

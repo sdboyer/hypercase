@@ -99,7 +99,7 @@ FAIL
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
     the corpus check cells can't read its cells: b/testdata/hypercase.json can't be read: the lift parse runs over testdata/export/ and testdata/script/, and has paths from testdata/script/, where a registry gives each column one path from each corpus it runs over, in the same order. No check runs, and an update writes no findings.
-        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it. If b holds no _test.go file, no update writes it, so delete it.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it.
     what ran, in order:
         import ran
         parse ran on prices

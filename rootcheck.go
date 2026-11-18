@@ -49,11 +49,15 @@ func (r *runner) rootCheck(t *testing.T, found []registry.Found) {
 			continue
 		}
 		g, err := registry.Parse(data)
-		if err != nil {
-			t.Errorf("%s can't be read: %v.\nRun %s to write it. If %s holds no _test.go file, no update writes it, so delete it.", rel, err, r.updateCmd(), r.rel(f.Pkg))
+		tested := hasTestFile(f.Pkg)
+		switch {
+		case err != nil && tested:
+			t.Errorf("%s can't be read: %v.\nRun %s to write it.", rel, err, r.updateCmd())
+			continue
+		case err != nil:
+			t.Errorf("%s can't be read: %v, and %s holds no _test.go file, so no update writes it.\nDelete it.", rel, err, r.rel(f.Pkg))
 			continue
 		}
-		tested := hasTestFile(f.Pkg)
 		regs = append(regs, pkgReg{pkg: r.pkgName(f.Pkg), reg: g, tested: tested})
 		if !tested {
 			t.Errorf("%s is a registry, and %s holds no _test.go file, so no test compares it, and it still claims sections.\nDelete it, or restore the package's tests.", rel, r.rel(f.Pkg))
@@ -509,11 +513,11 @@ func (r *runner) usedPaths(t *testing.T, entries map[string][]liftEntry, owners 
 				theirs, ok := owned[p.Corpus]
 				switch {
 				case !ok:
-					t.Errorf("the lift %s is used by %s on the path %s, and %s, which owns it, doesn't run it over testdata/%s/, so no package writes its cells of that corpus's cases, which %s's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either %s runs %s over testdata/%s/ by that path, or %s doesn't reach %s from testdata/%s/. If one holds already, a registry is stale: run %s, which rewrites the registry of every package with tests.",
+					t.Errorf("the lift %s is used by %s on the path %s, and %s, which owns it, doesn't run it over testdata/%s/, so no package writes its cells of that corpus's cases, which %s's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either %s runs %s over testdata/%s/ by that path, or %s doesn't reach %s from testdata/%s/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run %s, which rewrites the registry of every package with tests.",
 						name, u.pkg, route(p.Corpus, mine, name), owner, p.Corpus, u.pkg,
 						owner, name, p.Corpus, u.pkg, name, p.Corpus, r.updateCmd())
 				case !slices.Equal(mine, theirs):
-					t.Errorf("the lift %s is used by %s on the path %s, and %s, which owns it, runs it on the path %s, so no package writes the cells of %s that %s's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either %s reaches %s from testdata/%s/ by %s's path, or %s by %s's. If they reach it alike already, a registry is stale: run %s, which rewrites the registry of every package with tests.",
+					t.Errorf("the lift %s is used by %s on the path %s, and %s, which owns it, runs it on the path %s, so no package writes the cells of %s that %s's cells past it are built through.\nA package that uses a lift reaches it from each corpus by the path the lift's owner does: either %s reaches %s from testdata/%s/ by %s's path, or %s by %s's. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If they reach it alike already, a registry is stale: run %s, which rewrites the registry of every package with tests.",
 						name, u.pkg, route(p.Corpus, mine, name), owner, route(p.Corpus, theirs, name), name, u.pkg,
 						u.pkg, name, p.Corpus, owner, owner, u.pkg, r.updateCmd())
 				}

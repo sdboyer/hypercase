@@ -31,7 +31,7 @@ script parse: through no lift
 script resolve: through parse
 $ go test  # ladder-a-paths
     the lift resolve is used by ./b on the path testdata/script/ → parse2 → resolve, and ., which owns it, runs it on the path testdata/script/ → parse → resolve, so no package writes the cells of resolve that ./b's cells past it are built through.
-        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either ./b reaches resolve from testdata/script/ by .'s path, or . by ./b's. If they reach it alike already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either ./b reaches resolve from testdata/script/ by .'s path, or . by ./b's. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If they reach it alike already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
     what ran, in order:
         parse ran on x
         resolve ran on x
@@ -56,7 +56,6 @@ $ go test ./b  # ladder-b-producer
             --- PASS: TestCorpus/script/x/evaluate
             --- PASS: TestCorpus/script/x/parse2
 PASS
-$ edit testdata/script/x.txtar  # delete the cells no package writes now
 $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # ladder-b-producer
     what ran, in order:
         parse ran on x
@@ -69,6 +68,33 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # ladder-b-producer
             --- PASS: TestCorpus/script/x/evaluate
             --- PASS: TestCorpus/script/x/parse2
 PASS
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a-uses-producer
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+--- PASS: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+PASS
+$ go test  # ladder-a-uses-producer
+    testdata/script/x.txtar: no registry claims out/parse/outcome: no column named parse runs over the corpus script.
+        If a column should write them, register the column. If not, run hypercase strip -root . -column parse at the module root. It removes parse's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/resolve
+    --- PASS: TestCorpus/checks
+        --- PASS: TestCorpus/checks/paths
+FAIL
+[exit 1]
+$ edit testdata/script/x.txtar  # delete the cells no package writes now
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder-a-uses-producer
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
     what ran, in order:

@@ -4,7 +4,7 @@ $ edit testdata/top1/base.txtar  # the topology's base, where a package starts
 $ edit testdata/top0/base.txtar  # the topology's base, where a package starts
 $ go test  # topology-BN-baa-s21-c1-a
     the lift l2 is used by ./c on the path testdata/top0/ → l1 → l2, and ., which owns it, doesn't run it over testdata/top0/, so no package writes its cells of that corpus's cases, which ./c's cells past it are built through.
-        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs l2 over testdata/top0/ by that path, or ./c doesn't reach l2 from testdata/top0/. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
+        A package that uses a lift reaches it from each corpus by the path the lift's owner does: either . runs l2 over testdata/top0/ by that path, or ./c doesn't reach l2 from testdata/top0/. Making a way true may need other registrations to change, such as a lift that would then close a cycle or give a type a second path. If one holds already, a registry is stale: run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which rewrites the registry of every package with tests.
     what ran, in order:
         l2 ran on base
 --- FAIL: TestCorpus

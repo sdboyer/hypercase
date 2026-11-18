@@ -1217,9 +1217,9 @@ whether the project supplies `Codes`, stays `false`, and `evaluate`'s
     no registry has;
   - a registry file whose directory holds no `_test.go` file;
   - a registry it can't read, as one of another format version, whose
-    failure says to run the update, which writes the registry of a
-    package with tests, and to delete the registry where its directory
-    holds no `_test.go` file, since no update writes it;
+    failure says to run the update, which writes it, where its directory
+    holds a `_test.go` file, and to delete it where the directory holds
+    none, since no update writes it there;
   - a directory under `testdata/` that holds archives and that no registry
     declares;
   - a symbolic link under the corpus root's `testdata/`, `testdata/`
@@ -1627,9 +1627,11 @@ package owns every column it registers.
     user's.
   - It names no registrations: which ones make a way true turns on what
     else each package registers, and on the other packages that use the
-    lifts. The cells of a lift a package stops owning, which no package
-    writes then, are sections no registry claims, and the check names
-    them too.
+    lifts. Making a way true may need other registrations to change, such
+    as a lift that would then close a cycle or give a type a second path,
+    and the failure says so. The cells of a lift a package stops owning,
+    which no package writes then, are sections no registry claims, and
+    the check names them too.
   - Where a way holds already, a registry is stale, and the failure says
     so. The update, which rewrites the registries, ends it.
 
@@ -2544,14 +2546,15 @@ S202
   transform. An archive that can't be read fails every check of the
   package, and an update writes no findings. So does a transform's variant
   whose properties can't be known: one no corpus type lists, or one its
-  transform declines. So does a registry that doesn't give each column,
-  a lift the package uses included, one path from each corpus it runs
-  over, each corpus once and in their order, or whose path names the
-  column itself, a lift the registry doesn't list or one lift twice, or
-  names a lift for a suite over the raw input view. The root-package
-  check fails on such a registry too. Both say to run the update, which
-  writes the registry of a package with tests, and to delete the registry
-  of a package with no `_test.go` file, which no update writes.
+  transform declines. So does a registry that lists a suite or a lift
+  name twice, or doesn't give each column, a lift the package uses
+  included, one path from each corpus it runs over, each corpus once and
+  in their order, or whose path names the column itself, a lift the
+  registry doesn't list or one lift twice, or names a lift for a suite
+  over the raw input view. The root-package check fails on such a
+  registry too. Where the package has a `_test.go` file, both say to run
+  the update, which writes its registry; where it has none, both say to
+  delete the registry, which no update writes.
 - A check reads the cells as they are committed when it runs. The module's
   update runs packages at once, so a check can run before another package
   writes its cells: its findings can take a second update to settle, and a

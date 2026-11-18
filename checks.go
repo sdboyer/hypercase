@@ -140,8 +140,11 @@ func (r *runner) runChecks(t *testing.T, found []registry.Found) {
 			t.Run(c.Name, func(t *testing.T) {
 				var reg *unreadableRegistry
 				switch {
+				case errors.As(err, &reg) && reg.tested:
+					t.Errorf("the corpus check %s can't read its cells: %s can't be read: %v. No check runs, and an update writes no findings.\nRun %s to write it.", c.Name, reg.path, reg.err, r.updateCmd())
+					return
 				case errors.As(err, &reg):
-					t.Errorf("the corpus check %s can't read its cells: %s can't be read: %v. No check runs, and an update writes no findings.\nRun %s to write it. If %s holds no _test.go file, no update writes it, so delete it.", c.Name, reg.path, reg.err, r.updateCmd(), reg.dir)
+					t.Errorf("the corpus check %s can't read its cells: %s can't be read: %v, and %s holds no _test.go file, so no update writes it. No check runs, and an update writes no findings.\nDelete %s.", c.Name, reg.path, reg.err, reg.dir, reg.path)
 					return
 				case err != nil:
 					t.Errorf("the corpus check %s can't read its cells: %v\nFix what the message names. No check runs, and an update writes no findings.", c.Name, err)
@@ -263,7 +266,7 @@ func (r *runner) readCells(found []registry.Found) ([]Cell, error) {
 		}
 		g, err := registry.Parse(data)
 		if err != nil {
-			return nil, &unreadableRegistry{r.rel(f.Path), r.rel(f.Pkg), err}
+			return nil, &unreadableRegistry{r.rel(f.Path), r.rel(f.Pkg), hasTestFile(f.Pkg), err}
 		}
 		pkg := r.pkgName(f.Pkg)
 		// Parse refuses paths that aren't one from each corpus, so each
@@ -387,9 +390,11 @@ func gapTexts(transform string, gaps []archive.Gap) map[string]string {
 }
 
 // An unreadableRegistry is a registry readCells can't read, by its path
-// and its package's directory, relative to the module root, and why.
+// and its package's directory, relative to the module root, whether the
+// directory holds a _test.go file, as hasTestFile reports it, and why.
 type unreadableRegistry struct {
 	path, dir string
+	tested    bool
 	err       error
 }
 

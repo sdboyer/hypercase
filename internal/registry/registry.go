@@ -299,11 +299,12 @@ func (e *FormatError) Error() string {
 
 // Parse parses a registry. One of another format version is a
 // [*FormatError]. So that every reader of today's registries reads the
-// paths the update writes, Parse refuses one whose paths the update
-// couldn't have written: a column runs over each of its corpora once,
-// and its paths are one from each, in their order, and name only lifts
-// the registry lists, each once, never the column itself, and none for a
-// suite over the raw input view.
+// columns and paths the update writes, Parse refuses one the update
+// couldn't have written: it lists each suite and lift under a name of its
+// own, a column runs over each of its corpora once, and its paths are one
+// from each, in their order, and name only lifts the registry lists, each
+// once, never the column itself, and none for a suite over the raw input
+// view.
 func Parse(data []byte) (*Registry, error) {
 	var head struct {
 		Format int `json:"format"`
@@ -321,10 +322,42 @@ func Parse(data []byte) (*Registry, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := r.checkNames(); err != nil {
+		return nil, err
+	}
 	if err := r.checkPaths(); err != nil {
 		return nil, err
 	}
 	return r, nil
+}
+
+// checkNames reports the first name the registry lists twice among its
+// suites and lifts, owned or used: registration refuses a second column,
+// or lift, of one name.
+func (r *Registry) checkNames() error {
+	kinds := map[string]string{} // name → "suite" or "lift"
+	check := func(kind, name string) error {
+		switch was, ok := kinds[name]; {
+		case !ok:
+			kinds[name] = kind
+			return nil
+		case was == kind:
+			return fmt.Errorf("the registry lists the %s %s twice, where each suite and lift a package registers, owned or used, has a name of its own", kind, name)
+		default:
+			return fmt.Errorf("the registry lists a suite and a lift named %s, where each suite and lift a package registers, owned or used, has a name of its own", name)
+		}
+	}
+	for _, s := range r.Suites {
+		if err := check("suite", s.Name); err != nil {
+			return err
+		}
+	}
+	for _, l := range r.Lifts {
+		if err := check("lift", l.Name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // checkPaths reports the first column, suite or lift, owned or used,
