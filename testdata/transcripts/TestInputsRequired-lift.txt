@@ -1,0 +1,67 @@
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # inputs-none-lift-a
+    the lift parse declares the output error.txt with no Inputs.
+        State where its files come from: decl.FromPositions, which takes its ranges from where the error points, through the project's Positions, or decl.AllInputs.
+    the lift parse declares the output stderr.txt with no Inputs.
+        State where its files come from: a decl.InputsFunc, which maps each file to the lines of the input view it comes from, or decl.AllInputs.
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]
+$ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # inputs-none-lift-b
+    the lift parse declares the output error.txt with no Inputs.
+        State where its files come from: decl.FromPositions, which takes its ranges from where the error points, through the project's Positions, or decl.AllInputs.
+    the lift parse declares the output stderr.txt with no Inputs.
+        State where its files come from: a decl.InputsFunc, which maps each file to the lines of the input view it comes from, or decl.AllInputs.
+    what ran, in order:
+        parse ran on x
+        outline's probe ran
+        outline ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/outline
+FAIL
+[exit 1]
+$ go test  # inputs-none-lift-a
+    the lift parse declares the output error.txt with no Inputs.
+        State where its files come from: decl.FromPositions, which takes its ranges from where the error points, through the project's Positions, or decl.AllInputs.
+    the lift parse declares the output stderr.txt with no Inputs.
+        State where its files come from: a decl.InputsFunc, which maps each file to the lines of the input view it comes from, or decl.AllInputs.
+    what ran, in order:
+        parse ran on x
+        resolve ran on x
+        evaluate's probe ran
+        evaluate ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/evaluate
+            --- PASS: TestCorpus/script/x/parse
+            --- PASS: TestCorpus/script/x/resolve
+FAIL
+[exit 1]
+$ go test ./b  # inputs-none-lift-b
+    the lift parse declares the output error.txt with no Inputs.
+        State where its files come from: decl.FromPositions, which takes its ranges from where the error points, through the project's Positions, or decl.AllInputs.
+    the lift parse declares the output stderr.txt with no Inputs.
+        State where its files come from: a decl.InputsFunc, which maps each file to the lines of the input view it comes from, or decl.AllInputs.
+    what ran, in order:
+        parse ran on x
+        outline's probe ran
+        outline ran on x
+--- FAIL: TestCorpus
+    --- PASS: TestCorpus/script
+        --- PASS: TestCorpus/script/x
+            --- PASS: TestCorpus/script/x/outline
+FAIL
+[exit 1]

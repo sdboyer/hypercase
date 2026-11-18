@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"path"
 	"strings"
+	"testing"
 
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/decl"
@@ -91,6 +92,56 @@ func checkProductInputs(l *lift) {
 		case statesPositions:
 			refuse(fmt.Sprintf("the lift %s declares the product file %q with Inputs: decl.FromPositions, and Positions finds where an error points, which a product file never holds. Give it a decl.InputsFunc or decl.AllInputs.", l.name, o.Pattern))
 		}
+	}
+}
+
+// checkStatements fails the run on each output declaration that states
+// nothing in Inputs, a suite's, a lift's, owned or used, and a bytes
+// lift's product file's, each with the statements it may make; and, when
+// the project has no Positions, on the declarations that state
+// FromPositions, at once. Cells still run, and an update still writes
+// their outputs, as after a missing description: so one run names every
+// declaration to edit.
+func (r *runner) checkStatements(t *testing.T) {
+	t.Helper()
+	var positioned []string
+	check := func(kind, name string, outputs []decl.Output) {
+		for _, o := range outputs {
+			matches, _ := path.Match(o.Pattern, errorFile)
+			switch stated(o.Inputs) {
+			case statesPositions:
+				positioned = append(positioned, fmt.Sprintf("the %s %s's %s", kind, name, o.Pattern))
+			case statesNone:
+				switch {
+				case o.Pattern == errorFile:
+					t.Errorf("the %s %s declares the output %s with no Inputs.\nState where its files come from: decl.FromPositions, which takes its ranges from where the error points, through the project's Positions, or decl.AllInputs.", kind, name, o.Pattern)
+				case matches:
+					t.Errorf("the %s %s declares the output %s with no Inputs, and the pattern matches %s.\nState decl.AllInputs, or change the pattern so it doesn't match %s and declare %s on its own, with decl.FromPositions or decl.AllInputs, and the rest with a decl.InputsFunc or decl.AllInputs.", kind, name, o.Pattern, errorFile, errorFile, errorFile)
+				default:
+					t.Errorf("the %s %s declares the output %s with no Inputs.\nState where its files come from: a decl.InputsFunc, which maps each file to the lines of the input view it comes from, or decl.AllInputs.", kind, name, o.Pattern)
+				}
+			}
+		}
+	}
+	for _, l := range r.lifts {
+		if !l.owned {
+			check("lift", l.name, l.outputs)
+		}
+		for _, o := range l.product {
+			if stated(o.Inputs) == statesNone {
+				t.Errorf("the lift %s declares the product file %s with no Inputs.\nState where its files come from: a decl.InputsFunc, which maps each file to the lines of the lift's input view it comes from, or decl.AllInputs.", l.name, o.Pattern)
+			}
+		}
+	}
+	for _, c := range r.columns {
+		check(c.kind(), c.name, c.outputs)
+	}
+	if r.positions == nil && len(positioned) > 0 {
+		states := "states"
+		if len(positioned) > 1 {
+			states = "state"
+		}
+		t.Errorf("the project has no Positions, and %s %s decl.FromPositions, which takes error.txt's ranges from it.\nGive the decl.Project its Positions, which finds where an error points, or state decl.AllInputs in place of decl.FromPositions.", andList(positioned), states)
 	}
 }
 

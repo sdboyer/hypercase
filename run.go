@@ -43,6 +43,7 @@ func Test(t *testing.T) {
 		return
 	}
 	r.checkDescriptions(t)
+	r.checkStatements(t)
 	if r.update && r.refuseLinks(t) {
 		return
 	}
@@ -106,6 +107,7 @@ type runner struct {
 	updateVar   string
 	renderError func(in fs.FS, err error) []byte
 	codes       func(err error) []string
+	positions   func(err error) []decl.Range
 	issueLinks  []decl.IssueLink
 	moduleRoot  string
 	pkgDir      string
@@ -149,6 +151,7 @@ func newRunner(t *testing.T) (*runner, bool) {
 		updateVar:   project.UpdateVar,
 		renderError: project.RenderError,
 		codes:       project.Codes,
+		positions:   project.Positions,
 		issueLinks:  slices.Clone(project.IssueLinks),
 		rootRel:     rootRel,
 		rootPackage: rootPackage,
