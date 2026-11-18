@@ -148,7 +148,8 @@ func TestTwoRoots(t *testing.T) {
 }
 
 // TestCorpusMissing: a revision before the corpus root's registries, at a,
-// makes every cell at b appear. At b, the root is wrong, and the report
+// makes every cell at b appear, and the page says nothing of a's ranges,
+// as a has no cells to lack them. At b, the root is wrong, and the report
 // fails, saying so.
 func TestCorpusMissing(t *testing.T) {
 	t.Parallel()
@@ -160,6 +161,7 @@ func TestCorpusMissing(t *testing.T) {
 	if got := ok(t, g, "", "report", "-text", c[0], c[1]); got != want {
 		t.Errorf("from a revision with no corpus, the report is:\n%s\nwant:\n%s", got, want)
 	}
+	lacks(t, "the page", ok(t, g, "", "report", c[0], c[1]), `<p class="note">The newest registry`)
 	fails(t, g, "", 1, []string{"report", c[1], c[0]},
 		"hypercase report: no registry records the corpus root . at "+c[0]+", though some do at "+c[1]+", and the report shows the corpus at its second revision.\n")
 	g = gittest.New(t)

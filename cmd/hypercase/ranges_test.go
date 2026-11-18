@@ -12,7 +12,7 @@ import (
 )
 
 // registryAt returns a registry's bytes at an older format than today's,
-// one from registry.InputsFormat or before it: what Marshal writes, less
+// up to registry.InputsFormat: what Marshal writes, less
 // the keys the formats after it added. registry.ChecksFormat added the
 // corpus checks, and registry.InputsFormat the project's Positions and
 // each output declaration's Inputs.
@@ -52,7 +52,7 @@ func registryAt(r registry.Registry, format int) string {
 // inputs file it is given, or none.
 func rangesModule(format int, archives map[string]string) map[string]string {
 	reg := string(moduleRegistry().Marshal())
-	if format < registry.InputsFormat {
+	if format < registry.Format {
 		reg = registryAt(moduleRegistry(), format)
 	}
 	files := map[string]string{"go.mod": "module example.com/m\n\ngo 1.27\n", "testdata/hypercase.json": reg}
@@ -76,7 +76,9 @@ func rangesModule(format int, archives map[string]string) map[string]string {
 // parse, whose cell ranks on its bytes and lists no ranges; a cell that ran
 // with none; one beside a cell that didn't run, whose maps it shows none
 // of; a file it maps that the cell lacks; and a file of the cell it
-// doesn't map.
+// doesn't map. A product the report leaves out is a problem, and its maps
+// are neither files the cell lacks nor compared: a change to them alone
+// ranks no cell.
 func TestRangesRank(t *testing.T) {
 	t.Parallel()
 	const head = "A case.\n-- in/sheet/A1 --\n1\n"
@@ -87,6 +89,12 @@ func TestRangesRank(t *testing.T) {
 	const x = "testdata/sheet/x.txtar, out/calc/"
 	noInputs := func(state string) string {
 		return x + ": the cell is " + state + ", and has no inputs file, which every cell that ran has from registry format 8 on. So the report shows no ranges for its files."
+	}
+	// A product of calc, which no registry declares a bytes lift.
+	const product = "-- via/calc/sheet/A1 --\n4\n"
+	const leftOut = "testdata/sheet/x.txtar, via/calc/sheet/A1: the section is a product of calc, and no registry declares a bytes lift of that name over testdata/sheet/, so the report leaves it out, and doesn't compare its cell's product."
+	productMap := func(stdout, via string) string {
+		return inputs("stdout.txt\n  " + stdout + "\nvia/calc/sheet/A1\n  " + via + "\n")
 	}
 	for _, tt := range []struct {
 		name    string
@@ -128,6 +136,20 @@ func TestRangesRank(t *testing.T) {
 			a:    head + inputs("stdout.txt\n  in/sheet/A1\n") + accepted("1"),
 			b:    head + inputs("stdout.txt\n  in/sheet/A1:1-1\n") + "-- out/calc/outcome --\nrejected\n-- out/calc/stdout.txt --\n1\n",
 			want: "outcome changed\n  sheet/x calc: accepted -> rejected\n    stdout.txt ranges changed\n      - in/sheet/A1\n      + in/sheet/A1:1-1\n",
+		},
+		{
+			name: "a left-out product's map alone",
+			a:    head + productMap("in/sheet/A1", "in/sheet/A1") + accepted("1") + product,
+			b:    head + productMap("in/sheet/A1", "in/sheet/A1:1-1") + accepted("1") + product,
+			want: "",
+			text: [2]string{leftOut, leftOut},
+		},
+		{
+			name: "a left-out product's map and a file's",
+			a:    head + productMap("in/sheet/A1", "in/sheet/A1") + accepted("1") + product,
+			b:    head + productMap("in/sheet/A1:1-1", "in/sheet/A1:1-1") + accepted("1") + product,
+			want: "ranges changed\n  sheet/x calc: accepted\n    stdout.txt ranges changed\n      - in/sheet/A1\n      + in/sheet/A1:1-1\n",
+			text: [2]string{leftOut, leftOut},
 		},
 		{
 			name: "an added and a removed file list no ranges",
@@ -278,7 +300,8 @@ func TestRangesPage(t *testing.T) {
 // only one revision's holds, A's marked - and B's +, whenever both differ,
 // which every rank shows. With A's registry from before inputs files, whose
 // cells commit none, no cell ranks on its inputs file, and no file lists
-// ranges. Each pair is reported both ways.
+// ranges. A's registry is at that format, at the format that added inputs
+// files, and at today's, and each pair is reported both ways.
 func TestRangesGenerated(t *testing.T) {
 	t.Parallel()
 	type state struct {
@@ -351,7 +374,7 @@ func TestRangesGenerated(t *testing.T) {
 		}
 		return b.String()
 	}
-	for _, formatA := range []int{7, registry.Format} {
+	for _, formatA := range []int{registry.InputsFormat - 1, registry.InputsFormat, registry.Format} {
 		t.Run(fmt.Sprint("a at format ", formatA), func(t *testing.T) {
 			t.Parallel()
 			at := [2]map[string]state{{}, {}}

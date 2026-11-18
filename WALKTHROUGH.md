@@ -4021,7 +4021,8 @@ of `via/import/sheet/B1` at `<a>`, and line 2 of `via/import/sheet/A1` at
 - The report reads a cell's `inputs` as its maps, not as one of its files:
   it never lists `inputs` among the cell's files, and a change to it alone
   ranks no cell bytes changed. A cell whose files are the same at both
-  revisions, and whose maps of them differ, ranks ranges changed, a fifth
+  revisions, and whose `inputs` differs byte for byte, less its maps of a
+  product the report leaves out (step 10), ranks ranges changed, a fifth
   rank, after bytes changed.
 - In the plain text, under a file whose map changed, each range only
   `<a>`'s map holds, marked `-`, then each only `<b>`'s holds, marked `+`.
@@ -4043,8 +4044,8 @@ of `via/import/sheet/B1` at `<a>`, and line 2 of `via/import/sheet/A1` at
   problem, and so is an `inputs` that can't be read, that maps a file the
   cell lacks or doesn't map one it has, or that sits beside a cell that
   didn't run. At a revision whose registries predate format 8, an `inputs`
-  is a problem, left out, and the report shows no ranges there, ranks no
-  cell on them, and says so.
+  is a problem, left out, and the report shows no ranges there and ranks no
+  cell on them, which the page says.
 - The descriptions give each output and product declaration's statement,
   and for `FromPositions`, whether the project supplies `Positions`.
 - The report reads each package's findings, under its `testdata/checks/`,
@@ -4054,8 +4055,10 @@ of `via/import/sheet/B1` at `<a>`, and line 2 of `via/import/sheet/A1` at
   `findings changed`, after the problems and before the ranks, it lists
   each check whose findings differ, by its package's directory and its
   name: each finding only at `<a>`, marked `-`, then each only at `<b>`,
-  marked `+`. The page adds the check's description, from `<b>`, or from
-  `<a>` where `<b>` lists none. A listed check with no findings file, a
+  marked `+`, each quoted where it holds a carriage return or another
+  control character. The page adds the check's description, from `<b>`,
+  or from `<a>` where `<b>` lists none. A listed check with no findings
+  file, or with something other than a regular file in its place, a
   findings file not as an update writes it, and, from format 9, any other
   file under `testdata/checks/` are problems at their revision, and the
   check shows no change there.

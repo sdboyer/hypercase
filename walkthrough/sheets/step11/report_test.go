@@ -637,13 +637,10 @@ func TestCommit(t *testing.T) {
 
 // runUpdate runs the update of step11's packages in the scratch module,
 // then their normal run, which fails unless the update wrote everything.
-// One pass is enough: the one code the change moves that the corpus check
-// codes counts is past-xfd's, in a cell of import, and import's cells are
-// this package's, as codes is, so its update writes the cell before its
-// check reads it, and the findings don't depend on which package writes
-// first. Both build with -trimpath, which keeps the scratch module's
-// directory, new in each run, out of the build cache's keys, so that the
-// cache serves them.
+// One pass is enough for the toy as copied and for the change, as the
+// normal run after it shows. Both build with -trimpath, which keeps the
+// scratch module's directory, new in each run, out of the build cache's
+// keys, so that the cache serves them.
 func runUpdate(t *testing.T, repo, modfile string) {
 	t.Helper()
 	gotest := func(env []string) ([]byte, error) {

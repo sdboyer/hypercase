@@ -14,14 +14,14 @@ import (
 // any, come next, under the heading findings changed: under it, a line per
 // check whose findings changed, its package's directory, then its name,
 // and under that, each finding only at A, marked -, then each only at B,
-// marked +. Each rank that has changes has a heading, in rank order. Under it
-// is one line per cell: its case, its column, and its outcome, or the
-// change in it, so the outcome file is never listed as a file, and nor is
-// the inputs file. Under each cell is one line per other file of the cell
-// that was added, changed or removed, or whose reverse map alone changed,
-// and under a file that both revisions map, what changed in its map: each
-// line of A's that B's lacks, marked -, then each of B's that A's lacks,
-// marked +.
+// marked +, each as a diff shows a line. Each rank that has changes has a
+// heading, in rank order. Under it is one line per cell: its case, its
+// column, and its outcome, or the change in it, so the outcome file is
+// never listed as a file, and nor is the inputs file. Under each cell is
+// one line per other file of the cell that was added, changed or removed,
+// or whose reverse map alone changed, and under a file that both
+// revisions map, what changed in its map: each line of A's that B's
+// lacks, marked -, then each of B's that A's lacks, marked +.
 func (r *Report) WriteText(w io.Writer) error {
 	bw := bufio.NewWriter(w)
 	if len(r.Problems) > 0 {

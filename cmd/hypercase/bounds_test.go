@@ -24,6 +24,12 @@ import (
 // of how many sections, and how many of those sections' diffs it leaves
 // out. A section's diff is shown once per change, under its first file,
 // and the other files say where. Two runs give the same bytes.
+//
+// Beside the generated cells, three by hand. A section's diff that
+// another file of the change shows is none of the diffs a file's note
+// counts, whichever file comes first. And where a file's cap falls just
+// after the line that says what a range leaves out, the file's note counts
+// those lines in place of that line.
 func TestInputBounds(t *testing.T) {
 	t.Parallel()
 	const m, f = report.MaxRangeLines, report.MaxFileLines
@@ -64,6 +70,36 @@ func TestInputBounds(t *testing.T) {
 			}
 			revs[i]["testdata/sheet/"+name(c)+".txtar"] = s + cellOf("", "calc", "accepted", files, maps...)
 		}
+		// Sections A to E of m lines each, of which E changed, and a file
+		// mapping all their lines beside one mapping E's first.
+		five := "A case.\n"
+		var all []revmap.Range
+		for _, sec := range []string{"A", "B", "C", "D", "E"} {
+			five += "-- in/sheet/" + sec + " --\n"
+			for line := 1; line <= m; line++ {
+				five += fmt.Sprintf("%s line %d", sec, line)
+				if i == 1 && sec == "E" && line == m {
+					five += " at b"
+				}
+				five += "\n"
+			}
+			all = append(all, lines("in/sheet/"+sec, 1, m))
+		}
+		e := []revmap.Range{lines("in/sheet/E", 1, 1)}
+		v := fmt.Sprintf("%d\n", i)
+		revs[i]["testdata/sheet/shared-first.txtar"] = five + cellOf("", "calc", "accepted", [][2]string{{"one.txt", v}, {"two.txt", v}},
+			revmap.File{Path: "one.txt", Ranges: e}, revmap.File{Path: "two.txt", Ranges: all})
+		revs[i]["testdata/sheet/shared-last.txtar"] = five + cellOf("", "calc", "accepted", [][2]string{{"one.txt", v}, {"two.txt", v}},
+			revmap.File{Path: "one.txt", Ranges: all}, revmap.File{Path: "two.txt", Ranges: e})
+		// One section, whose ranges' first f lines end where the last of
+		// them leaves out lines past its first m.
+		s := "A case.\n-- in/sheet/S --\n"
+		for line := 1; line <= 5*m+10; line++ {
+			s += fmt.Sprintf("S line %d\n", line)
+		}
+		ranges := []revmap.Range{lines("in/sheet/S", 1, m), lines("in/sheet/S", m+6, 2*m+5), lines("in/sheet/S", 2*m+11, 3*m+10),
+			lines("in/sheet/S", 3*m+16, 4*m+20), lines("in/sheet/S", 4*m+25, 4*m+26)}
+		revs[i]["testdata/sheet/cut-at-cap.txtar"] = s + cellOf("", "calc", "accepted", [][2]string{{"one.txt", v}}, revmap.File{Path: "one.txt", Ranges: ranges})
 	}
 	g := gittest.New(t)
 	c := revisions(t, g, revs[0], revs[1])
@@ -73,6 +109,24 @@ func TestInputBounds(t *testing.T) {
 	}
 
 	numbered := regexp.MustCompile(`<span class="ctx">\s*(\d+)  `)
+	cutNote := func(left int) string {
+		return fmt.Sprintf(`<p class="note">The page shows the first %d lines the file&#39;s ranges hold, and leaves out %d more, of 1 section.</p>`, f, left)
+	}
+	const eDiff = `<code>in/sheet/E</code> changed <span class="stat">`
+	for _, cl := range []struct{ name, all, e string }{{"shared-first", "two.txt", "one.txt"}, {"shared-last", "one.txt", "two.txt"}} {
+		files := strings.Split(change(t, page, "sheet/"+cl.name, "calc"), `<li class="changed">`)[1:]
+		if len(files) != 2 {
+			t.Fatalf("%s calc's change lists %d changed files, want 2", cl.name, len(files))
+		}
+		file := map[string]string{"one.txt": files[0], "two.txt": files[1]}
+		what := cl.name + " calc's change, "
+		holds(t, what+cl.all+",", file[cl.all], cutNote(m))
+		lacks(t, what+cl.all+",", file[cl.all], eDiff, "is shown under")
+		holds(t, what+cl.e+",", file[cl.e], eDiff)
+	}
+	cut := change(t, page, "sheet/cut-at-cap", "calc")
+	holds(t, "cut-at-cap calc's change", cut, fmt.Sprintf(`<span class="ctx">  %d  S line %d</span></pre>`, 4*m+15, 4*m+15), cutNote(2+5))
+	lacks(t, "cut-at-cap calc's change", cut, "past the first")
 	for _, cl := range cells {
 		entry := change(t, page, "sheet/"+name(cl), "calc")
 		what := name(cl) + " calc's change"

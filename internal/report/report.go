@@ -314,8 +314,8 @@ func findModule(tree fs.FS, dir string) (string, bool) {
 // to compare, so it ranks on its files alone when it is at both, and one
 // whose product either revision leaves out has no product to compare. A
 // cell whose files are the same ranks on its inputs file, byte for byte,
-// where both revisions commit inputs files. props holds each property's
-// description.
+// where both revisions commit inputs files, less the maps of a product
+// either revision leaves out. props holds each property's description.
 func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 	keys := map[cellKey]bool{}
 	for k := range a.cells {
@@ -342,10 +342,15 @@ func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 		default:
 			ch.Rank, ch.Before, ch.After = BytesChanged, ca.line, cb.line
 		}
-		ch.Files = fileChanges([2]*snapshot{a, b}, k, !a.leftOut[k] && !b.leftOut[k])
+		leftOut := a.leftOut[k] || b.leftOut[k]
+		ch.Files = fileChanges([2]*snapshot{a, b}, k, !leftOut)
 		onceDiffs(ch.Files)
 		if ch.Rank == BytesChanged && !slices.ContainsFunc(ch.Files, func(f FileChange) bool { return f.How != RangesOnly }) {
-			if !a.ranges || !b.ranges || inputsEqual(ca.inputs, cb.inputs) {
+			var product string
+			if leftOut {
+				product = archive.Via + "/" + k.column + "/"
+			}
+			if !a.ranges || !b.ranges || inputsEqual(ca.inputs, cb.inputs, product) {
 				continue
 			}
 			ch.Rank = RangesChanged
@@ -361,12 +366,13 @@ func changes(a, b *snapshot, props map[string]string, links *linker) []Change {
 }
 
 // inputsEqual reports whether two revisions' inputs files of a cell are
-// the same: both absent, or both present with the same bytes.
-func inputsEqual(a, b *inputsAt) bool {
+// the same: both absent, or both present with the same bytes, less the
+// maps of the files under product, where product isn't "".
+func inputsEqual(a, b *inputsAt, product string) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
-	return bytes.Equal(a.data, b.data)
+	return bytes.Equal(a.less(product), b.less(product))
 }
 
 // fileChanges returns a cell's files, other than its outcome and its inputs
@@ -441,20 +447,13 @@ func rangeChanges(a, b *revmap.File) []RangeLine {
 		return nil
 	}
 	var out []RangeLine
-	only := func(kind byte, lines, other []string) {
-		in := map[string]bool{}
-		for _, l := range other {
-			in[l] = true
-		}
-		for _, l := range lines {
-			if !in[l] {
-				out = append(out, RangeLine{Kind: kind, Text: l})
-			}
-		}
-	}
 	la, lb := a.Lines(), b.Lines()
-	only('-', la, lb)
-	only('+', lb, la)
+	for _, l := range only(la, lb) {
+		out = append(out, RangeLine{Kind: '-', Text: l})
+	}
+	for _, l := range only(lb, la) {
+		out = append(out, RangeLine{Kind: '+', Text: l})
+	}
 	return out
 }
 

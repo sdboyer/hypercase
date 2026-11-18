@@ -198,6 +198,22 @@ type inputsAt struct {
 	maps map[string]revmap.File
 }
 
+// less returns the inputs file's bytes less its maps of the files under
+// prefix, as Format writes what is left, or its bytes where prefix is ""
+// or the report reads no maps from it.
+func (in *inputsAt) less(prefix string) []byte {
+	if prefix == "" || in.maps == nil {
+		return in.data
+	}
+	var files []revmap.File
+	for p, f := range in.maps {
+		if !strings.HasPrefix(p, prefix) {
+			files = append(files, f)
+		}
+	}
+	return revmap.Format(files)
+}
+
 // ran reports whether the cell ran: whether it is accepted, rejected or
 // panicked, and so has an inputs file from registry.InputsFormat on.
 func (c *cellAt) ran() bool {
@@ -538,8 +554,7 @@ func (s *snapshot) addArchive(corpus, name, p string, data []byte) error {
 			place(k)
 			cellOf(cellKey{c: k, column: lift}).product[file] = sec.Data
 		case top == archive.In && below != "", kind != "" && rest == archive.Delete:
-			// An input, or a variant's deleted inputs, which the report
-			// doesn't read.
+			// An input, or a variant's deleted inputs.
 			place(k)
 		case kind == archive.Variant && rest == archive.About:
 			place(k).description = strings.TrimSpace(string(sec.Data))

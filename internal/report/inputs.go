@@ -43,9 +43,13 @@ type Inputs struct {
 
 // A Cut is what MaxFileLines leaves out of a file's input lines: how many
 // lines its ranges hold past them, of how many sections, and the diffs of
-// how many of those sections that changed.
+// how many of those sections that changed, which no file of the change
+// shows.
 type Cut struct {
 	Lines, Sections, Diffs int
+	// diffs are the sections left out whose diffs the file would show,
+	// from which onceDiffs counts Diffs.
+	diffs []string
 }
 
 // A Map is what one revision's reverse map of a changed file states.
@@ -214,13 +218,13 @@ func (in *Inputs) capLines() {
 			if len(e.Lines) == 0 { // the excerpt's first line is past the cap
 				kept = i
 				if e.Diff != nil {
-					c.Diffs++
+					c.diffs = append(c.diffs, e.Section)
 				}
 			}
 			for _, d := range in.Excerpts[i+1:] {
 				leave(d, d.Lines)
 				if d.Diff != nil {
-					c.Diffs++
+					c.diffs = append(c.diffs, d.Section)
 				}
 			}
 			in.Excerpts = in.Excerpts[:kept]
@@ -232,7 +236,9 @@ func (in *Inputs) capLines() {
 }
 
 // onceDiffs leaves each section's diff on the first file of a change
-// whose input lines show it, and points the others' excerpts there.
+// whose input lines show it, and points the others' excerpts there. A
+// file whose cap leaves out a section's diff that another file shows
+// doesn't count it among those it leaves out.
 func onceDiffs(files []FileChange) {
 	at := map[string]string{} // section → the path of the file that shows its diff
 	for _, f := range files {
@@ -249,6 +255,18 @@ func onceDiffs(files []FileChange) {
 				continue
 			}
 			at[e.Section] = f.Path
+		}
+	}
+	for _, f := range files {
+		if f.Inputs == nil || f.Inputs.Cut == nil {
+			continue
+		}
+		c := f.Inputs.Cut
+		c.Diffs = 0
+		for _, sec := range c.diffs {
+			if _, shown := at[sec]; !shown {
+				c.Diffs++
+			}
 		}
 	}
 }

@@ -40,13 +40,16 @@ func lines(section string, start, end int) revmap.Range {
 // a variant's product.
 //
 // Lines that may not be the ones the cell read carry a note: past a
-// frozen bytes lift, and in the own inputs of a transform's variant no
-// registry owns. A range into a section the archive doesn't hold, or past
-// its last line, is a problem at its revision, and the page shows no lines
-// of it. The text list shows no lines.
+// frozen bytes lift, in the base, a variant or a transform's variant, and
+// in the own inputs of a transform's variant no registry owns. A gaps line
+// that marks a lift's cell the revision doesn't hold freezes nothing. A
+// range into a section the archive doesn't hold, or past its last line,
+// is a problem at its revision, and the page shows no lines of it. The
+// text list shows no lines.
 func TestInputLines(t *testing.T) {
 	t.Parallel()
 	reg := productRegistry()
+	reg.Types[0].Transforms = []registry.Transform{{Name: "t", Description: "Owned.", Owned: true}}
 	reg.Types[1].Transforms = []registry.Transform{
 		{Name: "t", Description: "Owned.", Owned: true},
 		{Name: "u", Description: "Owned by no registry."},
@@ -108,6 +111,12 @@ func TestInputLines(t *testing.T) {
 		"frozen":   both("A CSV.\n" + csv("", "-- gaps --\nimport Waits on sheets#4.\n")),
 		"vfrozen":  both("A CSV.\n" + csv("", "") + variant + csv("variant/v/", "-- variant/v/gaps --\nimport Waits on sheets#4.\n")),
 		"vproduct": both("A CSV.\n" + csv("", "") + variant + csv("variant/v/", "")),
+		// A gaps line of the base freezes import in transform t's variant.
+		"tfrozen": both("A CSV.\n" + csv("", "-- gaps --\ntransform/t import Waits on sheets#4.\n") + csv("transform/t/", "")),
+		// A gaps line marks import's cell, and the archive holds its
+		// product but no outcome, so no such cell.
+		"unborn": both("A CSV.\n-- in/csv/data --\na\n-- gaps --\nimport Waits on sheets#4.\n-- via/import/sheet/A1 --\n4\n" +
+			cellOf("", "calc", "accepted", out("V\n"), std(lines("via/import/sheet/A1", 0, 0)))),
 		// A gaps line freezes import at B alone, and calc's map changes.
 		"freezing": {
 			both("A CSV.\n" + csv("", ""))[0],
@@ -186,6 +195,12 @@ func TestInputLines(t *testing.T) {
 	holds(t, "vfrozen's variant's calc's change", change(t, page, "csv/vfrozen/variant/v", "calc"),
 		excerpt("variant/v/via/import/sheet/A1", 1)+`<span class="ctx">   1  4</span></pre>`+"\n"+frozen("import"))
 	lacks(t, "vfrozen calc's change", change(t, page, "csv/vfrozen", "calc"), `<p class="note">`)
+	holds(t, "tfrozen's transform's calc's change", change(t, page, "csv/tfrozen/transform/t", "calc"),
+		excerpt("transform/t/via/import/sheet/A1", 1)+`<span class="ctx">   1  4</span></pre>`+"\n"+frozen("import"))
+	lacks(t, "tfrozen calc's change", change(t, page, "csv/tfrozen", "calc"), `<p class="note">`)
+	unborn := change(t, page, "csv/unborn", "calc")
+	holds(t, "unborn calc's change", unborn, excerpt("via/import/sheet/A1", 1)+`<span class="ctx">   1  4</span></pre></div>`)
+	lacks(t, "unborn calc's change", unborn, `<p class="note">`)
 	holds(t, "freezing calc's change", change(t, page, "csv/freezing", "calc"),
 		excerpt("via/import/sheet/A1", 0)+`<span class="ctx">   1  4</span></pre></div>`+"\n"+
 			excerpt("via/import/sheet/A1", 1)+`<span class="ctx">   1  4</span></pre>`+"\n"+frozen("import"))
@@ -195,9 +210,11 @@ func TestInputLines(t *testing.T) {
 	lacks(t, "bad calc's change", bad, "<code>in/sheet/Z9</code>", `  3  y`)
 	text := ok(t, g, "", "report", "-text", c[0], c[1])
 	const x = "testdata/sheet/bad.txtar, out/calc/inputs: the inputs file maps stdout.txt to "
-	if want := "problems\n  at " + c[1] + "\n" +
+	const unbornCell = "    testdata/csv/unborn.txtar, via/import/: the cell has its product and no outcome file. A cell exists where its outcome file does, so the report shows no cell here.\n"
+	if want := "problems\n  at " + c[1] + "\n" + unbornCell +
 		"    " + x + "in/sheet/A1:3-9, and in/sheet/A1 has 4 lines, so the report shows no lines of the range.\n" +
-		"    " + x + "in/sheet/Z9, and the archive holds no section in/sheet/Z9, so the report shows no lines of the range.\n"; !strings.HasPrefix(text, want+"bytes changed\n") {
+		"    " + x + "in/sheet/Z9, and the archive holds no section in/sheet/Z9, so the report shows no lines of the range.\n" +
+		"  at " + c[0] + "\n" + unbornCell; !strings.HasPrefix(text, want+"bytes changed\n") {
 		t.Errorf("the text list is\n%s\nwant it to start with\n%s", text, want)
 	}
 	lacks(t, "the text list", text, "   1  w", "input lines")

@@ -130,14 +130,16 @@ func TestFindingsGenerated(t *testing.T) {
 
 // TestFindingsProblems: what the report can't read of a revision's findings
 // is a problem there, and the check shows no change: a check the registry
-// lists with no findings file, and a findings file not as an update writes
-// it, out of order, with a line twice or empty, or with no final newline.
-// Each other file in testdata/checks/, the findings of no check the
-// registry lists, is a problem too, left out. Before the format that lists
-// checks, a findings file is read by its name, so neither listing problem
-// arises, and a file whose name is no check's is left out. A revision's
+// lists with no findings file, one whose findings file's name names a
+// directory, and a findings file not as an update writes it, out of order,
+// with a line twice or empty, or with no final newline. Each other file in
+// testdata/checks/, the findings of no check the registry lists, is a
+// problem too, left out. Before the format that lists checks, a findings
+// file is read by its name, so neither listing problem arises, and a file
+// whose name is no check's, or a directory, is left out. A revision's
 // problems are listed by path. Two packages' checks of one name stay
-// apart, and a check that only A's registry lists shows A's description.
+// apart, and a check that only A's registry lists shows A's description. A
+// finding with a carriage return is shown quoted, as a diff shows a line.
 func TestFindingsProblems(t *testing.T) {
 	t.Parallel()
 	check := func(name string) registry.Check {
@@ -159,10 +161,12 @@ func TestFindingsProblems(t *testing.T) {
 	for name := range bad {
 		badChecks = append(badChecks, check(name))
 	}
-	a := findingsModule(registry.Format, append([]registry.Check{check("missing"), check("gone"), check("shared")}, badChecks...),
-		map[string]string{"gone": "x\n", "shared": "root\n"})
-	b := findingsModule(registry.Format, append([]registry.Check{check("missing"), check("shared")}, badChecks...),
-		map[string]string{"shared": "root\nroot 2\n", "orphan": "o\n"})
+	a := findingsModule(registry.Format, append([]registry.Check{check("missing"), check("dir"), check("cr"), check("gone"), check("shared")}, badChecks...),
+		map[string]string{"cr": "", "gone": "x\n", "shared": "root\n"})
+	b := findingsModule(registry.Format, append([]registry.Check{check("missing"), check("dir"), check("cr"), check("shared")}, badChecks...),
+		map[string]string{"cr": "a\rb\n", "shared": "root\nroot 2\n", "orphan": "o\n"})
+	// A directory where dir's findings file would be.
+	a["testdata/checks/dir.txt/x"], b["testdata/checks/dir.txt/x"] = "x\n", "y\n"
 	for name, data := range bad {
 		a["testdata/checks/"+name+".txt"] = data
 		b["testdata/checks/"+name+".txt"] = "z\n" // a change the report can't show
@@ -183,6 +187,7 @@ func TestFindingsProblems(t *testing.T) {
 		files["q/testdata/hypercase.json"] = registryAt(old, registry.ChecksFormat-1)
 		files["q/testdata/checks/found.txt"] = []string{"", "found\n"}[i]
 		files["q/testdata/checks/Not_A_Check.txt"] = []string{"", "n\n"}[i]
+		files["q/testdata/checks/qdir.txt/x"] = []string{"x\n", "y\n"}[i]
 	}
 	g := gittest.New(t)
 	c := revisions(t, g, a, b)
@@ -190,9 +195,10 @@ func TestFindingsProblems(t *testing.T) {
 
 	const missing = "testdata/hypercase.json lists the corpus check missing, and the package has no findings file for it, which an update writes for each check it lists. So the report shows no change in its findings here."
 	const orphan = "the file is the findings of no corpus check testdata/hypercase.json lists, so the report leaves it out."
+	const dir = "testdata/hypercase.json lists the corpus check dir, and this isn't a regular file, as the findings file an update writes for it is. So the report shows no change in its findings here."
 	problems := [2][][2]string{
-		{{"testdata/checks/missing.txt", missing}},
-		{{"testdata/checks/missing.txt", missing}, {"testdata/checks/orphan.txt", orphan}, {"testdata/checks/README", orphan}},
+		{{"testdata/checks/missing.txt", missing}, {"testdata/checks/dir.txt", dir}},
+		{{"testdata/checks/missing.txt", missing}, {"testdata/checks/dir.txt", dir}, {"testdata/checks/orphan.txt", orphan}, {"testdata/checks/README", orphan}},
 	}
 	for name := range bad {
 		problems[0] = append(problems[0], [2]string{"testdata/checks/" + name + ".txt", "the findings file isn't as an update writes it: " + whys[name] + ". So the report shows no change in the check's findings here."})
@@ -207,6 +213,7 @@ func TestFindingsProblems(t *testing.T) {
 		}
 	}
 	want.WriteString("findings changed\n" +
+		"  . cr\n    + \"a\\rb\"\n" +
 		"  . gone\n    - x\n" +
 		"  . shared\n    + root 2\n" +
 		"  p shared\n    + p 2\n" +
@@ -217,5 +224,6 @@ func TestFindingsProblems(t *testing.T) {
 	page := ok(t, g, "", "report", c[0], c[1])
 	holds(t, "the findings", section(t, page, `<h3 class="rank findings-changed">`, "</ul>"),
 		`<span class="pkg">.</span> <span class="check">gone</span>: Checks gone.</div>`,
-		`<span class="pkg">q</span> <span class="check">found</span></div>`)
+		`<span class="pkg">q</span> <span class="check">found</span></div>`,
+		`<span class="pkg">.</span> <span class="check">cr</span>: Checks cr.</div>`+"\n"+`<pre class="findings"><span class="add">&#43; &#34;a\rb&#34;</span></pre>`)
 }

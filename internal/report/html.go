@@ -199,7 +199,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
 	"class":         Rank.class,
 	"diffClass":     func(l diff.Line) string { c, _ := diffLine(l); return c },
 	"diffText":      func(l diff.Line) string { _, t := diffLine(l); return t },
-	"howClass":      func(how string) string { return strings.ReplaceAll(how, " ", "-") },
+	"howClass":      class,
 	"rangesOnly":    func(f FileChange) bool { return f.How == RangesOnly },
 	"rangeClass":    rangeClass,
 	"rangeText":     func(l RangeLine) string { return string(l.Kind) + " " + l.Text },

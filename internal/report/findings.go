@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/sdboyer/hypercase/archive"
+	"github.com/sdboyer/hypercase/internal/diff"
 )
 
 // A FindingsChange is what changed in one corpus check's findings between
@@ -24,7 +25,8 @@ type FindingsChange struct {
 	// registry from before registry.ChecksFormat lists none.
 	Description Text
 	// Disappeared are the findings only at A, and Appeared those only at
-	// B, each in its findings file's order.
+	// B, each in its findings file's order, and each as a diff shows a
+	// line.
 	Disappeared, Appeared []string
 }
 
@@ -46,13 +48,14 @@ func (k checkKey) compare(o checkKey) int {
 // the snapshot reads, in its testdata/checks/. From registry.ChecksFormat
 // on, a registry lists its package's checks, each with its description,
 // and the report reads each listed check's findings, and lists as a
-// problem a listed check with no findings file and each other file there,
-// which is no listed check's findings. Before it, the report reads each
-// file whose name is a check's under the naming rule, then .txt, as strip
-// finds them, with no description and neither problem. A findings file
-// that isn't as an update writes it is a problem, and the report shows no
-// change in its check's findings at this revision. A package's problems
-// are listed by path.
+// problem a listed check with no findings file, one with something other
+// than a regular file in its findings file's place, and each other file
+// there, which is no listed check's findings. Before it, the report reads
+// each file whose name is a check's under the naming rule, then .txt, as
+// strip finds them, with no description and neither problem. A findings
+// file that isn't as an update writes it is a problem, and the report
+// shows no change in its check's findings at this revision. A package's
+// problems are listed by path.
 func (s *snapshot) readFindings(tree fs.FS, regs []found) error {
 	for _, f := range regs {
 		pkg := path.Dir(path.Dir(f.path))
@@ -71,20 +74,27 @@ func (s *snapshot) readFindings(tree fs.FS, regs []found) error {
 			owns[c.Name] = true
 			s.checks[checkKey{pkg: pkg, name: c.Name}] = c.Description
 		}
-		files := map[string]bool{} // by check name
+		files := map[string]bool{}     // by check name
+		irregular := map[string]bool{} // by check name, where no regular file is in its findings file's place
 		for _, e := range entries {
-			name, ok := strings.CutSuffix(e.Name(), ".txt")
-			ok = ok && e.Type().IsRegular()
+			name, txt := strings.CutSuffix(e.Name(), ".txt")
+			ok := txt && e.Type().IsRegular()
 			switch {
 			case listed && ok && owns[name], !listed && ok && archive.ValidName(name):
 				files[name] = true
+			case listed && txt && owns[name]:
+				irregular[name] = true
+				problem(path.Join(dir, e.Name()), fmt.Sprintf("%s lists the corpus check %s, and this isn't a regular file, as the findings file an update writes for it is. So the report shows no change in its findings here.", f.path, name))
 			case listed:
 				problem(path.Join(dir, e.Name()), fmt.Sprintf("the file is the findings of no corpus check %s lists, so the report leaves it out.", f.path))
 			}
 		}
 		for _, c := range f.reg.Checks {
-			if !files[c.Name] {
-				s.unread[checkKey{pkg: pkg, name: c.Name}] = true
+			if files[c.Name] {
+				continue
+			}
+			s.unread[checkKey{pkg: pkg, name: c.Name}] = true
+			if !irregular[c.Name] {
 				problem(path.Join(dir, c.Name+".txt"), fmt.Sprintf("%s lists the corpus check %s, and the package has no findings file for it, which an update writes for each check it lists. So the report shows no change in its findings here.", f.path, c.Name))
 			}
 		}
@@ -156,7 +166,7 @@ func findingsChanges(a, b *snapshot, links *linker) []FindingsChange {
 		if a.unread[k] || b.unread[k] {
 			continue
 		}
-		fc := FindingsChange{Package: k.pkg, Check: k.name, Disappeared: only(a.findings[k], b.findings[k]), Appeared: only(b.findings[k], a.findings[k])}
+		fc := FindingsChange{Package: k.pkg, Check: k.name, Disappeared: displayed(only(a.findings[k], b.findings[k])), Appeared: displayed(only(b.findings[k], a.findings[k]))}
 		if fc.Appeared == nil && fc.Disappeared == nil {
 			continue
 		}
@@ -170,17 +180,26 @@ func findingsChanges(a, b *snapshot, links *linker) []FindingsChange {
 	return out
 }
 
-// only returns the findings of one list that the other lacks, in order.
-func only(findings, other []string) []string {
+// only returns the lines of one list that the other lacks, in order.
+func only(lines, other []string) []string {
 	in := map[string]bool{}
-	for _, f := range other {
-		in[f] = true
+	for _, l := range other {
+		in[l] = true
 	}
 	var out []string
-	for _, f := range findings {
-		if !in[f] {
-			out = append(out, f)
+	for _, l := range lines {
+		if !in[l] {
+			out = append(out, l)
 		}
+	}
+	return out
+}
+
+// displayed returns lines as a diff shows them.
+func displayed(lines []string) []string {
+	var out []string
+	for _, l := range lines {
+		out = append(out, diff.Display(l))
 	}
 	return out
 }
