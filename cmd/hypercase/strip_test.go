@@ -1247,15 +1247,61 @@ func TestStripFailedFindings(t *testing.T) {
 	sameTree(t, top, strippedModule())
 }
 
+// linkIn puts a symbolic link in place of rel, under top, moving what it
+// replaces to shared/<name>.d. The link names target, relative to its
+// directory, or, for "", what it replaces. unlinkIn moves rel back, and
+// removes shared/ once it is empty.
+func linkIn(t *testing.T, top, rel, target string) {
+	t.Helper()
+	p := filepath.Join(top, filepath.FromSlash(rel))
+	moved := filepath.Join(top, "shared", filepath.Base(rel)+".d")
+	if err := os.MkdirAll(filepath.Dir(moved), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(p, moved); err != nil {
+		t.Fatal(err)
+	}
+	target = filepath.FromSlash(target)
+	if target == "" {
+		var err error
+		if target, err = filepath.Rel(filepath.Dir(p), moved); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(target, p); err != nil {
+		t.Skipf("making a symbolic link failed: %v", err)
+	}
+}
+
+func unlinkIn(t *testing.T, top, rel string) {
+	t.Helper()
+	p := filepath.Join(top, filepath.FromSlash(rel))
+	if err := os.Remove(p); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(top, "shared", filepath.Base(rel)+".d"), p); err != nil {
+		t.Fatal(err)
+	}
+	shared := filepath.Join(top, "shared")
+	entries, err := os.ReadDir(shared)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) == 0 {
+		if err := os.Remove(shared); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 // TestStripLinks: nothing under the corpus root's testdata/ is a symbolic
 // link, so one there fails strip, exit 1, before it removes anything, the
 // registries included, whatever it names: a corpus's directory, an
-// archive, testdata/checks/, nothing, itself, or testdata/ itself, naming
-// a directory, nothing, itself or a file.
+// archive, testdata/checks/, nothing or itself. TestStripTestdataLink
+// covers testdata/ itself.
 func TestStripLinks(t *testing.T) {
 	t.Parallel()
 	const one = ". Nothing was removed.\nRemove it, or replace it with a copy of what it names, if it names anything, then run hypercase strip again.\n"
-	const itself = "hypercase strip: testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none" + one
 	type link struct{ rel, target string } // a target of "" names what the link replaces
 	for _, tt := range []struct {
 		links []link
@@ -1266,49 +1312,112 @@ func TestStripLinks(t *testing.T) {
 		{[]link{{"testdata/checks", ""}}, "hypercase strip: testdata/ holds no symbolic links: testdata/checks is one" + one},
 		{[]link{{"testdata/sheet", "../shared/missing"}}, "hypercase strip: testdata/ holds no symbolic links: testdata/sheet is one" + one},
 		{[]link{{"testdata/sheet", "sheet"}}, "hypercase strip: testdata/ holds no symbolic links: testdata/sheet is one" + one},
-		{[]link{{"testdata", ""}}, itself},
-		{[]link{{"testdata", "shared/missing"}}, itself},
-		{[]link{{"testdata", "testdata"}}, itself},
-		{[]link{{"testdata", "shared/testdata.d/hypercase.json"}}, itself},
 		{[]link{{"testdata/csv", ""}, {"testdata/sheet", ""}}, "hypercase strip: testdata/ holds no symbolic links: testdata/csv and testdata/sheet are links. Nothing was removed.\nRemove each, or replace it with a copy of what it names, if it names anything, then run hypercase strip again.\n"},
 	} {
 		files := stripModule()
 		top := writeTree(t, files)
 		for _, l := range tt.links {
-			p := filepath.Join(top, filepath.FromSlash(l.rel))
-			moved := filepath.Join(top, "shared", filepath.Base(l.rel)+".d")
-			if err := os.MkdirAll(filepath.Dir(moved), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.Rename(p, moved); err != nil {
-				t.Fatal(err)
-			}
-			target := filepath.FromSlash(l.target)
-			if l.target == "" {
-				var err error
-				if target, err = filepath.Rel(filepath.Dir(p), moved); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if err := os.Symlink(target, p); err != nil {
-				t.Skipf("making a symbolic link failed: %v", err)
-			}
+			linkIn(t, top, l.rel, l.target)
 		}
 		stripFails(t, top, "", 1, nil, tt.want)
 		for _, l := range tt.links {
-			p := filepath.Join(top, filepath.FromSlash(l.rel))
-			if err := os.Remove(p); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.Rename(filepath.Join(top, "shared", filepath.Base(l.rel)+".d"), p); err != nil {
-				t.Fatal(err)
-			}
-		}
-		if err := os.Remove(filepath.Join(top, "shared")); err != nil {
-			t.Fatal(err)
+			unlinkIn(t, top, l.rel)
 		}
 		sameTree(t, top, files)
 	}
+}
+
+// TestStripTestdataLink: strip reads the registry that records the corpus
+// root from -root's testdata/, or else from the current directory's, so a
+// symbolic link in place of that testdata/ fails it, exit 1, before it
+// reads anything through it, whatever the link names: a directory,
+// nothing, itself or a file. That holds at the module root and in a
+// subdirectory, with -root and without, and the line that says to run
+// strip again names -root where it was given. A link in place of the
+// corpus root's testdata/, which a registry read first names, fails it
+// the same way, before it reads another registry.
+func TestStripTestdataLink(t *testing.T) {
+	t.Parallel()
+	for _, at := range []struct {
+		link, dir string
+		args      []string
+		again     string
+	}{
+		{"testdata", "", nil, "hypercase strip"},
+		{"testdata", "", []string{"-root", "."}, "hypercase strip -root ."},
+		{"step09/testdata", "step09", nil, "hypercase strip"},
+		{"step09/testdata", "", []string{"-root", "step09"}, "hypercase strip -root step09"},
+		{"testdata", "a/b/c", nil, "hypercase strip -root ../../.."},
+	} {
+		for _, names := range []string{"a directory", "nothing", "itself", "a file"} {
+			t.Run(fmt.Sprintf("%s naming %s, from %s, by %s", at.link, names, filepath.ToSlash(filepath.Join(".", at.dir)), strings.Join(append([]string{"hypercase strip"}, at.args...), " ")), func(t *testing.T) {
+				files := stripModule()
+				top := writeTree(t, files)
+				target := map[string]string{"a directory": "", "nothing": "missing", "itself": "testdata"}[names]
+				if names == "a file" {
+					rel, err := filepath.Rel(filepath.Dir(filepath.Join(top, filepath.FromSlash(at.link))), filepath.Join(top, "go.mod"))
+					if err != nil {
+						t.Fatal(err)
+					}
+					target = filepath.ToSlash(rel)
+				}
+				linkIn(t, top, at.link, target)
+				stripFails(t, filepath.Join(top, filepath.FromSlash(at.dir)), "", 1, at.args, "hypercase strip: testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none. Nothing was removed.\nRemove it, or replace it with a copy of what it names, if it names anything, then run "+at.again+" again.\n")
+				unlinkIn(t, top, at.link)
+				sameTree(t, top, files)
+			})
+		}
+	}
+}
+
+// TestStripTestdataLinkRegistry: the module root's testdata/ a symbolic
+// link to a directory whose registry records another corpus root, step09.
+// Read through the link, the registry would send strip to step09, which
+// would remove the registry and the findings file through the link, in its
+// target. Strip refuses the link first, and leaves the target as it was.
+// So it does when the registry can't be read, with -root ., and the line
+// that says to run strip again keeps -root .: without it, strip run again
+// once the link is replaced would read the registry and strip step09.
+func TestStripTestdataLinkRegistry(t *testing.T) {
+	t.Parallel()
+	const want = "hypercase strip: testdata is a symbolic link, and a corpus root's testdata/ is a directory that holds none. Nothing was removed.\nRemove it, or replace it with a copy of what it names, if it names anything, then run "
+	files := with(stripModule(), map[string]string{"testdata/hypercase.json": stripRegistry("step09", sheetsVar)})
+	t.Run("readable", func(t *testing.T) {
+		top := writeTree(t, files)
+		linkIn(t, top, "testdata", "")
+		stripFails(t, top, "", 1, nil, want+"hypercase strip again.\n")
+		unlinkIn(t, top, "testdata")
+		sameTree(t, top, files)
+	})
+	t.Run("unreadable", func(t *testing.T) {
+		top := writeTree(t, files)
+		linkIn(t, top, "testdata", "")
+		reg := filepath.Join(top, "shared", "testdata.d", "hypercase.json")
+		if err := os.Chmod(reg, 0); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.Chmod(reg, 0o644) })
+		if _, err := os.ReadFile(reg); err == nil {
+			t.Skip("a file with no read permission is still readable here")
+		}
+		stripFails(t, top, "", 1, []string{"-root", "."}, want+"hypercase strip -root . again.\n")
+		if err := os.Chmod(reg, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		unlinkIn(t, top, "testdata")
+		sameTree(t, top, files)
+	})
+}
+
+// TestStripRegistryUnread: at the module root, a registry that can't be
+// read, in a testdata/ that is no link, fails strip, which can't tell the
+// corpus root it records, and doesn't take the module-root corpus.
+func TestStripRegistryUnread(t *testing.T) {
+	t.Parallel()
+	files := with(stripModule(), map[string]string{"testdata/hypercase.json": "", "testdata/hypercase.json/x": "x\n"})
+	top := writeTree(t, files)
+	stripFails(t, top, "", 1, nil, "hypercase strip: reading testdata/hypercase.json failed: ")
+	sameTree(t, top, files)
 }
 
 // TestStripUnreadTestdata: a directory under the corpus root's testdata/

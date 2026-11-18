@@ -117,12 +117,26 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	if err != nil {
 		return fail("finding the current directory failed: %v.\nRun strip from a directory that exists.", err)
 	}
+	// The testdata/ strip reads first, -root's or the current directory's,
+	// where it finds the registry that records the corpus root: a symbolic
+	// link there fails strip before it reads anything through it.
+	first := dir
+	if given != "" {
+		first = given
+		if !filepath.IsAbs(first) {
+			first = filepath.Join(dir, first)
+		}
+	}
+	if fi, err := os.Lstat(filepath.Join(first, "testdata")); err == nil && fi.Mode()&fs.ModeSymlink != 0 {
+		reason, it := walk.LinkReason(filepath.Join(first, "testdata"), []string{filepath.Join(first, "testdata")}, func(p string) string { return root.Rel(first, p) })
+		return fail("%s. Nothing was removed.\n"+walk.LinkFix+", then run %s again.", reason, it, rerun(dir, first, given != "", sel))
+	}
 	corpusRoot, err := findCorpusRoot(dir, given)
 	if err != nil {
 		return fail("%v", err)
 	}
-	// A symbolic link in place of testdata/ is refused below, whatever it
-	// names.
+	// A symbolic link in place of the corpus root's testdata/, which the
+	// registry read first may name, is refused below, whatever it names.
 	td := filepath.Join(corpusRoot, "testdata")
 	tdInfo, err := os.Lstat(td)
 	if err != nil || !tdInfo.IsDir() && tdInfo.Mode()&fs.ModeSymlink == 0 {
@@ -147,7 +161,8 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 	named := dir != mod || corpusRoot != mod || err != nil || bare != corpusRoot
 	again := rerun(dir, corpusRoot, named, sel)
 	if tdInfo.Mode()&fs.ModeSymlink != 0 {
-		return fail("%s is a symbolic link, and a corpus root's testdata/ is a directory that holds none. Nothing was removed.\nRemove it, or replace it with a copy of what it names, if it names anything, then run %s again.", rel(td), again)
+		reason, it := walk.LinkReason(td, []string{td}, rel)
+		return fail("%s. Nothing was removed.\n"+walk.LinkFix+", then run %s again.", reason, it, again)
 	}
 
 	// The registries, read before anything is removed: those that record
@@ -213,15 +228,8 @@ func stripRoot(dir, given string, sel strip.Selection, stdout, stderr io.Writer)
 		return fail("reading %s failed: %v. Nothing was removed.\nFix what failed, then run %s again.", rel(td), err, again)
 	}
 	if len(links) > 0 {
-		var each []string
-		for _, l := range links {
-			each = append(each, rel(l))
-		}
-		are, it := each[0]+" is one", "it"
-		if len(each) > 1 {
-			are, it = strings.Join(each[:len(each)-1], ", ")+" and "+each[len(each)-1]+" are links", "each"
-		}
-		return fail("testdata/ holds no symbolic links: %s. Nothing was removed.\nRemove %s, or replace it with a copy of what it names, if it names anything, then run %s again.", are, it, again)
+		reason, it := walk.LinkReason(td, links, rel)
+		return fail("%s. Nothing was removed.\n"+walk.LinkFix+", then run %s again.", reason, it, again)
 	}
 	if sel.Column != "" || sel.Transform != "" {
 		if ok, left := matches(corpusRoot, paths, sel); !ok && len(left) == 0 {
@@ -373,11 +381,6 @@ func findCorpusRoot(dir, given string) (string, error) {
 	switch {
 	case errors.Is(err, fs.ErrNotExist) && dir == mod:
 		return mod, nil
-	case err != nil && dir == mod && isLink(filepath.Join(dir, "testdata")):
-		// A symbolic link in place of testdata/ that can't be read
-		// through: strip takes the module-root corpus, as with no
-		// registry there, and refuses the link.
-		return mod, nil
 	case errors.Is(err, fs.ErrNotExist):
 		return "", fmt.Errorf("the current directory holds no registry, testdata/%s, to say which corpus root its package's tests read, and it isn't the module root, %s, where strip finds the module-root corpus.\nName the corpus root with -root, relative to the current directory or by an absolute path, or run strip at the module root.", registry.Name, root.Rel(dir, mod))
 	case err != nil:
@@ -395,12 +398,6 @@ func findCorpusRoot(dir, given string) (string, error) {
 		return "", fmt.Errorf("%s records the corpus root %s, which lies inside the module at %s, and not in the module at %s, the package's.\nMove the corpus root out of the module at %s, or name it with -root, relative to the current directory or by an absolute path, to strip it as a corpus root of that module.", root.Rel(dir, p), h.CorpusRoot, root.Rel(dir, m), root.Rel(dir, mod), root.Rel(dir, m))
 	}
 	return corpusRoot, nil
-}
-
-// isLink reports whether p is a symbolic link.
-func isLink(p string) bool {
-	fi, err := os.Lstat(p)
-	return err == nil && fi.Mode()&fs.ModeSymlink != 0
 }
 
 // matches reports whether sel selects a section of an archive of the

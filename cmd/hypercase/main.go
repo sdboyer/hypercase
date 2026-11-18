@@ -60,24 +60,29 @@
 // is one, records that corpus. A command quotes the root's path where a
 // shell would read it as other than itself.
 //
-// strip exits 1 having removed nothing when it can't find the corpus root
-// or the module root, or the corpus root holds no testdata/; when a
-// registry under the module can't be read, or the registries that record
-// the corpus root record different update variables; when reading the
-// corpus root's testdata/ fails, or testdata/, or anything strip reaches
-// under it, is a symbolic link; and when no archive that strip strips holds
-// a section -column or -transform selects, counting a frozen cell's
-// sections, which it leaves. It exits 1 too when it left an archive or a
-// file in place for a problem, a failed write or removal included. It exits
-// 2 for a usage error: a flag given twice, an unknown flag, an argument, an
-// empty -root, or an empty or ill-formed -column or -transform.
+// strip exits 1 having removed nothing when the testdata/ it reads first,
+// -root's or else the current directory's, is a symbolic link; when it
+// can't find the corpus root or the module root, or the corpus root holds
+// no testdata/; when a registry under the module can't be read, or the
+// registries that record the corpus root record different update variables;
+// when reading the corpus root's testdata/ fails, or testdata/, or anything
+// strip reaches under it, is a symbolic link; and when no archive that
+// strip strips holds a section -column or -transform selects, counting a
+// frozen cell's sections, which it leaves. It exits 1 too when it left an
+// archive or a file in place for a problem, a failed write or removal
+// included. It exits 2 for a usage error: a flag given twice, an unknown
+// flag, an argument, an empty -root, or an empty or ill-formed -column or
+// -transform.
 //
 // strip's -root names the corpus root, relative to the current directory,
 // or by an absolute path. Without -root, the corpus root is the one the
 // registry of the package in the current directory records, or, at the
 // module root with no registry there, the module root. Anywhere else with
 // no registry, strip asks for -root, and so it does for a registry's
-// corpus root that lies inside a module nested in the package's.
+// corpus root that lies inside a module nested in the package's. Before it
+// reads anything, strip fails when the testdata/ it reads first, -root's
+// or else the current directory's, is a symbolic link, and its line that
+// says to run it again gives the command as it was run.
 package main
 
 import (
