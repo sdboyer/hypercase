@@ -41,6 +41,29 @@ var (
 // projectNoPositions is project with no Positions.
 var projectNoPositions = decl.Project{UpdateVar: fixtureUpdate}
 
+// sharedStderr is one declaration of stderr.txt, which the lift
+// parseShared and the suite chatty each declare: the file comes from
+// parse/stderr, whole, in the view each one's cell runs on.
+var sharedStderr = decl.Output{
+	Pattern:     "stderr.txt",
+	Description: "What parse/stderr says to write to stderr.",
+	Inputs: decl.InputsFunc(func(fs.FS, string) ([]decl.Range, error) {
+		return []decl.Range{{Path: "parse/stderr"}}, nil
+	}),
+}
+
+var (
+	// parseShared is parse, declaring sharedStderr.
+	parseShared = func() decl.Lift[Script, *Parsed] {
+		l := parse
+		l.Outputs = []decl.Output{liftOutputs[0], sharedStderr}
+		return l
+	}()
+	// chatty follows the case's parse/ tree, as parse does, and declares
+	// sharedStderr alone.
+	chatty = withOutputs(steered[Script]("chatty", "parse"), sharedStderr)
+)
+
 // inputsRegistrations are step 11's declaration sets, by name.
 var inputsRegistrations = map[string]func(){
 	// Declarations that state nothing, or FromPositions in a project with
@@ -59,6 +82,8 @@ var inputsRegistrations = map[string]func(){
 		hypercase.Register(append([]any{project, scriptType, exportType, hypercase.Use(importNone, parse, resolve), own(evaluate, list, louder)}, chainProps...)...)
 	},
 	"inputs-no-positions": func() { ladder(projectNoPositions, parse, resolve, evaluate, format, calc) },
+	// One declaration, sharedStderr, of a lift and of a suite.
+	"inputs-shared": func() { ladder(project, parseShared, chatty) },
 
 	// Refusals at registration: what an output declaration's Inputs
 	// states that no declaration may.

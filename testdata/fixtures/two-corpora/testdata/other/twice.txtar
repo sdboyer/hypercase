@@ -1,6 +1,9 @@
 A1 is twice B1, in the corpus other, under the same name.
 -- in/shout/out/values.txt --
 A1 SIX
+-- out/shout/inputs --
+values.txt
+  in/shout/out/values.txt
 -- out/shout/outcome --
 accepted
 -- out/shout/values.txt --

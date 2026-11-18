@@ -308,6 +308,10 @@ A1 is twice B1.
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+  in/sheet/B1
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
@@ -316,7 +320,9 @@ B1 3
 ```
 
 `out/evaluate/outcome` holds the cell's outcome, the code's verdict on the
-case, which step 8 adds to every cell.
+case, which step 8 adds to every cell. `out/evaluate/inputs` holds where
+each output file comes from, the sections of the archive its declaration's
+`Inputs` maps it to, which step 11 adds to every cell that runs.
 
 The package also writes its registry, `testdata/hypercase.json`, which lists
 what it registers (step 5).
@@ -660,6 +666,10 @@ A1 and B1 refer to each other.
 circular
 -- out/evaluate/error.txt --
 A1 -> B1 -> A1: cycle
+-- out/evaluate/inputs --
+error.txt
+  in/sheet/A1:1-1
+  in/sheet/B1:1-1
 -- out/evaluate/outcome --
 rejected
 ```
@@ -676,6 +686,9 @@ A1 is a negative number.
 evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/evaluate/error.txt --
 A1: unexpected "-"
+-- out/evaluate/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/evaluate/outcome --
 rejected
 ```
@@ -957,10 +970,17 @@ A1 is twice B1.
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/calc/inputs --
+stdout.txt
+  all inputs
 -- out/calc/outcome --
 accepted
 -- out/calc/stdout.txt --
 6,3
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+  in/sheet/B1
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
@@ -968,6 +988,9 @@ A1 6
 B1 3
 -- out/format/formulas.txt --
 A1 =B1 * 2
+-- out/format/inputs --
+formulas.txt
+  in/sheet/A1
 -- out/format/outcome --
 accepted
 ```
@@ -990,14 +1013,23 @@ total
 malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
+-- out/calc/inputs --
+error.txt
+  in/sheet/D1:1-1
 -- out/calc/outcome --
 rejected
 -- out/evaluate/error.txt --
 D1: not a number or a formula: "total"
+-- out/evaluate/inputs --
+error.txt
+  in/sheet/D1:1-1
 -- out/evaluate/outcome --
 rejected
 -- out/format/error.txt --
 D1: not a number or a formula: "total"
+-- out/format/inputs --
+error.txt
+  in/sheet/D1:1-1
 -- out/format/outcome --
 rejected
 ```
@@ -1017,10 +1049,16 @@ evaluate A negative number is valid, and evaluates to itself. Waits on sheets#3.
 calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/calc/error.txt --
 A1: unexpected "-"
+-- out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/calc/outcome --
 rejected
 -- out/evaluate/error.txt --
 A1: unexpected "-"
+-- out/evaluate/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/evaluate/outcome --
 rejected
 -- out/format/outcome --
@@ -1501,6 +1539,9 @@ malformed
 -- out/calc/error.txt --
 D1: not a number or a formula: "total"
   sheet/D1:1: total
+-- out/calc/inputs --
+error.txt
+  in/sheet/D1:1-1
 -- out/calc/outcome --
 rejected
 -- out/evaluate/outcome --
@@ -1510,6 +1551,9 @@ blocked parse
 -- out/parse/error.txt --
 D1: not a number or a formula: "total"
   sheet/D1:1: total
+-- out/parse/inputs --
+error.txt
+  in/sheet/D1:1-1
 -- out/parse/outcome --
 rejected
 -- out/resolve/outcome --
@@ -1529,6 +1573,9 @@ calc A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/calc/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/calc/outcome --
 rejected
 -- out/evaluate/outcome --
@@ -1538,6 +1585,9 @@ blocked parse
 -- out/parse/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/parse/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/parse/outcome --
 rejected
 -- out/resolve/outcome --
@@ -1826,10 +1876,17 @@ A1 is twice B1.
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/calc/inputs --
+stdout.txt
+  all inputs
 -- out/calc/outcome --
 accepted
 -- out/calc/stdout.txt --
 6,3
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+  in/sheet/B1
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
@@ -1837,10 +1894,15 @@ A1 6
 B1 3
 -- out/format/formulas.txt --
 A1 =B1 * 2
+-- out/format/inputs --
+formulas.txt
+  in/sheet/A1
 -- out/format/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 -- variant/cycle/about --
@@ -1853,6 +1915,10 @@ circular
 A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1*2
   sheet/B1:1: =A1
+-- variant/cycle/out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
+  variant/cycle/in/sheet/B1:1-1
 -- variant/cycle/out/calc/outcome --
 rejected
 -- variant/cycle/out/evaluate/outcome --
@@ -1860,14 +1926,23 @@ blocked resolve
 -- variant/cycle/out/format/formulas.txt --
 A1 =B1 * 2
 B1 =A1
+-- variant/cycle/out/format/inputs --
+formulas.txt
+  in/sheet/A1
+  variant/cycle/in/sheet/B1
 -- variant/cycle/out/format/outcome --
 accepted
+-- variant/cycle/out/parse/inputs --
 -- variant/cycle/out/parse/outcome --
 accepted
 -- variant/cycle/out/resolve/error.txt --
 A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1*2
   sheet/B1:1: =A1
+-- variant/cycle/out/resolve/inputs --
+error.txt
+  in/sheet/A1:1-1
+  variant/cycle/in/sheet/B1:1-1
 -- variant/cycle/out/resolve/outcome --
 rejected
 -- variant/missing/about --
@@ -1879,19 +1954,29 @@ sheet/B1
 -- variant/missing/out/calc/error.txt --
 A1: B1 doesn't exist
   sheet/A1:1: =B1*2
+-- variant/missing/out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- variant/missing/out/calc/outcome --
 rejected
 -- variant/missing/out/evaluate/outcome --
 blocked resolve
 -- variant/missing/out/format/formulas.txt --
 A1 =B1 * 2
+-- variant/missing/out/format/inputs --
+formulas.txt
+  in/sheet/A1
 -- variant/missing/out/format/outcome --
 accepted
+-- variant/missing/out/parse/inputs --
 -- variant/missing/out/parse/outcome --
 accepted
 -- variant/missing/out/resolve/error.txt --
 A1: B1 doesn't exist
   sheet/A1:1: =B1*2
+-- variant/missing/out/resolve/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- variant/missing/out/resolve/outcome --
 rejected
 -- transform/looped/in/sheet/A1 --
@@ -1899,19 +1984,29 @@ rejected
 -- transform/looped/out/calc/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/calc/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/calc/outcome --
 rejected
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
 A1 =A1
+-- transform/looped/out/format/inputs --
+formulas.txt
+  transform/looped/in/sheet/A1
 -- transform/looped/out/format/outcome --
 accepted
+-- transform/looped/out/parse/inputs --
 -- transform/looped/out/parse/outcome --
 accepted
 -- transform/looped/out/resolve/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/resolve/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/resolve/outcome --
 rejected
 -- transform/renamed/in/sheet/A2 --
@@ -1921,11 +2016,18 @@ rejected
 -- transform/renamed/delete --
 sheet/A1
 sheet/B1
+-- transform/renamed/out/calc/inputs --
+stdout.txt
+  all inputs
 -- transform/renamed/out/calc/outcome --
 accepted
 -- transform/renamed/out/calc/stdout.txt --
 ,
 6,3
+-- transform/renamed/out/evaluate/inputs --
+values.txt
+  transform/renamed/in/sheet/A2
+  transform/renamed/in/sheet/B2
 -- transform/renamed/out/evaluate/outcome --
 accepted
 -- transform/renamed/out/evaluate/values.txt --
@@ -1933,10 +2035,15 @@ A2 6
 B2 3
 -- transform/renamed/out/format/formulas.txt --
 A2 =B2 * 2
+-- transform/renamed/out/format/inputs --
+formulas.txt
+  transform/renamed/in/sheet/A2
 -- transform/renamed/out/format/outcome --
 accepted
+-- transform/renamed/out/parse/inputs --
 -- transform/renamed/out/parse/outcome --
 accepted
+-- transform/renamed/out/resolve/inputs --
 -- transform/renamed/out/resolve/outcome --
 accepted
 ```
@@ -2118,6 +2225,9 @@ transform/renamed calc A negative number is valid, and evaluates to itself. Wait
 -- out/calc/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/calc/outcome --
 rejected
 -- out/evaluate/outcome --
@@ -2127,6 +2237,9 @@ blocked parse
 -- out/parse/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/parse/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/parse/outcome --
 rejected
 -- out/resolve/outcome --
@@ -2136,19 +2249,29 @@ blocked parse
 -- transform/looped/out/calc/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/calc/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/calc/outcome --
 rejected
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
 A1 =A1
+-- transform/looped/out/format/inputs --
+formulas.txt
+  transform/looped/in/sheet/A1
 -- transform/looped/out/format/outcome --
 accepted
+-- transform/looped/out/parse/inputs --
 -- transform/looped/out/parse/outcome --
 accepted
 -- transform/looped/out/resolve/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/resolve/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/resolve/outcome --
 rejected
 -- transform/renamed/in/sheet/A2 --
@@ -2158,6 +2281,9 @@ sheet/A1
 -- transform/renamed/out/calc/error.txt --
 A2: unexpected "-"
   sheet/A2:1: -3
+-- transform/renamed/out/calc/inputs --
+error.txt
+  transform/renamed/in/sheet/A2:1-1
 -- transform/renamed/out/calc/outcome --
 rejected
 -- transform/renamed/out/evaluate/outcome --
@@ -2167,6 +2293,9 @@ blocked parse
 -- transform/renamed/out/parse/error.txt --
 A2: unexpected "-"
   sheet/A2:1: -3
+-- transform/renamed/out/parse/inputs --
+error.txt
+  transform/renamed/in/sheet/A2:1-1
 -- transform/renamed/out/parse/outcome --
 rejected
 -- transform/renamed/out/resolve/outcome --
@@ -2320,12 +2449,22 @@ A1 divides B1 by C1, which is zero.
 1
 -- in/sheet/C1 --
 0
+-- out/calc/inputs --
+stderr.txt
+  all inputs
+stdout.txt
+  all inputs
 -- out/calc/outcome --
 accepted
 -- out/calc/stderr.txt --
 A1: divides by zero
 -- out/calc/stdout.txt --
 #DIV/0!,1,0
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+  in/sheet/B1
+  in/sheet/C1
 -- out/evaluate/outcome --
 accepted div-zero
 -- out/evaluate/values.txt --
@@ -2334,10 +2473,15 @@ B1 1
 C1 0
 -- out/format/formulas.txt --
 A1 =B1 / C1
+-- out/format/inputs --
+formulas.txt
+  in/sheet/A1
 -- out/format/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 -- transform/looped/in/sheet/A1 --
@@ -2345,19 +2489,29 @@ accepted
 -- transform/looped/out/calc/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/calc/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/calc/outcome --
 rejected S201
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
 A1 =A1
+-- transform/looped/out/format/inputs --
+formulas.txt
+  transform/looped/in/sheet/A1
 -- transform/looped/out/format/outcome --
 accepted
+-- transform/looped/out/parse/inputs --
 -- transform/looped/out/parse/outcome --
 accepted
 -- transform/looped/out/resolve/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/resolve/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/resolve/outcome --
 rejected S201
 -- transform/renamed/in/sheet/A2 --
@@ -2370,6 +2524,11 @@ rejected S201
 sheet/A1
 sheet/B1
 sheet/C1
+-- transform/renamed/out/calc/inputs --
+stderr.txt
+  all inputs
+stdout.txt
+  all inputs
 -- transform/renamed/out/calc/outcome --
 accepted
 -- transform/renamed/out/calc/stderr.txt --
@@ -2377,6 +2536,11 @@ A2: divides by zero
 -- transform/renamed/out/calc/stdout.txt --
 ,,
 #DIV/0!,1,0
+-- transform/renamed/out/evaluate/inputs --
+values.txt
+  transform/renamed/in/sheet/A2
+  transform/renamed/in/sheet/B2
+  transform/renamed/in/sheet/C2
 -- transform/renamed/out/evaluate/outcome --
 accepted div-zero
 -- transform/renamed/out/evaluate/values.txt --
@@ -2385,10 +2549,15 @@ B2 1
 C2 0
 -- transform/renamed/out/format/formulas.txt --
 A2 =B2 / C2
+-- transform/renamed/out/format/inputs --
+formulas.txt
+  transform/renamed/in/sheet/A2
 -- transform/renamed/out/format/outcome --
 accepted
+-- transform/renamed/out/parse/inputs --
 -- transform/renamed/out/parse/outcome --
 accepted
+-- transform/renamed/out/resolve/inputs --
 -- transform/renamed/out/resolve/outcome --
 accepted
 ```
@@ -2681,6 +2850,9 @@ malformed
 -- out/calc/error.txt --
 notes: not a cell name
   sheet/notes
+-- out/calc/inputs --
+error.txt
+  in/sheet/notes
 -- out/calc/outcome --
 rejected S101
 -- out/evaluate/outcome --
@@ -2690,6 +2862,9 @@ blocked parse
 -- out/parse/error.txt --
 notes: not a cell name
   sheet/notes
+-- out/parse/inputs --
+error.txt
+  in/sheet/notes
 -- out/parse/outcome --
 rejected S101
 -- out/resolve/outcome --
@@ -2830,18 +3005,22 @@ outcome changed
 appeared
   sheet/empty calc: rejected S101
     error.txt added
+    inputs added
   sheet/empty evaluate: blocked parse
   sheet/empty format: blocked parse
   sheet/empty parse: rejected S101
     error.txt added
+    inputs added
   sheet/empty resolve: blocked parse
 disappeared
   sheet/blank calc: rejected S101
     error.txt removed
+    inputs removed
   sheet/blank evaluate: blocked parse
   sheet/blank format: blocked parse
   sheet/blank parse: rejected S101
     error.txt removed
+    inputs removed
   sheet/blank resolve: blocked parse
 bytes changed
   sheet/notes calc: rejected S101
@@ -3025,10 +3204,18 @@ Two prices and their total, exported as CSV.
 6
 -- via/import/sheet/C1 --
 =A1+B1
+-- out/calc/inputs --
+stdout.txt
+  all inputs
 -- out/calc/outcome --
 accepted
 -- out/calc/stdout.txt --
 4,6,10
+-- out/evaluate/inputs --
+values.txt
+  via/import/sheet/A1
+  via/import/sheet/B1
+  via/import/sheet/C1
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
@@ -3037,12 +3224,24 @@ B1 6
 C1 10
 -- out/format/formulas.txt --
 C1 =A1 + B1
+-- out/format/inputs --
+formulas.txt
+  via/import/sheet/C1
 -- out/format/outcome --
 accepted
+-- out/import/inputs --
+via/import/sheet/A1
+  in/csv/prices.csv
+via/import/sheet/B1
+  in/csv/prices.csv
+via/import/sheet/C1
+  in/csv/prices.csv
 -- out/import/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 ```
@@ -3066,6 +3265,9 @@ blocked import
 -- out/import/error.txt --
 import: line 1: quote never closes
   csv/open-quote.csv:1: 4,"six,=A1+B1
+-- out/import/inputs --
+error.txt
+  in/csv/open-quote.csv:1-1
 -- out/import/outcome --
 rejected C101
 -- out/parse/outcome --
@@ -3115,6 +3317,10 @@ circular
 A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1
   sheet/B1:1: =A1
+-- out/calc/inputs --
+error.txt
+  via/import/sheet/A1:1-1
+  via/import/sheet/B1:1-1
 -- out/calc/outcome --
 rejected S201
 -- out/evaluate/outcome --
@@ -3122,16 +3328,30 @@ blocked resolve
 -- out/format/formulas.txt --
 A1 =B1
 B1 =A1
+-- out/format/inputs --
+formulas.txt
+  via/import/sheet/A1
+  via/import/sheet/B1
 -- out/format/outcome --
 accepted
+-- out/import/inputs --
+via/import/sheet/A1
+  in/csv/loop.csv
+via/import/sheet/B1
+  in/csv/loop.csv
 -- out/import/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
 -- out/resolve/error.txt --
 A1 -> B1 -> A1: cycle
   sheet/A1:1: =B1
   sheet/B1:1: =A1
+-- out/resolve/inputs --
+error.txt
+  via/import/sheet/A1:1-1
+  via/import/sheet/B1:1-1
 -- out/resolve/outcome --
 rejected S201
 ```

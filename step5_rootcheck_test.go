@@ -16,7 +16,7 @@ func TestRootCheckRemovedSuite(t *testing.T) {
 	s := newSandbox(t, "shared")
 	before := s.read(twice)
 	s.passes(s.run("b", "pkg-b-gone", true))
-	want := "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root . -column shout at the module root. It removes shout's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports."
+	want := "testdata/script/twice.txtar: no registry claims out/shout/inputs, out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root . -column shout at the module root. It removes shout's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports."
 	s.fails(s.normal("pkg-a"), want)
 	s.passes(s.update("pkg-a"))
 	s.same(twice, before)
@@ -43,7 +43,7 @@ func TestRootCheckRemovedSuiteRoot(t *testing.T) {
 	s.write(corp, s.read(twice), "a corpus under the root corp, whose package registers echo alone")
 	s.passes(s.update("corp-a"))
 	r := s.normal("corp-a")
-	s.fails(r, corp+": no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root corp -column shout at the module root.")
+	s.fails(r, corp+": no registry claims out/shout/inputs, out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root corp -column shout at the module root.")
 	before := s.read(twice)
 	s.passes(s.strip(s.printedStrip(r, "-column", "shout")...))
 	for _, r := range s.settle(childRun{"", "corp-a", true}) {
@@ -64,7 +64,7 @@ func TestRootCheckRemovedSuiteSpaced(t *testing.T) {
 	corp := "my corp/testdata/script/twice.txtar"
 	s.write(corp, s.read(twice), "a corpus under the root \"my corp\", whose package registers echo alone")
 	s.passes(s.update("spaced-a"))
-	s.fails(s.normal("spaced-a"), corp+": no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root 'my corp' -column shout at the module root.")
+	s.fails(s.normal("spaced-a"), corp+": no registry claims out/shout/inputs, out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, run hypercase strip -root 'my corp' -column shout at the module root.")
 	s.done()
 }
 
@@ -79,7 +79,7 @@ func TestRootCheckRemovedSuiteMarked(t *testing.T) {
 	s.passes(s.run("b", "pkg-b-gone", true))
 	s.edit(twice, "a gaps line marks shout's cell", insert("gaps", "shout Prints A1 as SIX. Waits on sheets#15.\n", "out/"))
 	const line = "testdata/script/twice.txtar: gaps, line 1, names shout, and no registry has a column of that name over the corpus script.\nRegister the column, or remove the line."
-	const want = "testdata/script/twice.txtar: no registry claims out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -root . -column shout at the module root. It removes shout's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports."
+	const want = "testdata/script/twice.txtar: no registry claims out/shout/inputs, out/shout/outcome and out/shout/values.txt: no column named shout runs over the corpus script.\nIf a column should write them, register the column. If not, remove gaps line 1, which marks a cell of theirs, so that strip removes them; then run hypercase strip -root . -column shout at the module root. It removes shout's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports."
 	r := s.normal("pkg-a")
 	s.fails(r, line, want)
 	cmd := s.printedStrip(r, "-column", "shout")
@@ -214,8 +214,8 @@ func TestRootCheckStaleEntries(t *testing.T) {
 func TestStatementsOfAnotherPackage(t *testing.T) {
 	t.Parallel()
 	s := newSandbox(t, "shared")
-	s.write("testdata/script/loop.txtar", []byte("A1 refers to itself, which only b's shout rejects.\n-- in/do/out/values.txt --\nA1 0\n-- in/shout/error --\nA1 -> A1: cycle\n-- properties --\ncircular\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 0\n-- out/shout/error.txt --\nA1 -> A1: cycle\n-- out/shout/outcome --\nrejected\n"), "a case that states a property only b registers")
-	s.write("testdata/script/gapped.txtar", []byte("shout prints A1 wrongly, a known gap in b's cell.\n-- in/do/out/values.txt --\nA1 6\n-- in/shout/out/values.txt --\nA1 SEVEN\n-- gaps --\nshout A1 is SIX. Waits on sheets#15.\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 6\n-- out/shout/outcome --\naccepted\n-- out/shout/values.txt --\nA1 SIX\n"), "a gaps line naming b's column, whose cell now differs")
+	s.write("testdata/script/loop.txtar", []byte("A1 refers to itself, which only b's shout rejects.\n-- in/do/out/values.txt --\nA1 0\n-- in/shout/error --\nA1 -> A1: cycle\n-- properties --\ncircular\n-- out/echo/inputs --\nvalues.txt\n  in/do/out/values.txt\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 0\n-- out/shout/error.txt --\nA1 -> A1: cycle\n-- out/shout/outcome --\nrejected\n"), "a case that states a property only b registers")
+	s.write("testdata/script/gapped.txtar", []byte("shout prints A1 wrongly, a known gap in b's cell.\n-- in/do/out/values.txt --\nA1 6\n-- in/shout/out/values.txt --\nA1 SEVEN\n-- gaps --\nshout A1 is SIX. Waits on sheets#15.\n-- out/echo/inputs --\nvalues.txt\n  in/do/out/values.txt\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 6\n-- out/shout/outcome --\naccepted\n-- out/shout/values.txt --\nA1 SIX\n"), "a gaps line naming b's column, whose cell now differs")
 	// b's update writes loop's cell, and fails on its frozen one, as committed.
 	s.fails(s.run("b", "pkg-b-circular", true), "The cell is frozen by its known gap")
 	s.cat("testdata/script/gapped.txtar")
@@ -231,7 +231,7 @@ func TestRootCheckArchives(t *testing.T) {
 	s := newSandbox(t, "shared")
 	data := string(s.read(twice))
 	s.write("testdata/script/nameless.txtar", []byte(data[strings.Index(data, "-- "):]), "an archive with no description")
-	s.write("testdata/script/loopy.txtar", []byte("A case that states a property nothing declares.\n-- in/do/out/values.txt --\nA1 6\n-- properties --\nloopy\n-- gaps --\nformat A1 prints as =6. Waits on sheets#8.\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 6\n-- out/shout/outcome --\naccepted\n"), "a case with a property and a gaps line nothing declares")
+	s.write("testdata/script/loopy.txtar", []byte("A case that states a property nothing declares.\n-- in/do/out/values.txt --\nA1 6\n-- properties --\nloopy\n-- gaps --\nformat A1 prints as =6. Waits on sheets#8.\n-- out/echo/inputs --\nvalues.txt\n  in/do/out/values.txt\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 6\n-- out/shout/inputs --\n-- out/shout/outcome --\naccepted\n"), "a case with a property and a gaps line nothing declares")
 	s.write("testdata/script/typo.txtar", []byte("A section outside the closed set.\n-- ni/do/out/values.txt --\nA1 6\n"), "an archive with a problem of form")
 	s.write("testdata/script/old/x.txtar", []byte("An archive in a directory below a corpus's.\n"), "an archive in no corpus's directory")
 	s.write("testdata/renamed/x.txtar", []byte("An archive of a corpus whose directory was renamed in Go.\n"), "an archive in a directory no registry declares")
@@ -262,7 +262,7 @@ func TestRootCheckDeclaredDirectory(t *testing.T) {
 	s := newSandbox(t, "shared")
 	s.run("b", "pkg-b-later", true)
 	s.remove("testdata/script/twice.txtar", "")
-	s.write(twice, []byte("A1 is twice B1, and only echo prints it.\n-- in/do/out/values.txt --\nA1 6\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 6\n"), "")
+	s.write(twice, []byte("A1 is twice B1, and only echo prints it.\n-- in/do/out/values.txt --\nA1 6\n-- out/echo/inputs --\nvalues.txt\n  in/do/out/values.txt\n-- out/echo/outcome --\naccepted\n-- out/echo/values.txt --\nA1 6\n"), "")
 	r := s.normal("pkg-a")
 	s.passes(r)
 	s.done()
@@ -341,7 +341,7 @@ func TestRootCheckRequired(t *testing.T) {
 	s.fails(s.run("b", "pkg-b-other", false), "no registry records a root-package check for the corpus root other")
 	// a's root has its check. What it reports is b's sections, which no column over it claims now.
 	r := s.normal("pkg-a")
-	s.fails(r, "no registry claims out/shout/outcome and out/shout/values.txt")
+	s.fails(r, "no registry claims out/shout/inputs, out/shout/outcome and out/shout/values.txt")
 	s.lacks(r, "no registry records a root-package check")
 	s.done()
 }

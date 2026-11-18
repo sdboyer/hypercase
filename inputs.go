@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path"
+	"slices"
 	"strings"
 	"testing"
 
@@ -310,4 +312,135 @@ func lineCount(data []byte) int {
 		n++
 	}
 	return n
+}
+
+// A mapped is one file a cell's inputs file maps: rel, its path under
+// out/<column>/, or a bytes lift's product file's under via/<lift>/;
+// section, the section that commits it; and the declaration it matches,
+// in a column's Outputs, or in the lift's Product.
+type mapped struct {
+	rel, section string
+	product      bool
+	decl         decl.Output
+}
+
+// mapInputs computes a cell's inputs file: for each of the cell's files
+// but its outcome, and each file of a bytes lift's product, the ranges of
+// the cell's input view, from, it comes from, as its declaration's Inputs
+// states. from is the input view a lift's cell runs its lift on. lr is
+// the run of a bytes lift's cell, and nil for any other column.
+//
+// It returns the file's bytes, with ok, or leaves it unjudged: where a
+// file of the cell is unjudged, a product file among them, so the map
+// would leave it out; where a file's declaration states nothing, or
+// FromPositions in a project with no Positions, which fails the run, and
+// leaves the cell's other files to the update; and where an Inputs or
+// Positions fails, which it reports in a note, and in fault, which keeps
+// an update from writing the cell. A panic's error.txt, under
+// FromPositions, maps to no range: there is no error to find positions of.
+func (r *runner) mapInputs(ns *notes, c *aCase, col *column, from *origin, files map[string][]byte, unjudged map[string]bool, out *called, lr *liftRun) (data []byte, ok, fault bool) {
+	if len(unjudged) > 0 || lr != nil && len(lr.problems) > 0 {
+		return nil, false, false
+	}
+	var each []mapped
+	for _, p := range slices.Sorted(maps.Keys(files)) {
+		if p == outcomeFile {
+			continue
+		}
+		each = append(each, mapped{rel: p, section: c.out(col.name, p), decl: declaration(col.outputs, p)})
+	}
+	if lr != nil {
+		l := col.lift
+		for _, p := range slices.Sorted(maps.Keys(lr.product)) {
+			each = append(each, mapped{rel: p, section: l.viaDir(c.prefix) + p, product: true, decl: declaration(l.product, p)})
+		}
+	}
+	for _, f := range each {
+		switch stated(f.decl.Inputs) {
+		case statesNone:
+			return nil, false, false
+		case statesPositions:
+			if r.positions == nil {
+				return nil, false, false
+			}
+		}
+	}
+	var made []revmap.File
+	for _, f := range each {
+		m := revmap.File{Path: f.rel}
+		if f.product {
+			m.Path = col.lift.viaDir("") + f.rel
+		}
+		var ranges []decl.Range
+		// says names the declaration whose Inputs gave the ranges, and fix
+		// is the closing of a note about them.
+		says := fmt.Sprintf("The Inputs of %s's output %s", col.name, f.decl.Pattern)
+		if f.product {
+			says = fmt.Sprintf("The Inputs of %s's product file %s", col.name, f.decl.Pattern)
+		}
+		fix := closing{fmt.Sprintf("Fix %s's Inputs.", f.decl.Pattern), claims{Nothing: true}}
+		switch stated(f.decl.Inputs) {
+		case statesAll:
+			m.All = true
+		case statesPositions:
+			if out.panicked {
+				break
+			}
+			says, fix = fmt.Sprintf("The project's Positions, on %s's error,", col.name), closing{"Fix Positions.", claims{Nothing: true}}
+			p := call(func(*called) { ranges = r.positions(out.err) })
+			if p.panicked {
+				ns.add(aboutFault, fmt.Sprintf("The project's Positions panicked on %s's error: %v", col.name, p.panicValue), fix)
+				fault = true
+				continue
+			}
+		case statesFunc:
+			fn := f.decl.Inputs.(decl.InputsFunc)
+			var err error
+			p := call(func(*called) { ranges, err = fn(from.view, f.rel) })
+			switch {
+			case p.panicked:
+				ns.add(aboutFault, fmt.Sprintf("%s panicked on %s: %v", says, f.section, p.panicValue), fix)
+				fault = true
+				continue
+			case err != nil:
+				ns.add(aboutFault, fmt.Sprintf("%s failed on %s: %v", says, f.section, err), fix)
+				fault = true
+				continue
+			}
+		}
+		for _, rg := range ranges {
+			got, bad, lines := from.check(rg)
+			if bad != rangeHeld {
+				ns.add(aboutFault, fmt.Sprintf("%s gave %s the range %s, and %s.", says, f.section, rangeLiteral(rg), bad.says(rg, lines)), fix)
+				fault = true
+				continue
+			}
+			m.Ranges = append(m.Ranges, got)
+		}
+		made = append(made, m)
+	}
+	if fault {
+		return nil, false, true
+	}
+	data = revmap.Format(made)
+	if data == nil {
+		data = []byte{}
+	}
+	return data, true, false
+}
+
+// declaration is the one declaration of outputs whose pattern matches a
+// file's path, which a judged file has.
+func declaration(outputs []decl.Output, p string) decl.Output {
+	for _, o := range outputs {
+		if ok, _ := path.Match(o.Pattern, p); ok {
+			return o
+		}
+	}
+	panic(fmt.Sprintf("hypercase: no declaration matches the judged file %s", p))
+}
+
+// rangeLiteral is a range, in a message, as Go writes its literal.
+func rangeLiteral(r decl.Range) string {
+	return fmt.Sprintf("decl.Range{Path: %q, Start: %d, End: %d}", r.Path, r.Start, r.End)
 }

@@ -13,6 +13,9 @@ A1 is twice B1, with no golden yet.
 -- in/do/out/values.txt --
 A1 6
 B1 3
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --

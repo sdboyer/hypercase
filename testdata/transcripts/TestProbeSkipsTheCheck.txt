@@ -3,6 +3,8 @@ $ go test -run=TestCorpus/script/no$/  # probe-none
         echo: Does what the case's do/ tree says.
         echo returned no error, but the case states circular, which echo rejects.
         Fix the code, or correct the case's properties or echo's Rejects.
+        out/echo/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/outcome differs (-golden +got):
         - skipped already serves 4
         + accepted

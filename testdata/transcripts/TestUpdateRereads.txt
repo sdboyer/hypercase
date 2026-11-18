@@ -86,6 +86,9 @@ A1 SIX
 -- in/do/edit --
 gaps
 format A1 prints as =6. Waits on sheets#8.
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --
@@ -106,6 +109,9 @@ A1 6
 A1 SIX
 -- in/do/edit --
 out/shout/values.txt
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --

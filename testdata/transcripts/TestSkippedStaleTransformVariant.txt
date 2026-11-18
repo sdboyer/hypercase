@@ -43,6 +43,8 @@ $ go test  # tr-ladder-eval
         - accepted
         + skipped a stale reason
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. What it writes for the cell, if anything, is its run's.
+        transform/upper/out/evaluate/inputs is recorded, and evaluate's probe says the case isn't for it: a stale reason
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Delete nothing by hand before it has run.
         transform/upper/out/evaluate/values.txt is recorded, and evaluate's probe says the case isn't for it: a stale reason
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs evaluate: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Delete nothing by hand before it has run.
     what ran, in order:

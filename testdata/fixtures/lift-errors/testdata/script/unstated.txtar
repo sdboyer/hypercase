@@ -1,6 +1,7 @@
 parse rejects a script that states nothing.
 -- in/parse/error --
 A1: not a number
+-- out/calc/inputs --
 -- out/calc/outcome --
 accepted
 -- out/evaluate/outcome --

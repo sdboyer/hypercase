@@ -215,6 +215,9 @@ func parseCell(f cellFile) (*cell, error) {
 	toks := lex(text)
 	var bad error
 	switch {
+	case len(f.data) == 0:
+		// An empty file has no line to point at.
+		return nil, newError(codeMalformed, []Position{{Cell: c.name, Path: c.path}}, "%s: not a number or a formula: %q", c.name, text)
 	case len(toks) == 0 || toks[0].kind == tWord || toks[0].kind == tRef:
 		return nil, newError(codeMalformed, c.at(), "%s: not a number or a formula: %q", c.name, text)
 	case toks[0].kind != tNumber:

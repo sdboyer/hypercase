@@ -108,44 +108,44 @@ $ go test  # strip-a
         Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
     the lift resolve is used by ./b, and no package owns it, so its error is recorded nowhere.
         Own the lift in one of them: give it to hypercase.Own in place of hypercase.Use.
-    testdata/export/prices.txtar: no registry claims out/import/outcome, variant/doubled/out/import/outcome and transform/louder/out/import/outcome: no column named import runs over the corpus export.
+    testdata/export/prices.txtar: no registry claims out/import/inputs, out/import/outcome, variant/doubled/out/import/inputs, variant/doubled/out/import/outcome, transform/louder/out/import/inputs and transform/louder/out/import/outcome: no column named import runs over the corpus export.
         If a column should write them, register the column. If not, run hypercase strip -root . -column import at the module root. It removes import's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/export/prices.txtar: no registry claims out/nobody/outcome: no column named nobody runs over the corpus export.
         If a column should write them, register the column. If not, run hypercase strip -root . -column nobody at the module root. It removes nobody's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
-    testdata/export/prices.txtar: no registry claims out/parse/outcome, variant/doubled/out/parse/outcome and transform/louder/out/parse/outcome: no column named parse runs over the corpus export.
+    testdata/export/prices.txtar: no registry claims out/parse/inputs, out/parse/outcome, variant/doubled/out/parse/inputs, variant/doubled/out/parse/outcome, transform/louder/out/parse/inputs and transform/louder/out/parse/outcome: no column named parse runs over the corpus export.
         If a column should write them, register the column. If not, run hypercase strip -root . -column parse at the module root. It removes parse's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
-    testdata/export/prices.txtar: no registry claims out/resolve/outcome, variant/doubled/out/resolve/outcome and transform/louder/out/resolve/outcome: no column named resolve runs over the corpus export.
+    testdata/export/prices.txtar: no registry claims out/resolve/inputs, out/resolve/outcome, variant/doubled/out/resolve/inputs, variant/doubled/out/resolve/outcome, transform/louder/out/resolve/inputs and transform/louder/out/resolve/outcome: no column named resolve runs over the corpus export.
         If a column should write them, register the column. If not, run hypercase strip -root . -column resolve at the module root. It removes resolve's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/export/prices.txtar: no registry claims via/import/evaluate/out/values.txt, via/import/quote/A1, via/import/quote/B1, variant/doubled/via/import/evaluate/out/values.txt, variant/doubled/via/import/quote/A1, variant/doubled/via/import/quote/B1, transform/louder/via/import/evaluate/out/values.txt, transform/louder/via/import/quote/A1 and transform/louder/via/import/quote/B1: no bytes lift named import runs over the corpus export.
         If a bytes lift should write them, register it. If not, run hypercase strip -root . -column import at the module root. It removes import's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
-    testdata/script/plain.txtar: no registry claims out/parse/outcome and variant/more/out/parse/outcome: no column named parse runs over the corpus script.
+    testdata/script/plain.txtar: no registry claims out/parse/inputs, out/parse/outcome, variant/more/out/parse/inputs and variant/more/out/parse/outcome: no column named parse runs over the corpus script.
         If a column should write them, register the column. If not, run hypercase strip -root . -column parse at the module root. It removes parse's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
-    testdata/script/plain.txtar: no registry claims out/resolve/outcome and variant/more/out/resolve/outcome: no column named resolve runs over the corpus script.
+    testdata/script/plain.txtar: no registry claims out/resolve/inputs, out/resolve/outcome, variant/more/out/resolve/inputs and variant/more/out/resolve/outcome: no column named resolve runs over the corpus script.
         If a column should write them, register the column. If not, run hypercase strip -root . -column resolve at the module root. It removes resolve's sections from every archive under the module-root corpus, but a frozen cell's, and lists what it leaves. Then run FIXTURE_UPDATE_GOLDEN=1 go test ./... until it changes nothing, and read what it reports.
     testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
-          export/prices evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-        - export/prices import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
-          export/prices list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        - export/prices parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-        - export/prices resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-          export/prices/transform/louder evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-        - export/prices/transform/louder import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
-          export/prices/transform/louder list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        - export/prices/transform/louder parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-        - export/prices/transform/louder resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-          export/prices/variant/doubled evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-        - export/prices/variant/doubled import: accepted; the lift import of ., rejecting [unterminated]; states []; files [outcome]
-          export/prices/variant/doubled list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        - export/prices/variant/doubled parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-        - export/prices/variant/doubled resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-          script/plain evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-          script/plain list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        - script/plain parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-        - script/plain resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
-          script/plain/variant/more evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [outcome values.txt]
-          script/plain/variant/more list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt outcome]
-        - script/plain/variant/more parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [outcome]
-        - script/plain/variant/more resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [outcome]
+          export/prices evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+        - export/prices import: accepted; the lift import of ., rejecting [unterminated]; states []; files [inputs outcome]
+          export/prices list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        - export/prices parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+        - export/prices resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+          export/prices/transform/louder evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+        - export/prices/transform/louder import: accepted; the lift import of ., rejecting [unterminated]; states []; files [inputs outcome]
+          export/prices/transform/louder list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        - export/prices/transform/louder parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+        - export/prices/transform/louder resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+          export/prices/variant/doubled evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+        - export/prices/variant/doubled import: accepted; the lift import of ., rejecting [unterminated]; states []; files [inputs outcome]
+          export/prices/variant/doubled list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        - export/prices/variant/doubled parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+        - export/prices/variant/doubled resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+          script/plain evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+          script/plain list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        - script/plain parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+        - script/plain resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
+          script/plain/variant/more evaluate: accepted; the suite evaluate of ./b, rejecting []; states []; files [inputs outcome values.txt]
+          script/plain/variant/more list: accepted; the suite list of ./b, rejecting []; states []; files [files.txt inputs outcome]
+        - script/plain/variant/more parse: accepted; the lift parse of ., rejecting [malformed]; states []; files [inputs outcome]
+        - script/plain/variant/more resolve: accepted; the lift resolve of ., rejecting [circular dangling]; states []; files [inputs outcome]
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
     what ran, in order:
         import ran

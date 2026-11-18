@@ -6,18 +6,28 @@ dangling
 -- out/calc/error.txt --
 A1: B1048576 doesn't exist
   sheet/A1:1: =B1048576
+-- out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/calc/outcome --
 rejected
 -- out/evaluate/outcome --
 blocked resolve
 -- out/format/formulas.txt --
 A1 =B1048576
+-- out/format/inputs --
+formulas.txt
+  in/sheet/A1
 -- out/format/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
 -- out/resolve/error.txt --
 A1: B1048576 doesn't exist
   sheet/A1:1: =B1048576
+-- out/resolve/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/resolve/outcome --
 rejected

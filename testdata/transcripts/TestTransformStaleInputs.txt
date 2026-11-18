@@ -87,6 +87,8 @@ $ go test ./b  # tr-b-probe
         copy: Does what the case's do/ tree says.
         copy's probe said the case isn't for it, and gave no reason.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs copy: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. What it writes for the cell, if anything, is its run's.
+        transform/upper/out/copy/inputs is recorded, and copy's probe says the case isn't for it, and gives no reason.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs copy: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Delete nothing by hand before it has run.
         transform/upper/out/copy/values.txt is recorded, and copy's probe says the case isn't for it, and gives no reason.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs copy: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Delete nothing by hand before it has run.
     script/twice/transform/upper: Uppercases every file under do/out/.
@@ -189,6 +191,8 @@ $ go test ./b  # tr-b-keep
         copy: Does what the case's do/ tree says.
         gaps, line 1, marks the cell, and copy's probe says the case isn't for it: not for copy
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs copy: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
+        transform/upper/out/copy/inputs is recorded, and copy's probe says the case isn't for it: not for copy
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs copy: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Delete nothing by hand before it has run.
         transform/upper/out/copy/values.txt is recorded, and copy's probe says the case isn't for it: not for copy
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs copy: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Delete nothing by hand before it has run.
     script/twice/transform/upper: Uppercases every file under do/out/.

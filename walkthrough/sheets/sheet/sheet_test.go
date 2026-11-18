@@ -102,7 +102,7 @@ func TestParseErrors(t *testing.T) {
 		want  string // describe
 	}{
 		{"word", map[string]string{"A1": "4", "D1": "total\n"}, `S101 D1: not a number or a formula: "total" @D1 sheet/D1:1`},
-		{"empty file", map[string]string{"A1": ""}, `S101 A1: not a number or a formula: "" @A1 sheet/A1:1`},
+		{"empty file", map[string]string{"A1": ""}, `S101 A1: not a number or a formula: "" @A1 sheet/A1:0`},
 		{"blank line", map[string]string{"A1": " \n"}, `S101 A1: not a number or a formula: "" @A1 sheet/A1:1`},
 		{"reference without =", map[string]string{"A1": "B1"}, `S101 A1: not a number or a formula: "B1" @A1 sheet/A1:1`},
 		{"number then word", map[string]string{"A1": "3x"}, `S101 A1: not a number or a formula: "3x" @A1 sheet/A1:1`},

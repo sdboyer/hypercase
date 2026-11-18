@@ -1,0 +1,81 @@
+$ edit testdata/script/twice.txtar  # echo's outputs, for the update to write
+$ edit testdata/script/range.txtar  # a case whose echo cell has a fault in its inputs
+$ edit testdata/script/failing.txtar  # a case whose echo cell has a fault in its inputs
+$ edit testdata/script/panicking.txtar  # a case whose echo cell has a fault in its inputs
+$ edit testdata/script/finder.txtar  # a case whose echo cell has a fault in its inputs
+$ edit testdata/script/pointing.txtar  # a case whose echo cell has a fault in its inputs
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # rejects
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/failing: An Inputs that fails.
+        echo: Does what the case's do/ tree says.
+        The Inputs of echo's output values.txt failed on out/echo/values.txt: the map is lost
+        Fix values.txt's Inputs. An update writes nothing for this cell.
+    script/finder: A Positions that panics.
+        echo: Does what the case's do/ tree says.
+        The project's Positions panicked on echo's error: the finder panicked
+        Fix Positions. An update writes nothing for this cell.
+    script/panicking: An Inputs that panics.
+        echo: Does what the case's do/ tree says.
+        The Inputs of echo's output ?.txt panicked on out/echo/a.txt: the map panicked
+        Fix ?.txt's Inputs. An update writes nothing for this cell.
+    script/pointing: A Positions that gives a range past its file's last line.
+        echo: Does what the case's do/ tree says.
+        The project's Positions, on echo's error, gave out/echo/error.txt the range decl.Range{Path: "do/error", Start: 1, End: 3}, and its End, 3, is past the last line of do/error, which has 2 lines.
+        Fix Positions. An update writes nothing for this cell.
+    script/range: A range past its file's last line, after one that holds.
+        echo: Does what the case's do/ tree says.
+        The Inputs of echo's output values.txt gave out/echo/values.txt the range decl.Range{Path: "do/out/values.txt", Start: 1, End: 2}, and its End, 2, is past the last line of do/out/values.txt, which has 1 line.
+        Fix values.txt's Inputs. An update writes nothing for this cell.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/failing
+            --- FAIL: TestCorpus/script/failing/echo
+        --- FAIL: TestCorpus/script/finder
+            --- FAIL: TestCorpus/script/finder/echo
+        --- FAIL: TestCorpus/script/panicking
+            --- FAIL: TestCorpus/script/panicking/echo
+        --- FAIL: TestCorpus/script/pointing
+            --- FAIL: TestCorpus/script/pointing/echo
+        --- FAIL: TestCorpus/script/range
+            --- FAIL: TestCorpus/script/range/echo
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]
+$ go test  # rejects
+    script/failing: An Inputs that fails.
+        echo: Does what the case's do/ tree says.
+        The Inputs of echo's output values.txt failed on out/echo/values.txt: the map is lost
+        Fix values.txt's Inputs. An update writes nothing for this cell.
+    script/finder: A Positions that panics.
+        echo: Does what the case's do/ tree says.
+        The project's Positions panicked on echo's error: the finder panicked
+        Fix Positions. An update writes nothing for this cell.
+    script/panicking: An Inputs that panics.
+        echo: Does what the case's do/ tree says.
+        The Inputs of echo's output ?.txt panicked on out/echo/a.txt: the map panicked
+        Fix ?.txt's Inputs. An update writes nothing for this cell.
+    script/pointing: A Positions that gives a range past its file's last line.
+        echo: Does what the case's do/ tree says.
+        The project's Positions, on echo's error, gave out/echo/error.txt the range decl.Range{Path: "do/error", Start: 1, End: 3}, and its End, 3, is past the last line of do/error, which has 2 lines.
+        Fix Positions. An update writes nothing for this cell.
+    script/range: A range past its file's last line, after one that holds.
+        echo: Does what the case's do/ tree says.
+        The Inputs of echo's output values.txt gave out/echo/values.txt the range decl.Range{Path: "do/out/values.txt", Start: 1, End: 2}, and its End, 2, is past the last line of do/out/values.txt, which has 1 line.
+        Fix values.txt's Inputs. An update writes nothing for this cell.
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- FAIL: TestCorpus/script/failing
+            --- FAIL: TestCorpus/script/failing/echo
+        --- FAIL: TestCorpus/script/finder
+            --- FAIL: TestCorpus/script/finder/echo
+        --- FAIL: TestCorpus/script/panicking
+            --- FAIL: TestCorpus/script/panicking/echo
+        --- FAIL: TestCorpus/script/pointing
+            --- FAIL: TestCorpus/script/pointing/echo
+        --- FAIL: TestCorpus/script/range
+            --- FAIL: TestCorpus/script/range/echo
+        --- PASS: TestCorpus/script/twice
+            --- PASS: TestCorpus/script/twice/echo
+FAIL
+[exit 1]

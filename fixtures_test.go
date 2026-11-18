@@ -67,6 +67,9 @@ var (
 //	                       during the run would
 //	<tree>/probe           read by withProbe's probe, and ignored by the run
 //	<tree>/probe-panic     read by withProbe's probe, and ignored by the run
+//	<tree>/ranges/<path>   read by steeredInputs, as steeredRanges reads it,
+//	                       in place of its own map of <path>, and ignored by
+//	                       the run
 //
 // Each output file comes from the instructions that make it, as
 // steeredInputs maps it, and error.txt from where its error points, as
@@ -105,9 +108,13 @@ var steeredKinds = []string{"out", "nonl", "crlf", "extranl", "marker", "twice"}
 // under <tree>/ that make it, each whole: <tree>/<kind>/<path> for a
 // kind that makes <path>, and <tree>/stdout, <tree>/stderr,
 // <tree>/tempdir and <tree>/archive for stdout.txt, stderr.txt, dir.txt
-// and archive.txt.
+// and archive.txt. Where the view holds <tree>/ranges/<path>, it maps
+// <path> as steeredRanges reads that file instead.
 func steeredInputs(tree string) decl.InputsFunc {
 	return func(in fs.FS, p string) ([]decl.Range, error) {
+		if rs, ok, err := steeredRanges(in, tree+"/ranges/"+p); ok {
+			return rs, err
+		}
 		var from []string
 		for _, kind := range steeredKinds {
 			from = append(from, tree+"/"+kind+"/"+p)
@@ -124,7 +131,9 @@ func steeredInputs(tree string) decl.InputsFunc {
 		}
 		var rs []decl.Range
 		for _, f := range from {
-			if _, err := fs.Stat(in, f); err == nil {
+			// A directory, such as <tree>/out/<path> when the run also
+			// returns <path>/x, makes nothing at <path>.
+			if info, err := fs.Stat(in, f); err == nil && !info.IsDir() {
 				rs = append(rs, decl.Range{Path: f})
 			}
 		}
@@ -132,15 +141,54 @@ func steeredInputs(tree string) decl.InputsFunc {
 	}
 }
 
+// steeredRanges reads the ranges a file of the input view states, in
+// place of an InputsFunc's own, and ok, where the view has the file. Each
+// line is a range, "<start> <end> <path>", whose path may be empty; or
+// "error <text>", which it returns as the error; or "panic <text>", which
+// it panics with.
+func steeredRanges(in fs.FS, file string) (rs []decl.Range, ok bool, err error) {
+	data, err := fs.ReadFile(in, file)
+	if err != nil {
+		return nil, false, nil
+	}
+	for _, line := range strings.Split(strings.TrimSuffix(string(data), "\n"), "\n") {
+		if text, ok := strings.CutPrefix(line, "error "); ok {
+			return nil, true, errors.New(text)
+		}
+		if text, ok := strings.CutPrefix(line, "panic "); ok {
+			panic(text)
+		}
+		fields := strings.SplitN(line, " ", 3)
+		if len(fields) < 2 {
+			panic(fmt.Sprintf("%s: %q is no range", file, line))
+		}
+		start, err1 := strconv.Atoi(fields[0])
+		end, err2 := strconv.Atoi(fields[1])
+		if err1 != nil || err2 != nil {
+			panic(fmt.Sprintf("%s: %q is no range", file, line))
+		}
+		r := decl.Range{Start: start, End: end}
+		if len(fields) == 3 {
+			r.Path = fields[2]
+		}
+		rs = append(rs, r)
+	}
+	return rs, true, nil
+}
+
 // steeredPositions is the fixtures' Positions: each line of an error's
 // text of the form "at <start> <end> <path>" is a range of the lines from
-// start to end of the file at path, the rest of the line.
+// start to end of the file at path, the rest of the line; and a line "at
+// panic <text>" panics with the text.
 func steeredPositions(err error) []decl.Range {
 	var rs []decl.Range
 	for _, line := range strings.Split(err.Error(), "\n") {
 		rest, ok := strings.CutPrefix(line, "at ")
 		if !ok {
 			continue
+		}
+		if text, ok := strings.CutPrefix(rest, "panic "); ok {
+			panic(text)
 		}
 		start, rest, _ := strings.Cut(rest, " ")
 		end, p, _ := strings.Cut(rest, " ")
@@ -212,7 +260,7 @@ func runSteered(t testing.TB, archiveName, tree string, in fs.FS, stdout, stderr
 			files = append(files, hypercase.File{Path: "archive.txt", Data: []byte(archiveName + "\n")})
 		case "edit":
 			editArchive(t, archiveName, text)
-		case "probe", "probe-panic":
+		case "probe", "probe-panic", "ranges":
 		default:
 			t.Fatalf("%s: no instruction %s", tree, p)
 		}

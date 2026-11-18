@@ -7,5 +7,9 @@ A1 and B1 refer to each other.
 circular
 -- out/evaluate/error.txt --
 A1 -> B1 -> A1: cycle
+-- out/evaluate/inputs --
+error.txt
+  in/sheet/A1:1-1
+  in/sheet/B1:1-1
 -- out/evaluate/outcome --
 rejected

@@ -20,6 +20,10 @@ $ go test  # chain-twice
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         import: Imports the export as a script, as its import/ tree says.
+        out/import/inputs differs (-golden +got):
+        - via/import/quote/A1
+        -   via/export/import/out/quote/A1
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it reruns export, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
         via/import/quote/A1 is a file of import's committed product, which this run of import doesn't make.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it reruns export, whose outcome and product a normal run reads from the archive. Its run may still make the file: delete nothing by hand before it has run.
     what ran, in order:
@@ -62,6 +66,11 @@ $ go test  # chain-twice
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it reruns export, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
         out/import/error.txt has no golden.
         FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it reruns export, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
+        out/import/inputs differs (-golden +got):
+        - via/import/quote/A1
+        -   via/export/import/out/quote/A1
+        + error.txt
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs import on another value than this run: it reruns export, whose outcome and product a normal run reads from the archive. Run it, fix what it reports, and read the diff before committing.
         out/import/outcome differs (-golden +got):
         - accepted
         + rejected
@@ -101,6 +110,11 @@ $ go test  # chain-twice
         export: Exports the grid, as its export/ tree says.
         out/export/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/export/inputs differs (-golden +got):
+        - via/export/import/out/quote/A1
+        -   in/export/out/import/out/quote/A1
+        + error.txt
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         out/export/outcome differs (-golden +got):
         - accepted
         + rejected
@@ -121,6 +135,11 @@ $ go test  # chain-twice
           quote/A1 "3\n"
         + quote/Z9 "9\n"
         FIXTURE_UPDATE_GOLDEN=1 go test ./... blocks list: it reruns export, whose outcome and product a normal run reads from the archive, and the lift export, on list's path, failed on the case. Run it, fix what it reports, and read the diff before committing.
+        out/list/inputs differs (-golden +got):
+          files.txt
+            via/import/quote/A1
+        +   via/import/quote/Z9
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... blocks list: it reruns export, whose outcome and product a normal run reads from the archive, and the lift export, on list's path, failed on the case. Run it, fix what it reports, and read the diff before committing.
     what ran, in order:
         export ran
         import ran
@@ -136,10 +155,15 @@ FAIL
 [exit 1]
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-twice
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
-    grid/sheet: import is blocked: the lift export failed on the case, and testdata/grid/sheet.txtar, out/export/error.txt, records its error.
+    grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
+        import: Imports the export as a script, as its import/ tree says.
+        out/import/inputs is recorded, and the cell is blocked: the lift export, on import's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     grid/sheet: A grid that export makes an export of, whose import makes a script of one quoted cell.
         list: Lists the files of the script's input view, with their bytes.
         out/list/files.txt is recorded, and the cell is blocked: the lift export, on list's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        out/list/inputs is recorded, and the cell is blocked: the lift export, on list's path, failed on the case.
         If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     what ran, in order:
         export ran
@@ -148,7 +172,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-twice
     --- FAIL: TestCorpus/grid
         --- FAIL: TestCorpus/grid/sheet
             --- PASS: TestCorpus/grid/sheet/export
-            --- SKIP: TestCorpus/grid/sheet/import
+            --- FAIL: TestCorpus/grid/sheet/import
             --- FAIL: TestCorpus/grid/sheet/list
     --- PASS: TestCorpus/script
 FAIL
@@ -172,6 +196,11 @@ $ go test  # chain-twice
         + 2 files
           quote/A1 "3\n"
         + quote/Z9 "9\n"
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: it reruns export, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift export, on list's path. Fix what export's cell reports.
+        out/list/inputs differs (-golden +got):
+          files.txt
+            via/import/quote/A1
+        +   via/import/quote/Z9
         FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for list: it reruns export, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift export, on list's path. Fix what export's cell reports.
     what ran, in order:
         export ran

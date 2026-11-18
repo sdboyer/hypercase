@@ -221,7 +221,7 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test ./b  # strip-b
 FAIL
 [exit 1]
 $ hypercase strip -column import
-testdata/export/prices.txtar: removed 12 sections
+testdata/export/prices.txtar: removed 15 sections
 Next, run FIXTURE_UPDATE_GOLDEN=1 go test ./... at the module root, and again until it changes nothing.
 # the update, run until a pass changes nothing; that pass:
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # strip-a
@@ -369,12 +369,16 @@ $ go test  # strip-a
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for parse: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on parse's path. Fix what import's cell reports.
+        out/parse/inputs is recorded, and the cell is blocked: the lift import, on parse's path, has no committed outcome, out/import/outcome, which a normal run reads.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for parse: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on parse's path. Fix what import's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.
     export/prices: One export of prices: import makes a script whose quote/ tree list shows.
         resolve: Resolves the parsed script, as its resolve/ tree says.
         out/resolve/outcome differs (-golden +got):
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for resolve: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on resolve's path. Fix what import's cell reports.
+        out/resolve/inputs is recorded, and the cell is blocked: the lift import, on resolve's path, has no committed outcome, out/import/outcome, which a normal run reads.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for resolve: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on resolve's path. Fix what import's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.
     export/prices/variant/doubled: The prices are doubled.
         import: Imports the export as a script, as its import/ tree says.
         import's jenny failed on the case, with an error that is no rejection:
@@ -386,12 +390,16 @@ $ go test  # strip-a
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for parse: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on parse's path. Fix what import's cell reports.
+        variant/doubled/out/parse/inputs is recorded, and the cell is blocked: the lift import, on parse's path, has no committed outcome, variant/doubled/out/import/outcome, which a normal run reads.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for parse: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on parse's path. Fix what import's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.
     export/prices/variant/doubled: The prices are doubled.
         resolve: Resolves the parsed script, as its resolve/ tree says.
         variant/doubled/out/resolve/outcome differs (-golden +got):
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for resolve: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on resolve's path. Fix what import's cell reports.
+        variant/doubled/out/resolve/inputs is recorded, and the cell is blocked: the lift import, on resolve's path, has no committed outcome, variant/doubled/out/import/outcome, which a normal run reads.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for resolve: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on resolve's path. Fix what import's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         import: Imports the export as a script, as its import/ tree says.
         import's jenny failed on the case, with an error that is no rejection:
@@ -403,12 +411,16 @@ $ go test  # strip-a
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for parse: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on parse's path. Fix what import's cell reports.
+        transform/louder/out/parse/inputs is recorded, and the cell is blocked: the lift import, on parse's path, has no committed outcome, transform/louder/out/import/outcome, which a normal run reads.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for parse: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on parse's path. Fix what import's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         resolve: Resolves the parsed script, as its resolve/ tree says.
         transform/louder/out/resolve/outcome differs (-golden +got):
         - accepted
         + blocked import
         FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for resolve: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on resolve's path. Fix what import's cell reports.
+        transform/louder/out/resolve/inputs is recorded, and the cell is blocked: the lift import, on resolve's path, has no committed outcome, transform/louder/out/import/outcome, which a normal run reads.
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... writes nothing for resolve: it reruns import, whose outcome and product a normal run reads from the archive, and it writes nothing for the cell of the lift import, on resolve's path. Fix what import's cell reports, and delete nothing by hand before FIXTURE_UPDATE_GOLDEN=1 go test ./... has run.
     what ran, in order:
         import ran
         import ran
@@ -449,6 +461,8 @@ $ go test ./b  # strip-b
         - accepted
         + blocked import
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
+        out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
         out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, out/import/outcome, which a normal run reads.
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
     export/prices: One export of prices: import makes a script whose quote/ tree list shows.
@@ -459,12 +473,16 @@ $ go test ./b  # strip-b
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
+        out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
     export/prices/variant/doubled: The prices are doubled.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
         variant/doubled/out/evaluate/outcome differs (-golden +got):
         - accepted
         + blocked import
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
+        variant/doubled/out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, variant/doubled/out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
         variant/doubled/out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, variant/doubled/out/import/outcome, which a normal run reads.
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
     export/prices/variant/doubled: The prices are doubled.
@@ -475,12 +493,16 @@ $ go test ./b  # strip-b
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
         variant/doubled/out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, variant/doubled/out/import/outcome, which a normal run reads.
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
+        variant/doubled/out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, variant/doubled/out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
         transform/louder/out/evaluate/outcome differs (-golden +got):
         - accepted
         + blocked import
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
+        transform/louder/out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, transform/louder/out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
         transform/louder/out/evaluate/values.txt is recorded, and the cell is blocked: the lift import, on evaluate's path, has no committed outcome, transform/louder/out/import/outcome, which a normal run reads.
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with evaluate: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
@@ -490,6 +512,8 @@ $ go test ./b  # strip-b
         + blocked import
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Run it, fix what it reports, and read the diff before committing.
         transform/louder/out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, transform/louder/out/import/outcome, which a normal run reads.
+        Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
+        transform/louder/out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, has no committed outcome, transform/louder/out/import/outcome, which a normal run reads.
         Only the package that owns import runs it in a normal run, so this one can't tell what FIXTURE_UPDATE_GOLDEN=1 go test ./... does with list: a normal run reads import's outcome and product from the archive. Delete nothing by hand before it has run.
     what ran, in order:
         parse ran on plain

@@ -7,5 +7,10 @@ b
 b
 -- out/echo/a.txt --
 a
+-- out/echo/inputs --
+a.txt
+  in/do/out/a.txt
+b.txt
+  in/do/out/b.txt
 -- out/echo/outcome --
 accepted

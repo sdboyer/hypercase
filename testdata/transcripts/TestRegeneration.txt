@@ -19,6 +19,13 @@ printed
 a
 -- out/echo/b.txt --
 b
+-- out/echo/inputs --
+a.txt
+  in/do/out/a.txt
+b.txt
+  in/do/out/b.txt
+stdout.txt
+  in/do/stdout
 -- out/echo/outcome --
 accepted
 -- out/echo/stdout.txt --

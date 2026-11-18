@@ -5,9 +5,11 @@ A1 -> A1: cycle
 format 2
 -- properties --
 circular
+-- out/calc/inputs --
 -- out/calc/outcome --
 accepted
 -- out/evaluate/outcome --
 blocked resolve
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted

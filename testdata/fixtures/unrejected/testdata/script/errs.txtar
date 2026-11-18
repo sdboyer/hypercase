@@ -5,5 +5,7 @@ D1: not a number
 malformed
 -- out/echo/error.txt --
 D1: not a number
+-- out/echo/inputs --
+error.txt
 -- out/echo/outcome --
 rejected

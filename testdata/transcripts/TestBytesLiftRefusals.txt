@@ -251,6 +251,8 @@ $ go test  # bytes-product-nodesc
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
     export/empty: import makes no file of this export, so its product is empty, and list reads an empty view.
         import: Imports the export as a script, as its import/ tree says.
+        out/import/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/import/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     export/looped: import makes a script with a cycle, which resolve rejects, and the export states.
@@ -276,6 +278,8 @@ $ go test  # bytes-product-nodesc
     export/prices/variant/unclosed: An unclosed quote, which the importer rejects.
         import: Imports the export as a script, as its import/ tree says.
         variant/unclosed/out/import/error.txt has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        variant/unclosed/out/import/inputs has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         variant/unclosed/out/import/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.

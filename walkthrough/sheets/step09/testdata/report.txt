@@ -4,18 +4,22 @@ outcome changed
 appeared
   sheet/empty calc: rejected S101
     error.txt added
+    inputs added
   sheet/empty evaluate: blocked parse
   sheet/empty format: blocked parse
   sheet/empty parse: rejected S101
     error.txt added
+    inputs added
   sheet/empty resolve: blocked parse
 disappeared
   sheet/blank calc: rejected S101
     error.txt removed
+    inputs removed
   sheet/blank evaluate: blocked parse
   sheet/blank format: blocked parse
   sheet/blank parse: rejected S101
     error.txt removed
+    inputs removed
   sheet/blank resolve: blocked parse
 bytes changed
   sheet/notes calc: rejected S101

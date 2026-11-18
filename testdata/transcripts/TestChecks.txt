@@ -55,18 +55,18 @@ $ go test  # tr-checks
     script/garbled/transform/looped: looped declines the base: the base states malformed, which looped neither gives nor keeps
     script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
     testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
-        + script/errs copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-          script/errs echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-        + script/errs/transform/upper copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-          script/errs/transform/upper echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-        + script/garbled copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states [malformed]; files [outcome values.txt]
-          script/garbled echo: accepted; the suite echo of ., rejecting [circular dangling]; states [malformed]; files [outcome values.txt]
-        + script/twice copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [outcome values.txt]
-          script/twice echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [outcome values.txt]
-        + script/twice/transform/looped copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-          script/twice/transform/looped echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-        + script/twice/transform/upper copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [outcome values.txt]
-          script/twice/transform/upper echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [outcome values.txt]
+        + script/errs copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+          script/errs echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+        + script/errs/transform/upper copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+          script/errs/transform/upper echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+        + script/garbled copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states [malformed]; files [inputs outcome values.txt]
+          script/garbled echo: accepted; the suite echo of ., rejecting [circular dangling]; states [malformed]; files [inputs outcome values.txt]
+        + script/twice copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [inputs outcome values.txt]
+          script/twice echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [inputs outcome values.txt]
+        + script/twice/transform/looped copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+          script/twice/transform/looped echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+        + script/twice/transform/upper copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [inputs outcome values.txt]
+          script/twice/transform/upper echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [inputs outcome values.txt]
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/script
@@ -169,18 +169,18 @@ $ go test ./b  # tr-b-checks
         --- PASS: TestCorpus/checks/cells
 PASS
 $ cat testdata/checks/cells.txt
-script/errs copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-script/errs echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-script/errs/transform/upper copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-script/errs/transform/upper echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-script/garbled copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states [malformed]; files [outcome values.txt]
-script/garbled echo: accepted; the suite echo of ., rejecting [circular dangling]; states [malformed]; files [outcome values.txt]
-script/twice copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [outcome values.txt]
-script/twice echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [outcome values.txt]
-script/twice/transform/looped copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-script/twice/transform/looped echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-script/twice/transform/upper copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [outcome values.txt]
-script/twice/transform/upper echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [outcome values.txt]
+script/errs copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+script/errs echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+script/errs/transform/upper copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+script/errs/transform/upper echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+script/garbled copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states [malformed]; files [inputs outcome values.txt]
+script/garbled echo: accepted; the suite echo of ., rejecting [circular dangling]; states [malformed]; files [inputs outcome values.txt]
+script/twice copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [inputs outcome values.txt]
+script/twice echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [inputs outcome values.txt]
+script/twice/transform/looped copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+script/twice/transform/looped echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+script/twice/transform/upper copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [inputs outcome values.txt]
+script/twice/transform/upper echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [inputs outcome values.txt]
 $ edit testdata/checks/cells.txt  # add a finding by hand
 $ go test  # tr-checks
     script/errs/transform/looped: looped declines the base: the base's do/ tree already errs
@@ -188,9 +188,9 @@ $ go test  # tr-checks
     script/garbled/transform/upper: upper declines the base: the base states malformed, which upper neither gives nor keeps
     testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
         - a finding by hand
-          script/errs copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-          script/errs echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-          script/errs/transform/upper copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
+          script/errs copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+          script/errs echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+          script/errs/transform/upper copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
 --- FAIL: TestCorpus
     --- PASS: TestCorpus/script
@@ -395,14 +395,14 @@ $ go test  # tr-checks
         + accepted
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
     testdata/checks/cells.txt, the corpus check cells's findings, differs (-golden +got):
-          script/garbled copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states [malformed]; files [outcome values.txt]
-          script/garbled echo: accepted; the suite echo of ., rejecting [circular dangling]; states [malformed]; files [outcome values.txt]
-          script/twice copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [outcome values.txt]
-        - script/twice echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [outcome values.txt]
-        + script/twice echo: rejected; the suite echo of ., rejecting [circular dangling]; states []; files [outcome values.txt]
-          script/twice/transform/looped copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-          script/twice/transform/looped echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt outcome values.txt]
-          script/twice/transform/upper copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [outcome values.txt]
+          script/garbled copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states [malformed]; files [inputs outcome values.txt]
+          script/garbled echo: accepted; the suite echo of ., rejecting [circular dangling]; states [malformed]; files [inputs outcome values.txt]
+          script/twice copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [inputs outcome values.txt]
+        - script/twice echo: accepted; the suite echo of ., rejecting [circular dangling]; states []; files [inputs outcome values.txt]
+        + script/twice echo: rejected; the suite echo of ., rejecting [circular dangling]; states []; files [inputs outcome values.txt]
+          script/twice/transform/looped copy: rejected; the suite copy of ./b, rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+          script/twice/transform/looped echo: rejected; the suite echo of ., rejecting [circular dangling]; states [circular]; files [error.txt inputs outcome values.txt]
+          script/twice/transform/upper copy: accepted; the suite copy of ./b, rejecting [circular dangling]; states []; files [inputs outcome values.txt]
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
 --- FAIL: TestCorpus
     --- FAIL: TestCorpus/script
@@ -601,6 +601,8 @@ $ go test  # tr-checks
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to remove them.
         transform/looped/out/echo/error.txt is recorded, and looped declines the base: the base states malformed, which looped neither gives nor keeps
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/looped/out/echo/inputs is recorded, and looped declines the base: the base states malformed, which looped neither gives nor keeps
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/looped/out/echo/outcome is recorded, and looped declines the base: the base states malformed, which looped neither gives nor keeps
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/looped/out/echo/values.txt is recorded, and looped declines the base: the base states malformed, which looped neither gives nor keeps
@@ -608,6 +610,8 @@ $ go test  # tr-checks
     script/twice/transform/upper: Uppercases every file under do/out/.
         transform/upper/in/do/out/values.txt is written, and upper declines the base: the base states malformed, which upper neither gives nor keeps
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to remove them.
+        transform/upper/out/echo/inputs is recorded, and upper declines the base: the base states malformed, which upper neither gives nor keeps
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/upper/out/echo/outcome is recorded, and upper declines the base: the base states malformed, which upper neither gives nor keeps
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/upper/out/echo/values.txt is recorded, and upper declines the base: the base states malformed, which upper neither gives nor keeps
@@ -647,11 +651,15 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # tr-checks
     script/twice/transform/looped: Adds do/error and resolve/error, so echo and resolve err as on a cycle.
         transform/looped/out/echo/error.txt is recorded, and looped declines the base: the base states malformed, which looped neither gives nor keeps
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/looped/out/echo/inputs is recorded, and looped declines the base: the base states malformed, which looped neither gives nor keeps
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/looped/out/echo/outcome is recorded, and looped declines the base: the base states malformed, which looped neither gives nor keeps
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/looped/out/echo/values.txt is recorded, and looped declines the base: the base states malformed, which looped neither gives nor keeps
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     script/twice/transform/upper: Uppercases every file under do/out/.
+        transform/upper/out/echo/inputs is recorded, and upper declines the base: the base states malformed, which upper neither gives nor keeps
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/upper/out/echo/outcome is recorded, and upper declines the base: the base states malformed, which upper neither gives nor keeps
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/upper/out/echo/values.txt is recorded, and upper declines the base: the base states malformed, which upper neither gives nor keeps

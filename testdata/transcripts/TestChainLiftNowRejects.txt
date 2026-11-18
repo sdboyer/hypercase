@@ -102,13 +102,24 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/empty/transform/louder: louder declines the base: the export makes no output of evaluate
     export/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/export/looped.txtar, out/resolve/error.txt, records its error.
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
-    export/names: evaluate is blocked: the lift import failed on the case, and testdata/export/names.txtar, out/import/error.txt, records its error.
+    export/names: import makes files named as a cell's own files are, which list reads.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/names: import makes files named as a cell's own files are, which list reads.
         list: Lists the files of the script's input view, with their bytes.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, failed on the case.
         If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
-    export/names: parse is blocked: the lift import failed on the case, and testdata/export/names.txtar, out/import/error.txt, records its error.
-    export/names: resolve is blocked: the lift import failed on the case, and testdata/export/names.txtar, out/import/error.txt, records its error.
+        out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/names: import makes files named as a cell's own files are, which list reads.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/inputs is recorded, and the cell is blocked: the lift import, on parse's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/names: import makes files named as a cell's own files are, which list reads.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        out/resolve/inputs is recorded, and the cell is blocked: the lift import, on resolve's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/variant/unclosed: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
@@ -161,11 +172,11 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
             --- PASS: TestCorpus/export/looped/resolve
             --- SKIP: TestCorpus/export/looped/transform/louder
         --- FAIL: TestCorpus/export/names
-            --- SKIP: TestCorpus/export/names/evaluate
+            --- FAIL: TestCorpus/export/names/evaluate
             --- PASS: TestCorpus/export/names/import
             --- FAIL: TestCorpus/export/names/list
-            --- SKIP: TestCorpus/export/names/parse
-            --- SKIP: TestCorpus/export/names/resolve
+            --- FAIL: TestCorpus/export/names/parse
+            --- FAIL: TestCorpus/export/names/resolve
             --- SKIP: TestCorpus/export/names/transform/louder
         --- PASS: TestCorpus/export/prices
             --- PASS: TestCorpus/export/prices/evaluate
@@ -211,10 +222,13 @@ a tree named inputs
 not an error
 -- in/import/out/names/outcome --
 not an outcome
+-- out/evaluate/inputs --
 -- out/evaluate/outcome --
 blocked import
 -- out/import/error.txt --
 import: line 2: unclosed quote
+-- out/import/inputs --
+error.txt
 -- out/import/outcome --
 rejected
 -- out/list/files.txt --
@@ -222,23 +236,41 @@ rejected
 inputs/x "a tree named inputs\n"
 names/error.txt "not an error\n"
 names/outcome "not an outcome\n"
+-- out/list/inputs --
+files.txt
+  via/import/inputs/x
+  via/import/names/error.txt
+  via/import/names/outcome
 -- out/list/outcome --
 blocked import
+-- out/parse/inputs --
 -- out/parse/outcome --
 blocked import
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 blocked import
 $ go test  # chain
     export/empty/transform/louder: louder declines the base: the export makes no output of evaluate
     export/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/export/looped.txtar, out/resolve/error.txt, records its error.
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
-    export/names: evaluate is blocked: testdata/export/names.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/names: import makes files named as a cell's own files are, which list reads.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, has the committed outcome "rejected", in out/import/outcome.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/names: import makes files named as a cell's own files are, which list reads.
         list: Lists the files of the script's input view, with their bytes.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
         If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
-    export/names: parse is blocked: testdata/export/names.txtar, out/import/outcome, records the lift import's outcome as "rejected".
-    export/names: resolve is blocked: testdata/export/names.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+        out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/names: import makes files named as a cell's own files are, which list reads.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/inputs is recorded, and the cell is blocked: the lift import, on parse's path, has the committed outcome "rejected", in out/import/outcome.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/names: import makes files named as a cell's own files are, which list reads.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        out/resolve/inputs is recorded, and the cell is blocked: the lift import, on resolve's path, has the committed outcome "rejected", in out/import/outcome.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
@@ -291,11 +323,11 @@ $ go test  # chain
             --- PASS: TestCorpus/export/looped/resolve
             --- SKIP: TestCorpus/export/looped/transform/louder
         --- FAIL: TestCorpus/export/names
-            --- SKIP: TestCorpus/export/names/evaluate
+            --- FAIL: TestCorpus/export/names/evaluate
             --- PASS: TestCorpus/export/names/import
             --- FAIL: TestCorpus/export/names/list
-            --- SKIP: TestCorpus/export/names/parse
-            --- SKIP: TestCorpus/export/names/resolve
+            --- FAIL: TestCorpus/export/names/parse
+            --- FAIL: TestCorpus/export/names/resolve
             --- SKIP: TestCorpus/export/names/transform/louder
         --- PASS: TestCorpus/export/prices
             --- PASS: TestCorpus/export/prices/evaluate
@@ -334,7 +366,10 @@ $ go test  # chain
     export/empty/transform/louder: louder declines the base: the export makes no output of evaluate
     export/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/export/looped.txtar, out/resolve/error.txt, records its error.
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
-    export/names: evaluate is blocked: testdata/export/names.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+    export/names: import makes files named as a cell's own files are, which list reads.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, has the committed outcome "rejected", in out/import/outcome.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/names: import makes files named as a cell's own files are, which list reads.
         import: Imports the export as a script, as its import/ tree says.
         via/import/inputs/x is recorded, and import failed on the case in this run, so this run has no product.
@@ -343,8 +378,16 @@ $ go test  # chain
         list: Lists the files of the script's input view, with their bytes.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
         If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
-    export/names: parse is blocked: testdata/export/names.txtar, out/import/outcome, records the lift import's outcome as "rejected".
-    export/names: resolve is blocked: testdata/export/names.txtar, out/import/outcome, records the lift import's outcome as "rejected".
+        out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, has the committed outcome "rejected", in out/import/outcome.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/names: import makes files named as a cell's own files are, which list reads.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/inputs is recorded, and the cell is blocked: the lift import, on parse's path, has the committed outcome "rejected", in out/import/outcome.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/names: import makes files named as a cell's own files are, which list reads.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        out/resolve/inputs is recorded, and the cell is blocked: the lift import, on resolve's path, has the committed outcome "rejected", in out/import/outcome.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
     export/prices/variant/unclosed: list is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
@@ -397,11 +440,11 @@ $ go test  # chain
             --- PASS: TestCorpus/export/looped/resolve
             --- SKIP: TestCorpus/export/looped/transform/louder
         --- FAIL: TestCorpus/export/names
-            --- SKIP: TestCorpus/export/names/evaluate
+            --- FAIL: TestCorpus/export/names/evaluate
             --- FAIL: TestCorpus/export/names/import
             --- FAIL: TestCorpus/export/names/list
-            --- SKIP: TestCorpus/export/names/parse
-            --- SKIP: TestCorpus/export/names/resolve
+            --- FAIL: TestCorpus/export/names/parse
+            --- FAIL: TestCorpus/export/names/resolve
             --- SKIP: TestCorpus/export/names/transform/louder
         --- PASS: TestCorpus/export/prices
             --- PASS: TestCorpus/export/prices/evaluate
@@ -440,13 +483,24 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/empty/transform/louder: louder declines the base: the export makes no output of evaluate
     export/looped: evaluate is blocked: the lift resolve failed on the case, and testdata/export/looped.txtar, out/resolve/error.txt, records its error.
     export/looped/transform/louder: louder declines the base: the base states circular, which louder neither gives nor keeps
-    export/names: evaluate is blocked: the lift import failed on the case, and testdata/export/names.txtar, out/import/error.txt, records its error.
+    export/names: import makes files named as a cell's own files are, which list reads.
+        evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/inputs is recorded, and the cell is blocked: the lift import, on evaluate's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/names: import makes files named as a cell's own files are, which list reads.
         list: Lists the files of the script's input view, with their bytes.
         out/list/files.txt is recorded, and the cell is blocked: the lift import, on list's path, failed on the case.
         If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
-    export/names: parse is blocked: the lift import failed on the case, and testdata/export/names.txtar, out/import/error.txt, records its error.
-    export/names: resolve is blocked: the lift import failed on the case, and testdata/export/names.txtar, out/import/error.txt, records its error.
+        out/list/inputs is recorded, and the cell is blocked: the lift import, on list's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/names: import makes files named as a cell's own files are, which list reads.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/inputs is recorded, and the cell is blocked: the lift import, on parse's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/names: import makes files named as a cell's own files are, which list reads.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        out/resolve/inputs is recorded, and the cell is blocked: the lift import, on resolve's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices/variant/unclosed: evaluate is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/variant/unclosed: list is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
@@ -499,11 +553,11 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
             --- PASS: TestCorpus/export/looped/resolve
             --- SKIP: TestCorpus/export/looped/transform/louder
         --- FAIL: TestCorpus/export/names
-            --- SKIP: TestCorpus/export/names/evaluate
+            --- FAIL: TestCorpus/export/names/evaluate
             --- PASS: TestCorpus/export/names/import
             --- FAIL: TestCorpus/export/names/list
-            --- SKIP: TestCorpus/export/names/parse
-            --- SKIP: TestCorpus/export/names/resolve
+            --- FAIL: TestCorpus/export/names/parse
+            --- FAIL: TestCorpus/export/names/resolve
             --- SKIP: TestCorpus/export/names/transform/louder
         --- PASS: TestCorpus/export/prices
             --- PASS: TestCorpus/export/prices/evaluate

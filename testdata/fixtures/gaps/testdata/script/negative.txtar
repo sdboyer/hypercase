@@ -5,5 +5,7 @@ A1: unexpected "-"
 echo A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/echo/error.txt --
 A1: unexpected "-"
+-- out/echo/inputs --
+error.txt
 -- out/echo/outcome --
 rejected

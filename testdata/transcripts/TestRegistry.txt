@@ -143,6 +143,8 @@ $ go test  # echo-shout
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read the diff before committing.
     script/twice: A1 is twice B1.
         shout: Does what the case's shout/ tree says.
+        out/shout/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/shout/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
 --- FAIL: TestCorpus

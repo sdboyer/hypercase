@@ -5,5 +5,7 @@ cycle: A1 -> A1
 circular
 -- out/echo/error.txt --
 A1 -> A1: cycle
+-- out/echo/inputs --
+error.txt
 -- out/echo/outcome --
 rejected

@@ -46,6 +46,8 @@ import (
 //	import/coded          a *codedError, with the code it holds, less its
 //	                      final newline, which decl.Reject marks
 //	import/panic          panicked with, less its final newline
+//	import/ranges/<path>  read by importedFrom, as steeredRanges reads it,
+//	                      in place of its own map of the product's <path>
 //
 // An import/ tree with more than one of error, fail and coded returns
 // their errors joined, with errors.Join, in that order. An export whose
@@ -169,9 +171,14 @@ func importProduct(name string) []decl.Output {
 // importedFrom maps a product file of the bytes lift whose jenny
 // steerImport steers as name to the instruction of its input view that
 // makes it, whole: <name>/out/<path>. The other instructions make files no
-// archive holds, so no product of them is mapped.
+// archive holds, so no product of them is mapped. Where the view holds
+// <name>/ranges/<path>, it maps <path> as steeredRanges reads that file
+// instead.
 func importedFrom(name string) decl.InputsFunc {
 	return func(in fs.FS, p string) ([]decl.Range, error) {
+		if rs, ok, err := steeredRanges(in, name+"/ranges/"+p); ok {
+			return rs, err
+		}
 		from := name + "/out/" + p
 		if _, err := fs.Stat(in, from); err != nil {
 			return nil, nil

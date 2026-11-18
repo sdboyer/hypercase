@@ -473,7 +473,11 @@ func (st *staging) text(n note, c closing) string {
 		says = append(says, said{fmt.Sprintf("Run %s to write it, and read it before committing.", u), fmt.Sprintf("run %s to write it, and read it before committing.", u)})
 	}
 	if len(cl.OnlyAdds) > 0 {
-		adds := fmt.Sprintf("to add it. The update adds %s and changes nothing else.", frameworkWords(cl.OnlyAdds))
+		them := "it"
+		if len(cl.OnlyAdds) > 1 {
+			them = "them"
+		}
+		adds := fmt.Sprintf("to add %s. The update adds %s and changes nothing else.", them, frameworkWords(cl.OnlyAdds))
 		says = append(says, said{fmt.Sprintf("Run %s %s", u, adds), fmt.Sprintf("run %s %s", u, adds)})
 	}
 	if cl.Leaves != "" {
@@ -529,6 +533,8 @@ func frameworkWords(sections []string) string {
 		switch path.Base(s) {
 		case outcomeFile:
 			words = append(words, "the outcome")
+		case inputsFile:
+			words = append(words, "the inputs file")
 		default:
 			panic(fmt.Sprintf("hypercase: no words for the framework's file %s", s))
 		}

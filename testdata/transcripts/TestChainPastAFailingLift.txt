@@ -51,6 +51,8 @@ blocked unpack
 blocked unpack
 -- out/unpack/error.txt --
 line 1: unclosed quote
+-- out/unpack/inputs --
+error.txt
 -- out/unpack/outcome --
 rejected
 $ go test  # chain-past
@@ -93,12 +95,17 @@ $ go test  # chain-past
         - accepted
         + blocked unpack
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
+        out/repack/inputs is recorded, and the cell is blocked: the lift unpack, on repack's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         via/repack/evaluate/out/values.txt is recorded, and repack is blocked: the lift unpack, on repack's path, failed on the case, so it has no product in this run.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
     export/packed: unpack and repack make a script that evaluate prints a1 from.
         unpack: Unpacks the export, as its unpack/ tree says.
         out/unpack/error.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
+        out/unpack/inputs differs (-golden +got):
+        + error.txt
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         out/unpack/outcome differs (-golden +got):
         - accepted
         + rejected
@@ -138,15 +145,28 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-past
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
     export/packed: unpack and repack make a script that evaluate prints a1 from.
         evaluate: Does what the case's evaluate/ tree says, from the stage it consumes.
+        out/evaluate/inputs is recorded, and the cell is blocked: the lift unpack, on evaluate's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         out/evaluate/values.txt is recorded, and the cell is blocked: the lift unpack, on evaluate's path, failed on the case.
         If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/packed: unpack and repack make a script that evaluate prints a1 from.
         list: Lists the files of the script's input view, with their bytes.
         out/list/files.txt is recorded, and the cell is blocked: the lift unpack, on list's path, failed on the case.
         If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
-    export/packed: parse is blocked: the lift unpack failed on the case, and testdata/export/packed.txtar, out/unpack/error.txt, records its error.
-    export/packed: repack is blocked: the lift unpack failed on the case, and testdata/export/packed.txtar, out/unpack/error.txt, records its error.
-    export/packed: resolve is blocked: the lift unpack failed on the case, and testdata/export/packed.txtar, out/unpack/error.txt, records its error.
+        out/list/inputs is recorded, and the cell is blocked: the lift unpack, on list's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/packed: unpack and repack make a script that evaluate prints a1 from.
+        parse: Parses the script, as its parse/ tree says.
+        out/parse/inputs is recorded, and the cell is blocked: the lift unpack, on parse's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/packed: unpack and repack make a script that evaluate prints a1 from.
+        repack: Repacks the unpacked export as a script, as its repack/ tree says.
+        out/repack/inputs is recorded, and the cell is blocked: the lift unpack, on repack's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+    export/packed: unpack and repack make a script that evaluate prints a1 from.
+        resolve: Resolves the parsed script, as its resolve/ tree says.
+        out/resolve/inputs is recorded, and the cell is blocked: the lift unpack, on resolve's path, failed on the case.
+        If the cell should run, fix the lift or the case. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
     export/stuck: evaluate is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
     export/stuck: list is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
     export/stuck: parse is blocked: the lift unpack failed on the case, and testdata/export/stuck.txtar, out/unpack/error.txt, records its error.
@@ -160,9 +180,9 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain-past
         --- FAIL: TestCorpus/export/packed
             --- FAIL: TestCorpus/export/packed/evaluate
             --- FAIL: TestCorpus/export/packed/list
-            --- SKIP: TestCorpus/export/packed/parse
-            --- SKIP: TestCorpus/export/packed/repack
-            --- SKIP: TestCorpus/export/packed/resolve
+            --- FAIL: TestCorpus/export/packed/parse
+            --- FAIL: TestCorpus/export/packed/repack
+            --- FAIL: TestCorpus/export/packed/resolve
             --- PASS: TestCorpus/export/packed/unpack
         --- PASS: TestCorpus/export/stuck
             --- SKIP: TestCorpus/export/stuck/evaluate

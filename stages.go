@@ -331,7 +331,7 @@ func (s *caseState) stage(typ reflect.Type) (any, *origin, *blockage) {
 	// Past a bytes lift, which runs here only in an update, or in a normal
 	// run's staging of the case as its update stages it, a cell is written
 	// only with the lift's cell: a normal run reads what that writes.
-	if l.bytes && s.heldBack(l, lr, in, from.view) {
+	if l.bytes && s.heldBack(l, lr, in, from) {
 		return nil, nil, &blockage{lift: l, failed: l.name, broken: true}
 	}
 	switch {
@@ -353,12 +353,12 @@ func (s *caseState) stage(typ reflect.Type) (any, *origin, *blockage) {
 // fault of the jenny or a product an archive can't hold, when it registers
 // the owner's declaration of l. The root-package check fails on two
 // declarations whose registry entries differ.
-func (s *caseState) heldBack(l *lift, lr *liftRun, in any, view fs.FS) bool {
+func (s *caseState) heldBack(l *lift, lr *liftRun, in any, from *origin) bool {
 	if l.owned {
-		return !s.liftVerdict(l, lr, in, view).writable
+		return !s.liftVerdict(l, lr, in, from).writable
 	}
 	if lr.bare == nil {
-		lr.bare = s.judgeLift(s.r.bare(), l, lr, in, view)
+		lr.bare = s.judgeLift(s.r.bare(), l, lr, in, from)
 	}
 	return !lr.bare.writable
 }

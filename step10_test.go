@@ -73,6 +73,7 @@ func TestChain(t *testing.T) {
 		"via/import/evaluate/out/values.txt":    "a1 3\nb1 6\n",
 		"via/import/quote/B1":                   "=A1*2\n",
 		"out/import/outcome":                    "accepted\n",
+		"out/import/inputs":                     "via/import/evaluate/out/values.txt\n  in/import/out/evaluate/out/values.txt\nvia/import/quote/A1\n  in/import/out/quote/A1\nvia/import/quote/B1\n  in/import/out/quote/B1\n",
 		"out/evaluate/values.txt":               "a1 3\nb1 6\n",
 		"variant/unclosed/out/import/error.txt": "import: line 1: unclosed quote\n",
 		"variant/unclosed/out/import/outcome":   "rejected\n",
@@ -97,6 +98,9 @@ func TestChain(t *testing.T) {
 		"via/import/names/error.txt": "not an error\n",
 		"via/import/names/outcome":   "not an outcome\n",
 		"out/list/files.txt":         "3 files\ninputs/x \"a tree named inputs\\n\"\nnames/error.txt \"not an error\\n\"\nnames/outcome \"not an outcome\\n\"\n",
+		// A product tree named inputs is no cell's inputs file, which maps it.
+		"out/import/inputs": "via/import/inputs/x\n  in/import/out/inputs/x\nvia/import/names/error.txt\n  in/import/out/names/error.txt\nvia/import/names/outcome\n  in/import/out/names/outcome\n",
+		"out/list/inputs":   "files.txt\n  via/import/inputs/x\n  via/import/names/error.txt\n  via/import/names/outcome\n",
 	})
 	s.hasSections("testdata/export/empty.txtar", map[string]string{
 		"out/import/outcome": "accepted\n",
@@ -615,11 +619,12 @@ func TestChainProbeAsUpdate(t *testing.T) {
 	s.passes(s.update("chain"))
 	s.same(prices, clean)
 
-	s.edit(prices, "import now makes evaluate/probe, and evaluate's cells have no values.txt", func(a *archive.Archive) {
+	s.edit(prices, "import now makes evaluate/probe, and evaluate's cells have no values.txt or inputs", func(a *archive.Archive) {
 		insert("in/import/out/evaluate/probe", "the new reason\n", "in/import/out/quote/")(a)
-		drop("out/evaluate/values.txt")(a)
-		drop("variant/doubled/out/evaluate/values.txt")(a)
-		drop("transform/louder/out/evaluate/values.txt")(a)
+		for _, tree := range []string{"", "variant/doubled/", "transform/louder/"} {
+			drop(tree + "out/evaluate/values.txt")(a)
+			drop(tree + "out/evaluate/inputs")(a)
+		}
 	})
 	s.passes(s.update("chain"))
 	s.hasSections(prices, map[string]string{"out/evaluate/outcome": "skipped the new reason\n", "via/import/evaluate/probe": "the new reason\n"})
@@ -650,8 +655,9 @@ func TestChainOutcomeAsUpdate(t *testing.T) {
 	const reruns = "it reruns import, whose outcome and product a normal run reads from the archive"
 	clean := s.read(names)
 
-	s.edit(names, "import's committed outcome is stale, and import now makes a script with a cycle, which the export states", func(a *archive.Archive) {
+	s.edit(names, "import's committed outcome is stale, import now makes a script with a cycle, which the export states, and evaluate's inputs, which its blocked cell won't have, is deleted", func(a *archive.Archive) {
 		set("out/import/outcome", "rejected\n")(a)
+		drop("out/evaluate/inputs")(a)
 		insert("properties", "circular\n", "in/")(a)
 		insert("in/import/out/resolve/error", "A1 -> A1: cycle\n", "out/")(a)
 	})
@@ -1363,7 +1369,7 @@ func TestUpdateUnreadableUntested(t *testing.T) {
 	s.fails(s.update("ladder-a-paths"), check)
 	s.remove("b/testdata/hypercase.json", "delete b's registry, which no update writes")
 	s.passes(s.update("ladder-a-paths"))
-	s.fails(s.normal("ladder-a-paths"), "testdata/script/x.txtar: no registry claims out/evaluate/outcome and out/evaluate/values.txt: no column named evaluate runs over the corpus script.")
+	s.fails(s.normal("ladder-a-paths"), "testdata/script/x.txtar: no registry claims out/evaluate/inputs, out/evaluate/outcome and out/evaluate/values.txt: no column named evaluate runs over the corpus script.")
 	s.edit("testdata/script/x.txtar", "delete ./b's cells, which no package writes", drop("out/evaluate/"))
 	s.passes(s.normal("ladder-a-paths"))
 	s.passes(s.update("ladder-a-paths"))
@@ -1578,8 +1584,10 @@ func TestChainSharedProjects(t *testing.T) {
 		// its rejection, and passes.
 		s.edit(prices, "projectRender no longer panics, and the cells' orphans are deleted by hand", func(a *archive.Archive) {
 			drop("in/render/panic")(a)
-			for _, col := range []string{"out/evaluate/values.txt", "out/list/files.txt", "transform/louder/out/evaluate/values.txt", "transform/louder/out/list/files.txt"} {
-				drop(col)(a)
+			for _, tree := range []string{"", "transform/louder/"} {
+				for _, f := range []string{"parse/inputs", "resolve/inputs", "evaluate/values.txt", "evaluate/inputs", "list/files.txt", "list/inputs"} {
+					drop(tree + "out/" + f)(a)
+				}
 			}
 		})
 		for _, r := range s.parallel(childRun{"", "chain-a-render", true}, childRun{"b", "chain-b", true}) {

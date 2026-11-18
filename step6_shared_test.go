@@ -97,7 +97,7 @@ func TestRootCheckUsedPath(t *testing.T) {
 			s.passes(s.run("b", tt.b, true))
 			s.passes(s.update(tt.a))
 			col := strings.TrimSuffix(strings.TrimPrefix(tt.drop, "out/"), "/")
-			s.fails(s.normal(tt.a), "testdata/script/x.txtar: no registry claims "+tt.drop+"outcome: no column named "+col+" runs over the corpus script.")
+			s.fails(s.normal(tt.a), "testdata/script/x.txtar: no registry claims "+tt.drop+"inputs and "+tt.drop+"outcome: no column named "+col+" runs over the corpus script.")
 			s.edit("testdata/script/x.txtar", "delete the cells no package writes now", drop(tt.drop))
 			s.passes(s.update(tt.a))
 			s.cat("testdata/checks/paths.txt")

@@ -104,6 +104,13 @@ $ go test  # chain
     export/names/transform/louder: louder declines the base: the export makes no output of evaluate
     export/prices: One export of prices: import makes a script whose evaluate prints a1 and b1.
         import: Imports the export as a script, as its import/ tree says.
+        out/import/inputs differs (-golden +got):
+        - via/import/evaluate/out/values.txt
+        -   in/import/out/evaluate/out/values.txt
+          via/import/quote/A1
+            in/import/out/quote/A1
+          via/import/quote/B1
+        If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
         via/import/evaluate/out/values.txt is a file of import's committed product, which this run of import doesn't make.
         If it should, fix import's jenny. If not, run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
     export/prices/variant/unclosed: evaluate is blocked: testdata/export/prices.txtar, variant/unclosed/out/import/outcome, records the lift import's outcome as "rejected".
@@ -113,9 +120,13 @@ $ go test  # chain
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
         transform/louder/in/import/out/evaluate/out/values.txt is written, and louder declines the base: the export makes no output of evaluate
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to remove them.
+        transform/louder/out/evaluate/inputs is recorded, and louder declines the base: the export makes no output of evaluate
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/evaluate/outcome is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/evaluate/values.txt is recorded, and louder declines the base: the export makes no output of evaluate
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/louder/out/import/inputs is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/import/outcome is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
@@ -127,9 +138,15 @@ $ go test  # chain
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./..., which removes it, and read the diff before committing.
         transform/louder/out/list/files.txt is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/louder/out/list/inputs is recorded, and louder declines the base: the export makes no output of evaluate
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/list/outcome is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/louder/out/parse/inputs is recorded, and louder declines the base: the export makes no output of evaluate
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/parse/outcome is recorded, and louder declines the base: the export makes no output of evaluate
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/louder/out/resolve/inputs is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/resolve/outcome is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
@@ -227,17 +244,27 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # chain
     export/prices/variant/unclosed: parse is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/variant/unclosed: resolve is blocked: the lift import failed on the case, and testdata/export/prices.txtar, variant/unclosed/out/import/error.txt, records its error.
     export/prices/transform/louder: Uppercases every file under import/out/evaluate/out/.
+        transform/louder/out/evaluate/inputs is recorded, and louder declines the base: the export makes no output of evaluate
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/evaluate/outcome is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/evaluate/values.txt is recorded, and louder declines the base: the export makes no output of evaluate
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/louder/out/import/inputs is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/import/outcome is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/list/files.txt is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/louder/out/list/inputs is recorded, and louder declines the base: the export makes no output of evaluate
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/list/outcome is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/louder/out/parse/inputs is recorded, and louder declines the base: the export makes no output of evaluate
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/parse/outcome is recorded, and louder declines the base: the export makes no output of evaluate
+        If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
+        transform/louder/out/resolve/inputs is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.
         transform/louder/out/resolve/outcome is recorded, and louder declines the base: the export makes no output of evaluate
         If the transform should make the variant, fix it. If not, delete the section by hand; FIXTURE_UPDATE_GOLDEN=1 go test ./... leaves it in place.

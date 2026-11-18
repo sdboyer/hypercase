@@ -5,6 +5,8 @@ unexpected "-" in A1
 echo A negative number is valid, and evaluates to itself. Waits on sheets#3.
 -- out/echo/error.txt --
 unexpected "-" in A1
+-- out/echo/inputs --
+error.txt
 -- out/echo/outcome --
 rejected
 -- variant/dangling/about --
@@ -15,5 +17,7 @@ dangling
 A1: B1 is not defined
 -- variant/dangling/out/echo/error.txt --
 A1: B1 is not defined
+-- variant/dangling/out/echo/inputs --
+error.txt
 -- variant/dangling/out/echo/outcome --
 rejected

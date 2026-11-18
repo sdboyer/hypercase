@@ -52,6 +52,8 @@ $ FIXTURE_UPDATE_GOLDEN=1 go test  # split-second
             --- PASS: TestCorpus/script/stray/direct
             --- SKIP: TestCorpus/script/stray/evaluate
 PASS
+$ edit testdata/script/both.txtar  # delete the inputs of evaluate's cell, which ladder blocks
+$ edit testdata/script/loop.txtar  # delete the inputs of evaluate's cell, which ladder blocks
 $ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
     The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
     script/both: evaluate is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.

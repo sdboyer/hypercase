@@ -1,6 +1,9 @@
 The run no longer writes old.txt, and no column named other is registered.
 -- in/do/out/values.txt --
 A1 6
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/old.txt --
 A1 6
 -- out/echo/outcome --

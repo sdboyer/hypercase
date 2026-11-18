@@ -35,6 +35,12 @@ $ go test  # transforms
         If the change is intended, run FIXTURE_UPDATE_GOLDEN=1 go test ./... and read the diff before committing.
     script/twice/transform/upper: Uppercases every file under do/out/.
         echo: Does what the case's do/ tree says.
+        transform/upper/out/echo/inputs differs (-golden +got):
+          values.txt
+            transform/upper/in/do/out/values.txt
+        + z.txt
+        +   transform/upper/in/do/out/z.txt
+        FIXTURE_UPDATE_GOLDEN=1 go test ./... runs echo on another value than this run: it runs the variant on what upper makes now, where a normal run reads the inputs the archive holds. Run it, fix what it reports, and read the diff before committing.
         transform/upper/out/echo/values.txt differs (-golden +got):
         - A1 SIX
         + A1 SEVEN

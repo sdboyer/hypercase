@@ -120,6 +120,8 @@ C101
 blocked import
 -- out/import/error.txt --
 import: an error with the code C101
+-- out/import/inputs --
+error.txt
 -- out/import/outcome --
 rejected C101
 -- out/list/outcome --

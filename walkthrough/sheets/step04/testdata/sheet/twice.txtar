@@ -3,6 +3,10 @@ A1 is twice B1.
 =B1*2
 -- in/sheet/B1 --
 3
+-- out/evaluate/inputs --
+values.txt
+  in/sheet/A1
+  in/sheet/B1
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --

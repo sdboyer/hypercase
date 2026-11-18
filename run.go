@@ -860,11 +860,11 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 	if bytesLift {
 		// In an update, the cells past the lift may have asked for the
 		// verdict first, to learn whether the update writes this cell.
-		v := c.state.liftVerdict(col.lift, lr, in, from.view)
+		v := c.state.liftVerdict(col.lift, lr, in, from)
 		ns = append(ns, v.notes...)
 		files, unjudged, writable = maps.Clone(v.files), maps.Clone(v.unjudged), v.writable
 	} else {
-		files, unjudged, writable = r.verdict(&ns, c, col, in, from.view, out)
+		files, unjudged, writable = r.verdict(&ns, c, col, in, from, out, nil)
 	}
 	// A bytes lift's cell includes its product. A fault of its jenny
 	// leaves the product uncompared: the fault comes first.
@@ -963,16 +963,28 @@ func (r *runner) runCell(t *testing.T, c *aCase, col *column, res *cellResult) {
 }
 
 // verdict is a cell's files, what it made and what the framework writes
-// for it, with its outcome, the files left unjudged, and whether an update
-// may write the cell, its freeze aside. It adds what is wrong to ns.
-func (r *runner) verdict(ns *notes, c *aCase, col *column, in any, view fs.FS, out *called) (files map[string][]byte, unjudged map[string]bool, writable bool) {
-	files, unjudged, writable = r.outputs(ns, c, col, view, out)
+// for it, with its outcome and its inputs file, the files left unjudged,
+// and whether an update may write the cell, its freeze aside. It adds what
+// is wrong to ns. from is the cell's input view, and lr the run of a bytes
+// lift's cell, nil for any other column.
+func (r *runner) verdict(ns *notes, c *aCase, col *column, in any, from *origin, out *called, lr *liftRun) (files map[string][]byte, unjudged map[string]bool, writable bool) {
+	files, unjudged, writable = r.outputs(ns, c, col, from.view, out)
 	if o, ok := r.outcome(ns, col, in, out, files); ok {
 		files[outcomeFile] = o.Format()
 	} else {
 		// The cell has no outcome, so a committed one is no orphan.
 		writable = false
 		unjudged[outcomeFile] = true
+	}
+	data, ok, fault := r.mapInputs(ns, c, col, from, files, unjudged, out, lr)
+	switch {
+	case ok:
+		files[inputsFile] = data
+	case fault:
+		writable = false
+		unjudged[inputsFile] = true
+	default:
+		unjudged[inputsFile] = true
 	}
 	return files, unjudged, writable
 }
@@ -993,18 +1005,18 @@ type liftVerdict struct {
 // the jenny keeps the update from writing the cell. A package that only
 // uses the lift holds the cells past it back on the cell's verdict under a
 // bare Project instead, which heldBack gives.
-func (s *caseState) liftVerdict(l *lift, lr *liftRun, in any, view fs.FS) *liftVerdict {
+func (s *caseState) liftVerdict(l *lift, lr *liftRun, in any, from *origin) *liftVerdict {
 	if lr.verdict == nil {
-		lr.verdict = s.judgeLift(s.r, l, lr, in, view)
+		lr.verdict = s.judgeLift(s.r, l, lr, in, from)
 	}
 	return lr.verdict
 }
 
 // judgeLift judges a bytes lift's cell on the case, from its one run, as
 // the runner r judges a cell.
-func (s *caseState) judgeLift(r *runner, l *lift, lr *liftRun, in any, view fs.FS) *liftVerdict {
+func (s *caseState) judgeLift(r *runner, l *lift, lr *liftRun, in any, from *origin) *liftVerdict {
 	v := &liftVerdict{}
-	v.files, v.unjudged, v.writable = r.verdict(&v.notes, s.c, l.column(), in, view, lr.out)
+	v.files, v.unjudged, v.writable = r.verdict(&v.notes, s.c, l.column(), in, from, lr.out, lr)
 	if len(lr.problems) > 0 {
 		v.notes = append(v.notes, lr.problems...)
 		v.writable = false
@@ -1013,14 +1025,15 @@ func (s *caseState) judgeLift(r *runner, l *lift, lr *liftRun, in any, view fs.F
 }
 
 // bare is the runner as it judges a cell under a bare Project: one whose
-// RenderError renders every error as an empty line, and which gives no
-// Codes, so neither fails a cell. What keeps an update from writing a cell
-// under the bare Project keeps it from writing the cell, as the same
-// declaration gives it, under any Project.
+// RenderError renders every error as an empty line, which gives no Codes,
+// and whose Positions finds no range, so none of them fails a cell. What
+// keeps an update from writing a cell under the bare Project keeps it from
+// writing the cell, as the same declaration gives it, under any Project.
 func (r *runner) bare() *runner {
 	b := *r
 	b.renderError = func(fs.FS, error) []byte { return []byte("\n") }
 	b.codes = nil
+	b.positions = func(error) []decl.Range { return nil }
 	return &b
 }
 
@@ -1072,7 +1085,7 @@ func accepts(data []byte) bool {
 // ranFiles are the framework's files every cell that ran has: those the
 // upgrade adds to a frozen cell that lacks them, when its committed files
 // match its run.
-var ranFiles = []string{outcomeFile}
+var ranFiles = []string{outcomeFile, inputsFile}
 
 // lacking returns the files of ranFiles that a cell's committed files
 // lack, in the order of ranFiles.
@@ -1089,7 +1102,7 @@ func lacking(committed map[string][]byte) []string {
 // lacks says, in a frozen cell's note, that the cell has none of the
 // sections, the framework's files it lacks, and which cells have them.
 func lacks(sections []string) string {
-	return fmt.Sprintf("it has no %s, which every cell has", strings.Join(sections, " or "))
+	return fmt.Sprintf("it has no %s, which every cell that ran has", strings.Join(sections, " or "))
 }
 
 // frozenDiffs says how the files a frozen cell's run made, got, differ from

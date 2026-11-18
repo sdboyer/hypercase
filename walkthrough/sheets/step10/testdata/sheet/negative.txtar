@@ -9,6 +9,9 @@ transform/renamed calc A negative number is valid, and evaluates to itself. Wait
 -- out/calc/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/calc/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/calc/outcome --
 rejected S101
 -- out/evaluate/outcome --
@@ -18,6 +21,9 @@ blocked parse
 -- out/parse/error.txt --
 A1: unexpected "-"
   sheet/A1:1: -3
+-- out/parse/inputs --
+error.txt
+  in/sheet/A1:1-1
 -- out/parse/outcome --
 rejected S101
 -- out/resolve/outcome --
@@ -27,19 +33,29 @@ blocked parse
 -- transform/looped/out/calc/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/calc/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/calc/outcome --
 rejected S201
 -- transform/looped/out/evaluate/outcome --
 blocked resolve
 -- transform/looped/out/format/formulas.txt --
 A1 =A1
+-- transform/looped/out/format/inputs --
+formulas.txt
+  transform/looped/in/sheet/A1
 -- transform/looped/out/format/outcome --
 accepted
+-- transform/looped/out/parse/inputs --
 -- transform/looped/out/parse/outcome --
 accepted
 -- transform/looped/out/resolve/error.txt --
 A1 -> A1: cycle
   sheet/A1:1: =A1
+-- transform/looped/out/resolve/inputs --
+error.txt
+  transform/looped/in/sheet/A1:1-1
 -- transform/looped/out/resolve/outcome --
 rejected S201
 -- transform/renamed/in/sheet/A2 --
@@ -49,6 +65,9 @@ sheet/A1
 -- transform/renamed/out/calc/error.txt --
 A2: unexpected "-"
   sheet/A2:1: -3
+-- transform/renamed/out/calc/inputs --
+error.txt
+  transform/renamed/in/sheet/A2:1-1
 -- transform/renamed/out/calc/outcome --
 rejected S101
 -- transform/renamed/out/evaluate/outcome --
@@ -58,6 +77,9 @@ blocked parse
 -- transform/renamed/out/parse/error.txt --
 A2: unexpected "-"
   sheet/A2:1: -3
+-- transform/renamed/out/parse/inputs --
+error.txt
+  transform/renamed/in/sheet/A2:1-1
 -- transform/renamed/out/parse/outcome --
 rejected S101
 -- transform/renamed/out/resolve/outcome --

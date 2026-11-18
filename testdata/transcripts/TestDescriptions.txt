@@ -7,12 +7,16 @@ $ go test  # echo
         Write the case's description, in prose, as the archive's comment, the text before its first section.
     script/blank: 
         echo: Does what the case's do/ tree says.
+        out/echo/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/values.txt has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
     script/empty: 
         echo: Does what the case's do/ tree says.
+        out/echo/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/values.txt has no golden.
@@ -20,6 +24,8 @@ $ go test  # echo
     script/key-value: A sheet whose comment sets a parameter.
           cells: 1
         echo: Does what the case's do/ tree says.
+        out/echo/inputs has no golden.
+        Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/outcome has no golden.
         Run FIXTURE_UPDATE_GOLDEN=1 go test ./... to write it, and read it before committing.
         out/echo/values.txt has no golden.

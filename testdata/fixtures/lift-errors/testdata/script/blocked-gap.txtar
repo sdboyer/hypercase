@@ -5,17 +5,23 @@ A1 -> A1: cycle
 circular
 -- gaps --
 evaluate prints A1 wrongly. Waits on sheets#4.
+-- out/calc/inputs --
 -- out/calc/outcome --
 accepted
 -- out/evaluate/outcome --
 blocked resolve
+-- out/format/inputs --
+trail.txt
 -- out/format/outcome --
 accepted
 -- out/format/trail.txt --
 parse
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
 -- out/resolve/error.txt --
 A1 -> A1: cycle
+-- out/resolve/inputs --
+error.txt
 -- out/resolve/outcome --
 rejected

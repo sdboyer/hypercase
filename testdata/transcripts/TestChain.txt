@@ -112,11 +112,21 @@ b1 6
 3
 -- via/import/quote/B1 --
 =A1*2
+-- out/evaluate/inputs --
+values.txt
+  via/import/evaluate/out/values.txt
 -- out/evaluate/outcome --
 accepted
 -- out/evaluate/values.txt --
 a1 3
 b1 6
+-- out/import/inputs --
+via/import/evaluate/out/values.txt
+  in/import/out/evaluate/out/values.txt
+via/import/quote/A1
+  in/import/out/quote/A1
+via/import/quote/B1
+  in/import/out/quote/B1
 -- out/import/outcome --
 accepted
 -- out/list/files.txt --
@@ -124,10 +134,17 @@ accepted
 evaluate/out/values.txt "a1 3\nb1 6\n"
 quote/A1 "3\n"
 quote/B1 "=A1*2\n"
+-- out/list/inputs --
+files.txt
+  via/import/evaluate/out/values.txt
+  via/import/quote/A1
+  via/import/quote/B1
 -- out/list/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 -- variant/unclosed/about --
@@ -140,6 +157,8 @@ line 1: unclosed quote
 blocked import
 -- variant/unclosed/out/import/error.txt --
 import: line 1: unclosed quote
+-- variant/unclosed/out/import/inputs --
+error.txt
 -- variant/unclosed/out/import/outcome --
 rejected
 -- variant/unclosed/out/list/outcome --
@@ -160,11 +179,21 @@ b1 12
 3
 -- variant/doubled/via/import/quote/B1 --
 =A1*2
+-- variant/doubled/out/evaluate/inputs --
+values.txt
+  variant/doubled/via/import/evaluate/out/values.txt
 -- variant/doubled/out/evaluate/outcome --
 accepted
 -- variant/doubled/out/evaluate/values.txt --
 a1 6
 b1 12
+-- variant/doubled/out/import/inputs --
+via/import/evaluate/out/values.txt
+  variant/doubled/in/import/out/evaluate/out/values.txt
+via/import/quote/A1
+  in/import/out/quote/A1
+via/import/quote/B1
+  in/import/out/quote/B1
 -- variant/doubled/out/import/outcome --
 accepted
 -- variant/doubled/out/list/files.txt --
@@ -172,10 +201,17 @@ accepted
 evaluate/out/values.txt "a1 6\nb1 12\n"
 quote/A1 "3\n"
 quote/B1 "=A1*2\n"
+-- variant/doubled/out/list/inputs --
+files.txt
+  variant/doubled/via/import/evaluate/out/values.txt
+  variant/doubled/via/import/quote/A1
+  variant/doubled/via/import/quote/B1
 -- variant/doubled/out/list/outcome --
 accepted
+-- variant/doubled/out/parse/inputs --
 -- variant/doubled/out/parse/outcome --
 accepted
+-- variant/doubled/out/resolve/inputs --
 -- variant/doubled/out/resolve/outcome --
 accepted
 -- transform/louder/in/import/out/evaluate/out/values.txt --
@@ -188,11 +224,21 @@ B1 6
 3
 -- transform/louder/via/import/quote/B1 --
 =A1*2
+-- transform/louder/out/evaluate/inputs --
+values.txt
+  transform/louder/via/import/evaluate/out/values.txt
 -- transform/louder/out/evaluate/outcome --
 accepted
 -- transform/louder/out/evaluate/values.txt --
 A1 3
 B1 6
+-- transform/louder/out/import/inputs --
+via/import/evaluate/out/values.txt
+  transform/louder/in/import/out/evaluate/out/values.txt
+via/import/quote/A1
+  in/import/out/quote/A1
+via/import/quote/B1
+  in/import/out/quote/B1
 -- transform/louder/out/import/outcome --
 accepted
 -- transform/louder/out/list/files.txt --
@@ -200,10 +246,17 @@ accepted
 evaluate/out/values.txt "A1 3\nB1 6\n"
 quote/A1 "3\n"
 quote/B1 "=A1*2\n"
+-- transform/louder/out/list/inputs --
+files.txt
+  transform/louder/via/import/evaluate/out/values.txt
+  transform/louder/via/import/quote/A1
+  transform/louder/via/import/quote/B1
 -- transform/louder/out/list/outcome --
 accepted
+-- transform/louder/out/parse/inputs --
 -- transform/louder/out/parse/outcome --
 accepted
+-- transform/louder/out/resolve/inputs --
 -- transform/louder/out/resolve/outcome --
 accepted
 $ cat testdata/export/names.txtar
@@ -220,8 +273,16 @@ a tree named inputs
 not an error
 -- via/import/names/outcome --
 not an outcome
+-- out/evaluate/inputs --
 -- out/evaluate/outcome --
 accepted
+-- out/import/inputs --
+via/import/inputs/x
+  in/import/out/inputs/x
+via/import/names/error.txt
+  in/import/out/names/error.txt
+via/import/names/outcome
+  in/import/out/names/outcome
 -- out/import/outcome --
 accepted
 -- out/list/files.txt --
@@ -229,26 +290,39 @@ accepted
 inputs/x "a tree named inputs\n"
 names/error.txt "not an error\n"
 names/outcome "not an outcome\n"
+-- out/list/inputs --
+files.txt
+  via/import/inputs/x
+  via/import/names/error.txt
+  via/import/names/outcome
 -- out/list/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 $ cat testdata/export/empty.txtar
 import makes no file of this export, so its product is empty, and list reads an empty view.
 -- in/import/note --
 Nothing for import to make.
+-- out/evaluate/inputs --
 -- out/evaluate/outcome --
 accepted
+-- out/import/inputs --
 -- out/import/outcome --
 accepted
 -- out/list/files.txt --
 0 files
+-- out/list/inputs --
+files.txt
 -- out/list/outcome --
 accepted
+-- out/parse/inputs --
 -- out/parse/outcome --
 accepted
+-- out/resolve/inputs --
 -- out/resolve/outcome --
 accepted
 $ cat testdata/hypercase.json

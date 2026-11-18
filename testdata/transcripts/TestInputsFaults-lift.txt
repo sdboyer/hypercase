@@ -1,0 +1,172 @@
+$ edit testdata/script/finder.txtar  # a case whose parse cell's Positions panics
+$ FIXTURE_UPDATE_GOLDEN=1 go test  # ladder
+    The root-package check for the module-root corpus runs in normal runs, so it runs after the update: go test ./...
+    script/both: evaluate is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: format is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: resolve is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/finder: A Positions that panics on parse's error.
+        calc: Does what the case's calc/ tree says.
+        calc returned no error, but the case states malformed, which calc rejects.
+        Fix the code, or correct the case's properties or calc's Rejects.
+    script/finder: evaluate is blocked: the lift parse failed on the case, and testdata/script/finder.txtar, out/parse/error.txt, records its error.
+    script/finder: format is blocked: the lift parse failed on the case, and testdata/script/finder.txtar, out/parse/error.txt, records its error.
+    script/finder: A Positions that panics on parse's error.
+        parse: Parses the script, as its parse/ tree says.
+        The project's Positions panicked on parse's error: the finder panicked
+        Fix Positions. An update writes nothing for this cell.
+    script/finder: resolve is blocked: the lift parse failed on the case, and testdata/script/finder.txtar, out/parse/error.txt, records its error.
+    script/loop: evaluate is blocked: the lift resolve failed on the case, and testdata/script/loop.txtar, out/resolve/error.txt, records its error.
+    script/stray: evaluate is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: format is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: resolve is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on both
+        parse ran on both
+        calc ran on finder
+        parse ran on finder
+        calc ran on fine
+        parse ran on fine
+        resolve ran on fine
+        evaluate's probe ran
+        evaluate ran on fine
+        format's probe ran
+        format ran on fine
+        calc ran on loop
+        parse ran on loop
+        resolve ran on loop
+        format's probe ran
+        format ran on loop
+        calc ran on noisy
+        parse ran on noisy
+        resolve ran on noisy
+        evaluate's probe ran
+        evaluate ran on noisy
+        format's probe ran
+        format ran on noisy
+        calc ran on stray
+        parse ran on stray
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/both
+            --- PASS: TestCorpus/script/both/calc
+            --- SKIP: TestCorpus/script/both/evaluate
+            --- SKIP: TestCorpus/script/both/format
+            --- PASS: TestCorpus/script/both/parse
+            --- SKIP: TestCorpus/script/both/resolve
+        --- FAIL: TestCorpus/script/finder
+            --- FAIL: TestCorpus/script/finder/calc
+            --- SKIP: TestCorpus/script/finder/evaluate
+            --- SKIP: TestCorpus/script/finder/format
+            --- FAIL: TestCorpus/script/finder/parse
+            --- SKIP: TestCorpus/script/finder/resolve
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/calc
+            --- PASS: TestCorpus/script/fine/evaluate
+            --- PASS: TestCorpus/script/fine/format
+            --- PASS: TestCorpus/script/fine/parse
+            --- PASS: TestCorpus/script/fine/resolve
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/calc
+            --- SKIP: TestCorpus/script/loop/evaluate
+            --- PASS: TestCorpus/script/loop/format
+            --- PASS: TestCorpus/script/loop/parse
+            --- PASS: TestCorpus/script/loop/resolve
+        --- PASS: TestCorpus/script/noisy
+            --- PASS: TestCorpus/script/noisy/calc
+            --- PASS: TestCorpus/script/noisy/evaluate
+            --- PASS: TestCorpus/script/noisy/format
+            --- PASS: TestCorpus/script/noisy/parse
+            --- PASS: TestCorpus/script/noisy/resolve
+        --- PASS: TestCorpus/script/stray
+            --- PASS: TestCorpus/script/stray/calc
+            --- SKIP: TestCorpus/script/stray/evaluate
+            --- SKIP: TestCorpus/script/stray/format
+            --- PASS: TestCorpus/script/stray/parse
+            --- SKIP: TestCorpus/script/stray/resolve
+FAIL
+[exit 1]
+$ go test  # ladder
+    script/both: evaluate is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: format is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/both: resolve is blocked: the lift parse failed on the case, and testdata/script/both.txtar, out/parse/error.txt, records its error.
+    script/finder: A Positions that panics on parse's error.
+        calc: Does what the case's calc/ tree says.
+        calc returned no error, but the case states malformed, which calc rejects.
+        Fix the code, or correct the case's properties or calc's Rejects.
+    script/finder: evaluate is blocked: the lift parse failed on the case, and testdata/script/finder.txtar, out/parse/error.txt, records its error.
+    script/finder: format is blocked: the lift parse failed on the case, and testdata/script/finder.txtar, out/parse/error.txt, records its error.
+    script/finder: A Positions that panics on parse's error.
+        parse: Parses the script, as its parse/ tree says.
+        The project's Positions panicked on parse's error: the finder panicked
+        Fix Positions. An update writes nothing for this cell.
+    script/finder: resolve is blocked: the lift parse failed on the case, and testdata/script/finder.txtar, out/parse/error.txt, records its error.
+    script/loop: evaluate is blocked: the lift resolve failed on the case, and testdata/script/loop.txtar, out/resolve/error.txt, records its error.
+    script/stray: evaluate is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: format is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    script/stray: resolve is blocked: the lift parse failed on the case, and testdata/script/stray.txtar, out/parse/error.txt, records its error.
+    what ran, in order:
+        calc ran on both
+        parse ran on both
+        calc ran on finder
+        parse ran on finder
+        calc ran on fine
+        parse ran on fine
+        resolve ran on fine
+        evaluate's probe ran
+        evaluate ran on fine
+        format's probe ran
+        format ran on fine
+        calc ran on loop
+        parse ran on loop
+        resolve ran on loop
+        format's probe ran
+        format ran on loop
+        calc ran on noisy
+        parse ran on noisy
+        resolve ran on noisy
+        evaluate's probe ran
+        evaluate ran on noisy
+        format's probe ran
+        format ran on noisy
+        calc ran on stray
+        parse ran on stray
+--- FAIL: TestCorpus
+    --- FAIL: TestCorpus/script
+        --- PASS: TestCorpus/script/both
+            --- PASS: TestCorpus/script/both/calc
+            --- SKIP: TestCorpus/script/both/evaluate
+            --- SKIP: TestCorpus/script/both/format
+            --- PASS: TestCorpus/script/both/parse
+            --- SKIP: TestCorpus/script/both/resolve
+        --- FAIL: TestCorpus/script/finder
+            --- FAIL: TestCorpus/script/finder/calc
+            --- SKIP: TestCorpus/script/finder/evaluate
+            --- SKIP: TestCorpus/script/finder/format
+            --- FAIL: TestCorpus/script/finder/parse
+            --- SKIP: TestCorpus/script/finder/resolve
+        --- PASS: TestCorpus/script/fine
+            --- PASS: TestCorpus/script/fine/calc
+            --- PASS: TestCorpus/script/fine/evaluate
+            --- PASS: TestCorpus/script/fine/format
+            --- PASS: TestCorpus/script/fine/parse
+            --- PASS: TestCorpus/script/fine/resolve
+        --- PASS: TestCorpus/script/loop
+            --- PASS: TestCorpus/script/loop/calc
+            --- SKIP: TestCorpus/script/loop/evaluate
+            --- PASS: TestCorpus/script/loop/format
+            --- PASS: TestCorpus/script/loop/parse
+            --- PASS: TestCorpus/script/loop/resolve
+        --- PASS: TestCorpus/script/noisy
+            --- PASS: TestCorpus/script/noisy/calc
+            --- PASS: TestCorpus/script/noisy/evaluate
+            --- PASS: TestCorpus/script/noisy/format
+            --- PASS: TestCorpus/script/noisy/parse
+            --- PASS: TestCorpus/script/noisy/resolve
+        --- PASS: TestCorpus/script/stray
+            --- PASS: TestCorpus/script/stray/calc
+            --- SKIP: TestCorpus/script/stray/evaluate
+            --- SKIP: TestCorpus/script/stray/format
+            --- PASS: TestCorpus/script/stray/parse
+            --- SKIP: TestCorpus/script/stray/resolve
+FAIL
+[exit 1]

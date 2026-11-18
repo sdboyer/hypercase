@@ -24,6 +24,9 @@ $ cat testdata/script/accepted.txtar
 echo prints a value.
 -- in/do/out/values.txt --
 A1 6
+-- out/echo/inputs --
+values.txt
+  in/do/out/values.txt
 -- out/echo/outcome --
 accepted
 -- out/echo/values.txt --
@@ -36,6 +39,8 @@ codes S2,S1,S2
 circular
 -- out/echo/error.txt --
 codes S2,S1,S2
+-- out/echo/inputs --
+error.txt
 -- out/echo/outcome --
 rejected S1 S2
 $ cat testdata/script/skipped.txtar
@@ -53,6 +58,8 @@ codes S1
 circular
 -- out/echo/error.txt --
 codes S1
+-- out/echo/inputs --
+error.txt
 -- out/echo/outcome --
 rejected S1; saw-error
 $ cat testdata/hypercase.json
