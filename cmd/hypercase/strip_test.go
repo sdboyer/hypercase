@@ -1682,8 +1682,9 @@ func TestStripToysReportFirst(t *testing.T) {
 
 // toyCopy copies the walkthrough's toy module, and returns the toy's
 // directory in the copy and a function that runs go there, which fails the
-// test unless go exits 0. Each go command runs off any workspace, with no
-// GOFLAGS, and with neither update variable unless extra sets one.
+// test unless go exits 0. Each go command runs off any workspace, with
+// GOFLAGS dropped from its environment, though a GOFLAGS set in the go env
+// file still applies, and with neither update variable unless extra sets one.
 //
 // The toy's go.mod replaces hypercase by ../.., hypercase's own module,
 // where step 9's report test also builds the hypercase command. So the
