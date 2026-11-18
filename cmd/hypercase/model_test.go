@@ -348,9 +348,9 @@ func TestPageEscapes(t *testing.T) {
 }
 
 // TestPageDescriptions: the page describes each corpus type, column,
-// output declaration, classifier, transform and property, from b, or from
-// a for what b lacks, which it marks; and each archive and hand-written
-// variant only at a, from a.
+// output declaration, with its statement, classifier, transform and
+// property, from b, or from a for what b lacks, which it marks; and each
+// archive and hand-written variant only at a, from a.
 func TestPageDescriptions(t *testing.T) {
 	t.Parallel()
 	reg := func(version string) registry.Registry {
@@ -368,7 +368,7 @@ func TestPageDescriptions(t *testing.T) {
 	// b drops calc's stdout.txt and evaluate's classifier; a's describe
 	// them. calc's classifier is at both, and b's describes it.
 	ra.Suites[0].Outputs = append(ra.Suites[0].Outputs, registry.Output{Pattern: "stderr.txt", Description: "What calc warns, at a.", Inputs: registry.InputsAll})
-	rb.Suites[0].Outputs = []registry.Output{{Pattern: "stderr.txt", Description: "What calc warns, at b.", Inputs: registry.InputsAll}}
+	rb.Suites[0].Outputs = []registry.Output{{Pattern: "stderr.txt", Description: "What calc warns, at b.", Inputs: registry.InputsFunc}}
 	ra.Suites[0].Classifier = &registry.Classifier{Name: "slow", Description: "Adds slow, at a."}
 	rb.Suites[0].Classifier = &registry.Classifier{Name: "slow", Description: "Adds slow, at b."}
 	rb.Suites[1].Classifier = nil
@@ -396,10 +396,11 @@ func TestPageDescriptions(t *testing.T) {
 	d := section(t, page, `<section class="corpus" id="describe-sheet">`, "</section>")
 	holds(t, "the sheet corpus's descriptions", d,
 		"<h3>sheet</h3>\n<p>A sheet, at b.</p>",
-		"<dt>calc</dt><dd>Runs calc, at b.<ul class=\"outputs\"><li><code>stderr.txt</code>: What calc warns, at b.</li><li><code>stdout.txt</code>"+only+": What calc prints, at a.</li></ul>"+
+		"<dt>calc</dt><dd>Runs calc, at b.<ul class=\"outputs\"><li><code>stderr.txt</code>: What calc warns, at b. <span class=\"statement\">Its ranges come from a function.</span></li>"+
+			"<li><code>stdout.txt</code>"+only+": What calc prints, at a. <span class=\"statement\">It depends on all inputs.</span></li></ul>"+
 			"<p class=\"classifier\">Its classifier, <code>slow</code>: Adds slow, at b.</p></dd>",
 		"<dt>evaluate</dt><dd>Evaluates.<p class=\"classifier\">Its classifier, <code>div-zero</code>"+only+": Adds div-zero, at a.</p></dd>",
-		"<dt>old"+only+"</dt><dd>A column only a has.<ul class=\"outputs\"><li><code>old.txt</code>: What old wrote.</li></ul></dd>",
+		"<dt>old"+only+"</dt><dd>A column only a has.<ul class=\"outputs\"><li><code>old.txt</code>: What old wrote. <span class=\"statement\">It depends on all inputs.</span></li></ul></dd>",
 		"<dt>doubled"+only+"</dt><dd>A transform only a has.<p>Keeps <span class=\"prop\">dangling</span>.</p></dd>",
 		"<dt>looped</dt><dd>Loops, at b.<p>Gives <span class=\"prop\">circular</span>.</p></dd>",
 		`<dt><span class="case">sheet/gone</span></dt><dd>A case only a has.</dd>`,
@@ -466,9 +467,9 @@ func TestPageProducts(t *testing.T) {
 
 	only := ` <span class="badge">only at ` + c[0] + `</span>`
 	holds(t, "the csv corpus's descriptions", section(t, page, `<section class="corpus" id="describe-csv">`, "</section>"),
-		`<dt>import</dt><dd>Imports the CSV as a sheet.<ul class="outputs"><li><code>error.txt</code>: Why the importer rejects the CSV.</li>`+
-			`<li><code>via/import/notes/*</code>`+only+`: A note, only at a.</li>`+
-			`<li><code>via/import/sheet/*</code>: One file per cell, as a sheet&#39;s in/sheet/ holds them.</li></ul></dd>`)
+		`<dt>import</dt><dd>Imports the CSV as a sheet.<ul class="outputs"><li><code>error.txt</code>: Why the importer rejects the CSV. <span class="statement">It depends on all inputs.</span></li>`+
+			`<li><code>via/import/notes/*</code>`+only+`: A note, only at a. <span class="statement">Its ranges come from a function.</span></li>`+
+			`<li><code>via/import/sheet/*</code>: One file per cell, as a sheet&#39;s in/sheet/ holds them. <span class="statement">Its ranges come from a function.</span></li></ul></dd>`)
 
 	holds(t, "the problems", section(t, page, `<section id="problems">`, "</section>"),
 		"<code>testdata/csv/x.txtar, via/calc/sheet/A1</code>: the section is a product of calc, and no registry declares a bytes lift of that name over testdata/csv/, so the report leaves it out, and doesn&#39;t compare its cell&#39;s product.</li>",

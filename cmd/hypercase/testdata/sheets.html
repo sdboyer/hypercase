@@ -94,6 +94,7 @@ dt { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font
 dd { margin: 0; color: var(--muted); }
 dd p, dd ul { margin: 2px 0 0; }
 ul.outputs { padding-left: 18px; }
+.statement { color: var(--muted); }
 .none, .note { color: var(--muted); }
 </style>
 </head>
@@ -302,11 +303,11 @@ ul.outputs { padding-left: 18px; }
 <p>A sheet: one file per cell, under sheet/, named for the cell.</p>
 <h4>Columns</h4>
 <dl class="columns">
-<dt>calc</dt><dd>Runs the calc command on the sheet; see <a href="https://example.com/sheets/issues/12">sheets#12</a>.<ul class="outputs"><li><code>stdout.txt</code>: What calc prints: each cell&#39;s value, as one CSV line.</li></ul></dd>
-<dt>evaluate</dt><dd>Evaluates every cell of the sheet.<ul class="outputs"><li><code>values.txt</code>: Each cell&#39;s value, one per line, in cell order.</li></ul><p class="classifier">Its classifier, <code>div-zero</code>: Adds div-zero when some cell divides by zero.</p></dd>
-<dt>format</dt><dd>Prints each formula back in canonical form.<ul class="outputs"><li><code>formulas.txt</code>: Each formula, in canonical form, one per line.</li></ul></dd>
-<dt>parse</dt><dd>Parses every cell.<ul class="outputs"><li><code>error.txt</code>: The error, and each line it points at.</li></ul></dd>
-<dt>resolve</dt><dd>Orders the cells so that each comes after the cells it refers to.<ul class="outputs"><li><code>error.txt</code>: The error, and each line it points at.</li></ul></dd>
+<dt>calc</dt><dd>Runs the calc command on the sheet; see <a href="https://example.com/sheets/issues/12">sheets#12</a>.<ul class="outputs"><li><code>stdout.txt</code>: What calc prints: each cell&#39;s value, as one CSV line. <span class="statement">It depends on all inputs.</span></li></ul></dd>
+<dt>evaluate</dt><dd>Evaluates every cell of the sheet.<ul class="outputs"><li><code>values.txt</code>: Each cell&#39;s value, one per line, in cell order. <span class="statement">Its ranges come from a function.</span></li></ul><p class="classifier">Its classifier, <code>div-zero</code>: Adds div-zero when some cell divides by zero.</p></dd>
+<dt>format</dt><dd>Prints each formula back in canonical form.<ul class="outputs"><li><code>formulas.txt</code>: Each formula, in canonical form, one per line. <span class="statement">Its ranges come from a function.</span></li></ul></dd>
+<dt>parse</dt><dd>Parses every cell.<ul class="outputs"><li><code>error.txt</code>: The error, and each line it points at. <span class="statement">Its ranges come from Positions, which the project supplies.</span></li></ul></dd>
+<dt>resolve</dt><dd>Orders the cells so that each comes after the cells it refers to.<ul class="outputs"><li><code>error.txt</code>: The error, and each line it points at. <span class="statement">Its ranges come from Positions, which the project supplies.</span></li></ul></dd>
 </dl>
 <h4>Transforms</h4>
 <dl class="transforms">

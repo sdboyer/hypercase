@@ -72,6 +72,9 @@ type column struct {
 	outputs    []registry.Output
 	classifier *registry.Classifier
 	corpora    map[string]bool
+	// positions records that the registry that claims the column records
+	// that the project supplies Positions.
+	positions bool
 	// registries are the registries that claim the column, by path. When
 	// two do, the column is in conflict, and the report shows neither one's
 	// description, outputs or classifier.
@@ -330,7 +333,7 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 		claim := func(name, description string, outputs []registry.Output, classifier *registry.Classifier, corpora []string) {
 			c := s.columns[name]
 			if c == nil {
-				c = &column{description: description, outputs: outputs, classifier: classifier, corpora: map[string]bool{}}
+				c = &column{description: description, outputs: outputs, classifier: classifier, corpora: map[string]bool{}, positions: g.Positions}
 				s.columns[name] = c
 			}
 			if !slices.Contains(c.registries, f.path) {
@@ -356,10 +359,10 @@ func load(rev Rev, tree fs.FS, root string, regs []found) (*snapshot, error) {
 			if l.Owned {
 				// A bytes lift's product declarations are described with
 				// its outputs, each named via/<lift>/<pattern>, as its
-				// product's files are shown.
+				// product's files are shown, and its map names them.
 				outputs := slices.Clone(l.Outputs)
 				for _, o := range l.ProductFiles {
-					outputs = append(outputs, registry.Output{Pattern: archive.Via + "/" + l.Name + "/" + o.Pattern, Description: o.Description})
+					outputs = append(outputs, registry.Output{Pattern: archive.Via + "/" + l.Name + "/" + o.Pattern, Description: o.Description, Inputs: o.Inputs})
 				}
 				claim(l.Name, l.Description, outputs, nil, l.Corpora)
 			}

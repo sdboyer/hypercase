@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"maps"
+	"path"
 	"slices"
 	"strings"
 
 	"github.com/sdboyer/hypercase/archive"
 	"github.com/sdboyer/hypercase/internal/diff"
+	"github.com/sdboyer/hypercase/internal/registry"
 	"github.com/sdboyer/hypercase/internal/revmap"
 )
 
@@ -53,6 +55,8 @@ type Map struct {
 	// Ranges that it comes from some ranges: a file with neither comes from
 	// no input lines.
 	All, Ranges bool
+	// Note says why the map may not be what the cell's run gives, or is "".
+	Note string
 }
 
 // An Excerpt is lines of one archive section that a changed file's
@@ -114,7 +118,7 @@ func inputsOf(snaps [2]*snapshot, cells [2]*cellAt, k cellKey, fc FileChange, at
 		if m == nil {
 			continue
 		}
-		in.Maps[i] = &Map{At: snaps[i].rev.Name, All: m.All, Ranges: len(m.Ranges) > 0}
+		in.Maps[i] = &Map{At: snaps[i].rev.Name, All: m.All, Ranges: len(m.Ranges) > 0, Note: snaps[i].kept(k, cells[i])}
 		ranges[i] = map[string][]revmap.Range{}
 		for _, r := range m.Ranges {
 			ranges[i][r.Section] = append(ranges[i][r.Section], r)
@@ -168,7 +172,7 @@ func inputsOf(snaps [2]*snapshot, cells [2]*cellAt, k cellKey, fc FileChange, at
 			e.Diff, e.Added, e.Removed, e.Unaligned = lineDiff(data[0], data[1])
 		}
 	}
-	if len(in.Excerpts) == 0 && !slices.ContainsFunc(in.Maps[:], func(m *Map) bool { return m != nil && !m.Ranges }) {
+	if len(in.Excerpts) == 0 && !slices.ContainsFunc(in.Maps[:], func(m *Map) bool { return m != nil && (!m.Ranges || m.Note != "") }) {
 		return nil
 	}
 	in.capLines()
@@ -325,6 +329,46 @@ func (s *snapshot) note(c caseKey, section string) string {
 		}
 	case top == archive.In && kind == archive.Transform && !s.owned[c.corpus][name]:
 		return fmt.Sprintf("No registry owns the transform %s, so no update writes its variant's own inputs, and these may not be the lines the cell read.", name)
+	}
+	return ""
+}
+
+// kept says why a cell's committed inputs file may not be the map its run
+// gives, where its column's declarations tell, or is "": a file of the
+// cell, its product's among them, is of a declaration that states no
+// source of ranges, or that takes its ranges from Positions where the
+// project doesn't supply Positions. Such a declaration fails the run, and
+// the update leaves the cell's inputs file as it is. A file that more than
+// one declaration matches can't be judged, so no declaration decides it.
+func (s *snapshot) kept(k cellKey, c *cellAt) string {
+	col, ok := s.column(k.c.corpus, k.column)
+	if !ok {
+		return ""
+	}
+	files := slices.Sorted(maps.Keys(c.files))
+	for _, f := range slices.Sorted(maps.Keys(c.product)) {
+		files = append(files, archive.Via+"/"+k.column+"/"+f)
+	}
+	for _, f := range files {
+		var decls []registry.Output
+		for _, o := range col.outputs {
+			if ok, _ := path.Match(o.Pattern, f); ok {
+				decls = append(decls, o)
+			}
+		}
+		if len(decls) != 1 {
+			continue
+		}
+		var why string
+		switch {
+		case decls[0].Inputs == registry.InputsNone:
+			why = fmt.Sprintf("%s's declaration states no source of ranges", f)
+		case decls[0].Inputs == registry.InputsPositions && !col.positions:
+			why = fmt.Sprintf("%s takes its ranges from Positions, which the project doesn't supply", f)
+		default:
+			continue
+		}
+		return why + ", so no update writes the cell's inputs file, and its ranges may not be what the cell read."
 	}
 	return ""
 }

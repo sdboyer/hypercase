@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/sdboyer/hypercase/internal/diff"
+	"github.com/sdboyer/hypercase/internal/registry"
 )
 
 // WriteHTML writes the report as one static HTML page, which loads
@@ -157,6 +158,25 @@ func excerptText(l ExcerptLine) string {
 	return text
 }
 
+// statement says where an output declaration's ranges come from, as its
+// Inputs states, or is "" where its registry records no statement.
+func statement(o OutputDescribed) string {
+	switch o.Inputs {
+	case registry.InputsFunc:
+		return "Its ranges come from a function."
+	case registry.InputsPositions:
+		if o.Positions {
+			return "Its ranges come from Positions, which the project supplies."
+		}
+		return "Its ranges come from Positions, which the project doesn't supply."
+	case registry.InputsAll:
+		return "It depends on all inputs."
+	case registry.InputsNone:
+		return "It states no source of ranges."
+	}
+	return ""
+}
+
 // cutNote says what MaxFileLines leaves out of a file's input lines.
 func cutNote(c *Cut) string {
 	s := fmt.Sprintf("The page shows the first %d lines the file's ranges hold, and leaves out %d more, of %d section", MaxFileLines, c.Lines, c.Sections)
@@ -185,6 +205,7 @@ var page = template.Must(template.New("page").Funcs(template.FuncMap{
 	"excerptClass":  excerptClass,
 	"excerptText":   excerptText,
 	"cutNote":       cutNote,
+	"statement":     statement,
 }).Parse(pageTemplate))
 
 const pageTemplate = `<!doctype html>
@@ -244,6 +265,8 @@ const pageTemplate = `<!doctype html>
 <p class="map">At <span class="rev">{{.At}}</span>: all inputs.</p>
 {{- else if not .Ranges}}
 <p class="map">At <span class="rev">{{.At}}</span>: no ranges.</p>
+{{- end}}{{if .Note}}
+<p class="note">At <span class="rev">{{.At}}</span>: {{.Note}}</p>
 {{- end}}{{end}}{{end}}
 {{- range .Excerpts}}
 <div class="excerpt"><code>{{.Section}}</code> at {{range $i, $r := .At}}{{if $i}} and {{end}}<span class="rev">{{$r}}</span>{{end}}
@@ -318,7 +341,7 @@ const pageTemplate = `<!doctype html>
 <dl class="columns">
 {{- range .Columns}}{{$only := .OnlyAtA}}
 <dt>{{.Name}}{{if .OnlyAtA}} <span class="badge">only at {{$.A.Name}}</span>{{end}}</dt><dd>{{template "text" .Description}}
-{{- if .Outputs}}<ul class="outputs">{{range .Outputs}}<li><code>{{.Name}}</code>{{if and .OnlyAtA (not $only)}} <span class="badge">only at {{$.A.Name}}</span>{{end}}: {{template "text" .Description}}</li>{{end}}</ul>{{end}}
+{{- if .Outputs}}<ul class="outputs">{{range .Outputs}}<li><code>{{.Name}}</code>{{if and .OnlyAtA (not $only)}} <span class="badge">only at {{$.A.Name}}</span>{{end}}: {{template "text" .Description}}{{with statement .}} <span class="statement">{{.}}</span>{{end}}</li>{{end}}</ul>{{end}}
 {{- with .Classifier}}<p class="classifier">Its classifier, <code>{{.Name}}</code>{{if and .OnlyAtA (not $only)}} <span class="badge">only at {{$.A.Name}}</span>{{end}}: {{template "text" .Description}}</p>{{end -}}
 </dd>
 {{- end}}
@@ -452,5 +475,6 @@ dt { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font
 dd { margin: 0; color: var(--muted); }
 dd p, dd ul { margin: 2px 0 0; }
 ul.outputs { padding-left: 18px; }
+.statement { color: var(--muted); }
 .none, .note { color: var(--muted); }
 `
