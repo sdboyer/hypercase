@@ -398,3 +398,26 @@ A sketch, not a design. All untested.
   manifests, and measures who finds them. A mutant is a visible seeded
   defect, with its footprint as its manifest. Whether mutants could supply
   #54's defect classes, or whether being visible rules them out, is open.
+
+## 9. For later: "Mutants & Metamorphs"
+
+A blog post, once hypercase is established, with the title and the feel of
+a tabletop role-playing game, Dungeons & Dragons. These are notes, not a
+draft:
+- **The two perturbations as two kinds of creature.** Metamorphs change
+  shape: transforms, which change the input. Mutants change nature:
+  mutants, which change the code.
+- **The matrix as the dungeon's map.** Cases are rooms, columns are the
+  paths through them, and a cell is a square on the grid.
+- **A transform is a polymorph spell.** `Gives` and `Keeps` are what the
+  spell changes and what it leaves alone.
+- **A mutant's footprint is its area of effect.** The prediction is the
+  game master's notes, written before the session.
+- **Guards are guards.** A mutant gets past one, and the map shows where it
+  went.
+- **A known gap is a square marked on the map** with the quest that will
+  clear it.
+- **The post's arc** is section 2's run, told as an encounter.
+  - One guard is down.
+  - Every circular room is overrun, and no other room is.
+  - The map shows exactly that, and says why for each square.
